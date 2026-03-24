@@ -1,0 +1,84 @@
+{
+  "inicio": {
+    "pregunta": "¿Qué tipo de dispositivo vas a diagnosticar?",
+    "opciones": [
+      { "texto": "Apple (iPhone)", "siguientePaso": "iphone_fallas" },
+      { "texto": "Android", "siguientePaso": "android_fallas" }
+    ]
+  },
+  "iphone_fallas": {
+    "pregunta": "Selecciona la categoría de la falla para iPhone:",
+    "opciones": [
+      { "texto": "Falla de Carga", "siguientePaso": "ip_carga_1" },
+      { "texto": "Falla de Encendido", "siguientePaso": "ip_encendido_1" }
+    ]
+  },
+  "android_fallas": {
+    "pregunta": "Selecciona la categoría de la falla para Android:",
+    "opciones": [
+      { "texto": "Falla de Encendido", "siguientePaso": "and_encendido_1" },
+      { "texto": "Falla de Carga", "siguientePaso": "and_carga_1" }
+    ]
+  },
+
+  "ip_carga_1": {
+    "pregunta": "Revisa el puerto Lightning con el microscopio. ¿Está sucio o sulfatado?",
+    "opciones": [
+      { "texto": "Sí, está muy sucio", "siguientePaso": "ip_carga_limpiar" },
+      { "texto": "No, se ve limpio", "siguientePaso": "ip_carga_2" }
+    ]
+  },
+  "ip_carga_limpiar": {
+    "pregunta": "Diagnóstico: Limpieza de puerto con alcohol isopropílico. ¿El equipo ya carga?",
+    "opciones": [
+      { "texto": "Sí, ya carga", "siguientePaso": "exito" },
+      { "texto": "No, sigue sin cargar", "siguientePaso": "ip_carga_2" }
+    ]
+  },
+  "ip_carga_2": {
+    "pregunta": "Conecta el equipo a un detector USB (Doc Test). ¿Hay un consumo de amperaje normal (ej. 1A - 2A)?",
+    "opciones": [
+      { "texto": "No, el consumo es cero o muy bajo", "siguientePaso": "ip_carga_tristar" },
+      { "texto": "Sí, tiene buen consumo", "siguientePaso": "ip_carga_bateria" }
+    ]
+  },
+  "ip_carga_tristar": {
+    "pregunta": "Diagnóstico Final: Reemplazar IC de carga (Tristar/Hydra) en la placa base.",
+    "esFinal": true
+  },
+  "ip_carga_bateria": {
+    "pregunta": "Diagnóstico Final: Reemplazar batería, está agotada o defectuosa.",
+    "esFinal": true
+  },
+
+  "and_encendido_1": {
+    "pregunta": "Conecta el teléfono a la fuente de alimentación. Antes de presionar el botón de encendido, ¿hay consumo (corto)?",
+    "opciones": [
+      { "texto": "Sí, hay consumo (Corto inicial)", "siguientePaso": "and_corto_vbat" },
+      { "texto": "No, el consumo es 0.000", "siguientePaso": "and_encendido_2" }
+    ]
+  },
+  "and_corto_vbat": {
+    "pregunta": "Diagnóstico Final: Falla en la línea principal (VPH_PWR / VBAT). Buscar componente en corto usando cámara térmica o rocín.",
+    "esFinal": true
+  },
+  "and_encendido_2": {
+    "pregunta": "Presiona el botón de encendido. ¿Qué hace el amperaje?",
+    "opciones": [
+      { "texto": "Se queda fijo en un valor bajo (ej. 0.080A)", "siguientePaso": "and_falla_memoria" },
+      { "texto": "Sube y baja a cero (Ciclo de reinicio)", "siguientePaso": "and_falla_pmic" }
+    ]
+  },
+  "and_falla_memoria": {
+    "pregunta": "Diagnóstico Final: Posible falla de Memoria (eMMC/UFS) o procesador (CPU). Requiere Reballing.",
+    "esFinal": true
+  },
+  "and_falla_pmic": {
+    "pregunta": "Diagnóstico Final: Falla en el IC de Encendido (PMIC). Revisar voltajes de salida.",
+    "esFinal": true
+  },
+  "exito": {
+    "pregunta": "¡Excelente! Reparación completada con éxito.",
+    "esFinal": true
+  }
+}
