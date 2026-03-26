@@ -1,0 +1,22 @@
+
+
+
+que tu página se pueda "instalar" en la pantalla de inicio de tu celular con su propio ícono
+ (como si la hubieras bajado de la tienda de aplicaciones)?
+
+
+
+------------------------------------------------------------------------------------------
+
+
+Cuando quieras agregar o cambiar una pregunta, el proceso será así de fácil:
+
+Abres Visual Studio Code en tu computadora.
+
+Agregas la nueva falla en tu archivo data/arbol.json y guardas con Control + S.
+
+Vas al ícono del arbolito en la izquierda (Source Control).
+
+Escribes un mensaje (ej. "Agregué falla de batería"), le das al botón azul de Commit y luego a Sync Changes (Sincronizar cambios).
+
+¡Y listo! Vercel detectará automáticamente que guardaste algo nuevo en tu caja fuerte y actualizará tu página web en internet en menos de 1 minuto sin que tú muevas un solo dedo.
