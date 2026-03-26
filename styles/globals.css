@@ -78,7 +78,17 @@ html, body {
 }
 
 .logo-img {
-  height: 40px;
+  height: 80px;
   width: auto;
   filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+}
+
+footer {
+  margin-top: auto;
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  font-weight: 500;
+  width: 100%;
 }

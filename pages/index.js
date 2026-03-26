@@ -16,7 +16,8 @@ import {
   Sun,
   Moon,
   Monitor,
-  CheckCircle2
+  CheckCircle2,
+  Home
 } from 'lucide-react';
 
 // Mapeo de iconos para las categorías
@@ -87,9 +88,13 @@ export default function AppDiagnostico() {
 
   if (cargando || !pasoActual) {
     return (
-      <div className="flex items-center justify-center min-vh-100">
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-          <RefreshCcw className="animate-spin text-accent" size={48} />
+      <div className="flex items-center justify-center min-vh-100" style={{height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+        <motion.div 
+          animate={{ scale: [1, 1.1, 1], opacity: [0.5, 1, 0.5] }} 
+          transition={{ duration: 1.5, repeat: Infinity }}
+          className="text-accent"
+        >
+          <Smartphone size={100} strokeWidth={1} />
         </motion.div>
       </div>
     );
@@ -114,7 +119,7 @@ export default function AppDiagnostico() {
 
       {/* Toggle de Tema */}
       <button className="theme-toggle" onClick={toggleTema}>
-        {tema === 'light' ? <Moon size={20} /> : <Sun size={20} />}
+        {tema === 'light' ? <Moon size={22} /> : <Sun size={22} />}
       </button>
 
       <div className="content-wrapper">
@@ -142,14 +147,14 @@ export default function AppDiagnostico() {
                   animate={{ scale: 1 }}
                   className="success-icon"
                 >
-                  <CheckCircle2 size={64} color="#10b981" />
+                  <CheckCircle2 size={72} color="#10b981" />
                 </motion.div>
                 <h2 className="final-message">{pasoActual.pregunta}</h2>
                 <button 
                   className="btn-restart" 
                   onClick={() => { setHistorial([]); cargarPaso('inicio'); }}
                 >
-                  <RefreshCcw size={18} />
+                  <RefreshCcw size={20} />
                   Comenzar nuevo diagnóstico
                 </button>
               </div>
@@ -168,7 +173,7 @@ export default function AppDiagnostico() {
                         onClick={() => cargarPaso(opcion.siguientePaso)}
                       >
                         <div className="option-content">
-                          <Icono size={22} className="option-icon" />
+                          <Icono size={28} className="option-icon" />
                           <span>{opcion.texto}</span>
                         </div>
                       </motion.button>
@@ -180,18 +185,36 @@ export default function AppDiagnostico() {
           </motion.div>
         </AnimatePresence>
 
-        {historial.length > 0 && !pasoActual.esFinal && (
-          <motion.button 
-            initial={{ opacity: 0 }} 
-            animate={{ opacity: 1 }}
-            className="btn-back"
-            onClick={irAtras}
-          >
-            <ChevronLeft size={18} />
-            Volver al paso anterior
-          </motion.button>
-        )}
+        <div className="nav-buttons">
+          {historial.length > 0 && !pasoActual.esFinal && (
+            <motion.button 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }}
+              className="btn-back"
+              onClick={irAtras}
+            >
+              <ChevronLeft size={22} />
+              Volver al paso anterior
+            </motion.button>
+          )}
+
+          {pasoActual.id !== 'inicio' && (
+            <motion.button 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }}
+              className="btn-home"
+              onClick={() => { setHistorial([]); cargarPaso('inicio'); }}
+            >
+              <Home size={22} />
+              Inicio
+            </motion.button>
+          )}
+        </div>
       </div>
+
+      <footer>
+        Marshall Cell Diagnostics todos los derechos resevados 2026
+      </footer>
 
       <style jsx>{`
         .main-container {
@@ -199,51 +222,55 @@ export default function AppDiagnostico() {
           display: flex;
           flex-direction: column;
           align-items: center;
-          padding: 100px 20px 40px;
+          padding: 140px 20px 40px;
         }
         .content-wrapper {
           width: 100%;
-          max-width: 600px;
+          max-width: 680px;
           display: flex;
           flex-direction: column;
           align-items: center;
         }
         .app-title {
-          font-size: 2.2rem;
+          font-size: 2.4rem;
           font-weight: 800;
-          margin-bottom: 40px;
+          margin-bottom: 60px;
           text-align: center;
-          letter-spacing: -1px;
+          letter-spacing: -1.5px;
         }
         .card {
           background: var(--bg-card);
-          padding: 40px;
-          border-radius: 28px;
+          padding: 60px 50px;
+          border-radius: 36px;
           box-shadow: var(--shadow);
           border: 1px solid var(--border-color);
           width: 100%;
         }
         .question-text {
-          font-size: 1.5rem;
-          margin-bottom: 30px;
+          font-size: 1.8rem;
+          margin-bottom: 40px;
           font-weight: 700;
           line-height: 1.3;
+          text-align: center;
         }
         .options-grid {
           display: flex;
           flex-direction: column;
-          gap: 12px;
+          gap: 20px;
+          align-items: center;
         }
         .option-button {
           background: var(--bg-card);
           border: 1px solid var(--border-color);
           color: var(--text-primary);
-          padding: 18px 24px;
-          border-radius: 16px;
+          padding: 28px 36px;
+          border-radius: 24px;
           cursor: pointer;
           text-align: left;
-          font-size: 1.05rem;
+          font-size: 1.2rem;
           font-weight: 600;
+          width: 100%;
+          max-width: 500px;
         }
         .option-button:hover {
           border-color: var(--accent);
@@ -252,7 +279,7 @@ export default function AppDiagnostico() {
         .option-content {
           display: flex;
           align-items: center;
-          gap: 15px;
+          gap: 20px;
         }
         .option-icon {
           color: var(--accent);
@@ -264,44 +291,51 @@ export default function AppDiagnostico() {
           text-align: center;
         }
         .success-icon {
-          margin-bottom: 20px;
+          margin-bottom: 30px;
         }
         .final-message {
-          font-size: 1.6rem;
-          margin-bottom: 30px;
+          font-size: 2rem;
+          margin-bottom: 50px;
+          font-weight: 700;
         }
         .btn-restart {
           background: var(--accent);
           color: white;
           border: none;
-          padding: 16px 32px;
-          border-radius: 16px;
+          padding: 20px 40px;
+          border-radius: 20px;
           font-weight: 700;
           cursor: pointer;
           display: flex;
           align-items: center;
-          gap: 10px;
+          gap: 12px;
+          font-size: 1.15rem;
         }
-        .btn-back {
-          margin-top: 30px;
-          background: transparent;
-          border: none;
+        .nav-buttons {
+          margin-top: 80px;
+          display: flex;
+          gap: 40px;
+          width: 100%;
+          justify-content: center;
+          flex-wrap: wrap;
+        }
+        .btn-back, .btn-home {
+          background: var(--bg-card);
+          border: 1px solid var(--border-color);
           color: var(--text-secondary);
+          padding: 14px 28px;
+          border-radius: 16px;
           cursor: pointer;
           display: flex;
           align-items: center;
-          gap: 5px;
+          gap: 10px;
           font-weight: 600;
+          font-size: 1rem;
+          box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
         }
-        .btn-back:hover {
+        .btn-back:hover, .btn-home:hover {
           color: var(--text-primary);
-        }
-        .animate-spin {
-          animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
+          border-color: var(--text-secondary);
         }
       `}</style>
     </div>
