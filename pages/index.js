@@ -11,7 +11,7 @@ import {
   Signal, 
   Camera, 
   Fingerprint, 
-  ChevronLeft, 
+  ArrowLeft, 
   RefreshCcw,
   Sun,
   Moon,
@@ -193,7 +193,7 @@ export default function AppDiagnostico() {
               className="btn-back"
               onClick={irAtras}
             >
-              <ChevronLeft size={22} />
+              <ArrowLeft size={22} />
               Volver al paso anterior
             </motion.button>
           )}
@@ -257,7 +257,7 @@ export default function AppDiagnostico() {
           display: flex;
           flex-direction: column;
           gap: 20px;
-          align-items: center;
+          align-items: stretch;
         }
         .option-button {
           background: var(--bg-card);
