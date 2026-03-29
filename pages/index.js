@@ -47,9 +47,10 @@ export default function AppDiagnostico() {
     return texto.replace(/[\u{1F300}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F1E6}-\u{1F1FF}\u{2300}-\u{23FF}\u{2B50}]/gu, '').trim();
   };
 
-  // 3. Diccionario de iconos actualizado
-  const obtenerIconoDinamico = (texto) => {
+ const obtenerIconoDinamico = (texto) => {
     const txt = texto.toLowerCase();
+    
+    // 1. Categorías Principales
     if (txt.includes('apple') || txt.includes('iphone')) return <Smartphone size={24} color="#0058bc" />;
     if (txt.includes('android')) return <Smartphone size={24} color="#0058bc" />;
     if (txt.includes('carga')) return <Zap size={24} color="#0058bc" />;
@@ -62,7 +63,23 @@ export default function AppDiagnostico() {
     if (txt.includes('huella')) return <Fingerprint size={24} color="#0058bc" />;
     if (txt.includes('señal') || txt.includes('red')) return <Signal size={24} color="#0058bc" />;
     if (txt.includes('software')) return <Wrench size={24} color="#0058bc" />;
-    return <AlertTriangle size={24} color="#0058bc" />;
+
+    // 2. Niveles de Dificultad (Página 3)
+    if (txt.includes('básico')) return <CheckCircle2 size={24} color="#22c55e" />; // Verde
+    if (txt.includes('medio')) return <Settings size={24} color="#eab308" />; // Amarillo
+    if (txt.includes('avanzado')) return <Cpu size={24} color="#ef4444" />; // Rojo
+
+    // 3. Respuestas de Diagnóstico (Sí / No / Error)
+    if (txt.startsWith('sí') || txt.includes('si,') || txt.includes('resolvemos') || txt.includes('encendió')) return <CheckCircle2 size={24} color="#22c55e" />;
+    if (txt.startsWith('no') || txt.includes('error') || txt.includes('sigue igual') || txt.includes('falla')) return <XCircle size={24} color="#ef4444" />;
+
+    // 4. Herramientas y Estados técnicos
+    if (txt.includes('pc') || txt.includes('itunes') || txt.includes('dfu') || txt.includes('ordenador')) return <Monitor size={24} color="#8b5cf6" />; // Morado
+    if (txt.includes('limpia') || txt.includes('sucio')) return <Sparkles size={24} color="#3b82f6" />; // Azul claro
+    if (txt.includes('corto') || txt.includes('0.00a') || txt.includes('amperaje') || txt.includes('fijo')) return <Activity size={24} color="#f97316" />; // Naranja
+
+    // 5. Icono por defecto (Si no reconoce la palabra, pone un check gris neutro en lugar de la alerta gigante)
+    return <ChevronRight size={24} color="#9ca3af" />;
   };
 
   if (!pasoActual) return null;
