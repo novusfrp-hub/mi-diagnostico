@@ -1,18 +1,24 @@
-// Importamos nuestro archivo secreto con todas las fallas
-import arbolDeDiagnostico from '../../data/arbol.json';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../../firebase'; // Conecta con tus llaves
 
-export default function handler(req, res) {
-  // Leemos qué paso nos está pidiendo React. Si no pide nada, le damos el 'inicio'
-  const pasoSolicitado = req.query.paso || 'inicio'; 
-  
-  // Buscamos ese paso específico en nuestro JSON
-  const datosDelPaso = arbolDeDiagnostico[pasoSolicitado];
+export default async function handler(req, res) {
+  // Leemos qué paso está pidiendo la app (por defecto 'inicio')
+  const idPaso = req.query.paso || 'inicio';
 
-  if (datosDelPaso) {
-    // Si lo encontramos, se lo enviamos al usuario con un código 200 (Éxito)
-    res.status(200).json({ id: pasoSolicitado, ...datosDelPaso });
-  } else {
-    // Si hay un error o no existe la falla, enviamos un error 404
-    res.status(404).json({ error: "Paso no encontrado en el diagnóstico" });
+  try {
+    // Vamos a la colección "pasos" en Firebase y buscamos el documento exacto
+    const docRef = doc(db, "pasos", idPaso);
+    const docSnap = await getDoc(docRef);
+
+    if (docSnap.exists()) {
+      // Si lo encuentra, se lo enviamos a la app
+      res.status(200).json({ id: idPaso, ...docSnap.data() });
+    } else {
+      // Si no existe (ej. un link roto)
+      res.status(404).json({ error: "Paso no encontrado", pregunta: "Error: Paso no existe", esFinal: true });
+    }
+  } catch (error) {
+    console.error("Error conectando a Firebase:", error);
+    res.status(500).json({ error: "Error conectando a la base de datos" });
   }
 }
