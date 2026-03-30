@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { doc, setDoc } from 'firebase/firestore';
-import { db } from '../firebase'; // Conexión a tu base de datos
-import { Sun, Moon, ArrowLeft, RefreshCcw, Zap, Smartphone, Battery, Power, Wrench, AlertTriangle, ChevronRight, Home, LifeBuoy, ShieldCheck, Camera, Fingerprint, Volume2, Wifi, Signal, CheckCircle2, XCircle, Cpu, Settings, Activity, Monitor, Sparkles, Plus, Save, X, Trash2 } from 'lucide-react';
+// Agregamos nuevas funciones de Firebase (collection, getDocs, deleteDoc)
+import { doc, setDoc, collection, getDocs, deleteDoc } from 'firebase/firestore';
+import { db } from '../firebase';
+import { Sun, Moon, ArrowLeft, RefreshCcw, Zap, Smartphone, Battery, Power, Wrench, AlertTriangle, ChevronRight, Home, LifeBuoy, ShieldCheck, Camera, Fingerprint, Volume2, Wifi, Signal, CheckCircle2, XCircle, Cpu, Settings, Activity, Monitor, Sparkles, Plus, Save, X, Trash2, Edit, Search, List } from 'lucide-react';
 
 export default function AppDiagnostico() {
   const [pasoActual, setPasoActual] = useState(null);
@@ -10,8 +11,13 @@ export default function AppDiagnostico() {
   const [cargando, setCargando] = useState(true);
   const [tema, setTema] = useState('light');
 
-  // Estados para el Panel Administrador Secreto
+  // Estados para el Panel Administrador
   const [mostrarAdmin, setMostrarAdmin] = useState(false);
+  const [vistaAdmin, setVistaAdmin] = useState('lista'); // 'lista' o 'formulario'
+  const [listaPasos, setListaPasos] = useState([]);
+  const [busqueda, setBusqueda] = useState('');
+
+  // Estados del Formulario
   const [formId, setFormId] = useState('');
   const [formPregunta, setFormPregunta] = useState('');
   const [formEsFinal, setFormEsFinal] = useState(false);
@@ -66,60 +72,94 @@ export default function AppDiagnostico() {
     if (txt.includes('básico')) return <CheckCircle2 size={24} color="#22c55e" />;
     if (txt.includes('medio')) return <Settings size={24} color="#eab308" />;
     if (txt.includes('avanzado')) return <Cpu size={24} color="#ef4444" />;
-    if (txt.startsWith('sí') || txt.includes('si,') || txt.includes('resolvemos') || txt.includes('encendió')) return <CheckCircle2 size={24} color="#22c55e" />;
-    if (txt.startsWith('no') || txt.includes('error') || txt.includes('sigue igual') || txt.includes('falla')) return <XCircle size={24} color="#ef4444" />;
+    if (txt.startsWith('sí') || txt.includes('si,') || txt.includes('resolvemos')) return <CheckCircle2 size={24} color="#22c55e" />;
+    if (txt.startsWith('no') || txt.includes('error') || txt.includes('sigue igual')) return <XCircle size={24} color="#ef4444" />;
     if (txt.includes('pc') || txt.includes('itunes') || txt.includes('dfu')) return <Monitor size={24} color="#8b5cf6" />;
     if (txt.includes('limpia') || txt.includes('sucio')) return <Sparkles size={24} color="#3b82f6" />;
-    if (txt.includes('corto') || txt.includes('0.00a') || txt.includes('amperaje') || txt.includes('fijo')) return <Activity size={24} color="#f97316" />;
+    if (txt.includes('corto') || txt.includes('0.00a') || txt.includes('amperaje')) return <Activity size={24} color="#f97316" />;
     return <ChevronRight size={24} color="#9ca3af" />;
   };
 
-  // --- LÓGICA DEL PANEL ADMINISTRADOR ---
+  // --- LÓGICA DEL EXPLORADOR ADMINISTRADOR ---
+
+  // Descargar todos los pasos de Firebase
+  const cargarTodosLosPasos = async () => {
+    try {
+      const querySnapshot = await getDocs(collection(db, "pasos"));
+      const pasosArray = [];
+      querySnapshot.forEach((doc) => {
+        pasosArray.push({ id: doc.id, ...doc.data() });
+      });
+      setListaPasos(pasosArray);
+    } catch (error) {
+      console.error("Error al cargar lista:", error);
+    }
+  };
+
+  // Abrir el modal y cargar la lista
+  const abrirAdmin = () => {
+    setMostrarAdmin(true);
+    setVistaAdmin('lista');
+    cargarTodosLosPasos();
+  };
+
+  // Preparar formulario para crear uno nuevo
+  const prepararNuevoPaso = () => {
+    setFormId(''); setFormPregunta(''); setFormEsFinal(false); setFormOpciones([{ texto: '', siguientePaso: '' }]);
+    setMensajeAdmin('');
+    setVistaAdmin('formulario');
+  };
+
+  // Preparar formulario para editar uno existente
+  const editarPaso = (paso) => {
+    setFormId(paso.id);
+    setFormPregunta(paso.pregunta || '');
+    setFormEsFinal(!!paso.esFinal);
+    setFormOpciones(paso.opciones && paso.opciones.length > 0 ? paso.opciones : [{ texto: '', siguientePaso: '' }]);
+    setMensajeAdmin('');
+    setVistaAdmin('formulario');
+  };
+
+  // Eliminar un paso de Firebase
+  const eliminarPaso = async (id) => {
+    const confirmar = window.confirm(`¿Estás súper seguro de eliminar el paso "${id}"? Esta acción no se puede deshacer.`);
+    if (confirmar) {
+      try {
+        await deleteDoc(doc(db, "pasos", id));
+        cargarTodosLosPasos(); // Recargar la lista
+      } catch (error) {
+        alert("Error al eliminar: " + error.message);
+      }
+    }
+  };
+
+  // Lógica del Formulario
   const handleAgregarOpcion = () => setFormOpciones([...formOpciones, { texto: '', siguientePaso: '' }]);
-
-  const handleQuitarOpcion = (index) => {
-    const nuevas = [...formOpciones];
-    nuevas.splice(index, 1);
-    setFormOpciones(nuevas);
-  };
-
-  const handleCambioOpcion = (index, campo, valor) => {
-    const nuevas = [...formOpciones];
-    nuevas[index][campo] = valor;
-    setFormOpciones(nuevas);
-  };
+  const handleQuitarOpcion = (index) => { const nuevas = [...formOpciones]; nuevas.splice(index, 1); setFormOpciones(nuevas); };
+  const handleCambioOpcion = (index, campo, valor) => { const nuevas = [...formOpciones]; nuevas[index][campo] = valor; setFormOpciones(nuevas); };
 
   const guardarPasoFirebase = async () => {
-    if (!formId || !formPregunta) {
-      setMensajeAdmin('⚠️ El ID y la pregunta son obligatorios.');
-      return;
-    }
+    if (!formId || !formPregunta) { setMensajeAdmin('⚠️ El ID y la pregunta son obligatorios.'); return; }
     setMensajeAdmin('Guardando en la nube...');
     try {
-      const datosAGuardar = {
-        pregunta: formPregunta,
-        esFinal: formEsFinal,
-      };
-      // Si no es un paso final, guardamos las opciones
-      if (!formEsFinal) {
-        datosAGuardar.opciones = formOpciones;
-      }
+      const datosAGuardar = { pregunta: formPregunta, esFinal: formEsFinal };
+      if (!formEsFinal) datosAGuardar.opciones = formOpciones;
 
       await setDoc(doc(db, "pasos", formId), datosAGuardar);
-      setMensajeAdmin('✅ ¡Guardado con éxito en Firebase!');
+      setMensajeAdmin('✅ ¡Guardado con éxito!');
 
-      // Limpiar formulario después de 2 segundos
       setTimeout(() => {
-        setFormId(''); setFormPregunta(''); setFormEsFinal(false); setFormOpciones([{ texto: '', siguientePaso: '' }]);
-        setMensajeAdmin('');
-        setMostrarAdmin(false); // Cerramos el modal
-        cargarPaso(pasoActual.id); // Recargamos la pantalla actual por si editamos algo que estamos viendo
-      }, 2000);
-
+        cargarTodosLosPasos();
+        setVistaAdmin('lista');
+        if (pasoActual.id === formId) cargarPaso(formId); // Actualizar pantalla si editamos el actual
+      }, 1500);
     } catch (error) {
       setMensajeAdmin('❌ Error: ' + error.message);
     }
   };
+
+  // Filtrar lista por búsqueda
+  const pasosFiltrados = listaPasos.filter(p => p.id.toLowerCase().includes(busqueda.toLowerCase()) || (p.pregunta && p.pregunta.toLowerCase().includes(busqueda.toLowerCase())));
 
   if (!pasoActual) return null;
   const t = estilos[tema];
@@ -170,14 +210,6 @@ export default function AppDiagnostico() {
             )}
           </motion.div>
         </AnimatePresence>
-
-        <div style={estilos.compromisoSec}>
-          <div style={estilos.avatarPlaceholder}><Wrench size={24} color="#0058bc" /></div>
-          <div>
-            <h4 style={{ ...estilos.compromisoTitulo, color: '#0058bc' }}>COMPROMISO MARSHALL</h4>
-            <p style={{ ...estilos.compromisoTexto, ...t.textoSutil }}>Utilizamos componentes OEM y diagnósticos certificados por software.</p>
-          </div>
-        </div>
       </main>
 
       <nav style={{ ...estilos.navInferior, ...t.cristalBgNav, ...t.bordeFantasmaTop }}>
@@ -192,69 +224,113 @@ export default function AppDiagnostico() {
           <Home size={24} color="white" />
         </button>
         <div style={{ width: '80px', display: 'flex', justifyContent: 'center' }}>
-          {/* EL BOTÓN SECRETO DE ADMINISTRADOR */}
-          <button style={{ ...estilos.navBtn, ...t.textoSutil }} onClick={() => setMostrarAdmin(true)}>
+          <button style={{ ...estilos.navBtn, ...t.textoSutil }} onClick={abrirAdmin}>
             <Settings size={24} /> <span style={estilos.navLabel}>ADMIN</span>
           </button>
         </div>
       </nav>
 
-      {/* MODAL DEL PANEL ADMINISTRADOR */}
+      {/* MODAL DEL PANEL ADMINISTRADOR MEJORADO */}
       <AnimatePresence>
         {mostrarAdmin && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={estilos.modalOverlay}>
             <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} style={{ ...estilos.modalCard, ...t.fondoPrincipal, ...t.bordeFantasma }}>
 
               <div style={estilos.modalHeader}>
-                <h3 style={{ ...estilos.modalTitulo, ...t.textoPrincipal }}>⚙️ Panel de Administrador</h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  {vistaAdmin === 'formulario' && (
+                    <button onClick={() => setVistaAdmin('lista')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0058bc', display: 'flex', alignItems: 'center' }} title="Volver a la lista">
+                      <ArrowLeft size={20} />
+                    </button>
+                  )}
+                  <h3 style={{ ...estilos.modalTitulo, ...t.textoPrincipal }}>
+                    {vistaAdmin === 'lista' ? '📂 Explorador de Diagnósticos' : '⚙️ Editar Paso'}
+                  </h3>
+                </div>
                 <button onClick={() => setMostrarAdmin(false)} style={{ ...estilos.btnCerrar, ...t.textoSutil }}><X size={24} /></button>
               </div>
 
-              <div style={estilos.modalBody}>
-                <label style={{ ...estilos.labelForm, ...t.textoPrincipal }}>ID del Paso (ej. ip_pantalla_rota)</label>
-                <input style={{ ...estilos.inputForm, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} type="text" value={formId} onChange={(e) => setFormId(e.target.value.replace(/\s+/g, '_').toLowerCase())} placeholder="Sin espacios, usa guiones bajos" />
-
-                <label style={{ ...estilos.labelForm, ...t.textoPrincipal }}>Pregunta o Diagnóstico a mostrar</label>
-                <textarea style={{ ...estilos.inputForm, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma, minHeight: '80px' }} value={formPregunta} onChange={(e) => setFormPregunta(e.target.value)} placeholder="¿Qué revisamos ahora?" />
-
-                <div style={estilos.checkboxGroup}>
-                  <input type="checkbox" id="esFinal" checked={formEsFinal} onChange={(e) => setFormEsFinal(e.target.checked)} />
-                  <label htmlFor="esFinal" style={{ ...t.textoPrincipal, fontWeight: '600' }}>¿Es un diagnóstico final? (Termina el proceso)</label>
-                </div>
-
-                {!formEsFinal && (
-                  <div style={estilos.opcionesContainer}>
-                    <h4 style={{ ...t.textoPrincipal, marginBottom: '10px' }}>Opciones de Respuesta:</h4>
-                    {formOpciones.map((op, index) => (
-                      <div key={index} style={estilos.opcionRow}>
-                        <div style={{ flex: 1 }}>
-                          <input style={{ ...estilos.inputFormPequeño, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} type="text" placeholder="Texto del botón (ej. Sí, funciona)" value={op.texto} onChange={(e) => handleCambioOpcion(index, 'texto', e.target.value)} />
-                          <input style={{ ...estilos.inputFormPequeño, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma, marginTop: '8px' }} type="text" placeholder="ID del Siguiente Paso (ej. ip_siguiente)" value={op.siguientePaso} onChange={(e) => handleCambioOpcion(index, 'siguientePaso', e.target.value.replace(/\s+/g, '_').toLowerCase())} />
-                        </div>
-                        <button onClick={() => handleQuitarOpcion(index)} style={estilos.btnBorrarOp}><Trash2 size={20} color="#ef4444" /></button>
-                      </div>
-                    ))}
-                    <button onClick={handleAgregarOpcion} style={estilos.btnAgregarOp}><Plus size={18} /> Agregar otra opción</button>
+              {/* VISTA 1: EXPLORADOR (LISTA) */}
+              {vistaAdmin === 'lista' && (
+                <div style={estilos.modalBody}>
+                  <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
+                    <div style={{ position: 'relative', flex: 1 }}>
+                      <Search size={18} style={{ position: 'absolute', left: '10px', top: '12px', color: '#9ca3af' }} />
+                      <input style={{ ...estilos.inputForm, paddingLeft: '35px', ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} type="text" placeholder="Buscar por ID o pregunta..." value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
+                    </div>
+                    <button onClick={prepararNuevoPaso} style={estilos.btnPrimarioGuardar} title="Crear nuevo paso"><Plus size={20} /></button>
                   </div>
-                )}
 
-                {mensajeAdmin && <p style={{ color: mensajeAdmin.includes('❌') ? '#ef4444' : '#22c55e', fontWeight: 'bold', textAlign: 'center', marginTop: '15px' }}>{mensajeAdmin}</p>}
-              </div>
+                  <div style={estilos.listaContainer}>
+                    {pasosFiltrados.length === 0 ? (
+                      <p style={{ textAlign: 'center', color: '#9ca3af', padding: '20px' }}>No se encontraron pasos.</p>
+                    ) : (
+                      pasosFiltrados.map((paso) => (
+                        <div key={paso.id} style={{ ...estilos.listaItem, ...t.bordeFantasma, ...t.cristalBgItem }}>
+                          <div style={{ flex: 1, overflow: 'hidden' }}>
+                            <h4 style={{ margin: '0 0 4px 0', fontSize: '0.9rem', color: '#0058bc', fontWeight: 'bold' }}>{paso.id}</h4>
+                            <p style={{ margin: 0, fontSize: '0.8rem', ...t.textoPrincipal, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{paso.pregunta}</p>
+                          </div>
+                          <div style={{ display: 'flex', gap: '5px' }}>
+                            <button onClick={() => editarPaso(paso)} style={estilos.btnAccionLista}><Edit size={18} color="#eab308" /></button>
+                            <button onClick={() => eliminarPaso(paso.id)} style={estilos.btnAccionLista}><Trash2 size={18} color="#ef4444" /></button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
 
-              <div style={estilos.modalFooter}>
-                <button onClick={guardarPasoFirebase} style={estilos.btnPrimarioGuardar}><Save size={18} style={{ marginRight: '8px' }} /> Guardar en Firebase</button>
-              </div>
+              {/* VISTA 2: FORMULARIO */}
+              {vistaAdmin === 'formulario' && (
+                <>
+                  <div style={estilos.modalBody}>
+                    <label style={{ ...estilos.labelForm, ...t.textoPrincipal }}>ID del Paso</label>
+                    <input style={{ ...estilos.inputForm, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} type="text" value={formId} onChange={(e) => setFormId(e.target.value.replace(/\s+/g, '_').toLowerCase())} placeholder="ej. ip_pantalla_rota" readOnly={formId === 'inicio'} />
+
+                    <label style={{ ...estilos.labelForm, ...t.textoPrincipal }}>Pregunta o Diagnóstico a mostrar</label>
+                    <textarea style={{ ...estilos.inputForm, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma, minHeight: '80px' }} value={formPregunta} onChange={(e) => setFormPregunta(e.target.value)} placeholder="¿Qué revisamos ahora?" />
+
+                    <div style={estilos.checkboxGroup}>
+                      <input type="checkbox" id="esFinal" checked={formEsFinal} onChange={(e) => setFormEsFinal(e.target.checked)} />
+                      <label htmlFor="esFinal" style={{ ...t.textoPrincipal, fontWeight: '600' }}>¿Es un diagnóstico final?</label>
+                    </div>
+
+                    {!formEsFinal && (
+                      <div style={estilos.opcionesContainer}>
+                        <h4 style={{ ...t.textoPrincipal, marginBottom: '10px' }}>Opciones de Respuesta:</h4>
+                        {formOpciones.map((op, index) => (
+                          <div key={index} style={estilos.opcionRow}>
+                            <div style={{ flex: 1 }}>
+                              <input style={{ ...estilos.inputFormPequeño, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} type="text" placeholder="Texto (ej. Sí, funciona)" value={op.texto} onChange={(e) => handleCambioOpcion(index, 'texto', e.target.value)} />
+                              <input style={{ ...estilos.inputFormPequeño, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma, marginTop: '8px' }} type="text" placeholder="ID Siguiente (ej. ip_siguiente)" value={op.siguientePaso} onChange={(e) => handleCambioOpcion(index, 'siguientePaso', e.target.value.replace(/\s+/g, '_').toLowerCase())} />
+                            </div>
+                            <button onClick={() => handleQuitarOpcion(index)} style={estilos.btnBorrarOp}><Trash2 size={20} color="#ef4444" /></button>
+                          </div>
+                        ))}
+                        <button onClick={handleAgregarOpcion} style={estilos.btnAgregarOp}><Plus size={18} /> Agregar otra opción</button>
+                      </div>
+                    )}
+
+                    {mensajeAdmin && <p style={{ color: mensajeAdmin.includes('❌') ? '#ef4444' : '#22c55e', fontWeight: 'bold', textAlign: 'center', marginTop: '15px' }}>{mensajeAdmin}</p>}
+                  </div>
+
+                  <div style={estilos.modalFooter}>
+                    <button onClick={guardarPasoFirebase} style={estilos.btnPrimarioGuardar}><Save size={18} style={{ marginRight: '8px' }} /> Guardar Paso</button>
+                  </div>
+                </>
+              )}
 
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
-
     </div>
   );
 }
 
-// Estilos existentes y nuevos para el modal
+// Estilos
 const estilos = {
   contenedor: { minHeight: '100vh', fontFamily: '"Inter", system-ui, -apple-system, sans-serif', paddingBottom: '100px', display: 'flex', flexDirection: 'column', transition: 'background-color 0.3s' },
   header: { paddingTop: '16px', paddingBottom: '16px', position: 'relative' },
@@ -278,22 +354,21 @@ const estilos = {
   iconoFinalBg: { width: '80px', height: '80px', borderRadius: '50%', backgroundColor: 'rgba(0, 88, 188, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '24px' },
   textoFinal: { fontSize: '1.5rem', fontWeight: '700', marginBottom: '32px' },
   btnPrimario: { background: 'linear-gradient(135deg, #0058bc 0%, #0070eb 100%)', color: 'white', border: 'none', padding: '16px 32px', borderRadius: '1.5rem', fontSize: '1rem', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', boxShadow: '0 10px 20px rgba(0, 88, 188, 0.2)' },
-  compromisoSec: { display: 'flex', alignItems: 'center', gap: '20px', marginTop: '60px', maxWidth: '700px', padding: '0 20px' },
-  avatarPlaceholder: { width: '60px', height: '60px', borderRadius: '50%', backgroundColor: 'rgba(0, 88, 188, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  compromisoTitulo: { fontSize: '0.75rem', fontWeight: '800', letterSpacing: '0.1em', margin: '0 0 8px 0' },
-  compromisoTexto: { fontSize: '0.85rem', lineHeight: '1.6', margin: 0 },
   navInferior: { position: 'fixed', bottom: 0, left: 0, right: 0, height: '80px', display: 'flex', justifyContent: 'space-around', alignItems: 'center', padding: '0 20px', backdropFilter: 'blur(25px)', WebkitBackdropFilter: 'blur(25px)', zIndex: 1000 },
   navBtn: { background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', cursor: 'pointer', width: '80px' },
   navLabel: { fontSize: '0.65rem', fontWeight: '700', letterSpacing: '0.05em' },
   navBtnCentro: { width: '56px', height: '56px', borderRadius: '50%', background: 'linear-gradient(135deg, #0058bc 0%, #0070eb 100%)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 10px 25px rgba(0, 88, 188, 0.3)', transform: 'translateY(-15px)' },
 
-  // ESTILOS NUEVOS PARA EL MODAL ADMIN
+  // MODAL ADMIN MEJORADO
   modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(5px)', zIndex: 2000, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' },
   modalCard: { width: '100%', maxWidth: '600px', maxHeight: '90vh', borderRadius: '1.5rem', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' },
   modalHeader: { padding: '20px 30px', borderBottom: '1px solid rgba(150,150,150,0.2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
   modalTitulo: { margin: 0, fontSize: '1.2rem', fontWeight: 'bold' },
   btnCerrar: { background: 'none', border: 'none', cursor: 'pointer' },
-  modalBody: { padding: '30px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '15px' },
+  modalBody: { padding: '30px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '15px', flex: 1 },
+  listaContainer: { display: 'flex', flexDirection: 'column', gap: '10px', overflowY: 'auto', maxHeight: '400px', paddingRight: '5px' },
+  listaItem: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px', borderRadius: '12px' },
+  btnAccionLista: { background: 'none', border: 'none', cursor: 'pointer', padding: '8px', borderRadius: '8px', backgroundColor: 'rgba(0,0,0,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center' },
   labelForm: { fontSize: '0.9rem', fontWeight: '600', marginBottom: '-5px' },
   inputForm: { width: '100%', padding: '12px 15px', borderRadius: '10px', fontSize: '1rem', outline: 'none' },
   inputFormPequeño: { width: '100%', padding: '10px 15px', borderRadius: '8px', fontSize: '0.9rem', outline: 'none' },
@@ -306,27 +381,11 @@ const estilos = {
   btnPrimarioGuardar: { background: 'linear-gradient(135deg, #0058bc 0%, #0070eb 100%)', color: 'white', border: 'none', padding: '12px 24px', borderRadius: '10px', fontSize: '1rem', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center' },
 
   dark: {
-    fondoPrincipal: { backgroundColor: '#2f3034' },
-    cristalBg: { backgroundColor: 'rgba(47, 48, 52, 0.7)' },
-    cristalBgItem: { backgroundColor: 'rgba(255, 255, 255, 0.03)' },
-    cristalBgNav: { backgroundColor: 'rgba(47, 48, 52, 0.85)' },
-    textoPrincipal: { color: '#ffffff' },
-    textoSutil: { color: '#9ca3af' },
-    bordeFantasma: { border: '1px solid rgba(255, 255, 255, 0.08)' },
-    bordeFantasmaBottom: { borderBottom: '1px solid rgba(255, 255, 255, 0.08)' },
-    bordeFantasmaTop: { borderTop: '1px solid rgba(255, 255, 255, 0.08)' },
-    hoverBg: 'rgba(255, 255, 255, 0.06)'
+    fondoPrincipal: { backgroundColor: '#2f3034' }, cristalBg: { backgroundColor: 'rgba(47, 48, 52, 0.7)' }, cristalBgItem: { backgroundColor: 'rgba(255, 255, 255, 0.03)' }, cristalBgNav: { backgroundColor: 'rgba(47, 48, 52, 0.85)' },
+    textoPrincipal: { color: '#ffffff' }, textoSutil: { color: '#9ca3af' }, bordeFantasma: { border: '1px solid rgba(255, 255, 255, 0.08)' }, bordeFantasmaBottom: { borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }, bordeFantasmaTop: { borderTop: '1px solid rgba(255, 255, 255, 0.08)' }, hoverBg: 'rgba(255, 255, 255, 0.06)'
   },
   light: {
-    fondoPrincipal: { backgroundColor: '#faf9fe' },
-    cristalBg: { backgroundColor: 'rgba(255, 255, 255, 0.8)' },
-    cristalBgItem: { backgroundColor: 'rgba(255, 255, 255, 1)' },
-    cristalBgNav: { backgroundColor: 'rgba(250, 249, 254, 0.85)' },
-    textoPrincipal: { color: '#111827' },
-    textoSutil: { color: '#6b7280' },
-    bordeFantasma: { border: '1px solid rgba(0, 0, 0, 0.05)' },
-    bordeFantasmaBottom: { borderBottom: '1px solid rgba(0, 0, 0, 0.05)' },
-    bordeFantasmaTop: { borderTop: '1px solid rgba(0, 0, 0, 0.05)' },
-    hoverBg: 'rgba(0, 88, 188, 0.02)'
+    fondoPrincipal: { backgroundColor: '#faf9fe' }, cristalBg: { backgroundColor: 'rgba(255, 255, 255, 0.8)' }, cristalBgItem: { backgroundColor: 'rgba(255, 255, 255, 1)' }, cristalBgNav: { backgroundColor: 'rgba(250, 249, 254, 0.85)' },
+    textoPrincipal: { color: '#111827' }, textoSutil: { color: '#6b7280' }, bordeFantasma: { border: '1px solid rgba(0, 0, 0, 0.05)' }, bordeFantasmaBottom: { borderBottom: '1px solid rgba(0, 0, 0, 0.05)' }, bordeFantasmaTop: { borderTop: '1px solid rgba(0, 0, 0, 0.05)' }, hoverBg: 'rgba(0, 88, 188, 0.02)'
   }
 };
