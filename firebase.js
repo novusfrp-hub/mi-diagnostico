@@ -1,7 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
+import { getAuth } from "firebase/auth"; // <-- NUEVO: Importamos Autenticación
 
-// Las "llaves" de tu proyecto Marshall Diagnostics
 const firebaseConfig = {
     apiKey: "AIzaSyAcfACaG0ZkRhNdXmCNLqE-PqqL2KrG9q0",
     authDomain: "marshall-diagnostics.firebaseapp.com",
@@ -11,8 +11,9 @@ const firebaseConfig = {
     appId: "1:909545236768:web:4d9c08d7c7312be079cf45"
 };
 
-// Inicializamos Firebase y la Base de Datos
+// Inicializamos Firebase, la Base de Datos y la Autenticación
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app); // <-- NUEVO: Inicializamos Autenticación
 
-export { db };
+export { db, auth }; // <-- NUEVO: Exportamos auth para usarlo en el panel

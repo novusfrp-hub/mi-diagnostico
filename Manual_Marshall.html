@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manual de Flujos - Marshall Diagnostics</title>
+    <style>
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: #faf9fe;
+            color: #111827;
+            line-height: 1.6;
+            margin: 0;
+            padding: 40px 20px;
+            display: flex;
+            justify-content: center;
+        }
+        .container {
+            max-width: 800px;
+            background: white;
+            padding: 50px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 88, 188, 0.08);
+        }
+        h1 { color: #0058bc; font-size: 2.5rem; margin-bottom: 5px; letter-spacing: -1px; }
+        h2 { color: #111827; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px; margin-top: 40px; }
+        h3 { color: #0058bc; margin-top: 25px; }
+        p { font-size: 1.05rem; color: #4b5563; }
+        .alert {
+            background-color: #fffbeb;
+            border-left: 4px solid #f59e0b;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 0 8px 8px 0;
+        }
+        .success {
+            background-color: #f0fdf4;
+            border-left: 4px solid #22c55e;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 0 8px 8px 0;
+        }
+        .card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+        .code {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Manual del Arquitecto ⚙️</h1>
+    <p>Guía definitiva para crear y conectar flujos en Marshall Cell Diagnostics.</p>
+
+    <h2>1. La Regla de Oro: Preguntas vs. Destinos</h2>
+    <p>En esta aplicación existen solo <strong>DOS</strong> tipos de pantallas. Si entiendes la diferencia, dominarás el sistema completo:</p>
+    
+    <div class="card">
+        <h3>A. El "Puente" (La Pregunta) 🌉</h3>
+        <p>Es una pantalla donde el técnico debe tomar una decisión. <strong>Tiene botones.</strong></p>
+        <ul>
+            <li><strong>Ejemplo:</strong> "¿El puerto está sulfatado?"</li>
+            <li><strong>Configuración:</strong> La casilla <em>"¿Es diagnóstico final?"</em> debe estar <strong>DESMARCADA</strong>.</li>
+            <li><strong>Obligatorio:</strong> Debes agregar Opciones de Respuesta (botones) para que el técnico pueda salir de esta pantalla.</li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <h3>B. El "Destino" (El Diagnóstico Final) 🛡️</h3>
+        <p>Es el final del camino. Aquí le dices al técnico cuál es la solución. <strong>NO tiene botones de opciones.</strong></p>
+        <ul>
+            <li><strong>Ejemplo:</strong> "Es necesario reemplazar el zócalo de carga."</li>
+            <li><strong>Configuración:</strong> La casilla <em>"¿Es diagnóstico final?"</em> debe estar <strong>MARCADA ✅</strong>.</li>
+            <li><strong>Resultado:</strong> Aparecerá el escudo verde y el botón gigante de "Iniciar Nueva Evaluación".</li>
+        </ul>
+    </div>
+
+    <h2>2. Cómo enlazar dos pantallas (El "ID Siguiente")</h2>
+    <p>Piensa en el <strong>ID del Paso</strong> como si fuera la dirección de una casa (ej. <span class="code">and_carga_1</span>). Para ir a esa casa, el botón de la pantalla anterior debe tener esa dirección exacta.</p>
+
+    <div class="alert">
+        <strong>El flujo correcto se construye así:</strong><br><br>
+        <strong>Pantalla Origen:</strong> "¿El cable funciona?" <br>
+        ➡️ <strong>Botón "Sí":</strong> Apunta al ID Siguiente: <span class="code">solucion_cambiar_bateria</span><br>
+        ➡️ <strong>Botón "No":</strong> Apunta al ID Siguiente: <span class="code">solucion_cambiar_cable</span>
+    </div>
+
+    <h2>3. Cómo "Subir de Nivel" (Básico ➡️ Medio)</h2>
+    <p>Para saltar de una revisión básica a una media, <strong>no uses un diagnóstico final</strong>. Usa un "Puente" que conecte los dos mundos.</p>
+    
+    <div class="success">
+        <strong>Paso a Paso para subir de nivel:</strong>
+        <ol>
+            <li>Ve a la última pregunta de tu nivel básico (ej. <em>"No hay humedad visible."</em>).</li>
+            <li>Asegúrate de que <strong>NO</strong> esté marcada la casilla de diagnóstico final.</li>
+            <li>Crea una Opción de Respuesta (botón) que diga: <em>"Pasar a revisión de placa (Nivel Medio)"</em>.</li>
+            <li>En "ID Siguiente", escribe el ID del primer paso de tu nivel medio (ej. <span class="code">and_medio_inicio</span>).</li>
+        </ol>
+        ¡Listo! El técnico hará clic ahí y la app lo teletransportará a la nueva rama.
+    </div>
+
+    <h2>4. Errores Comunes y Soluciones 🚑</h2>
+    <ul>
+        <li><strong>Falla:</strong> <em>"Escribí una instrucción larga pero me aparece como un botón gigante que se puede presionar."</em><br>
+        <strong>Solución:</strong> Escribiste la instrucción en el espacio de "Opciones de respuesta" en vez de crear una pantalla nueva. Crea un paso nuevo, marca "Es diagnóstico final", y pon esa instrucción en el título.</li><br>
+        
+        <li><strong>Falla:</strong> <em>"Llegué a una pantalla pero no hay botones, no puedo avanzar, y no me sale el escudo de final."</em><br>
+        <strong>Solución:</strong> Dejaste la pantalla sin botones y se te olvidó marcar la casilla de "Diagnóstico final". ¡La dejaste atrapada en el limbo! Edítala y agrégale botones o ponle el check de final.</li><br>
+
+        <li><strong>Falla:</strong> <em>"Hago clic en un botón y me dice 'Paso no encontrado'."</em><br>
+        <strong>Solución:</strong> El texto que pusiste en "ID Siguiente" no coincide con la realidad. Si escribiste <span class="code">falla_placa</span> pero tu paso se llama <span class="code">falla_placas</span>, el puente está roto. Revisa la ortografía exacta (sin espacios ni mayúsculas).</li>
+    </ul>
+
+</div>
+
+</body>
+</html>

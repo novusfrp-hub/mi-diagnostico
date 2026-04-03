@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { doc, setDoc, collection, getDocs, deleteDoc } from 'firebase/firestore';
-import { db } from '../firebase';
-// Agregados iconos para el árbol (ChevronDown, CornerDownRight, Network)
-import { Sun, Moon, ArrowLeft, RefreshCcw, Zap, Smartphone, Battery, Power, Wrench, AlertTriangle, ChevronRight, Home, LifeBuoy, ShieldCheck, Camera, Fingerprint, Volume2, Wifi, Signal, CheckCircle2, XCircle, Cpu, Settings, Activity, Monitor, Sparkles, Plus, Save, X, Trash2, Edit, Search, ChevronDown, CornerDownRight, Network } from 'lucide-react';
+import { signInWithEmailAndPassword, signOut } from 'firebase/auth'; // Nuevas funciones de Auth
+import { db, auth } from '../firebase'; // Importamos 'auth'
+import { Sun, Moon, ArrowLeft, RefreshCcw, Zap, Smartphone, Battery, Power, Wrench, AlertTriangle, ChevronRight, Home, LifeBuoy, ShieldCheck, Camera, Fingerprint, Volume2, Wifi, Signal, CheckCircle2, XCircle, Cpu, Settings, Activity, Monitor, Sparkles, Plus, Save, X, Trash2, Edit, Search, ChevronDown, CornerDownRight, Network, Lock, LogOut } from 'lucide-react'; // Agregamos Lock y LogOut
 
 export default function AppDiagnostico() {
   const [pasoActual, setPasoActual] = useState(null);
@@ -11,14 +11,18 @@ export default function AppDiagnostico() {
   const [cargando, setCargando] = useState(true);
   const [tema, setTema] = useState('light');
 
-  // Estados para el Panel Administrador
+  // Estados para el Panel Administrador y Autenticación
   const [mostrarAdmin, setMostrarAdmin] = useState(false);
-  const [vistaAdmin, setVistaAdmin] = useState('lista');
+  const [vistaAdmin, setVistaAdmin] = useState('login'); // Inicia en login
+  const [estaAutenticado, setEstaAutenticado] = useState(false); // Candado principal
+  const [emailAdmin, setEmailAdmin] = useState('');
+  const [passAdmin, setPassAdmin] = useState('');
+  const [errorLogin, setErrorLogin] = useState('');
+
   const [listaPasos, setListaPasos] = useState([]);
   const [busqueda, setBusqueda] = useState('');
-  const [pasosExpandidos, setPasosExpandidos] = useState({}); // Controla qué ramas del árbol están abiertas
+  const [pasosExpandidos, setPasosExpandidos] = useState({});
 
-  // Estados del Formulario
   const [formId, setFormId] = useState('');
   const [formPregunta, setFormPregunta] = useState('');
   const [formEsFinal, setFormEsFinal] = useState(false);
@@ -60,19 +64,35 @@ export default function AppDiagnostico() {
     if (txt.includes('batería') || txt.includes('consumo')) return <Battery size={24} color="#0058bc" />;
     if (txt.includes('audio')) return <Volume2 size={24} color="#0058bc" />;
     if (txt.includes('wifi') || txt.includes('bluetooth')) return <Wifi size={24} color="#0058bc" />;
-    if (txt.includes('cámara')) return <Camera size={24} color="#0058bc" />;
-    if (txt.includes('huella')) return <Fingerprint size={24} color="#0058bc" />;
-    if (txt.includes('señal') || txt.includes('red')) return <Signal size={24} color="#0058bc" />;
-    if (txt.includes('software')) return <Wrench size={24} color="#0058bc" />;
     if (txt.includes('básico')) return <CheckCircle2 size={24} color="#22c55e" />;
     if (txt.includes('medio')) return <Settings size={24} color="#eab308" />;
     if (txt.includes('avanzado')) return <Cpu size={24} color="#ef4444" />;
-    if (txt.startsWith('sí') || txt.includes('si,') || txt.includes('resolvemos')) return <CheckCircle2 size={24} color="#22c55e" />;
-    if (txt.startsWith('no') || txt.includes('error') || txt.includes('sigue igual')) return <XCircle size={24} color="#ef4444" />;
-    if (txt.includes('pc') || txt.includes('itunes') || txt.includes('dfu')) return <Monitor size={24} color="#8b5cf6" />;
-    if (txt.includes('limpia') || txt.includes('sucio')) return <Sparkles size={24} color="#3b82f6" />;
-    if (txt.includes('corto') || txt.includes('0.00a') || txt.includes('amperaje')) return <Activity size={24} color="#f97316" />;
+    if (txt.startsWith('sí') || txt.includes('si,')) return <CheckCircle2 size={24} color="#22c55e" />;
+    if (txt.startsWith('no') || txt.includes('error')) return <XCircle size={24} color="#ef4444" />;
+    if (txt.includes('corto') || txt.includes('0.00a')) return <Activity size={24} color="#f97316" />;
     return <ChevronRight size={24} color="#9ca3af" />;
+  };
+
+  // --- LÓGICA DE AUTENTICACIÓN ---
+  const iniciarSesion = async (e) => {
+    e.preventDefault();
+    setErrorLogin('');
+    try {
+      await signInWithEmailAndPassword(auth, emailAdmin, passAdmin);
+      setEstaAutenticado(true);
+      setEmailAdmin('');
+      setPassAdmin('');
+      setVistaAdmin('lista');
+      cargarTodosLosPasos();
+    } catch (error) {
+      setErrorLogin('❌ Credenciales incorrectas.');
+    }
+  };
+
+  const cerrarSesion = async () => {
+    await signOut(auth);
+    setEstaAutenticado(false);
+    setMostrarAdmin(false);
   };
 
   // --- LÓGICA DEL EXPLORADOR ADMINISTRADOR ---
@@ -82,12 +102,19 @@ export default function AppDiagnostico() {
       const pasosArray = [];
       querySnapshot.forEach((doc) => pasosArray.push({ id: doc.id, ...doc.data() }));
       setListaPasos(pasosArray);
-      // Expandir 'inicio' por defecto
       setPasosExpandidos({ inicio: true });
     } catch (error) { console.error("Error al cargar lista:", error); }
   };
 
-  const abrirAdmin = () => { setMostrarAdmin(true); setVistaAdmin('lista'); cargarTodosLosPasos(); };
+  const abrirAdmin = () => {
+    setMostrarAdmin(true);
+    if (estaAutenticado) {
+      setVistaAdmin('lista');
+      cargarTodosLosPasos();
+    } else {
+      setVistaAdmin('login');
+    }
+  };
 
   const prepararNuevoPaso = () => {
     setFormId(''); setFormPregunta(''); setFormEsFinal(false); setFormOpciones([{ texto: '', siguientePaso: '' }]);
@@ -101,9 +128,8 @@ export default function AppDiagnostico() {
   };
 
   const eliminarPaso = async (id) => {
-    if (id === 'inicio') { alert("No puedes eliminar el paso de inicio. Es la raíz de tu app."); return; }
-    const confirmar = window.confirm(`¿Estás súper seguro de eliminar "${id}"?`);
-    if (confirmar) {
+    if (id === 'inicio') { alert("No puedes eliminar la raíz."); return; }
+    if (window.confirm(`¿Seguro de eliminar "${id}"?`)) {
       try { await deleteDoc(doc(db, "pasos", id)); cargarTodosLosPasos(); }
       catch (error) { alert("Error al eliminar: " + error.message); }
     }
@@ -114,13 +140,13 @@ export default function AppDiagnostico() {
   const handleCambioOpcion = (index, campo, valor) => { const nuevas = [...formOpciones]; nuevas[index][campo] = valor; setFormOpciones(nuevas); };
 
   const guardarPasoFirebase = async () => {
-    if (!formId || !formPregunta) { setMensajeAdmin('⚠️ El ID y la pregunta son obligatorios.'); return; }
-    setMensajeAdmin('Guardando en la nube...');
+    if (!formId || !formPregunta) { setMensajeAdmin('⚠️ ID y pregunta obligatorios.'); return; }
+    setMensajeAdmin('Guardando...');
     try {
       const datosAGuardar = { pregunta: formPregunta, esFinal: formEsFinal };
       if (!formEsFinal) datosAGuardar.opciones = formOpciones;
       await setDoc(doc(db, "pasos", formId), datosAGuardar);
-      setMensajeAdmin('✅ ¡Guardado con éxito!');
+      setMensajeAdmin('✅ ¡Guardado!');
       setTimeout(() => {
         cargarTodosLosPasos(); setVistaAdmin('lista');
         if (pasoActual.id === formId) cargarPaso(formId);
@@ -128,19 +154,13 @@ export default function AppDiagnostico() {
     } catch (error) { setMensajeAdmin('❌ Error: ' + error.message); }
   };
 
-  // --- LÓGICA DEL ÁRBOL ---
   const pasosMap = listaPasos.reduce((acc, paso) => { acc[paso.id] = paso; return acc; }, {});
   const pasosFiltrados = listaPasos.filter(p => p.id.toLowerCase().includes(busqueda.toLowerCase()) || (p.pregunta && p.pregunta.toLowerCase().includes(busqueda.toLowerCase())));
-
-  const toggleExpandir = (id) => {
-    setPasosExpandidos(prev => ({ ...prev, [id]: !prev[id] }));
-  };
+  const toggleExpandir = (id) => setPasosExpandidos(prev => ({ ...prev, [id]: !prev[id] }));
 
   const renderArbol = (idPaso, nivel = 0, visitados = new Set()) => {
     const paso = pasosMap[idPaso];
     const t = estilos[tema];
-
-    // Si el paso no existe o hay un bucle infinito, cortamos la rama
     if (!paso || visitados.has(idPaso)) return null;
 
     const tieneHijos = !paso.esFinal && paso.opciones && paso.opciones.length > 0;
@@ -149,17 +169,9 @@ export default function AppDiagnostico() {
 
     return (
       <div key={`${idPaso}-${nivel}`} style={{ marginLeft: nivel > 0 ? '20px' : '0', borderLeft: nivel > 0 ? `2px solid ${tema === 'light' ? '#e5e7eb' : '#374151'}` : 'none', paddingLeft: nivel > 0 ? '15px' : '0', marginTop: '10px' }}>
-
-        {/* La Tarjeta del Paso */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', borderRadius: '10px', backgroundColor: t.cristalBgItem.backgroundColor, border: t.bordeFantasma.border, transition: 'all 0.2s' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', borderRadius: '10px', backgroundColor: t.cristalBgItem.backgroundColor, border: t.bordeFantasma.border }}>
           <div onClick={() => tieneHijos && toggleExpandir(idPaso)} style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: tieneHijos ? 'pointer' : 'default', flex: 1 }}>
-            {tieneHijos ? (
-              expandido ? <ChevronDown size={18} color="#0058bc" /> : <ChevronRight size={18} color="#0058bc" />
-            ) : (
-              <div style={{ width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <ShieldCheck size={14} color="#22c55e" /> {/* Icono de final */}
-              </div>
-            )}
+            {tieneHijos ? (expandido ? <ChevronDown size={18} color="#0058bc" /> : <ChevronRight size={18} color="#0058bc" />) : (<ShieldCheck size={14} color="#22c55e" />)}
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <span style={{ fontWeight: 'bold', color: '#0058bc', fontSize: '0.9rem' }}>{paso.id}</span>
               <span style={{ fontSize: '0.8rem', color: t.textoPrincipal.color, opacity: 0.8 }}>{paso.pregunta}</span>
@@ -170,15 +182,13 @@ export default function AppDiagnostico() {
             <button onClick={() => eliminarPaso(paso.id)} style={estilos.btnAccionLista}><Trash2 size={16} color="#ef4444" /></button>
           </div>
         </div>
-
-        {/* Los Hijos (Opciones) si está expandido */}
         <AnimatePresence>
           {expandido && tieneHijos && (
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} style={{ overflow: 'hidden' }}>
               {paso.opciones.map((op, idx) => (
                 <div key={idx} style={{ marginTop: '5px' }}>
                   <div style={{ fontSize: '0.75rem', color: t.textoSutil.color, marginLeft: '35px', marginTop: '8px', marginBottom: '-5px', display: 'flex', alignItems: 'center', gap: '5px', fontWeight: '600' }}>
-                    <CornerDownRight size={14} /> Respuesta: "{op.texto}" ➡️
+                    <CornerDownRight size={14} /> "{op.texto}" ➡️
                   </div>
                   {renderArbol(op.siguientePaso, nivel + 1, nuevosVisitados)}
                 </div>
@@ -198,9 +208,7 @@ export default function AppDiagnostico() {
       <header style={{ ...estilos.header, ...t.bordeFantasmaBottom }}>
         <div style={estilos.headerInner}>
           <h1 style={{ ...estilos.logoTexto, ...t.textoPrincipal }}>MARSHALL CELL DIAGNOSTICS</h1>
-          <button onClick={toggleTema} style={{ ...estilos.btnTema, ...t.textoSutil }}>
-            {tema === 'light' ? <Moon size={20} /> : <Sun size={20} />}
-          </button>
+          <button onClick={toggleTema} style={{ ...estilos.btnTema, ...t.textoSutil }}>{tema === 'light' ? <Moon size={20} /> : <Sun size={20} />}</button>
         </div>
         <div style={estilos.lineaAcento}></div>
       </header>
@@ -212,14 +220,11 @@ export default function AppDiagnostico() {
               <span style={{ ...estilos.etiquetaPaso, color: '#0058bc' }}>PASO {String(historial.length + 1).padStart(2, '0')}</span>
               <h2 style={{ ...estilos.tituloPregunta, ...t.textoPrincipal }}>{pasoActual.pregunta}</h2>
             </div>
-
             {pasoActual.esFinal ? (
               <div style={estilos.estadoFinal}>
                 <div style={estilos.iconoFinalBg}><ShieldCheck size={48} color="#0058bc" /></div>
                 <h3 style={{ ...estilos.textoFinal, ...t.textoPrincipal }}>Diagnóstico Completado</h3>
-                <button style={estilos.btnPrimario} onClick={() => { setHistorial([]); cargarPaso('inicio'); }}>
-                  <RefreshCcw size={18} style={{ marginRight: '8px' }} /> Iniciar Nueva Evaluación
-                </button>
+                <button style={estilos.btnPrimario} onClick={() => { setHistorial([]); cargarPaso('inicio'); }}><RefreshCcw size={18} style={{ marginRight: '8px' }} /> Iniciar Nueva Evaluación</button>
               </div>
             ) : (
               <div style={estilos.gridOpciones}>
@@ -251,7 +256,7 @@ export default function AppDiagnostico() {
         </div>
       </nav>
 
-      {/* MODAL DEL PANEL ADMINISTRADOR (AHORA CON ÁRBOL COLAPSABLE) */}
+      {/* MODAL DEL PANEL ADMINISTRADOR */}
       <AnimatePresence>
         {mostrarAdmin && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={estilos.modalOverlay}>
@@ -260,15 +265,46 @@ export default function AppDiagnostico() {
               <div style={estilos.modalHeader}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   {vistaAdmin === 'formulario' && (
-                    <button onClick={() => setVistaAdmin('lista')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0058bc', display: 'flex', alignItems: 'center' }} title="Volver a la lista"><ArrowLeft size={20} /></button>
+                    <button onClick={() => setVistaAdmin('lista')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0058bc', display: 'flex', alignItems: 'center' }} title="Volver"><ArrowLeft size={20} /></button>
                   )}
                   <h3 style={{ ...estilos.modalTitulo, ...t.textoPrincipal }}>
-                    {vistaAdmin === 'lista' ? <><Network size={20} style={{ marginRight: '8px', transform: 'translateY(4px)' }} /> Explorador de Flujos</> : '⚙️ Editar Paso'}
+                    {vistaAdmin === 'login' ? 'Autenticación Requerida' : vistaAdmin === 'lista' ? <><Network size={20} style={{ marginRight: '8px', transform: 'translateY(4px)' }} /> Explorador de Flujos</> : '⚙️ Editar Paso'}
                   </h3>
                 </div>
-                <button onClick={() => setMostrarAdmin(false)} style={{ ...estilos.btnCerrar, ...t.textoSutil }}><X size={24} /></button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                  {estaAutenticado && vistaAdmin !== 'login' && (
+                    <button onClick={cerrarSesion} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', display: 'flex', alignItems: 'center' }} title="Cerrar Sesión"><LogOut size={20} /></button>
+                  )}
+                  <button onClick={() => setMostrarAdmin(false)} style={{ ...estilos.btnCerrar, ...t.textoSutil }}><X size={24} /></button>
+                </div>
               </div>
 
+              {/* VISTA 0: LOGIN */}
+              {vistaAdmin === 'login' && (
+                <div style={estilos.modalBody}>
+                  <div style={{ textAlign: 'center', marginBottom: '20px', padding: '20px 0' }}>
+                    <div style={{ display: 'inline-flex', padding: '20px', backgroundColor: 'rgba(0, 88, 188, 0.08)', borderRadius: '50%', marginBottom: '20px' }}>
+                      <Lock size={40} color="#0058bc" />
+                    </div>
+                    <h4 style={{ ...t.textoPrincipal, margin: '0 0 10px 0', fontSize: '1.2rem' }}>Acceso Restringido</h4>
+                    <p style={{ ...t.textoSutil, margin: 0, fontSize: '0.9rem' }}>Ingresa tus credenciales maestras para modificar los diagnósticos.</p>
+                  </div>
+                  <form onSubmit={iniciarSesion} style={{ display: 'flex', flexDirection: 'column', gap: '15px', maxWidth: '400px', margin: '0 auto', width: '100%' }}>
+                    <div>
+                      <label style={{ ...estilos.labelForm, ...t.textoPrincipal }}>Correo Electrónico</label>
+                      <input required type="email" style={{ ...estilos.inputForm, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} value={emailAdmin} onChange={(e) => setEmailAdmin(e.target.value)} placeholder="admin@taller.com" />
+                    </div>
+                    <div>
+                      <label style={{ ...estilos.labelForm, ...t.textoPrincipal }}>Contraseña</label>
+                      <input required type="password" style={{ ...estilos.inputForm, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} value={passAdmin} onChange={(e) => setPassAdmin(e.target.value)} placeholder="••••••••" />
+                    </div>
+                    {errorLogin && <p style={{ color: '#ef4444', fontSize: '0.85rem', textAlign: 'center', margin: 0, fontWeight: 'bold' }}>{errorLogin}</p>}
+                    <button type="submit" style={{ ...estilos.btnPrimarioGuardar, justifyContent: 'center', width: '100%', marginTop: '10px' }}>Ingresar al Panel</button>
+                  </form>
+                </div>
+              )}
+
+              {/* VISTA 1: EXPLORADOR (LISTA/ÁRBOL) */}
               {vistaAdmin === 'lista' && (
                 <div style={estilos.modalBody}>
                   <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
@@ -281,10 +317,7 @@ export default function AppDiagnostico() {
 
                   <div style={estilos.listaContainer}>
                     {busqueda !== '' ? (
-                      /* SI ESTÁ BUSCANDO ALGO, MOSTRAMOS LA LISTA PLANA RÁPIDA */
-                      pasosFiltrados.length === 0 ? (
-                        <p style={{ textAlign: 'center', color: '#9ca3af', padding: '20px' }}>No se encontraron pasos.</p>
-                      ) : (
+                      pasosFiltrados.length === 0 ? <p style={{ textAlign: 'center', color: '#9ca3af', padding: '20px' }}>No se encontraron pasos.</p> : (
                         pasosFiltrados.map((paso) => (
                           <div key={paso.id} style={{ ...estilos.listaItem, ...t.bordeFantasma, ...t.cristalBgItem }}>
                             <div style={{ flex: 1, overflow: 'hidden' }}>
@@ -299,13 +332,8 @@ export default function AppDiagnostico() {
                         ))
                       )
                     ) : (
-                      /* SI NO ESTÁ BUSCANDO, MOSTRAMOS EL ÁRBOL COLAPSABLE */
                       <div style={{ paddingRight: '10px' }}>
                         {listaPasos.length > 0 ? renderArbol('inicio') : <p style={{ textAlign: 'center', color: '#9ca3af' }}>Cargando árbol...</p>}
-
-                        <div style={{ marginTop: '30px', paddingTop: '15px', borderTop: `1px dashed ${t.bordeFantasma.borderColor}`, color: t.textoSutil.color, fontSize: '0.8rem', textAlign: 'center' }}>
-                          <p>💡 Tip: Si creas un paso y olvidas conectarlo al árbol, búscalo escribiendo en la barra superior.</p>
-                        </div>
                       </div>
                     )}
                   </div>
@@ -357,7 +385,6 @@ export default function AppDiagnostico() {
   );
 }
 
-// Estilos (Se mantienen iguales, solo actualizamos padding para acomodar el scroll del árbol)
 const estilos = {
   contenedor: { minHeight: '100vh', fontFamily: '"Inter", system-ui, -apple-system, sans-serif', paddingBottom: '100px', display: 'flex', flexDirection: 'column', transition: 'background-color 0.3s' },
   header: { paddingTop: '16px', paddingBottom: '16px', position: 'relative' }, headerInner: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', maxWidth: '1200px', margin: '0 auto', padding: '0 24px' }, logoTexto: { fontSize: '0.875rem', fontWeight: '800', letterSpacing: '0.05em', margin: 0 }, btnTema: { background: 'none', border: 'none', cursor: 'pointer', padding: '8px' }, lineaAcento: { height: '3px', width: '30%', background: 'linear-gradient(135deg, #0058bc 0%, #0070eb 100%)', position: 'absolute', bottom: 0, left: 0 },
@@ -365,18 +392,7 @@ const estilos = {
   gridOpciones: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px', width: '100%' }, btnOpcion: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px', borderRadius: '1.5rem', cursor: 'pointer', textAlign: 'left', transition: 'all 0.3s ease' }, opcionContenido: { display: 'flex', alignItems: 'center', gap: '16px' }, iconoCirculo: { width: '48px', height: '48px', borderRadius: '50%', backgroundColor: 'rgba(0, 88, 188, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }, textosOpcion: { display: 'flex', flexDirection: 'column', gap: '4px' }, tituloOpcion: { fontSize: '1.05rem', fontWeight: '700' }, descOpcion: { fontSize: '0.8rem' },
   estadoFinal: { display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 0', textAlign: 'center' }, iconoFinalBg: { width: '80px', height: '80px', borderRadius: '50%', backgroundColor: 'rgba(0, 88, 188, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '24px' }, textoFinal: { fontSize: '1.5rem', fontWeight: '700', marginBottom: '32px' }, btnPrimario: { background: 'linear-gradient(135deg, #0058bc 0%, #0070eb 100%)', color: 'white', border: 'none', padding: '16px 32px', borderRadius: '1.5rem', fontSize: '1rem', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', boxShadow: '0 10px 20px rgba(0, 88, 188, 0.2)' },
   navInferior: { position: 'fixed', bottom: 0, left: 0, right: 0, height: '80px', display: 'flex', justifyContent: 'space-around', alignItems: 'center', padding: '0 20px', backdropFilter: 'blur(25px)', WebkitBackdropFilter: 'blur(25px)', zIndex: 1000 }, navBtn: { background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', cursor: 'pointer', width: '80px' }, navLabel: { fontSize: '0.65rem', fontWeight: '700', letterSpacing: '0.05em' }, navBtnCentro: { width: '56px', height: '56px', borderRadius: '50%', background: 'linear-gradient(135deg, #0058bc 0%, #0070eb 100%)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 10px 25px rgba(0, 88, 188, 0.3)', transform: 'translateY(-15px)' },
-
-  // MODAL ADMIN
-  modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(5px)', zIndex: 2000, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' },
-  modalCard: { width: '100%', maxWidth: '700px', maxHeight: '90vh', borderRadius: '1.5rem', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' },
-  modalHeader: { padding: '20px 30px', borderBottom: '1px solid rgba(150,150,150,0.2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }, modalTitulo: { margin: 0, fontSize: '1.2rem', fontWeight: 'bold' }, btnCerrar: { background: 'none', border: 'none', cursor: 'pointer' },
-  modalBody: { padding: '20px 30px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '15px', flex: 1 },
-  listaContainer: { display: 'flex', flexDirection: 'column', gap: '10px', overflowY: 'auto', maxHeight: '500px', paddingRight: '5px' },
-  listaItem: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 15px', borderRadius: '10px' },
-  btnAccionLista: { background: 'none', border: 'none', cursor: 'pointer', padding: '6px', borderRadius: '8px', backgroundColor: 'rgba(0,0,0,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  labelForm: { fontSize: '0.9rem', fontWeight: '600', marginBottom: '-5px' }, inputForm: { width: '100%', padding: '12px 15px', borderRadius: '10px', fontSize: '1rem', outline: 'none' }, inputFormPequeño: { width: '100%', padding: '10px 15px', borderRadius: '8px', fontSize: '0.9rem', outline: 'none' }, checkboxGroup: { display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 0' }, opcionesContainer: { backgroundColor: 'rgba(0,0,0,0.03)', padding: '20px', borderRadius: '12px', marginTop: '10px' }, opcionRow: { display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '15px' }, btnBorrarOp: { background: 'none', border: 'none', cursor: 'pointer', padding: '5px' }, btnAgregarOp: { background: 'none', border: 'none', color: '#0058bc', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer', padding: '10px 0' },
-  modalFooter: { padding: '20px 30px', borderTop: '1px solid rgba(150,150,150,0.2)', display: 'flex', justifyContent: 'flex-end' }, btnPrimarioGuardar: { background: 'linear-gradient(135deg, #0058bc 0%, #0070eb 100%)', color: 'white', border: 'none', padding: '12px 24px', borderRadius: '10px', fontSize: '1rem', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center' },
-
+  modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(5px)', zIndex: 2000, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }, modalCard: { width: '100%', maxWidth: '700px', maxHeight: '90vh', borderRadius: '1.5rem', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' }, modalHeader: { padding: '20px 30px', borderBottom: '1px solid rgba(150,150,150,0.2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }, modalTitulo: { margin: 0, fontSize: '1.2rem', fontWeight: 'bold' }, btnCerrar: { background: 'none', border: 'none', cursor: 'pointer' }, modalBody: { padding: '20px 30px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '15px', flex: 1 }, listaContainer: { display: 'flex', flexDirection: 'column', gap: '10px', overflowY: 'auto', maxHeight: '500px', paddingRight: '5px' }, listaItem: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 15px', borderRadius: '10px' }, btnAccionLista: { background: 'none', border: 'none', cursor: 'pointer', padding: '6px', borderRadius: '8px', backgroundColor: 'rgba(0,0,0,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center' }, labelForm: { fontSize: '0.9rem', fontWeight: '600', marginBottom: '-5px' }, inputForm: { width: '100%', padding: '12px 15px', borderRadius: '10px', fontSize: '1rem', outline: 'none' }, inputFormPequeño: { width: '100%', padding: '10px 15px', borderRadius: '8px', fontSize: '0.9rem', outline: 'none' }, checkboxGroup: { display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 0' }, opcionesContainer: { backgroundColor: 'rgba(0,0,0,0.03)', padding: '20px', borderRadius: '12px', marginTop: '10px' }, opcionRow: { display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '15px' }, btnBorrarOp: { background: 'none', border: 'none', cursor: 'pointer', padding: '5px' }, btnAgregarOp: { background: 'none', border: 'none', color: '#0058bc', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer', padding: '10px 0' }, modalFooter: { padding: '20px 30px', borderTop: '1px solid rgba(150,150,150,0.2)', display: 'flex', justifyContent: 'flex-end' }, btnPrimarioGuardar: { background: 'linear-gradient(135deg, #0058bc 0%, #0070eb 100%)', color: 'white', border: 'none', padding: '12px 24px', borderRadius: '10px', fontSize: '1rem', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center' },
   dark: { fondoPrincipal: { backgroundColor: '#2f3034' }, cristalBg: { backgroundColor: 'rgba(47, 48, 52, 0.7)' }, cristalBgItem: { backgroundColor: 'rgba(255, 255, 255, 0.03)' }, cristalBgNav: { backgroundColor: 'rgba(47, 48, 52, 0.85)' }, textoPrincipal: { color: '#ffffff' }, textoSutil: { color: '#9ca3af' }, bordeFantasma: { border: '1px solid rgba(255, 255, 255, 0.08)' }, bordeFantasmaBottom: { borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }, bordeFantasmaTop: { borderTop: '1px solid rgba(255, 255, 255, 0.08)' }, hoverBg: 'rgba(255, 255, 255, 0.06)' },
   light: { fondoPrincipal: { backgroundColor: '#faf9fe' }, cristalBg: { backgroundColor: 'rgba(255, 255, 255, 0.8)' }, cristalBgItem: { backgroundColor: 'rgba(255, 255, 255, 1)' }, cristalBgNav: { backgroundColor: 'rgba(250, 249, 254, 0.85)' }, textoPrincipal: { color: '#111827' }, textoSutil: { color: '#6b7280' }, bordeFantasma: { border: '1px solid rgba(0, 0, 0, 0.05)' }, bordeFantasmaBottom: { borderBottom: '1px solid rgba(0, 0, 0, 0.05)' }, bordeFantasmaTop: { borderTop: '1px solid rgba(0, 0, 0, 0.05)' }, hoverBg: 'rgba(0, 88, 188, 0.02)' }
 };
