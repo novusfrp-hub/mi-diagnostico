@@ -5,6 +5,51 @@ import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { db, auth } from '../firebase'; 
 import { Sun, Moon, ArrowLeft, RefreshCcw, Zap, Smartphone, Battery, Power, Wrench, AlertTriangle, ChevronRight, Home, LifeBuoy, ShieldCheck, Camera, Fingerprint, Volume2, Wifi, Signal, CheckCircle2, XCircle, Cpu, Settings, Activity, Monitor, Sparkles, Plus, Save, X, Trash2, Edit, Search, ChevronDown, CornerDownRight, Network, Lock, LogOut, Lightbulb, BookOpen } from 'lucide-react'; 
 
+// --- NUEVO COMPONENTE: PANTALLA DIGITAL DE FUENTE ---
+const SimuladorFuente = ({ voltaje, amperaje }) => {
+  const [ampVisible, setAmpVisible] = useState('0.000');
+
+  useEffect(() => {
+    if (!amperaje) return;
+    const valores = amperaje.split(',').map(v => v.trim()); // Separa por comas
+    
+    if (valores.length === 1) {
+      setAmpVisible(valores[0]); // Si es solo uno, se queda fijo
+      return;
+    }
+
+    // Si hay varios valores, hace una secuencia animada
+    let index = 0;
+    setAmpVisible(valores[0]);
+    const intervalo = setInterval(() => {
+      index = (index + 1) % valores.length;
+      setAmpVisible(valores[index]);
+    }, 800); // Cambia cada 800 milisegundos
+
+    return () => clearInterval(intervalo);
+  }, [amperaje]);
+
+  return (
+    <div style={{ backgroundColor: '#111827', padding: '15px 25px', borderRadius: '15px', border: '2px solid #374151', display: 'flex', justifyContent: 'space-around', alignItems: 'center', marginBottom: '25px', boxShadow: 'inset 0 4px 10px rgba(0,0,0,0.5), 0 10px 15px -3px rgba(0,0,0,0.1)', fontFamily: '"Courier New", Courier, monospace', width: '100%', maxWidth: '400px', margin: '0 auto 25px auto' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <span style={{ color: '#6b7280', fontSize: '0.7rem', fontWeight: 'bold', letterSpacing: '2px', marginBottom: '5px' }}>VOLTAGE</span>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+          <span style={{ color: '#ef4444', fontSize: '2.5rem', fontWeight: 'bold', textShadow: '0 0 10px rgba(239,68,68,0.5)' }}>{voltaje || '0.0'}</span>
+          <span style={{ color: '#ef4444', fontSize: '1rem', fontWeight: 'bold' }}>V</span>
+        </div>
+      </div>
+      <div style={{ width: '2px', height: '50px', backgroundColor: '#374151' }}></div>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <span style={{ color: '#6b7280', fontSize: '0.7rem', fontWeight: 'bold', letterSpacing: '2px', marginBottom: '5px' }}>CURRENT</span>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+          <span style={{ color: '#10b981', fontSize: '2.5rem', fontWeight: 'bold', textShadow: '0 0 10px rgba(16,185,129,0.5)' }}>{ampVisible}</span>
+          <span style={{ color: '#10b981', fontSize: '1rem', fontWeight: 'bold' }}>A</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default function AppDiagnostico() {
   const [pasoActual, setPasoActual] = useState(null);
   const [historial, setHistorial] = useState([]);
@@ -31,9 +76,12 @@ export default function AppDiagnostico() {
   const [formNota, setFormNota] = useState(''); 
   const [formEsFinal, setFormEsFinal] = useState(false);
   const [formOpciones, setFormOpciones] = useState([{ texto: '', siguientePaso: '' }]);
-  
-  // NUEVO: Estado para gestionar la tabla desde el Admin
   const [formTabla, setFormTabla] = useState([]);
+  
+  // NUEVO: Estados para el formulario del simulador
+  const [formSimV, setFormSimV] = useState('');
+  const [formSimA, setFormSimA] = useState('');
+  
   const [mensajeAdmin, setMensajeAdmin] = useState('');
 
   const cargarPaso = async (idPaso, esRetroceso = false) => {
@@ -43,24 +91,12 @@ export default function AppDiagnostico() {
       const datos = await respuesta.json();
       if (!esRetroceso && pasoActual) setHistorial([...historial, pasoActual.id]);
       setPasoActual(datos);
-      
-      // Reiniciamos modales al cambiar de paso
-      setNotaVisible(false); 
-      setTipVisto(false); 
-      setMostrarTablaConsumos(false);
+      setNotaVisible(false); setTipVisto(false); setMostrarTablaConsumos(false);
     } catch (error) { alert("Hubo un error al cargar el diagnóstico"); }
     setCargando(false);
   };
 
-  const irAtras = () => {
-    if (historial.length === 0) return;
-    const pasoAnterior = historial[historial.length - 1];
-    const nuevoHistorial = [...historial];
-    nuevoHistorial.pop();
-    setHistorial(nuevoHistorial);
-    cargarPaso(pasoAnterior, true);
-  };
-
+  const irAtras = () => { if (historial.length === 0) return; const pasoAnterior = historial[historial.length - 1]; const nuevoHistorial = [...historial]; nuevoHistorial.pop(); setHistorial(nuevoHistorial); cargarPaso(pasoAnterior, true); };
   const toggleTema = () => setTema(tema === 'light' ? 'dark' : 'light');
   useEffect(() => { cargarPaso('inicio'); }, []);
 
@@ -85,48 +121,31 @@ export default function AppDiagnostico() {
     return <ChevronRight size={24} color="#9ca3af" />;
   };
 
-  const iniciarSesion = async (e) => {
-    e.preventDefault(); setErrorLogin('');
-    try { await signInWithEmailAndPassword(auth, emailAdmin, passAdmin); setEstaAutenticado(true); setEmailAdmin(''); setPassAdmin(''); setVistaAdmin('lista'); cargarTodosLosPasos(); } 
-    catch (error) { setErrorLogin('❌ Credenciales incorrectas.'); }
-  };
-
+  const iniciarSesion = async (e) => { e.preventDefault(); setErrorLogin(''); try { await signInWithEmailAndPassword(auth, emailAdmin, passAdmin); setEstaAutenticado(true); setEmailAdmin(''); setPassAdmin(''); setVistaAdmin('lista'); cargarTodosLosPasos(); } catch (error) { setErrorLogin('❌ Credenciales incorrectas.'); } };
   const cerrarSesion = async () => { await signOut(auth); setEstaAutenticado(false); setMostrarAdmin(false); };
 
-  const cargarTodosLosPasos = async () => {
-    try {
-      const querySnapshot = await getDocs(collection(db, "pasos"));
-      const pasosArray = [];
-      querySnapshot.forEach((doc) => pasosArray.push({ id: doc.id, ...doc.data() }));
-      setListaPasos(pasosArray); setPasosExpandidos({ inicio: true });
-    } catch (error) { console.error("Error al cargar lista:", error); }
-  };
-
+  const cargarTodosLosPasos = async () => { try { const querySnapshot = await getDocs(collection(db, "pasos")); const pasosArray = []; querySnapshot.forEach((doc) => pasosArray.push({ id: doc.id, ...doc.data() })); setListaPasos(pasosArray); setPasosExpandidos({ inicio: true }); } catch (error) { console.error("Error al cargar lista:", error); } };
   const abrirAdmin = () => { setMostrarAdmin(true); if (estaAutenticado) { setVistaAdmin('lista'); cargarTodosLosPasos(); } else { setVistaAdmin('login'); } };
 
   const prepararNuevoPaso = () => {
     setFormId(''); setFormPregunta(''); setFormNota(''); setFormEsFinal(false); setFormOpciones([{ texto: '', siguientePaso: '' }]);
-    setFormTabla([]); // Limpiamos la tabla
+    setFormTabla([]); setFormSimV(''); setFormSimA(''); // Limpia campos simulador
     setMensajeAdmin(''); setVistaAdmin('formulario');
   };
 
   const editarPaso = (paso) => {
     setFormId(paso.id); setFormPregunta(paso.pregunta || ''); setFormNota(paso.notaExperta || ''); setFormEsFinal(!!paso.esFinal);
     setFormOpciones(paso.opciones && paso.opciones.length > 0 ? paso.opciones : [{ texto: '', siguientePaso: '' }]);
-    setFormTabla(paso.tablaReferencia || []); // Cargamos la tabla si existe
+    setFormTabla(paso.tablaReferencia || []); 
+    setFormSimV(paso.simVoltaje || ''); setFormSimA(paso.simAmperaje || ''); // Carga valores simulador
     setMensajeAdmin(''); setVistaAdmin('formulario');
   };
 
-  const eliminarPaso = async (id) => {
-    if (id === 'inicio') { alert("No puedes eliminar la raíz."); return; }
-    if (window.confirm(`¿Seguro de eliminar "${id}"?`)) { try { await deleteDoc(doc(db, "pasos", id)); cargarTodosLosPasos(); } catch (error) { alert("Error al eliminar: " + error.message); } }
-  };
+  const eliminarPaso = async (id) => { if (id === 'inicio') { alert("No puedes eliminar la raíz."); return; } if (window.confirm(`¿Seguro de eliminar "${id}"?`)) { try { await deleteDoc(doc(db, "pasos", id)); cargarTodosLosPasos(); } catch (error) { alert("Error al eliminar: " + error.message); } } };
 
   const handleAgregarOpcion = () => setFormOpciones([...formOpciones, { texto: '', siguientePaso: '' }]);
   const handleQuitarOpcion = (index) => { const nuevas = [...formOpciones]; nuevas.splice(index, 1); setFormOpciones(nuevas); };
   const handleCambioOpcion = (index, campo, valor) => { const nuevas = [...formOpciones]; nuevas[index][campo] = valor; setFormOpciones(nuevas); };
-
-  // Funciones para manejar las filas de la Tabla Inteligente
   const handleAgregarFilaTabla = () => setFormTabla([...formTabla, { valor: '', descripcion: '' }]);
   const handleQuitarFilaTabla = (index) => { const nuevas = [...formTabla]; nuevas.splice(index, 1); setFormTabla(nuevas); };
   const handleCambioFilaTabla = (index, campo, valor) => { const nuevas = [...formTabla]; nuevas[index][campo] = valor; setFormTabla(nuevas); };
@@ -137,15 +156,12 @@ export default function AppDiagnostico() {
     try {
       const datosAGuardar = { pregunta: formPregunta, esFinal: formEsFinal };
       if (formNota.trim() !== '') datosAGuardar.notaExperta = formNota;
+      if (formSimV.trim() !== '') datosAGuardar.simVoltaje = formSimV;
+      if (formSimA.trim() !== '') datosAGuardar.simAmperaje = formSimA;
       if (!formEsFinal) datosAGuardar.opciones = formOpciones;
-      
-      // Filtramos filas vacías y guardamos la tabla si tiene datos
       const tablaValida = formTabla.filter(fila => fila.valor.trim() !== '' || fila.descripcion.trim() !== '');
-      if (tablaValida.length > 0) {
-        datosAGuardar.tablaReferencia = tablaValida;
-      } else {
-        datosAGuardar.tablaReferencia = []; // Si está vacía la borramos
-      }
+      if (tablaValida.length > 0) datosAGuardar.tablaReferencia = tablaValida;
+      else datosAGuardar.tablaReferencia = [];
 
       await setDoc(doc(db, "pasos", formId), datosAGuardar);
       setMensajeAdmin('✅ ¡Guardado!');
@@ -173,8 +189,9 @@ export default function AppDiagnostico() {
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <span style={{ fontWeight: 'bold', color: '#0058bc', fontSize: '0.9rem', display: 'flex', alignItems:'center', gap:'4px' }}>
                 {paso.id} 
-                {paso.notaExperta && <Lightbulb size={12} color="#eab308" title="Tiene nota del experto"/>}
-                {paso.tablaReferencia && paso.tablaReferencia.length > 0 && <BookOpen size={12} color="#10b981" title="Tiene tabla de referencia"/>}
+                {paso.notaExperta && <Lightbulb size={12} color="#eab308" />}
+                {paso.tablaReferencia && paso.tablaReferencia.length > 0 && <BookOpen size={12} color="#10b981" />}
+                {paso.simAmperaje && <Activity size={12} color="#ef4444" />}
               </span>
               <span style={{ fontSize: '0.8rem', color: t.textoPrincipal.color, opacity: 0.8 }}>{paso.pregunta}</span>
             </div>
@@ -219,6 +236,12 @@ export default function AppDiagnostico() {
               </span>
               <h2 style={{ ...estilos.tituloPregunta, ...t.textoPrincipal }}>{pasoActual.pregunta}</h2>
             </div>
+            
+            {/* NUEVO: Renderiza el simulador si hay valores */}
+            {(pasoActual.simVoltaje || pasoActual.simAmperaje) && (
+              <SimuladorFuente voltaje={pasoActual.simVoltaje} amperaje={pasoActual.simAmperaje} />
+            )}
+
             {pasoActual.esFinal ? (
               <div style={estilos.estadoFinal}>
                 <div style={estilos.iconoFinalBg}><ShieldCheck size={48} color="#0058bc" /></div>
@@ -245,57 +268,18 @@ export default function AppDiagnostico() {
         </AnimatePresence>
       </main>
 
-      {/* Botón Flotante Dinámico: Solo aparece si el paso tiene tabla guardada */}
       <AnimatePresence>
         {pasoActual.tablaReferencia && pasoActual.tablaReferencia.length > 0 && (
-          <motion.button 
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0, opacity: 0 }}
-            whileHover={{ scale: 1.1 }} 
-            whileTap={{ scale: 0.9 }} 
-            onClick={() => setMostrarTablaConsumos(true)}
-            style={{ position: 'fixed', bottom: '100px', right: '20px', width: '60px', height: '60px', borderRadius: '50%', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', boxShadow: '0 10px 25px rgba(16, 185, 129, 0.4)', cursor: 'pointer', zIndex: 900 }}
-            title="Abrir Tabla de Referencia"
-          >
-            <BookOpen size={28} />
-          </motion.button>
+          <motion.button initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0, opacity: 0 }} whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} onClick={() => setMostrarTablaConsumos(true)} style={{ position: 'fixed', bottom: '100px', right: '20px', width: '60px', height: '60px', borderRadius: '50%', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', boxShadow: '0 10px 25px rgba(16, 185, 129, 0.4)', cursor: 'pointer', zIndex: 900 }} title="Abrir Tabla de Referencia"><BookOpen size={28} /></motion.button>
         )}
       </AnimatePresence>
 
-      {/* Modal de la Tabla de Consumos Inteligente */}
       <AnimatePresence>
         {mostrarTablaConsumos && pasoActual.tablaReferencia && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={estilos.modalOverlay} onClick={() => setMostrarTablaConsumos(false)}>
             <motion.div initial={{ y: 50, scale: 0.95 }} animate={{ y: 0, scale: 1 }} exit={{ y: 50, scale: 0.95 }} style={{ ...estilos.modalCard, maxWidth: '800px', ...t.fondoPrincipal, ...t.bordeFantasma }} onClick={(e) => e.stopPropagation()}>
-              <div style={estilos.modalHeader}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <div style={{ backgroundColor: 'rgba(16, 185, 129, 0.1)', padding: '8px', borderRadius: '50%' }}><Activity size={24} color="#10b981" /></div>
-                  <h3 style={{ margin: 0, ...t.textoPrincipal, fontSize: '1.2rem', fontWeight: 'bold' }}>Referencia para este diagnóstico</h3>
-                </div>
-                <button onClick={() => setMostrarTablaConsumos(false)} style={{ ...estilos.btnCerrar, ...t.textoSutil }}><X size={24} /></button>
-              </div>
-              
-              <div style={{ ...estilos.modalBody, padding: '0' }}>
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                    <thead>
-                      <tr style={{ backgroundColor: t.hoverBg, borderBottom: `2px solid ${t.bordeFantasma.borderColor}` }}>
-                        <th style={{ padding: '15px 20px', ...t.textoPrincipal, fontSize: '0.9rem', width: '35%' }}>Valor / Medición</th>
-                        <th style={{ padding: '15px 20px', ...t.textoPrincipal, fontSize: '0.9rem' }}>Diagnóstico / Indicación</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pasoActual.tablaReferencia.map((item, index) => (
-                        <tr key={index} style={{ borderBottom: `1px solid ${t.bordeFantasma.borderColor}` }}>
-                          <td style={{ padding: '15px 20px', ...t.textoPrincipal, fontSize: '0.95rem', fontWeight: '600', color: '#10b981' }}>{item.valor}</td>
-                          <td style={{ padding: '15px 20px', ...t.textoSutil, fontSize: '0.9rem', lineHeight: '1.4' }}>{item.descripcion}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+              <div style={estilos.modalHeader}><div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><div style={{ backgroundColor: 'rgba(16, 185, 129, 0.1)', padding: '8px', borderRadius: '50%' }}><Activity size={24} color="#10b981" /></div><h3 style={{ margin: 0, ...t.textoPrincipal, fontSize: '1.2rem', fontWeight: 'bold' }}>Referencia para este diagnóstico</h3></div><button onClick={() => setMostrarTablaConsumos(false)} style={{ ...estilos.btnCerrar, ...t.textoSutil }}><X size={24} /></button></div>
+              <div style={{ ...estilos.modalBody, padding: '0' }}><div style={{ overflowX: 'auto' }}><table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}><thead><tr style={{ backgroundColor: t.hoverBg, borderBottom: `2px solid ${t.bordeFantasma.borderColor}` }}><th style={{ padding: '15px 20px', ...t.textoPrincipal, fontSize: '0.9rem', width: '35%' }}>Valor / Medición</th><th style={{ padding: '15px 20px', ...t.textoPrincipal, fontSize: '0.9rem' }}>Diagnóstico / Indicación</th></tr></thead><tbody>{pasoActual.tablaReferencia.map((item, index) => (<tr key={index} style={{ borderBottom: `1px solid ${t.bordeFantasma.borderColor}` }}><td style={{ padding: '15px 20px', ...t.textoPrincipal, fontSize: '0.95rem', fontWeight: '600', color: '#10b981' }}>{item.valor}</td><td style={{ padding: '15px 20px', ...t.textoSutil, fontSize: '0.9rem', lineHeight: '1.4' }}>{item.descripcion}</td></tr>))}</tbody></table></div></div>
             </motion.div>
           </motion.div>
         )}
@@ -303,13 +287,7 @@ export default function AppDiagnostico() {
 
       <AnimatePresence>
         {notaVisible && pasoActual.notaExperta && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={estilos.modalOverlay} onClick={() => setNotaVisible(false)}>
-            <motion.div initial={{ y: 20, scale: 0.95 }} animate={{ y: 0, scale: 1 }} exit={{ y: 20, scale: 0.95 }} style={{ ...estilos.notaCard, ...t.fondoPrincipal, ...t.bordeFantasma }} onClick={(e) => e.stopPropagation()}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '15px', borderBottom: `1px solid ${t.bordeFantasma.borderColor}`, paddingBottom: '10px' }}><div style={{ backgroundColor: 'rgba(234, 179, 8, 0.1)', padding: '8px', borderRadius: '50%' }}><Lightbulb size={24} color="#eab308" /></div><h3 style={{ margin: 0, ...t.textoPrincipal, fontSize: '1.1rem' }}>Nota del Experto</h3></div>
-              <p style={{ ...t.textoPrincipal, fontSize: '0.95rem', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>{pasoActual.notaExperta}</p>
-              <button onClick={() => setNotaVisible(false)} style={{ ...estilos.btnPrimarioGuardar, width: '100%', marginTop: '20px', justifyContent: 'center' }}>Entendido</button>
-            </motion.div>
-          </motion.div>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={estilos.modalOverlay} onClick={() => setNotaVisible(false)}><motion.div initial={{ y: 20, scale: 0.95 }} animate={{ y: 0, scale: 1 }} exit={{ y: 20, scale: 0.95 }} style={{ ...estilos.notaCard, ...t.fondoPrincipal, ...t.bordeFantasma }} onClick={(e) => e.stopPropagation()}><div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '15px', borderBottom: `1px solid ${t.bordeFantasma.borderColor}`, paddingBottom: '10px' }}><div style={{ backgroundColor: 'rgba(234, 179, 8, 0.1)', padding: '8px', borderRadius: '50%' }}><Lightbulb size={24} color="#eab308" /></div><h3 style={{ margin: 0, ...t.textoPrincipal, fontSize: '1.1rem' }}>Nota del Experto</h3></div><p style={{ ...t.textoPrincipal, fontSize: '0.95rem', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>{pasoActual.notaExperta}</p><button onClick={() => setNotaVisible(false)} style={{ ...estilos.btnPrimarioGuardar, width: '100%', marginTop: '20px', justifyContent: 'center' }}>Entendido</button></motion.div></motion.div>
         )}
       </AnimatePresence>
 
@@ -319,20 +297,13 @@ export default function AppDiagnostico() {
         <div style={{ width: '80px', display: 'flex', justifyContent: 'center' }}><button style={{ ...estilos.navBtn, ...t.textoSutil }} onClick={abrirAdmin}><Settings size={24} /> <span style={estilos.navLabel}>ADMIN</span></button></div>
       </nav>
 
-      {/* MODAL DEL PANEL ADMINISTRADOR */}
       <AnimatePresence>
         {mostrarAdmin && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={estilos.modalOverlay}>
             <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} style={{ ...estilos.modalCard, ...t.fondoPrincipal, ...t.bordeFantasma }}>
               <div style={estilos.modalHeader}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  {vistaAdmin === 'formulario' && <button onClick={() => setVistaAdmin('lista')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0058bc', display: 'flex', alignItems: 'center' }} title="Volver"><ArrowLeft size={20} /></button>}
-                  <h3 style={{ ...estilos.modalTitulo, ...t.textoPrincipal }}>{vistaAdmin === 'login' ? 'Autenticación Requerida' : vistaAdmin === 'lista' ? <><Network size={20} style={{marginRight:'8px', transform:'translateY(4px)'}}/> Explorador de Flujos</> : '⚙️ Editar Paso'}</h3>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                  {estaAutenticado && vistaAdmin !== 'login' && <button onClick={cerrarSesion} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', display: 'flex', alignItems: 'center' }} title="Cerrar Sesión"><LogOut size={20} /></button>}
-                  <button onClick={() => setMostrarAdmin(false)} style={{ ...estilos.btnCerrar, ...t.textoSutil }}><X size={24} /></button>
-                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>{vistaAdmin === 'formulario' && <button onClick={() => setVistaAdmin('lista')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0058bc', display: 'flex', alignItems: 'center' }} title="Volver"><ArrowLeft size={20} /></button>}<h3 style={{ ...estilos.modalTitulo, ...t.textoPrincipal }}>{vistaAdmin === 'login' ? 'Autenticación Requerida' : vistaAdmin === 'lista' ? <><Network size={20} style={{marginRight:'8px', transform:'translateY(4px)'}}/> Explorador de Flujos</> : '⚙️ Editar Paso'}</h3></div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>{estaAutenticado && vistaAdmin !== 'login' && <button onClick={cerrarSesion} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', display: 'flex', alignItems: 'center' }} title="Cerrar Sesión"><LogOut size={20} /></button>}<button onClick={() => setMostrarAdmin(false)} style={{ ...estilos.btnCerrar, ...t.textoSutil }}><X size={24} /></button></div>
               </div>
 
               {vistaAdmin === 'login' && (
@@ -349,24 +320,9 @@ export default function AppDiagnostico() {
 
               {vistaAdmin === 'lista' && (
                 <div style={estilos.modalBody}>
-                  <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
-                    <div style={{ position: 'relative', flex: 1 }}><Search size={18} style={{ position: 'absolute', left: '10px', top: '12px', color: '#9ca3af' }} /><input style={{ ...estilos.inputForm, paddingLeft: '35px', ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} type="text" placeholder="Buscar falla o ID..." value={busqueda} onChange={(e) => setBusqueda(e.target.value)} /></div>
-                    <button onClick={prepararNuevoPaso} style={estilos.btnPrimarioGuardar} title="Crear nuevo paso"><Plus size={20} /></button>
-                  </div>
+                  <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}><div style={{ position: 'relative', flex: 1 }}><Search size={18} style={{ position: 'absolute', left: '10px', top: '12px', color: '#9ca3af' }} /><input style={{ ...estilos.inputForm, paddingLeft: '35px', ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} type="text" placeholder="Buscar falla o ID..." value={busqueda} onChange={(e) => setBusqueda(e.target.value)} /></div><button onClick={prepararNuevoPaso} style={estilos.btnPrimarioGuardar} title="Crear nuevo paso"><Plus size={20} /></button></div>
                   <div style={estilos.listaContainer}>
-                    {busqueda !== '' ? (pasosFiltrados.length === 0 ? <p style={{ textAlign: 'center', color: '#9ca3af', padding: '20px' }}>No se encontraron pasos.</p> : (pasosFiltrados.map((paso) => (
-                          <div key={paso.id} style={{ ...estilos.listaItem, ...t.bordeFantasma, ...t.cristalBgItem }}>
-                            <div style={{ flex: 1, overflow: 'hidden' }}>
-                              <h4 style={{ margin: '0 0 4px 0', fontSize: '0.9rem', color: '#0058bc', fontWeight: 'bold', display:'flex', gap:'5px', alignItems:'center' }}>
-                                {paso.id} 
-                                {paso.notaExperta && <Lightbulb size={12} color="#eab308" />}
-                                {paso.tablaReferencia && paso.tablaReferencia.length > 0 && <BookOpen size={12} color="#10b981" />}
-                              </h4>
-                              <p style={{ margin: 0, fontSize: '0.8rem', ...t.textoPrincipal, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{paso.pregunta}</p>
-                            </div>
-                            <div style={{ display: 'flex', gap: '5px' }}><button onClick={() => editarPaso(paso)} style={estilos.btnAccionLista}><Edit size={16} color="#eab308" /></button><button onClick={() => eliminarPaso(paso.id)} style={estilos.btnAccionLista}><Trash2 size={16} color="#ef4444" /></button></div>
-                          </div>
-                        )))) : (<div style={{ paddingRight: '10px' }}>{listaPasos.length > 0 ? renderArbol('inicio') : <p style={{textAlign:'center', color:'#9ca3af'}}>Cargando árbol...</p>}</div>)}
+                    {busqueda !== '' ? (pasosFiltrados.length === 0 ? <p style={{ textAlign: 'center', color: '#9ca3af', padding: '20px' }}>No se encontraron pasos.</p> : (pasosFiltrados.map((paso) => (<div key={paso.id} style={{ ...estilos.listaItem, ...t.bordeFantasma, ...t.cristalBgItem }}><div style={{ flex: 1, overflow: 'hidden' }}><h4 style={{ margin: '0 0 4px 0', fontSize: '0.9rem', color: '#0058bc', fontWeight: 'bold', display:'flex', gap:'5px', alignItems:'center' }}>{paso.id} {paso.notaExperta && <Lightbulb size={12} color="#eab308" />}{paso.tablaReferencia && paso.tablaReferencia.length > 0 && <BookOpen size={12} color="#10b981" />}{paso.simAmperaje && <Activity size={12} color="#ef4444" />}</h4><p style={{ margin: 0, fontSize: '0.8rem', ...t.textoPrincipal, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{paso.pregunta}</p></div><div style={{ display: 'flex', gap: '5px' }}><button onClick={() => editarPaso(paso)} style={estilos.btnAccionLista}><Edit size={16} color="#eab308" /></button><button onClick={() => eliminarPaso(paso.id)} style={estilos.btnAccionLista}><Trash2 size={16} color="#ef4444" /></button></div></div>)))) : (<div style={{ paddingRight: '10px' }}>{listaPasos.length > 0 ? renderArbol('inicio') : <p style={{textAlign:'center', color:'#9ca3af'}}>Cargando árbol...</p>}</div>)}
                   </div>
                 </div>
               )}
@@ -379,22 +335,32 @@ export default function AppDiagnostico() {
                     <label style={{ ...estilos.labelForm, ...t.textoPrincipal, marginTop: '10px' }}>Pregunta o Diagnóstico a mostrar</label>
                     <textarea style={{ ...estilos.inputForm, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma, minHeight: '80px' }} value={formPregunta} onChange={(e) => setFormPregunta(e.target.value)} placeholder="¿Qué revisamos ahora?" />
                     
+                    {/* NUEVO: Controles del Simulador de Fuente */}
+                    <div style={{ ...estilos.opcionesContainer, backgroundColor: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+                      <h4 style={{ ...t.textoPrincipal, margin: '0 0 10px 0', display: 'flex', alignItems: 'center', gap: '6px', color: '#ef4444' }}>
+                        <Activity size={18} /> Simulador de Fuente DC (Opcional)
+                      </h4>
+                      <div style={{ display: 'flex', gap: '10px' }}>
+                        <div style={{ flex: 1 }}>
+                          <label style={{ fontSize: '0.8rem', color: t.textoSutil.color }}>Voltaje (ej: 4.2)</label>
+                          <input style={{ ...estilos.inputFormPequeño, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} type="text" placeholder="4.2" value={formSimV} onChange={(e) => setFormSimV(e.target.value)} />
+                        </div>
+                        <div style={{ flex: 2 }}>
+                          <label style={{ fontSize: '0.8rem', color: t.textoSutil.color }}>Amperaje (Separar por comas para animar)</label>
+                          <input style={{ ...estilos.inputFormPequeño, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} type="text" placeholder="Ej: 0.020, 0.060, 0.080, 0.000" value={formSimA} onChange={(e) => setFormSimA(e.target.value)} />
+                        </div>
+                      </div>
+                    </div>
+
                     <label style={{ ...estilos.labelForm, color: '#eab308', marginTop: '10px', display: 'flex', alignItems: 'center', gap: '5px' }}><Lightbulb size={16}/> Nota del Experto (Opcional)</label>
                     <textarea style={{ ...estilos.inputForm, ...t.cristalBgItem, ...t.textoPrincipal, border: '1px solid rgba(234, 179, 8, 0.3)', minHeight: '60px' }} value={formNota} onChange={(e) => setFormNota(e.target.value)} placeholder="Ej: Ten cuidado al levantar el flex..." />
                     
-                    {/* NUEVO: Formulario para la Tabla Inteligente */}
                     <div style={{ ...estilos.opcionesContainer, backgroundColor: 'rgba(16, 185, 129, 0.05)', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
-                      <h4 style={{ ...t.textoPrincipal, marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px', color: '#10b981' }}>
-                        <BookOpen size={18} /> Tabla de Referencia (Opcional)
-                      </h4>
+                      <h4 style={{ ...t.textoPrincipal, margin: '0 0 10px 0', display: 'flex', alignItems: 'center', gap: '6px', color: '#10b981' }}><BookOpen size={18} /> Tabla de Referencia (Opcional)</h4>
                       {formTabla.map((fila, index) => (
-                        <div key={index} style={{ display: 'flex', gap: '10px', marginBottom: '10px', alignItems: 'flex-start' }}>
-                          <input style={{ ...estilos.inputFormPequeño, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma, flex: 0.35 }} type="text" placeholder="Valor (ej: 0.150A)" value={fila.valor} onChange={(e) => handleCambioFilaTabla(index, 'valor', e.target.value)} />
-                          <input style={{ ...estilos.inputFormPequeño, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma, flex: 0.65 }} type="text" placeholder="Diagnóstico / Significado" value={fila.descripcion} onChange={(e) => handleCambioFilaTabla(index, 'descripcion', e.target.value)} />
-                          <button onClick={() => handleQuitarFilaTabla(index)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '8px' }}><Trash2 size={18} color="#ef4444" /></button>
-                        </div>
+                        <div key={index} style={{ display: 'flex', gap: '10px', marginBottom: '10px', alignItems: 'flex-start' }}><input style={{ ...estilos.inputFormPequeño, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma, flex: 0.35 }} type="text" placeholder="Valor" value={fila.valor} onChange={(e) => handleCambioFilaTabla(index, 'valor', e.target.value)} /><input style={{ ...estilos.inputFormPequeño, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma, flex: 0.65 }} type="text" placeholder="Diagnóstico" value={fila.descripcion} onChange={(e) => handleCambioFilaTabla(index, 'descripcion', e.target.value)} /><button onClick={() => handleQuitarFilaTabla(index)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '8px' }}><Trash2 size={18} color="#ef4444" /></button></div>
                       ))}
-                      <button onClick={handleAgregarFilaTabla} style={{ background: 'none', border: 'none', color: '#10b981', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer', padding: '5px 0' }}><Plus size={16} /> Agregar fila de datos</button>
+                      <button onClick={handleAgregarFilaTabla} style={{ background: 'none', border: 'none', color: '#10b981', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer', padding: '5px 0' }}><Plus size={16} /> Agregar fila</button>
                     </div>
 
                     <div style={estilos.checkboxGroup}><input type="checkbox" id="esFinal" checked={formEsFinal} onChange={(e) => setFormEsFinal(e.target.checked)} /><label htmlFor="esFinal" style={{ ...t.textoPrincipal, fontWeight: '600' }}>¿Es un diagnóstico final?</label></div>
@@ -402,12 +368,9 @@ export default function AppDiagnostico() {
                       <div style={estilos.opcionesContainer}>
                         <h4 style={{ ...t.textoPrincipal, marginBottom: '10px' }}>Opciones de Respuesta:</h4>
                         {formOpciones.map((op, index) => (
-                          <div key={index} style={estilos.opcionRow}>
-                            <div style={{ flex: 1 }}><input style={{ ...estilos.inputFormPequeño, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} type="text" placeholder="Texto (ej. Sí, funciona)" value={op.texto} onChange={(e) => handleCambioOpcion(index, 'texto', e.target.value)} /><input style={{ ...estilos.inputFormPequeño, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma, marginTop: '8px' }} type="text" placeholder="ID Siguiente (ej. ip_siguiente)" value={op.siguientePaso} onChange={(e) => handleCambioOpcion(index, 'siguientePaso', e.target.value.replace(/\s+/g, '_').toLowerCase())} /></div>
-                            <button onClick={() => handleQuitarOpcion(index)} style={estilos.btnBorrarOp}><Trash2 size={20} color="#ef4444" /></button>
-                          </div>
+                          <div key={index} style={estilos.opcionRow}><div style={{ flex: 1 }}><input style={{ ...estilos.inputFormPequeño, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} type="text" placeholder="Texto (ej. Sí)" value={op.texto} onChange={(e) => handleCambioOpcion(index, 'texto', e.target.value)} /><input style={{ ...estilos.inputFormPequeño, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma, marginTop: '8px' }} type="text" placeholder="ID Siguiente" value={op.siguientePaso} onChange={(e) => handleCambioOpcion(index, 'siguientePaso', e.target.value.replace(/\s+/g, '_').toLowerCase())} /></div><button onClick={() => handleQuitarOpcion(index)} style={estilos.btnBorrarOp}><Trash2 size={20} color="#ef4444" /></button></div>
                         ))}
-                        <button onClick={handleAgregarOpcion} style={estilos.btnAgregarOp}><Plus size={18} /> Agregar otra opción</button>
+                        <button onClick={handleAgregarOpcion} style={estilos.btnAgregarOp}><Plus size={18} /> Agregar opción</button>
                       </div>
                     )}
                     {mensajeAdmin && <p style={{ color: mensajeAdmin.includes('❌') ? '#ef4444' : '#22c55e', fontWeight: 'bold', textAlign: 'center', marginTop: '15px' }}>{mensajeAdmin}</p>}
