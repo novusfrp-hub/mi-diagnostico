@@ -47,8 +47,9 @@ export default function AppDiagnostico() {
   const [tipVisto, setTipVisto] = useState(false);
   const [mostrarTablaConsumos, setMostrarTablaConsumos] = useState(false);
 
-  // NUEVO: Estado para el panel lateral de Docktest
+  // Estados para el panel lateral de Docktest
   const [panelMedicionVisible, setPanelMedicionVisible] = useState(false);
+  const [dockViewTab, setDockViewTab] = useState('diodo'); // 'diodo' o 'ua'
 
   const [formId, setFormId] = useState('');
   const [formPregunta, setFormPregunta] = useState('');
@@ -59,12 +60,10 @@ export default function AppDiagnostico() {
   const [formSimV, setFormSimV] = useState('');
   const [formSimA, setFormSimA] = useState('');
 
-  // NUEVO: Estados para los valores del Docktest en el Admin
-  const [formVbus, setFormVbus] = useState('');
-  const [formDp, setFormDp] = useState('');
-  const [formDm, setFormDm] = useState('');
-  const [formCc1, setFormCc1] = useState('');
-  const [formCc2, setFormCc2] = useState('');
+  // NUEVO: Estados separados para Diodo y uA en el Admin
+  const [dockAdminTab, setDockAdminTab] = useState('diodo');
+  const [formDockDiodo, setFormDockDiodo] = useState({ vbus: '', dp: '', dm: '', cc1: '', cc2: '' });
+  const [formDockUa, setFormDockUa] = useState({ vbus: '', dp: '', dm: '', cc1: '', cc2: '' });
 
   const [mensajeAdmin, setMensajeAdmin] = useState('');
 
@@ -78,6 +77,9 @@ export default function AppDiagnostico() {
 
       // Cerrar todos los modales al cambiar de paso
       setNotaVisible(false); setTipVisto(false); setMostrarTablaConsumos(false); setPanelMedicionVisible(false);
+      // Reiniciar tab de docktest a diodo por defecto si está disponible
+      if (datos.docktestDiodo) setDockViewTab('diodo');
+      else if (datos.docktestUa) setDockViewTab('ua');
     } catch (error) { alert("Hubo un error al cargar el diagnóstico"); }
     setCargando(false);
   };
@@ -87,7 +89,7 @@ export default function AppDiagnostico() {
   useEffect(() => { cargarPaso('inicio'); }, []);
 
   const limpiarTexto = (texto) => texto.replace(/[\u{1F300}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F1E6}-\u{1F1FF}\u{2300}-\u{23FF}\u{2B50}]/gu, '').trim();
-  const obtenerIconoDinamico = (texto) => { /*... (mantenido igual) ...*/
+  const obtenerIconoDinamico = (texto) => {
     const txt = texto.toLowerCase();
     if (txt.includes('apple') || txt.includes('iphone')) return <Smartphone size={24} color="#0058bc" />;
     if (txt.includes('carga')) return <Zap size={24} color="#0058bc" />;
@@ -104,7 +106,9 @@ export default function AppDiagnostico() {
   const prepararNuevoPaso = () => {
     setFormId(''); setFormPregunta(''); setFormNota(''); setFormEsFinal(false); setFormOpciones([{ texto: '', siguientePaso: '' }]);
     setFormTabla([]); setFormSimV(''); setFormSimA('');
-    setFormVbus(''); setFormDp(''); setFormDm(''); setFormCc1(''); setFormCc2(''); // Limpia Docktest
+    setFormDockDiodo({ vbus: '', dp: '', dm: '', cc1: '', cc2: '' });
+    setFormDockUa({ vbus: '', dp: '', dm: '', cc1: '', cc2: '' });
+    setDockAdminTab('diodo');
     setMensajeAdmin(''); setVistaAdmin('formulario');
   };
 
@@ -113,9 +117,9 @@ export default function AppDiagnostico() {
     setFormOpciones(paso.opciones && paso.opciones.length > 0 ? paso.opciones : [{ texto: '', siguientePaso: '' }]);
     setFormTabla(paso.tablaReferencia || []); setFormSimV(paso.simVoltaje || ''); setFormSimA(paso.simAmperaje || '');
 
-    // Cargar Docktest si existe
-    const dock = paso.docktest || {};
-    setFormVbus(dock.vbus || ''); setFormDp(dock.dp || ''); setFormDm(dock.dm || ''); setFormCc1(dock.cc1 || ''); setFormCc2(dock.cc2 || '');
+    setFormDockDiodo(paso.docktestDiodo || { vbus: '', dp: '', dm: '', cc1: '', cc2: '' });
+    setFormDockUa(paso.docktestUa || { vbus: '', dp: '', dm: '', cc1: '', cc2: '' });
+    setDockAdminTab('diodo');
 
     setMensajeAdmin(''); setVistaAdmin('formulario');
   };
@@ -127,6 +131,12 @@ export default function AppDiagnostico() {
   const handleAgregarFilaTabla = () => setFormTabla([...formTabla, { valor: '', descripcion: '' }]);
   const handleQuitarFilaTabla = (index) => { const nuevas = [...formTabla]; nuevas.splice(index, 1); setFormTabla(nuevas); };
   const handleCambioFilaTabla = (index, campo, valor) => { const nuevas = [...formTabla]; nuevas[index][campo] = valor; setFormTabla(nuevas); };
+
+  // Manejador dinámico para el docktest admin
+  const handleDockChange = (campo, valor) => {
+    if (dockAdminTab === 'diodo') setFormDockDiodo({ ...formDockDiodo, [campo]: valor });
+    else setFormDockUa({ ...formDockUa, [campo]: valor });
+  };
 
   const guardarPasoFirebase = async () => {
     if (!formId || !formPregunta) { setMensajeAdmin('⚠️ ID y pregunta obligatorios.'); return; }
@@ -141,14 +151,11 @@ export default function AppDiagnostico() {
       const tablaValida = formTabla.filter(fila => fila.valor.trim() !== '' || fila.descripcion.trim() !== '');
       if (tablaValida.length > 0) datosAGuardar.tablaReferencia = tablaValida; else datosAGuardar.tablaReferencia = [];
 
-      // NUEVO: Guardar Docktest si hay al menos un valor
-      if (formVbus || formDp || formDm || formCc1 || formCc2) {
-        datosAGuardar.docktest = {
-          vbus: formVbus, dp: formDp, dm: formDm, cc1: formCc1, cc2: formCc2
-        };
-      } else {
-        datosAGuardar.docktest = null;
-      }
+      const hasDiodo = Object.values(formDockDiodo).some(v => v.trim() !== '');
+      const hasUa = Object.values(formDockUa).some(v => v.trim() !== '');
+
+      if (hasDiodo) datosAGuardar.docktestDiodo = formDockDiodo; else datosAGuardar.docktestDiodo = null;
+      if (hasUa) datosAGuardar.docktestUa = formDockUa; else datosAGuardar.docktestUa = null;
 
       await setDoc(doc(db, "pasos", formId), datosAGuardar);
       setMensajeAdmin('✅ ¡Guardado!');
@@ -176,7 +183,7 @@ export default function AppDiagnostico() {
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <span style={{ fontWeight: 'bold', color: '#0058bc', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
                 {paso.id}
-                {paso.docktest && <Usb size={12} color="#3b82f6" title="Tiene Docktest" />}
+                {(paso.docktestDiodo || paso.docktestUa) && <Usb size={12} color="#3b82f6" title="Tiene Docktest" />}
               </span>
               <span style={{ fontSize: '0.8rem', color: t.textoPrincipal.color, opacity: 0.8 }}>{paso.pregunta}</span>
             </div>
@@ -198,6 +205,9 @@ export default function AppDiagnostico() {
 
   if (!pasoActual) return null;
   const t = estilos[tema];
+  const tieneDocktest = pasoActual.docktestDiodo || pasoActual.docktestUa;
+  const currentDockData = dockViewTab === 'diodo' ? pasoActual.docktestDiodo : pasoActual.docktestUa;
+  const currentDockInputs = dockAdminTab === 'diodo' ? formDockDiodo : formDockUa;
 
   return (
     <div style={{ ...estilos.contenedor, ...t.fondoPrincipal }}>
@@ -235,58 +245,58 @@ export default function AppDiagnostico() {
         </AnimatePresence>
       </main>
 
-      {/* NUEVO: Botón Parpadeante Lateral para Docktest */}
       <AnimatePresence>
-        {pasoActual.docktest && (
+        {tieneDocktest && (
           <motion.button
             initial={{ x: 100, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 100, opacity: 0 }}
             onClick={() => setPanelMedicionVisible(true)}
-            style={{ position: 'fixed', right: 0, top: '40%', transform: 'translateY(-50%)', backgroundColor: '#3b82f6', color: 'white', border: 'none', padding: '15px 10px 15px 15px', borderRadius: '15px 0 0 15px', cursor: 'pointer', zIndex: 900, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', boxShadow: '-5px 0 15px rgba(59, 130, 246, 0.4)' }}
+            style={{ position: 'fixed', right: 0, top: '40%', transform: 'translateY(-50%)', backgroundColor: dockViewTab === 'diodo' ? '#3b82f6' : '#10b981', color: 'white', border: 'none', padding: '15px 10px 15px 15px', borderRadius: '15px 0 0 15px', cursor: 'pointer', zIndex: 900, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', boxShadow: `-5px 0 15px ${dockViewTab === 'diodo' ? 'rgba(59, 130, 246, 0.4)' : 'rgba(16, 185, 129, 0.4)'}`, transition: 'background-color 0.3s' }}
           >
-            <motion.div animate={{ opacity: [1, 0.5, 1] }} transition={{ duration: 1.5, repeat: Infinity }}>
-              <Usb size={24} />
-            </motion.div>
+            <motion.div animate={{ opacity: [1, 0.5, 1] }} transition={{ duration: 1.5, repeat: Infinity }}><Usb size={24} /></motion.div>
             <span style={{ fontSize: '0.7rem', fontWeight: 'bold', writingMode: 'vertical-rl', transform: 'rotate(180deg)', marginTop: '5px' }}>DOCKTEST</span>
           </motion.button>
         )}
       </AnimatePresence>
 
-      {/* NUEVO: Drawer (Panel Lateral) de Mediciones */}
+      {/* DRAWER (PANEL LATERAL) DE DOCKTEST CON TOGGLE */}
       <AnimatePresence>
-        {panelMedicionVisible && pasoActual.docktest && (
+        {panelMedicionVisible && tieneDocktest && (
           <>
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1999 }} onClick={() => setPanelMedicionVisible(false)} />
             <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: 'spring', damping: 25, stiffness: 200 }} style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: '320px', backgroundColor: t.fondoPrincipal.backgroundColor, borderLeft: t.bordeFantasma.border, zIndex: 2000, display: 'flex', flexDirection: 'column', boxShadow: '-10px 0 30px rgba(0,0,0,0.2)' }}>
 
-              <div style={{ padding: '20px', borderBottom: t.bordeFantasma.border, display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'rgba(59, 130, 246, 0.05)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <Usb size={24} color="#3b82f6" />
-                  <h3 style={{ margin: 0, ...t.textoPrincipal, fontSize: '1.1rem' }}>Valores de Referencia</h3>
-                </div>
+              <div style={{ padding: '20px', borderBottom: t.bordeFantasma.border, display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: dockViewTab === 'diodo' ? 'rgba(59, 130, 246, 0.05)' : 'rgba(16, 185, 129, 0.05)', transition: 'background-color 0.3s' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><Usb size={24} color={dockViewTab === 'diodo' ? '#3b82f6' : '#10b981'} /><h3 style={{ margin: 0, ...t.textoPrincipal, fontSize: '1.1rem' }}>Valores de Referencia</h3></div>
                 <button onClick={() => setPanelMedicionVisible(false)} style={estilos.btnCerrar}><X size={20} color={t.textoSutil.color} /></button>
               </div>
 
               <div style={{ padding: '20px', flex: 1, overflowY: 'auto' }}>
-                <p style={{ fontSize: '0.85rem', ...t.textoSutil, marginBottom: '20px', textAlign: 'center' }}>Mediciones en escala de diodos (caída de tensión) o mV.</p>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {[
-                    { label: 'VBUS', value: pasoActual.docktest.vbus, color: '#ef4444' },
-                    { label: 'D-', value: pasoActual.docktest.dm, color: '#10b981' },
-                    { label: 'D+', value: pasoActual.docktest.dp, color: '#10b981' },
-                    { label: 'CC1', value: pasoActual.docktest.cc1, color: '#3b82f6' },
-                    { label: 'CC2', value: pasoActual.docktest.cc2, color: '#3b82f6' },
-                    { label: 'GND', value: '0.000', color: '#6b7280' }
-                  ].map((pin, i) => pin.value ? (
-                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 15px', backgroundColor: t.cristalBgItem.backgroundColor, borderRadius: '10px', border: t.bordeFantasma.border }}>
-                      <span style={{ fontWeight: 'bold', color: pin.color, fontSize: '1.1rem' }}>{pin.label}</span>
-                      <span style={{ fontWeight: '600', ...t.textoPrincipal, fontSize: '1.1rem' }}>{pin.value}</span>
-                    </div>
-                  ) : null)}
+                {/* TOGGLE SWITCH EN EL PANEL */}
+                <div style={{ display: 'flex', backgroundColor: 'rgba(0,0,0,0.05)', borderRadius: '20px', padding: '4px', marginBottom: '20px' }}>
+                  <button onClick={() => setDockViewTab('diodo')} disabled={!pasoActual.docktestDiodo} style={{ flex: 1, padding: '8px', borderRadius: '16px', border: 'none', backgroundColor: dockViewTab === 'diodo' ? '#3b82f6' : 'transparent', color: dockViewTab === 'diodo' ? 'white' : (pasoActual.docktestDiodo ? t.textoSutil.color : 'rgba(0,0,0,0.2)'), fontWeight: 'bold', cursor: pasoActual.docktestDiodo ? 'pointer' : 'not-allowed', transition: 'all 0.3s' }}>Diodo (mV)</button>
+                  <button onClick={() => setDockViewTab('ua')} disabled={!pasoActual.docktestUa} style={{ flex: 1, padding: '8px', borderRadius: '16px', border: 'none', backgroundColor: dockViewTab === 'ua' ? '#10b981' : 'transparent', color: dockViewTab === 'ua' ? 'white' : (pasoActual.docktestUa ? t.textoSutil.color : 'rgba(0,0,0,0.2)'), fontWeight: 'bold', cursor: pasoActual.docktestUa ? 'pointer' : 'not-allowed', transition: 'all 0.3s' }}>Microamps (uA)</button>
                 </div>
-              </div>
-              <div style={{ padding: '15px', textAlign: 'center', borderTop: t.bordeFantasma.border, fontSize: '0.75rem', ...t.textoSutil }}>
-                Marshall Cell Diagnostics
+
+                {currentDockData ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {[
+                      { label: 'VBUS', value: currentDockData.vbus, color: '#ef4444' },
+                      { label: 'D-', value: currentDockData.dm, color: dockViewTab === 'diodo' ? '#3b82f6' : '#10b981' },
+                      { label: 'D+', value: currentDockData.dp, color: dockViewTab === 'diodo' ? '#3b82f6' : '#10b981' },
+                      { label: 'CC1', value: currentDockData.cc1, color: '#eab308' },
+                      { label: 'CC2', value: currentDockData.cc2, color: '#eab308' },
+                      { label: 'GND', value: '0.000', color: '#6b7280' }
+                    ].map((pin, i) => pin.value ? (
+                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 15px', backgroundColor: t.cristalBgItem.backgroundColor, borderRadius: '10px', border: t.bordeFantasma.border }}>
+                        <span style={{ fontWeight: 'bold', color: pin.color, fontSize: '1.1rem' }}>{pin.label}</span>
+                        <span style={{ fontWeight: '600', ...t.textoPrincipal, fontSize: '1.1rem' }}>{pin.value} {dockViewTab === 'ua' && pin.label !== 'GND' ? 'uA' : ''}</span>
+                      </div>
+                    ) : null)}
+                  </div>
+                ) : (
+                  <p style={{ textAlign: 'center', color: t.textoSutil.color, marginTop: '20px' }}>No hay valores registrados para esta unidad.</p>
+                )}
               </div>
             </motion.div>
           </>
@@ -324,7 +334,7 @@ export default function AppDiagnostico() {
                 <div style={estilos.modalBody}>
                   <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}><div style={{ position: 'relative', flex: 1 }}><Search size={18} style={{ position: 'absolute', left: '10px', top: '12px', color: '#9ca3af' }} /><input style={{ ...estilos.inputForm, paddingLeft: '35px', ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} type="text" placeholder="Buscar falla o ID..." value={busqueda} onChange={(e) => setBusqueda(e.target.value)} /></div><button onClick={prepararNuevoPaso} style={estilos.btnPrimarioGuardar} title="Crear nuevo paso"><Plus size={20} /></button></div>
                   <div style={estilos.listaContainer}>
-                    {busqueda !== '' ? (pasosFiltrados.length === 0 ? <p style={{ textAlign: 'center', color: '#9ca3af', padding: '20px' }}>No se encontraron pasos.</p> : (pasosFiltrados.map((paso) => (<div key={paso.id} style={{ ...estilos.listaItem, ...t.bordeFantasma, ...t.cristalBgItem }}><div style={{ flex: 1, overflow: 'hidden' }}><h4 style={{ margin: '0 0 4px 0', fontSize: '0.9rem', color: '#0058bc', fontWeight: 'bold', display: 'flex', gap: '5px', alignItems: 'center' }}>{paso.id} {paso.notaExperta && <Lightbulb size={12} color="#eab308" />}{paso.docktest && <Usb size={12} color="#3b82f6" />}{paso.simAmperaje && <Activity size={12} color="#ef4444" />}</h4><p style={{ margin: 0, fontSize: '0.8rem', ...t.textoPrincipal, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{paso.pregunta}</p></div><div style={{ display: 'flex', gap: '5px' }}><button onClick={() => editarPaso(paso)} style={estilos.btnAccionLista}><Edit size={16} color="#eab308" /></button><button onClick={() => eliminarPaso(paso.id)} style={estilos.btnAccionLista}><Trash2 size={16} color="#ef4444" /></button></div></div>)))) : (<div style={{ paddingRight: '10px' }}>{listaPasos.length > 0 ? renderArbol('inicio') : <p style={{ textAlign: 'center', color: '#9ca3af' }}>Cargando árbol...</p>}</div>)}
+                    {busqueda !== '' ? (pasosFiltrados.length === 0 ? <p style={{ textAlign: 'center', color: '#9ca3af', padding: '20px' }}>No se encontraron pasos.</p> : (pasosFiltrados.map((paso) => (<div key={paso.id} style={{ ...estilos.listaItem, ...t.bordeFantasma, ...t.cristalBgItem }}><div style={{ flex: 1, overflow: 'hidden' }}><h4 style={{ margin: '0 0 4px 0', fontSize: '0.9rem', color: '#0058bc', fontWeight: 'bold', display: 'flex', gap: '5px', alignItems: 'center' }}>{paso.id} {(paso.docktestDiodo || paso.docktestUa) && <Usb size={12} color="#3b82f6" />}</h4><p style={{ margin: 0, fontSize: '0.8rem', ...t.textoPrincipal, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{paso.pregunta}</p></div><div style={{ display: 'flex', gap: '5px' }}><button onClick={() => editarPaso(paso)} style={estilos.btnAccionLista}><Edit size={16} color="#eab308" /></button><button onClick={() => eliminarPaso(paso.id)} style={estilos.btnAccionLista}><Trash2 size={16} color="#ef4444" /></button></div></div>)))) : (<div style={{ paddingRight: '10px' }}>{listaPasos.length > 0 ? renderArbol('inicio') : <p style={{ textAlign: 'center', color: '#9ca3af' }}>Cargando árbol...</p>}</div>)}
                   </div>
                 </div>
               )}
@@ -337,23 +347,26 @@ export default function AppDiagnostico() {
                     <label style={{ ...estilos.labelForm, ...t.textoPrincipal, marginTop: '10px' }}>Pregunta o Diagnóstico a mostrar</label>
                     <textarea style={{ ...estilos.inputForm, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma, minHeight: '80px' }} value={formPregunta} onChange={(e) => setFormPregunta(e.target.value)} />
 
-                    {/* Simulador Fuente */}
-                    <div style={{ ...estilos.opcionesContainer, backgroundColor: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
-                      <h4 style={{ ...t.textoPrincipal, margin: '0 0 10px 0', display: 'flex', alignItems: 'center', gap: '6px', color: '#ef4444' }}><Activity size={18} /> Simulador de Fuente DC (Opcional)</h4>
-                      <div style={{ display: 'flex', gap: '10px' }}><div style={{ flex: 1 }}><label style={{ fontSize: '0.8rem', color: t.textoSutil.color }}>Voltaje (V)</label><input style={{ ...estilos.inputFormPequeño, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} type="text" placeholder="4.2" value={formSimV} onChange={(e) => setFormSimV(e.target.value)} /></div><div style={{ flex: 2 }}><label style={{ fontSize: '0.8rem', color: t.textoSutil.color }}>Amperaje (Animado con comas)</label><input style={{ ...estilos.inputFormPequeño, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} type="text" placeholder="0.020, 0.080, 0.120" value={formSimA} onChange={(e) => setFormSimA(e.target.value)} /></div></div>
-                    </div>
-
-                    {/* NUEVO: PANEL DOCKTEST */}
-                    <div style={{ ...estilos.opcionesContainer, backgroundColor: 'rgba(59, 130, 246, 0.05)', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
-                      <h4 style={{ ...t.textoPrincipal, margin: '0 0 10px 0', display: 'flex', alignItems: 'center', gap: '6px', color: '#3b82f6' }}><Usb size={18} /> Valores Docktest / Diodos (Opcional)</h4>
+                    {/* PANEL DOCKTEST ADMIN CON TOGGLE */}
+                    <div style={{ ...estilos.opcionesContainer, backgroundColor: dockAdminTab === 'diodo' ? 'rgba(59, 130, 246, 0.05)' : 'rgba(16, 185, 129, 0.05)', border: `1px solid ${dockAdminTab === 'diodo' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(16, 185, 129, 0.2)'}`, transition: 'all 0.3s' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                        <h4 style={{ ...t.textoPrincipal, margin: 0, display: 'flex', alignItems: 'center', gap: '6px', color: dockAdminTab === 'diodo' ? '#3b82f6' : '#10b981' }}><Usb size={18} /> Valores Docktest</h4>
+                        <div style={{ display: 'flex', gap: '5px', backgroundColor: 'rgba(0,0,0,0.05)', padding: '4px', borderRadius: '12px' }}>
+                          <button onClick={(e) => { e.preventDefault(); setDockAdminTab('diodo') }} style={{ padding: '6px 12px', borderRadius: '8px', border: 'none', background: dockAdminTab === 'diodo' ? '#3b82f6' : 'transparent', color: dockAdminTab === 'diodo' ? 'white' : t.textoSutil.color, cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}>Diodo</button>
+                          <button onClick={(e) => { e.preventDefault(); setDockAdminTab('ua') }} style={{ padding: '6px 12px', borderRadius: '8px', border: 'none', background: dockAdminTab === 'ua' ? '#10b981' : 'transparent', color: dockAdminTab === 'ua' ? 'white' : t.textoSutil.color, cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}>uA</button>
+                        </div>
+                      </div>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                        <div><label style={{ fontSize: '0.8rem', color: t.textoSutil.color }}>VBUS (mV)</label><input style={{ ...estilos.inputFormPequeño, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} type="text" placeholder="Ej: 450" value={formVbus} onChange={(e) => setFormVbus(e.target.value)} /></div>
-                        <div><label style={{ fontSize: '0.8rem', color: t.textoSutil.color }}>D+ (mV)</label><input style={{ ...estilos.inputFormPequeño, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} type="text" placeholder="Ej: 650" value={formDp} onChange={(e) => setFormDp(e.target.value)} /></div>
-                        <div><label style={{ fontSize: '0.8rem', color: t.textoSutil.color }}>D- (mV)</label><input style={{ ...estilos.inputFormPequeño, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} type="text" placeholder="Ej: 650" value={formDm} onChange={(e) => setFormDm(e.target.value)} /></div>
-                        <div><label style={{ fontSize: '0.8rem', color: t.textoSutil.color }}>CC1 (mV)</label><input style={{ ...estilos.inputFormPequeño, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} type="text" placeholder="Ej: 580" value={formCc1} onChange={(e) => setFormCc1(e.target.value)} /></div>
-                        <div><label style={{ fontSize: '0.8rem', color: t.textoSutil.color }}>CC2 (mV)</label><input style={{ ...estilos.inputFormPequeño, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} type="text" placeholder="Ej: 580" value={formCc2} onChange={(e) => setFormCc2(e.target.value)} /></div>
+                        <div><label style={{ fontSize: '0.8rem', color: t.textoSutil.color }}>VBUS</label><input style={{ ...estilos.inputFormPequeño, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} type="text" placeholder="Ej: 450" value={currentDockInputs.vbus} onChange={(e) => handleDockChange('vbus', e.target.value)} /></div>
+                        <div><label style={{ fontSize: '0.8rem', color: t.textoSutil.color }}>D+</label><input style={{ ...estilos.inputFormPequeño, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} type="text" placeholder="Ej: 650" value={currentDockInputs.dp} onChange={(e) => handleDockChange('dp', e.target.value)} /></div>
+                        <div><label style={{ fontSize: '0.8rem', color: t.textoSutil.color }}>D-</label><input style={{ ...estilos.inputFormPequeño, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} type="text" placeholder="Ej: 650" value={currentDockInputs.dm} onChange={(e) => handleDockChange('dm', e.target.value)} /></div>
+                        <div><label style={{ fontSize: '0.8rem', color: t.textoSutil.color }}>CC1</label><input style={{ ...estilos.inputFormPequeño, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} type="text" placeholder="Ej: 580" value={currentDockInputs.cc1} onChange={(e) => handleDockChange('cc1', e.target.value)} /></div>
+                        <div><label style={{ fontSize: '0.8rem', color: t.textoSutil.color }}>CC2</label><input style={{ ...estilos.inputFormPequeño, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} type="text" placeholder="Ej: 580" value={currentDockInputs.cc2} onChange={(e) => handleDockChange('cc2', e.target.value)} /></div>
                       </div>
                     </div>
+
+                    {/* Simulador Fuente y Otros campos (ocultos por espacio pero iguales que antes) */}
+                    <div style={{ ...estilos.opcionesContainer, backgroundColor: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.2)' }}><h4 style={{ ...t.textoPrincipal, margin: '0 0 10px 0', display: 'flex', alignItems: 'center', gap: '6px', color: '#ef4444' }}><Activity size={18} /> Simulador Fuente DC</h4><div style={{ display: 'flex', gap: '10px' }}><div style={{ flex: 1 }}><input style={{ ...estilos.inputFormPequeño, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} type="text" placeholder="Voltaje (ej: 4.2)" value={formSimV} onChange={(e) => setFormSimV(e.target.value)} /></div><div style={{ flex: 2 }}><input style={{ ...estilos.inputFormPequeño, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} type="text" placeholder="Amperaje animado (0.02, 0.08...)" value={formSimA} onChange={(e) => setFormSimA(e.target.value)} /></div></div></div>
 
                     <label style={{ ...estilos.labelForm, color: '#eab308', marginTop: '10px', display: 'flex', alignItems: 'center', gap: '5px' }}><Lightbulb size={16} /> Nota del Experto (Opcional)</label>
                     <textarea style={{ ...estilos.inputForm, ...t.cristalBgItem, ...t.textoPrincipal, border: '1px solid rgba(234, 179, 8, 0.3)', minHeight: '60px' }} value={formNota} onChange={(e) => setFormNota(e.target.value)} />
