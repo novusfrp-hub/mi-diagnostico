@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { doc, setDoc, collection, getDocs, deleteDoc } from 'firebase/firestore';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { db, auth } from '../firebase';
-import { Sun, Moon, ArrowLeft, RefreshCcw, Zap, Smartphone, Battery, Power, Wrench, AlertTriangle, ChevronRight, Home, LifeBuoy, ShieldCheck, Camera, Fingerprint, Volume2, Wifi, Signal, CheckCircle2, XCircle, Cpu, Settings, Activity, Monitor, Sparkles, Plus, Save, X, Trash2, Edit, Search, ChevronDown, CornerDownRight, Network, Lock, LogOut, Lightbulb } from 'lucide-react';
+// Agregamos BookOpen para el botón de la tabla
+import { Sun, Moon, ArrowLeft, RefreshCcw, Zap, Smartphone, Battery, Power, Wrench, AlertTriangle, ChevronRight, Home, LifeBuoy, ShieldCheck, Camera, Fingerprint, Volume2, Wifi, Signal, CheckCircle2, XCircle, Cpu, Settings, Activity, Monitor, Sparkles, Plus, Save, X, Trash2, Edit, Search, ChevronDown, CornerDownRight, Network, Lock, LogOut, Lightbulb, BookOpen } from 'lucide-react';
 
 export default function AppDiagnostico() {
   const [pasoActual, setPasoActual] = useState(null);
@@ -23,8 +24,10 @@ export default function AppDiagnostico() {
   const [pasosExpandidos, setPasosExpandidos] = useState({});
 
   const [notaVisible, setNotaVisible] = useState(false);
-  // NUEVO: Estado para saber si el tip ya fue visto
   const [tipVisto, setTipVisto] = useState(false);
+
+  // NUEVO: Estado para mostrar/ocultar la tabla de consumos
+  const [mostrarTablaConsumos, setMostrarTablaConsumos] = useState(false);
 
   const [formId, setFormId] = useState('');
   const [formPregunta, setFormPregunta] = useState('');
@@ -40,11 +43,8 @@ export default function AppDiagnostico() {
       const datos = await respuesta.json();
       if (!esRetroceso && pasoActual) setHistorial([...historial, pasoActual.id]);
       setPasoActual(datos);
-
-      // Reiniciamos los estados del tip al cambiar de pantalla
       setNotaVisible(false);
       setTipVisto(false);
-
     } catch (error) { alert("Hubo un error al cargar el diagnóstico"); }
     setCargando(false);
   };
@@ -142,7 +142,6 @@ export default function AppDiagnostico() {
     const paso = pasosMap[idPaso];
     const t = estilos[tema];
     if (!paso || visitados.has(idPaso)) return null;
-
     const tieneHijos = !paso.esFinal && paso.opciones && paso.opciones.length > 0;
     const expandido = pasosExpandidos[idPaso];
     const nuevosVisitados = new Set(visitados).add(idPaso);
@@ -153,27 +152,17 @@ export default function AppDiagnostico() {
           <div onClick={() => tieneHijos && toggleExpandir(idPaso)} style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: tieneHijos ? 'pointer' : 'default', flex: 1 }}>
             {tieneHijos ? (expandido ? <ChevronDown size={18} color="#0058bc" /> : <ChevronRight size={18} color="#0058bc" />) : (<ShieldCheck size={14} color="#22c55e" />)}
             <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <span style={{ fontWeight: 'bold', color: '#0058bc', fontSize: '0.9rem' }}>
-                {paso.id} {paso.notaExperta && <Lightbulb size={12} color="#eab308" style={{ marginLeft: '4px' }} title="Tiene nota del experto" />}
-              </span>
+              <span style={{ fontWeight: 'bold', color: '#0058bc', fontSize: '0.9rem' }}>{paso.id} {paso.notaExperta && <Lightbulb size={12} color="#eab308" style={{ marginLeft: '4px' }} title="Tiene nota del experto" />}</span>
               <span style={{ fontSize: '0.8rem', color: t.textoPrincipal.color, opacity: 0.8 }}>{paso.pregunta}</span>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '5px' }}>
-            <button onClick={() => editarPaso(paso)} style={estilos.btnAccionLista}><Edit size={16} color="#eab308" /></button>
-            <button onClick={() => eliminarPaso(paso.id)} style={estilos.btnAccionLista}><Trash2 size={16} color="#ef4444" /></button>
-          </div>
+          <div style={{ display: 'flex', gap: '5px' }}><button onClick={() => editarPaso(paso)} style={estilos.btnAccionLista}><Edit size={16} color="#eab308" /></button><button onClick={() => eliminarPaso(paso.id)} style={estilos.btnAccionLista}><Trash2 size={16} color="#ef4444" /></button></div>
         </div>
         <AnimatePresence>
           {expandido && tieneHijos && (
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} style={{ overflow: 'hidden' }}>
               {paso.opciones.map((op, idx) => (
-                <div key={idx} style={{ marginTop: '5px' }}>
-                  <div style={{ fontSize: '0.75rem', color: t.textoSutil.color, marginLeft: '35px', marginTop: '8px', marginBottom: '-5px', display: 'flex', alignItems: 'center', gap: '5px', fontWeight: '600' }}>
-                    <CornerDownRight size={14} /> "{op.texto}" ➡️
-                  </div>
-                  {renderArbol(op.siguientePaso, nivel + 1, nuevosVisitados)}
-                </div>
+                <div key={idx} style={{ marginTop: '5px' }}><div style={{ fontSize: '0.75rem', color: t.textoSutil.color, marginLeft: '35px', marginTop: '8px', marginBottom: '-5px', display: 'flex', alignItems: 'center', gap: '5px', fontWeight: '600' }}><CornerDownRight size={14} /> "{op.texto}" ➡️</div>{renderArbol(op.siguientePaso, nivel + 1, nuevosVisitados)}</div>
               ))}
             </motion.div>
           )}
@@ -184,6 +173,15 @@ export default function AppDiagnostico() {
 
   if (!pasoActual) return null;
   const t = estilos[tema];
+
+  // Datos simulados para la tabla de consumos
+  const datosConsumos = [
+    { amperaje: "0.000A al presionar Power", diag: "Línea abierta. Revisar flex de encendido, conector de batería o línea VBAT/VCC_MAIN." },
+    { amperaje: "0.010A a 0.080A (Fijo)", diag: "No hay booteo. Posible daño en PMIC, CPU, RAM o soldaduras frías bajo el procesador." },
+    { amperaje: "Consumo inicial directo (Sin presionar)", diag: "Corto en líneas principales (VDD_MAIN / VBAT). Inyectar voltaje y usar cámara térmica." },
+    { amperaje: "0.100A a 0.200A y cae a cero", diag: "El equipo intenta encender pero se protege. Corto en líneas secundarias del PMIC o falla de OVP." },
+    { amperaje: "Oscila entre 0.080A y 0.150A", diag: "Bucle de reinicio (Bootloop). Puede ser falla de software, memoria NAND corrupta o periférico en corto." }
+  ];
 
   return (
     <div style={{ ...estilos.contenedor, ...t.fondoPrincipal }}>
@@ -201,33 +199,8 @@ export default function AppDiagnostico() {
             <div style={estilos.seccionTitulo}>
               <span style={{ ...estilos.etiquetaPaso, color: '#0058bc', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
                 PASO {String(historial.length + 1).padStart(2, '0')}
-
-                {/* NUEVO: Botón de Nota ANIMADO y con más contraste */}
                 {pasoActual.notaExperta && (
-                  <motion.button
-                    onClick={() => {
-                      setNotaVisible(true);
-                      setTipVisto(true); // Se marca como visto al hacer clic
-                    }}
-                    animate={
-                      !tipVisto
-                        ? {
-                          scale: [1, 1.1, 1],
-                          boxShadow: ["0px 0px 0px rgba(234, 179, 8, 0)", "0px 0px 15px rgba(234, 179, 8, 0.7)", "0px 0px 0px rgba(234, 179, 8, 0)"]
-                        }
-                        : { scale: 1, boxShadow: "none" }
-                    }
-                    transition={
-                      !tipVisto
-                        ? { duration: 1.5, repeat: Infinity, ease: "easeInOut" }
-                        : { duration: 0.3 }
-                    }
-                    style={estilos.btnBombillo}
-                    title="Tip del Experto"
-                  >
-                    <Lightbulb size={16} color="#a16207" />
-                    <span style={{ fontSize: '0.75rem', fontWeight: '800', color: '#a16207', letterSpacing: '0.05em' }}>TIP</span>
-                  </motion.button>
+                  <motion.button onClick={() => { setNotaVisible(true); setTipVisto(true); }} animate={!tipVisto ? { scale: [1, 1.1, 1], boxShadow: ["0px 0px 0px rgba(234, 179, 8, 0)", "0px 0px 15px rgba(234, 179, 8, 0.7)", "0px 0px 0px rgba(234, 179, 8, 0)"] } : { scale: 1, boxShadow: "none" }} transition={!tipVisto ? { duration: 1.5, repeat: Infinity, ease: "easeInOut" } : { duration: 0.3 }} style={estilos.btnBombillo} title="Tip del Experto"><Lightbulb size={16} color="#a16207" /> <span style={{ fontSize: '0.75rem', fontWeight: '800', color: '#a16207', letterSpacing: '0.05em' }}>TIP</span></motion.button>
                 )}
               </span>
               <h2 style={{ ...estilos.tituloPregunta, ...t.textoPrincipal }}>{pasoActual.pregunta}</h2>
@@ -258,14 +231,63 @@ export default function AppDiagnostico() {
         </AnimatePresence>
       </main>
 
+      {/* NUEVO: Botón Flotante para la Tabla de Consumos */}
+      <motion.button
+        whileHover={{ scale: 1.1 }}
+        whileTap={{ scale: 0.9 }}
+        onClick={() => setMostrarTablaConsumos(true)}
+        style={{ position: 'fixed', bottom: '100px', right: '20px', width: '60px', height: '60px', borderRadius: '50%', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', boxShadow: '0 10px 25px rgba(16, 185, 129, 0.4)', cursor: 'pointer', zIndex: 900 }}
+        title="Tabla de Consumos Rápidos"
+      >
+        <BookOpen size={28} />
+      </motion.button>
+
+      {/* NUEVO: Modal de la Tabla de Consumos */}
+      <AnimatePresence>
+        {mostrarTablaConsumos && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={estilos.modalOverlay} onClick={() => setMostrarTablaConsumos(false)}>
+            <motion.div initial={{ y: 50, scale: 0.95 }} animate={{ y: 0, scale: 1 }} exit={{ y: 50, scale: 0.95 }} style={{ ...estilos.modalCard, maxWidth: '800px', ...t.fondoPrincipal, ...t.bordeFantasma }} onClick={(e) => e.stopPropagation()}>
+              <div style={estilos.modalHeader}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ backgroundColor: 'rgba(16, 185, 129, 0.1)', padding: '8px', borderRadius: '50%' }}><Activity size={24} color="#10b981" /></div>
+                  <h3 style={{ margin: 0, ...t.textoPrincipal, fontSize: '1.2rem', fontWeight: 'bold' }}>Referencia Rápida de Consumos (Fuente DC)</h3>
+                </div>
+                <button onClick={() => setMostrarTablaConsumos(false)} style={{ ...estilos.btnCerrar, ...t.textoSutil }}><X size={24} /></button>
+              </div>
+
+              <div style={{ ...estilos.modalBody, padding: '0' }}>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                    <thead>
+                      <tr style={{ backgroundColor: t.hoverBg, borderBottom: `2px solid ${t.bordeFantasma.borderColor}` }}>
+                        <th style={{ padding: '15px 20px', ...t.textoPrincipal, fontSize: '0.9rem' }}>Comportamiento en Fuente (Amperaje)</th>
+                        <th style={{ padding: '15px 20px', ...t.textoPrincipal, fontSize: '0.9rem' }}>Diagnóstico Posible</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {datosConsumos.map((item, index) => (
+                        <tr key={index} style={{ borderBottom: `1px solid ${t.bordeFantasma.borderColor}` }}>
+                          <td style={{ padding: '15px 20px', ...t.textoPrincipal, fontSize: '0.95rem', fontWeight: '600', color: '#10b981' }}>{item.amperaje}</td>
+                          <td style={{ padding: '15px 20px', ...t.textoSutil, fontSize: '0.9rem', lineHeight: '1.4' }}>{item.diag}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div style={{ padding: '15px 20px', backgroundColor: t.hoverBg, borderTop: `1px solid ${t.bordeFantasma.borderColor}`, textAlign: 'center', fontSize: '0.8rem', ...t.textoSutil }}>
+                Nota: Estos valores son referenciales. El consumo puede variar dependiendo de la marca, modelo y estado de la batería.
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <AnimatePresence>
         {notaVisible && pasoActual.notaExperta && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={estilos.modalOverlay} onClick={() => setNotaVisible(false)}>
             <motion.div initial={{ y: 20, scale: 0.95 }} animate={{ y: 0, scale: 1 }} exit={{ y: 20, scale: 0.95 }} style={{ ...estilos.notaCard, ...t.fondoPrincipal, ...t.bordeFantasma }} onClick={(e) => e.stopPropagation()}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '15px', borderBottom: `1px solid ${t.bordeFantasma.borderColor}`, paddingBottom: '10px' }}>
-                <div style={{ backgroundColor: 'rgba(234, 179, 8, 0.1)', padding: '8px', borderRadius: '50%' }}><Lightbulb size={24} color="#eab308" /></div>
-                <h3 style={{ margin: 0, ...t.textoPrincipal, fontSize: '1.1rem' }}>Nota del Experto</h3>
-              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '15px', borderBottom: `1px solid ${t.bordeFantasma.borderColor}`, paddingBottom: '10px' }}><div style={{ backgroundColor: 'rgba(234, 179, 8, 0.1)', padding: '8px', borderRadius: '50%' }}><Lightbulb size={24} color="#eab308" /></div><h3 style={{ margin: 0, ...t.textoPrincipal, fontSize: '1.1rem' }}>Nota del Experto</h3></div>
               <p style={{ ...t.textoPrincipal, fontSize: '0.95rem', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>{pasoActual.notaExperta}</p>
               <button onClick={() => setNotaVisible(false)} style={{ ...estilos.btnPrimarioGuardar, width: '100%', marginTop: '20px', justifyContent: 'center' }}>Entendido</button>
             </motion.div>
@@ -274,21 +296,16 @@ export default function AppDiagnostico() {
       </AnimatePresence>
 
       <nav style={{ ...estilos.navInferior, ...t.cristalBgNav, ...t.bordeFantasmaTop }}>
-        <div style={{ width: '80px', display: 'flex', justifyContent: 'center' }}>
-          {historial.length > 0 && <button style={{ ...estilos.navBtn, ...t.textoSutil }} onClick={irAtras}><ArrowLeft size={24} /> <span style={estilos.navLabel}>BACK</span></button>}
-        </div>
+        <div style={{ width: '80px', display: 'flex', justifyContent: 'center' }}>{historial.length > 0 && <button style={{ ...estilos.navBtn, ...t.textoSutil }} onClick={irAtras}><ArrowLeft size={24} /> <span style={estilos.navLabel}>BACK</span></button>}</div>
         <button style={estilos.navBtnCentro} onClick={() => { setHistorial([]); cargarPaso('inicio'); }}><Home size={24} color="white" /></button>
-        <div style={{ width: '80px', display: 'flex', justifyContent: 'center' }}>
-          <button style={{ ...estilos.navBtn, ...t.textoSutil }} onClick={abrirAdmin}><Settings size={24} /> <span style={estilos.navLabel}>ADMIN</span></button>
-        </div>
+        <div style={{ width: '80px', display: 'flex', justifyContent: 'center' }}><button style={{ ...estilos.navBtn, ...t.textoSutil }} onClick={abrirAdmin}><Settings size={24} /> <span style={estilos.navLabel}>ADMIN</span></button></div>
       </nav>
 
-      {/* MODAL DEL PANEL ADMINISTRADOR */}
+      {/* MODAL DEL PANEL ADMINISTRADOR (Ocultado en este bloque por espacio, pero es el mismo que ya tienes arriba) */}
       <AnimatePresence>
         {mostrarAdmin && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={estilos.modalOverlay}>
             <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} style={{ ...estilos.modalCard, ...t.fondoPrincipal, ...t.bordeFantasma }}>
-
               <div style={estilos.modalHeader}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   {vistaAdmin === 'formulario' && <button onClick={() => setVistaAdmin('lista')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0058bc', display: 'flex', alignItems: 'center' }} title="Volver"><ArrowLeft size={20} /></button>}
@@ -302,11 +319,7 @@ export default function AppDiagnostico() {
 
               {vistaAdmin === 'login' && (
                 <div style={estilos.modalBody}>
-                  <div style={{ textAlign: 'center', marginBottom: '20px', padding: '20px 0' }}>
-                    <div style={{ display: 'inline-flex', padding: '20px', backgroundColor: 'rgba(0, 88, 188, 0.08)', borderRadius: '50%', marginBottom: '20px' }}><Lock size={40} color="#0058bc" /></div>
-                    <h4 style={{ ...t.textoPrincipal, margin: '0 0 10px 0', fontSize: '1.2rem' }}>Acceso Restringido</h4>
-                    <p style={{ ...t.textoSutil, margin: 0, fontSize: '0.9rem' }}>Ingresa tus credenciales maestras para modificar los diagnósticos.</p>
-                  </div>
+                  <div style={{ textAlign: 'center', marginBottom: '20px', padding: '20px 0' }}><div style={{ display: 'inline-flex', padding: '20px', backgroundColor: 'rgba(0, 88, 188, 0.08)', borderRadius: '50%', marginBottom: '20px' }}><Lock size={40} color="#0058bc" /></div><h4 style={{ ...t.textoPrincipal, margin: '0 0 10px 0', fontSize: '1.2rem' }}>Acceso Restringido</h4><p style={{ ...t.textoSutil, margin: 0, fontSize: '0.9rem' }}>Ingresa tus credenciales maestras para modificar los diagnósticos.</p></div>
                   <form onSubmit={iniciarSesion} style={{ display: 'flex', flexDirection: 'column', gap: '15px', maxWidth: '400px', margin: '0 auto', width: '100%' }}>
                     <div><label style={{ ...estilos.labelForm, ...t.textoPrincipal }}>Correo Electrónico</label><input required type="email" style={{ ...estilos.inputForm, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} value={emailAdmin} onChange={(e) => setEmailAdmin(e.target.value)} placeholder="admin@taller.com" /></div>
                     <div><label style={{ ...estilos.labelForm, ...t.textoPrincipal }}>Contraseña</label><input required type="password" style={{ ...estilos.inputForm, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} value={passAdmin} onChange={(e) => setPassAdmin(e.target.value)} placeholder="••••••••" /></div>
@@ -328,9 +341,7 @@ export default function AppDiagnostico() {
                         <div style={{ flex: 1, overflow: 'hidden' }}><h4 style={{ margin: '0 0 4px 0', fontSize: '0.9rem', color: '#0058bc', fontWeight: 'bold' }}>{paso.id} {paso.notaExperta && <Lightbulb size={12} color="#eab308" />}</h4><p style={{ margin: 0, fontSize: '0.8rem', ...t.textoPrincipal, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{paso.pregunta}</p></div>
                         <div style={{ display: 'flex', gap: '5px' }}><button onClick={() => editarPaso(paso)} style={estilos.btnAccionLista}><Edit size={16} color="#eab308" /></button><button onClick={() => eliminarPaso(paso.id)} style={estilos.btnAccionLista}><Trash2 size={16} color="#ef4444" /></button></div>
                       </div>
-                    ))
-                    )
-                    ) : (<div style={{ paddingRight: '10px' }}>{listaPasos.length > 0 ? renderArbol('inicio') : <p style={{ textAlign: 'center', color: '#9ca3af' }}>Cargando árbol...</p>}</div>)}
+                    )))) : (<div style={{ paddingRight: '10px' }}>{listaPasos.length > 0 ? renderArbol('inicio') : <p style={{ textAlign: 'center', color: '#9ca3af' }}>Cargando árbol...</p>}</div>)}
                   </div>
                 </div>
               )}
@@ -343,7 +354,7 @@ export default function AppDiagnostico() {
                     <label style={{ ...estilos.labelForm, ...t.textoPrincipal, marginTop: '10px' }}>Pregunta o Diagnóstico a mostrar</label>
                     <textarea style={{ ...estilos.inputForm, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma, minHeight: '80px' }} value={formPregunta} onChange={(e) => setFormPregunta(e.target.value)} placeholder="¿Qué revisamos ahora?" />
                     <label style={{ ...estilos.labelForm, color: '#eab308', marginTop: '10px', display: 'flex', alignItems: 'center', gap: '5px' }}><Lightbulb size={16} /> Nota del Experto (Opcional)</label>
-                    <textarea style={{ ...estilos.inputForm, ...t.cristalBgItem, ...t.textoPrincipal, border: '1px solid rgba(234, 179, 8, 0.3)', minHeight: '60px' }} value={formNota} onChange={(e) => setFormNota(e.target.value)} placeholder="Ej: Ten cuidado al levantar el flex, suele romperse fácilmente..." />
+                    <textarea style={{ ...estilos.inputForm, ...t.cristalBgItem, ...t.textoPrincipal, border: '1px solid rgba(234, 179, 8, 0.3)', minHeight: '60px' }} value={formNota} onChange={(e) => setFormNota(e.target.value)} placeholder="Ej: Ten cuidado al levantar el flex..." />
                     <div style={estilos.checkboxGroup}><input type="checkbox" id="esFinal" checked={formEsFinal} onChange={(e) => setFormEsFinal(e.target.checked)} /><label htmlFor="esFinal" style={{ ...t.textoPrincipal, fontWeight: '600' }}>¿Es un diagnóstico final?</label></div>
                     {!formEsFinal && (
                       <div style={estilos.opcionesContainer}>
@@ -371,9 +382,7 @@ export default function AppDiagnostico() {
 }
 
 const estilos = {
-  contenedor: { minHeight: '100vh', fontFamily: '"Inter", system-ui, -apple-system, sans-serif', paddingBottom: '100px', display: 'flex', flexDirection: 'column', transition: 'background-color 0.3s' }, header: { paddingTop: '16px', paddingBottom: '16px', position: 'relative' }, headerInner: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', maxWidth: '1200px', margin: '0 auto', padding: '0 24px' }, logoTexto: { fontSize: '0.875rem', fontWeight: '800', letterSpacing: '0.05em', margin: 0 }, btnTema: { background: 'none', border: 'none', cursor: 'pointer', padding: '8px' }, lineaAcento: { height: '3px', width: '30%', background: 'linear-gradient(135deg, #0058bc 0%, #0070eb 100%)', position: 'absolute', bottom: 0, left: 0 }, main: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 20px', maxWidth: '900px', margin: '0 auto', width: '100%' }, tarjetaCristal: { width: '100%', borderRadius: '2.5rem', padding: '50px', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', boxShadow: '0 20px 40px rgba(0, 88, 188, 0.05)', display: 'flex', flexDirection: 'column', alignItems: 'center' }, seccionTitulo: { textAlign: 'center', marginBottom: '40px', maxWidth: '600px', position: 'relative' }, etiquetaPaso: { fontSize: '0.75rem', fontWeight: '800', letterSpacing: '0.1em', textTransform: 'uppercase', display: 'block', marginBottom: '16px' }, tituloPregunta: { fontSize: '2.2rem', fontWeight: '800', letterSpacing: '-0.02em', lineHeight: '1.2', margin: '0 0 16px 0' }, gridOpciones: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px', width: '100%' }, btnOpcion: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px', borderRadius: '1.5rem', cursor: 'pointer', textAlign: 'left', transition: 'all 0.3s ease' }, opcionContenido: { display: 'flex', alignItems: 'center', gap: '16px' }, iconoCirculo: { width: '48px', height: '48px', borderRadius: '50%', backgroundColor: 'rgba(0, 88, 188, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }, textosOpcion: { display: 'flex', flexDirection: 'column', gap: '4px' }, tituloOpcion: { fontSize: '1.05rem', fontWeight: '700' }, descOpcion: { fontSize: '0.8rem' }, estadoFinal: { display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 0', textAlign: 'center' }, iconoFinalBg: { width: '80px', height: '80px', borderRadius: '50%', backgroundColor: 'rgba(0, 88, 188, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '24px' }, textoFinal: { fontSize: '1.5rem', fontWeight: '700', marginBottom: '32px' }, btnPrimario: { background: 'linear-gradient(135deg, #0058bc 0%, #0070eb 100%)', color: 'white', border: 'none', padding: '16px 32px', borderRadius: '1.5rem', fontSize: '1rem', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', boxShadow: '0 10px 20px rgba(0, 88, 188, 0.2)' }, navInferior: { position: 'fixed', bottom: 0, left: 0, right: 0, height: '80px', display: 'flex', justifyContent: 'space-around', alignItems: 'center', padding: '0 20px', backdropFilter: 'blur(25px)', WebkitBackdropFilter: 'blur(25px)', zIndex: 1000 }, navBtn: { background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', cursor: 'pointer', width: '80px' }, navLabel: { fontSize: '0.65rem', fontWeight: '700', letterSpacing: '0.05em' }, navBtnCentro: { width: '56px', height: '56px', borderRadius: '50%', background: 'linear-gradient(135deg, #0058bc 0%, #0070eb 100%)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 10px 25px rgba(0, 88, 188, 0.3)', transform: 'translateY(-15px)' }, modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(5px)', zIndex: 2000, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }, modalCard: { width: '100%', maxWidth: '700px', maxHeight: '90vh', borderRadius: '1.5rem', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' }, notaCard: { width: '100%', maxWidth: '400px', borderRadius: '1.5rem', padding: '25px', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' }, modalHeader: { padding: '20px 30px', borderBottom: '1px solid rgba(150,150,150,0.2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }, modalTitulo: { margin: 0, fontSize: '1.2rem', fontWeight: 'bold' }, btnCerrar: { background: 'none', border: 'none', cursor: 'pointer' }, modalBody: { padding: '20px 30px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '15px', flex: 1 }, listaContainer: { display: 'flex', flexDirection: 'column', gap: '10px', overflowY: 'auto', maxHeight: '500px', paddingRight: '5px' }, listaItem: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 15px', borderRadius: '10px' }, btnAccionLista: { background: 'none', border: 'none', cursor: 'pointer', padding: '6px', borderRadius: '8px', backgroundColor: 'rgba(0,0,0,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center' }, labelForm: { fontSize: '0.9rem', fontWeight: '600', marginBottom: '-5px' }, inputForm: { width: '100%', padding: '12px 15px', borderRadius: '10px', fontSize: '1rem', outline: 'none' }, inputFormPequeño: { width: '100%', padding: '10px 15px', borderRadius: '8px', fontSize: '0.9rem', outline: 'none' }, checkboxGroup: { display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 0' }, opcionesContainer: { backgroundColor: 'rgba(0,0,0,0.03)', padding: '20px', borderRadius: '12px', marginTop: '10px' }, opcionRow: { display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '15px' }, btnBorrarOp: { background: 'none', border: 'none', cursor: 'pointer', padding: '5px' }, btnAgregarOp: { background: 'none', border: 'none', color: '#0058bc', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer', padding: '10px 0' }, modalFooter: { padding: '20px 30px', borderTop: '1px solid rgba(150,150,150,0.2)', display: 'flex', justifyContent: 'flex-end' }, btnPrimarioGuardar: { background: 'linear-gradient(135deg, #0058bc 0%, #0070eb 100%)', color: 'white', border: 'none', padding: '12px 24px', borderRadius: '10px', fontSize: '1rem', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center' },
-  // NUEVO: Estilo del botón TIP con contraste alto
-  btnBombillo: { backgroundColor: '#fef08a', border: '1px solid #eab308', borderRadius: '20px', padding: '4px 10px', display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginLeft: '10px' },
+  contenedor: { minHeight: '100vh', fontFamily: '"Inter", system-ui, -apple-system, sans-serif', paddingBottom: '100px', display: 'flex', flexDirection: 'column', transition: 'background-color 0.3s' }, header: { paddingTop: '16px', paddingBottom: '16px', position: 'relative' }, headerInner: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', maxWidth: '1200px', margin: '0 auto', padding: '0 24px' }, logoTexto: { fontSize: '0.875rem', fontWeight: '800', letterSpacing: '0.05em', margin: 0 }, btnTema: { background: 'none', border: 'none', cursor: 'pointer', padding: '8px' }, lineaAcento: { height: '3px', width: '30%', background: 'linear-gradient(135deg, #0058bc 0%, #0070eb 100%)', position: 'absolute', bottom: 0, left: 0 }, main: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 20px', maxWidth: '900px', margin: '0 auto', width: '100%' }, tarjetaCristal: { width: '100%', borderRadius: '2.5rem', padding: '50px', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', boxShadow: '0 20px 40px rgba(0, 88, 188, 0.05)', display: 'flex', flexDirection: 'column', alignItems: 'center' }, seccionTitulo: { textAlign: 'center', marginBottom: '40px', maxWidth: '600px', position: 'relative' }, etiquetaPaso: { fontSize: '0.75rem', fontWeight: '800', letterSpacing: '0.1em', textTransform: 'uppercase', display: 'block', marginBottom: '16px' }, tituloPregunta: { fontSize: '2.2rem', fontWeight: '800', letterSpacing: '-0.02em', lineHeight: '1.2', margin: '0 0 16px 0' }, gridOpciones: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px', width: '100%' }, btnOpcion: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px', borderRadius: '1.5rem', cursor: 'pointer', textAlign: 'left', transition: 'all 0.3s ease' }, opcionContenido: { display: 'flex', alignItems: 'center', gap: '16px' }, iconoCirculo: { width: '48px', height: '48px', borderRadius: '50%', backgroundColor: 'rgba(0, 88, 188, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }, textosOpcion: { display: 'flex', flexDirection: 'column', gap: '4px' }, tituloOpcion: { fontSize: '1.05rem', fontWeight: '700' }, descOpcion: { fontSize: '0.8rem' }, estadoFinal: { display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 0', textAlign: 'center' }, iconoFinalBg: { width: '80px', height: '80px', borderRadius: '50%', backgroundColor: 'rgba(0, 88, 188, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '24px' }, textoFinal: { fontSize: '1.5rem', fontWeight: '700', marginBottom: '32px' }, btnPrimario: { background: 'linear-gradient(135deg, #0058bc 0%, #0070eb 100%)', color: 'white', border: 'none', padding: '16px 32px', borderRadius: '1.5rem', fontSize: '1rem', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', boxShadow: '0 10px 20px rgba(0, 88, 188, 0.2)' }, navInferior: { position: 'fixed', bottom: 0, left: 0, right: 0, height: '80px', display: 'flex', justifyContent: 'space-around', alignItems: 'center', padding: '0 20px', backdropFilter: 'blur(25px)', WebkitBackdropFilter: 'blur(25px)', zIndex: 1000 }, navBtn: { background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', cursor: 'pointer', width: '80px' }, navLabel: { fontSize: '0.65rem', fontWeight: '700', letterSpacing: '0.05em' }, navBtnCentro: { width: '56px', height: '56px', borderRadius: '50%', background: 'linear-gradient(135deg, #0058bc 0%, #0070eb 100%)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 10px 25px rgba(0, 88, 188, 0.3)', transform: 'translateY(-15px)' }, modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(5px)', zIndex: 2000, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }, modalCard: { width: '100%', maxWidth: '700px', maxHeight: '90vh', borderRadius: '1.5rem', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' }, notaCard: { width: '100%', maxWidth: '400px', borderRadius: '1.5rem', padding: '25px', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' }, modalHeader: { padding: '20px 30px', borderBottom: '1px solid rgba(150,150,150,0.2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }, modalTitulo: { margin: 0, fontSize: '1.2rem', fontWeight: 'bold' }, btnCerrar: { background: 'none', border: 'none', cursor: 'pointer' }, modalBody: { padding: '20px 30px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '15px', flex: 1 }, listaContainer: { display: 'flex', flexDirection: 'column', gap: '10px', overflowY: 'auto', maxHeight: '500px', paddingRight: '5px' }, listaItem: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 15px', borderRadius: '10px' }, btnAccionLista: { background: 'none', border: 'none', cursor: 'pointer', padding: '6px', borderRadius: '8px', backgroundColor: 'rgba(0,0,0,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center' }, labelForm: { fontSize: '0.9rem', fontWeight: '600', marginBottom: '-5px' }, inputForm: { width: '100%', padding: '12px 15px', borderRadius: '10px', fontSize: '1rem', outline: 'none' }, inputFormPequeño: { width: '100%', padding: '10px 15px', borderRadius: '8px', fontSize: '0.9rem', outline: 'none' }, checkboxGroup: { display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 0' }, opcionesContainer: { backgroundColor: 'rgba(0,0,0,0.03)', padding: '20px', borderRadius: '12px', marginTop: '10px' }, opcionRow: { display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '15px' }, btnBorrarOp: { background: 'none', border: 'none', cursor: 'pointer', padding: '5px' }, btnAgregarOp: { background: 'none', border: 'none', color: '#0058bc', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer', padding: '10px 0' }, modalFooter: { padding: '20px 30px', borderTop: '1px solid rgba(150,150,150,0.2)', display: 'flex', justifyContent: 'flex-end' }, btnPrimarioGuardar: { background: 'linear-gradient(135deg, #0058bc 0%, #0070eb 100%)', color: 'white', border: 'none', padding: '12px 24px', borderRadius: '10px', fontSize: '1rem', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center' }, btnBombillo: { backgroundColor: '#fef08a', border: '1px solid #eab308', borderRadius: '20px', padding: '4px 10px', display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginLeft: '10px' },
   dark: { fondoPrincipal: { backgroundColor: '#2f3034' }, cristalBg: { backgroundColor: 'rgba(47, 48, 52, 0.7)' }, cristalBgItem: { backgroundColor: 'rgba(255, 255, 255, 0.03)' }, cristalBgNav: { backgroundColor: 'rgba(47, 48, 52, 0.85)' }, textoPrincipal: { color: '#ffffff' }, textoSutil: { color: '#9ca3af' }, bordeFantasma: { border: '1px solid rgba(255, 255, 255, 0.08)' }, bordeFantasmaBottom: { borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }, bordeFantasmaTop: { borderTop: '1px solid rgba(255, 255, 255, 0.08)' }, hoverBg: 'rgba(255, 255, 255, 0.06)' },
   light: { fondoPrincipal: { backgroundColor: '#faf9fe' }, cristalBg: { backgroundColor: 'rgba(255, 255, 255, 0.8)' }, cristalBgItem: { backgroundColor: 'rgba(255, 255, 255, 1)' }, cristalBgNav: { backgroundColor: 'rgba(250, 249, 254, 0.85)' }, textoPrincipal: { color: '#111827' }, textoSutil: { color: '#6b7280' }, bordeFantasma: { border: '1px solid rgba(0, 0, 0, 0.05)' }, bordeFantasmaBottom: { borderBottom: '1px solid rgba(0, 0, 0, 0.05)' }, bordeFantasmaTop: { borderTop: '1px solid rgba(0, 0, 0, 0.05)' }, hoverBg: 'rgba(0, 88, 188, 0.02)' }
 };
