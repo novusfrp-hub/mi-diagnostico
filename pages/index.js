@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { doc, setDoc, collection, getDocs, deleteDoc } from 'firebase/firestore';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { db, auth } from '../firebase';
-import { Sun, Moon, ArrowLeft, RefreshCcw, Zap, Smartphone, Battery, Power, Wrench, AlertTriangle, ChevronRight, Home, LifeBuoy, ShieldCheck, Camera, Fingerprint, Volume2, Wifi, Signal, CheckCircle2, XCircle, Cpu, Settings, Activity, Monitor, Sparkles, Plus, Save, X, Trash2, Edit, Search, ChevronDown, CornerDownRight, Network, Lock, LogOut, Lightbulb, BookOpen, Usb } from 'lucide-react';
+import { Sun, Moon, ArrowLeft, RefreshCcw, Zap, Smartphone, Battery, Power, Wrench, AlertTriangle, ChevronRight, Home, LifeBuoy, ShieldCheck, Camera, Fingerprint, Volume2, Wifi, Signal, CheckCircle2, XCircle, Cpu, Settings, Activity, Monitor, Sparkles, Plus, Save, X, Trash2, Edit, Search, ChevronDown, CornerDownRight, Network, Lock, LogOut, Lightbulb, BookOpen, Usb, Map } from 'lucide-react';
 
 const SimuladorFuente = ({ voltaje, amperaje }) => {
   const [ampVisible, setAmpVisible] = useState('0.000');
@@ -31,25 +31,23 @@ export default function AppDiagnostico() {
   const [historial, setHistorial] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [tema, setTema] = useState('light');
-
   const [mostrarAdmin, setMostrarAdmin] = useState(false);
   const [vistaAdmin, setVistaAdmin] = useState('login');
   const [estaAutenticado, setEstaAutenticado] = useState(false);
   const [emailAdmin, setEmailAdmin] = useState('');
   const [passAdmin, setPassAdmin] = useState('');
   const [errorLogin, setErrorLogin] = useState('');
-
   const [listaPasos, setListaPasos] = useState([]);
   const [busqueda, setBusqueda] = useState('');
   const [pasosExpandidos, setPasosExpandidos] = useState({});
-
   const [notaVisible, setNotaVisible] = useState(false);
   const [tipVisto, setTipVisto] = useState(false);
   const [mostrarTablaConsumos, setMostrarTablaConsumos] = useState(false);
-
-  // Estados para el panel lateral de Docktest
   const [panelMedicionVisible, setPanelMedicionVisible] = useState(false);
-  const [dockViewTab, setDockViewTab] = useState('diodo'); // 'diodo' o 'ua'
+  const [dockViewTab, setDockViewTab] = useState('diodo');
+
+  // NUEVO: Estados para el visualizador de imágenes
+  const [imgModalVisible, setImgModalVisible] = useState(false);
 
   const [formId, setFormId] = useState('');
   const [formPregunta, setFormPregunta] = useState('');
@@ -59,11 +57,13 @@ export default function AppDiagnostico() {
   const [formTabla, setFormTabla] = useState([]);
   const [formSimV, setFormSimV] = useState('');
   const [formSimA, setFormSimA] = useState('');
-
-  // NUEVO: Estados separados para Diodo y uA en el Admin
   const [dockAdminTab, setDockAdminTab] = useState('diodo');
   const [formDockDiodo, setFormDockDiodo] = useState({ vbus: '', dp: '', dm: '', cc1: '', cc2: '' });
   const [formDockUa, setFormDockUa] = useState({ vbus: '', dp: '', dm: '', cc1: '', cc2: '' });
+
+  // NUEVO: Estados Admin para Imágenes
+  const [formImgUrl, setFormImgUrl] = useState('');
+  const [formImgTipo, setFormImgTipo] = useState('microscopio'); // 'microscopio' o 'esquema'
 
   const [mensajeAdmin, setMensajeAdmin] = useState('');
 
@@ -74,12 +74,8 @@ export default function AppDiagnostico() {
       const datos = await respuesta.json();
       if (!esRetroceso && pasoActual) setHistorial([...historial, pasoActual.id]);
       setPasoActual(datos);
-
-      // Cerrar todos los modales al cambiar de paso
-      setNotaVisible(false); setTipVisto(false); setMostrarTablaConsumos(false); setPanelMedicionVisible(false);
-      // Reiniciar tab de docktest a diodo por defecto si está disponible
-      if (datos.docktestDiodo) setDockViewTab('diodo');
-      else if (datos.docktestUa) setDockViewTab('ua');
+      setNotaVisible(false); setTipVisto(false); setMostrarTablaConsumos(false); setPanelMedicionVisible(false); setImgModalVisible(false);
+      if (datos.docktestDiodo) setDockViewTab('diodo'); else if (datos.docktestUa) setDockViewTab('ua');
     } catch (error) { alert("Hubo un error al cargar el diagnóstico"); }
     setCargando(false);
   };
@@ -87,14 +83,12 @@ export default function AppDiagnostico() {
   const irAtras = () => { if (historial.length === 0) return; const pasoAnterior = historial[historial.length - 1]; const nuevoHistorial = [...historial]; nuevoHistorial.pop(); setHistorial(nuevoHistorial); cargarPaso(pasoAnterior, true); };
   const toggleTema = () => setTema(tema === 'light' ? 'dark' : 'light');
   useEffect(() => { cargarPaso('inicio'); }, []);
-
   const limpiarTexto = (texto) => texto.replace(/[\u{1F300}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F1E6}-\u{1F1FF}\u{2300}-\u{23FF}\u{2B50}]/gu, '').trim();
+
   const obtenerIconoDinamico = (texto) => {
     const txt = texto.toLowerCase();
     if (txt.includes('apple') || txt.includes('iphone')) return <Smartphone size={24} color="#0058bc" />;
     if (txt.includes('carga')) return <Zap size={24} color="#0058bc" />;
-    if (txt.includes('básico') || txt.startsWith('sí')) return <CheckCircle2 size={24} color="#22c55e" />;
-    if (txt.includes('avanzado') || txt.startsWith('no')) return <XCircle size={24} color="#ef4444" />;
     return <ChevronRight size={24} color="#9ca3af" />;
   };
 
@@ -105,10 +99,8 @@ export default function AppDiagnostico() {
 
   const prepararNuevoPaso = () => {
     setFormId(''); setFormPregunta(''); setFormNota(''); setFormEsFinal(false); setFormOpciones([{ texto: '', siguientePaso: '' }]);
-    setFormTabla([]); setFormSimV(''); setFormSimA('');
-    setFormDockDiodo({ vbus: '', dp: '', dm: '', cc1: '', cc2: '' });
-    setFormDockUa({ vbus: '', dp: '', dm: '', cc1: '', cc2: '' });
-    setDockAdminTab('diodo');
+    setFormTabla([]); setFormSimV(''); setFormSimA(''); setFormImgUrl(''); setFormImgTipo('microscopio');
+    setFormDockDiodo({ vbus: '', dp: '', dm: '', cc1: '', cc2: '' }); setFormDockUa({ vbus: '', dp: '', dm: '', cc1: '', cc2: '' });
     setMensajeAdmin(''); setVistaAdmin('formulario');
   };
 
@@ -116,11 +108,9 @@ export default function AppDiagnostico() {
     setFormId(paso.id); setFormPregunta(paso.pregunta || ''); setFormNota(paso.notaExperta || ''); setFormEsFinal(!!paso.esFinal);
     setFormOpciones(paso.opciones && paso.opciones.length > 0 ? paso.opciones : [{ texto: '', siguientePaso: '' }]);
     setFormTabla(paso.tablaReferencia || []); setFormSimV(paso.simVoltaje || ''); setFormSimA(paso.simAmperaje || '');
-
+    setFormImgUrl(paso.imgUrl || ''); setFormImgTipo(paso.imgTipo || 'microscopio');
     setFormDockDiodo(paso.docktestDiodo || { vbus: '', dp: '', dm: '', cc1: '', cc2: '' });
     setFormDockUa(paso.docktestUa || { vbus: '', dp: '', dm: '', cc1: '', cc2: '' });
-    setDockAdminTab('diodo');
-
     setMensajeAdmin(''); setVistaAdmin('formulario');
   };
 
@@ -131,12 +121,7 @@ export default function AppDiagnostico() {
   const handleAgregarFilaTabla = () => setFormTabla([...formTabla, { valor: '', descripcion: '' }]);
   const handleQuitarFilaTabla = (index) => { const nuevas = [...formTabla]; nuevas.splice(index, 1); setFormTabla(nuevas); };
   const handleCambioFilaTabla = (index, campo, valor) => { const nuevas = [...formTabla]; nuevas[index][campo] = valor; setFormTabla(nuevas); };
-
-  // Manejador dinámico para el docktest admin
-  const handleDockChange = (campo, valor) => {
-    if (dockAdminTab === 'diodo') setFormDockDiodo({ ...formDockDiodo, [campo]: valor });
-    else setFormDockUa({ ...formDockUa, [campo]: valor });
-  };
+  const handleDockChange = (campo, valor) => { if (dockAdminTab === 'diodo') setFormDockDiodo({ ...formDockDiodo, [campo]: valor }); else setFormDockUa({ ...formDockUa, [campo]: valor }); };
 
   const guardarPasoFirebase = async () => {
     if (!formId || !formPregunta) { setMensajeAdmin('⚠️ ID y pregunta obligatorios.'); return; }
@@ -146,14 +131,12 @@ export default function AppDiagnostico() {
       if (formNota.trim() !== '') datosAGuardar.notaExperta = formNota;
       if (formSimV.trim() !== '') datosAGuardar.simVoltaje = formSimV;
       if (formSimA.trim() !== '') datosAGuardar.simAmperaje = formSimA;
+      if (formImgUrl.trim() !== '') { datosAGuardar.imgUrl = formImgUrl; datosAGuardar.imgTipo = formImgTipo; } else { datosAGuardar.imgUrl = null; }
       if (!formEsFinal) datosAGuardar.opciones = formOpciones;
-
       const tablaValida = formTabla.filter(fila => fila.valor.trim() !== '' || fila.descripcion.trim() !== '');
       if (tablaValida.length > 0) datosAGuardar.tablaReferencia = tablaValida; else datosAGuardar.tablaReferencia = [];
-
       const hasDiodo = Object.values(formDockDiodo).some(v => v.trim() !== '');
       const hasUa = Object.values(formDockUa).some(v => v.trim() !== '');
-
       if (hasDiodo) datosAGuardar.docktestDiodo = formDockDiodo; else datosAGuardar.docktestDiodo = null;
       if (hasUa) datosAGuardar.docktestUa = formDockUa; else datosAGuardar.docktestUa = null;
 
@@ -183,22 +166,14 @@ export default function AppDiagnostico() {
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <span style={{ fontWeight: 'bold', color: '#0058bc', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
                 {paso.id}
-                {(paso.docktestDiodo || paso.docktestUa) && <Usb size={12} color="#3b82f6" title="Tiene Docktest" />}
+                {paso.imgUrl && (paso.imgTipo === 'microscopio' ? <Camera size={12} color="#8b5cf6" /> : <Map size={12} color="#8b5cf6" />)}
               </span>
               <span style={{ fontSize: '0.8rem', color: t.textoPrincipal.color, opacity: 0.8 }}>{paso.pregunta}</span>
             </div>
           </div>
           <div style={{ display: 'flex', gap: '5px' }}><button onClick={() => editarPaso(paso)} style={estilos.btnAccionLista}><Edit size={16} color="#eab308" /></button><button onClick={() => eliminarPaso(paso.id)} style={estilos.btnAccionLista}><Trash2 size={16} color="#ef4444" /></button></div>
         </div>
-        <AnimatePresence>
-          {expandido && tieneHijos && (
-            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} style={{ overflow: 'hidden' }}>
-              {paso.opciones.map((op, idx) => (
-                <div key={idx} style={{ marginTop: '5px' }}><div style={{ fontSize: '0.75rem', color: t.textoSutil.color, marginLeft: '35px', marginTop: '8px', marginBottom: '-5px', display: 'flex', alignItems: 'center', gap: '5px', fontWeight: '600' }}><CornerDownRight size={14} /> "{op.texto}" ➡️</div>{renderArbol(op.siguientePaso, nivel + 1, nuevosVisitados)}</div>
-              ))}
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <AnimatePresence>{expandido && tieneHijos && (<motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} style={{ overflow: 'hidden' }}>{paso.opciones.map((op, idx) => (<div key={idx} style={{ marginTop: '5px' }}><div style={{ fontSize: '0.75rem', color: t.textoSutil.color, marginLeft: '35px', marginTop: '8px', marginBottom: '-5px', display: 'flex', alignItems: 'center', gap: '5px', fontWeight: '600' }}><CornerDownRight size={14} /> "{op.texto}" ➡️</div>{renderArbol(op.siguientePaso, nivel + 1, nuevosVisitados)}</div>))}</motion.div>)}</AnimatePresence>
       </div>
     );
   };
@@ -222,13 +197,19 @@ export default function AppDiagnostico() {
                 {pasoActual.notaExperta && (
                   <motion.button onClick={() => { setNotaVisible(true); setTipVisto(true); }} animate={!tipVisto ? { scale: [1, 1.1, 1], boxShadow: ["0px 0px 0px rgba(234, 179, 8, 0)", "0px 0px 15px rgba(234, 179, 8, 0.7)", "0px 0px 0px rgba(234, 179, 8, 0)"] } : { scale: 1, boxShadow: "none" }} transition={!tipVisto ? { duration: 1.5, repeat: Infinity, ease: "easeInOut" } : { duration: 0.3 }} style={estilos.btnBombillo} title="Tip del Experto"><Lightbulb size={16} color="#a16207" /> <span style={{ fontSize: '0.75rem', fontWeight: '800', color: '#a16207', letterSpacing: '0.05em' }}>TIP</span></motion.button>
                 )}
+
+                {/* BOTÓN DE IMAGEN / ESQUEMÁTICO */}
+                {pasoActual.imgUrl && (
+                  <button onClick={() => setImgModalVisible(true)} style={estilos.btnImgFlotante} title={pasoActual.imgTipo === 'microscopio' ? 'Ver foto microscopio' : 'Ver esquemático'}>
+                    {pasoActual.imgTipo === 'microscopio' ? <Camera size={16} color="white" /> : <Map size={16} color="white" />}
+                    <span style={{ fontSize: '0.7rem', fontWeight: '800', color: 'white' }}>{pasoActual.imgTipo === 'microscopio' ? 'FOTO' : 'PLANO'}</span>
+                  </button>
+                )}
               </span>
               <h2 style={{ ...estilos.tituloPregunta, ...t.textoPrincipal }}>{pasoActual.pregunta}</h2>
             </div>
 
-            {(pasoActual.simVoltaje || pasoActual.simAmperaje) && (
-              <SimuladorFuente voltaje={pasoActual.simVoltaje} amperaje={pasoActual.simAmperaje} />
-            )}
+            {(pasoActual.simVoltaje || pasoActual.simAmperaje) && (<SimuladorFuente voltaje={pasoActual.simVoltaje} amperaje={pasoActual.simAmperaje} />)}
 
             {pasoActual.esFinal ? (
               <div style={estilos.estadoFinal}><div style={estilos.iconoFinalBg}><ShieldCheck size={48} color="#0058bc" /></div><h3 style={{ ...estilos.textoFinal, ...t.textoPrincipal }}>Diagnóstico Completado</h3><button style={estilos.btnPrimario} onClick={() => { setHistorial([]); cargarPaso('inicio'); }}><RefreshCcw size={18} style={{ marginRight: '8px' }} /> Iniciar Nueva Evaluación</button></div>
@@ -245,145 +226,101 @@ export default function AppDiagnostico() {
         </AnimatePresence>
       </main>
 
+      {/* VISUALIZADOR DE IMAGEN (MICROSCÓPIO VIRTUAL) */}
       <AnimatePresence>
-        {tieneDocktest && (
-          <motion.button
-            initial={{ x: 100, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 100, opacity: 0 }}
-            onClick={() => setPanelMedicionVisible(true)}
-            style={{ position: 'fixed', right: 0, top: '40%', transform: 'translateY(-50%)', backgroundColor: dockViewTab === 'diodo' ? '#3b82f6' : '#10b981', color: 'white', border: 'none', padding: '15px 10px 15px 15px', borderRadius: '15px 0 0 15px', cursor: 'pointer', zIndex: 900, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', boxShadow: `-5px 0 15px ${dockViewTab === 'diodo' ? 'rgba(59, 130, 246, 0.4)' : 'rgba(16, 185, 129, 0.4)'}`, transition: 'background-color 0.3s' }}
-          >
-            <motion.div animate={{ opacity: [1, 0.5, 1] }} transition={{ duration: 1.5, repeat: Infinity }}><Usb size={24} /></motion.div>
-            <span style={{ fontSize: '0.7rem', fontWeight: 'bold', writingMode: 'vertical-rl', transform: 'rotate(180deg)', marginTop: '5px' }}>DOCKTEST</span>
-          </motion.button>
+        {imgModalVisible && pasoActual.imgUrl && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={estilos.modalOverlay} onClick={() => setImgModalVisible(false)}>
+            <motion.div initial={{ scale: 0.8 }} animate={{ scale: 1 }} exit={{ scale: 0.8 }} style={estilos.visualizadorContenedor} onClick={(e) => e.stopPropagation()}>
+              <div style={estilos.visualizadorHeader}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  {pasoActual.imgTipo === 'microscopio' ? <Camera size={20} color="white" /> : <Map size={20} color="white" />}
+                  <span style={{ color: 'white', fontWeight: 'bold' }}>{pasoActual.imgTipo === 'microscopio' ? 'Vista de Microscopio' : 'Plano de Referencia'}</span>
+                </div>
+                <button onClick={() => setImgModalVisible(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={24} color="white" /></button>
+              </div>
+              <div style={estilos.visualizadorCuerpo}>
+                <img src={pasoActual.imgUrl} alt="Visualización técnica" style={estilos.imagenTecnica} />
+              </div>
+              <div style={estilos.visualizadorFooter}>
+                Tip: Pellizca o usa el zoom del navegador para ver detalles.
+              </div>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
 
-      {/* DRAWER (PANEL LATERAL) DE DOCKTEST CON TOGGLE */}
+      {/* PANEL DOCKTEST LATERAL (Drawer) */}
+      <AnimatePresence>
+        {tieneDocktest && (
+          <motion.button initial={{ x: 100, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 100, opacity: 0 }} onClick={() => setPanelMedicionVisible(true)} style={{ position: 'fixed', right: 0, top: '40%', transform: 'translateY(-50%)', backgroundColor: dockViewTab === 'diodo' ? '#3b82f6' : '#10b981', color: 'white', border: 'none', padding: '15px 10px 15px 15px', borderRadius: '15px 0 0 15px', cursor: 'pointer', zIndex: 900, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', boxShadow: `-5px 0 15px ${dockViewTab === 'diodo' ? 'rgba(59, 130, 246, 0.4)' : 'rgba(16, 185, 129, 0.4)'}` }}><motion.div animate={{ opacity: [1, 0.5, 1] }} transition={{ duration: 1.5, repeat: Infinity }}><Usb size={24} /></motion.div><span style={{ fontSize: '0.7rem', fontWeight: 'bold', writingMode: 'vertical-rl', transform: 'rotate(180deg)', marginTop: '5px' }}>DOCKTEST</span></motion.button>
+        )}
+      </AnimatePresence>
+
       <AnimatePresence>
         {panelMedicionVisible && tieneDocktest && (
           <>
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1999 }} onClick={() => setPanelMedicionVisible(false)} />
             <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: 'spring', damping: 25, stiffness: 200 }} style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: '320px', backgroundColor: t.fondoPrincipal.backgroundColor, borderLeft: t.bordeFantasma.border, zIndex: 2000, display: 'flex', flexDirection: 'column', boxShadow: '-10px 0 30px rgba(0,0,0,0.2)' }}>
-
-              <div style={{ padding: '20px', borderBottom: t.bordeFantasma.border, display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: dockViewTab === 'diodo' ? 'rgba(59, 130, 246, 0.05)' : 'rgba(16, 185, 129, 0.05)', transition: 'background-color 0.3s' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><Usb size={24} color={dockViewTab === 'diodo' ? '#3b82f6' : '#10b981'} /><h3 style={{ margin: 0, ...t.textoPrincipal, fontSize: '1.1rem' }}>Valores de Referencia</h3></div>
-                <button onClick={() => setPanelMedicionVisible(false)} style={estilos.btnCerrar}><X size={20} color={t.textoSutil.color} /></button>
-              </div>
-
-              <div style={{ padding: '20px', flex: 1, overflowY: 'auto' }}>
-
-                {/* TOGGLE SWITCH EN EL PANEL */}
-                <div style={{ display: 'flex', backgroundColor: 'rgba(0,0,0,0.05)', borderRadius: '20px', padding: '4px', marginBottom: '20px' }}>
-                  <button onClick={() => setDockViewTab('diodo')} disabled={!pasoActual.docktestDiodo} style={{ flex: 1, padding: '8px', borderRadius: '16px', border: 'none', backgroundColor: dockViewTab === 'diodo' ? '#3b82f6' : 'transparent', color: dockViewTab === 'diodo' ? 'white' : (pasoActual.docktestDiodo ? t.textoSutil.color : 'rgba(0,0,0,0.2)'), fontWeight: 'bold', cursor: pasoActual.docktestDiodo ? 'pointer' : 'not-allowed', transition: 'all 0.3s' }}>Diodo (mV)</button>
-                  <button onClick={() => setDockViewTab('ua')} disabled={!pasoActual.docktestUa} style={{ flex: 1, padding: '8px', borderRadius: '16px', border: 'none', backgroundColor: dockViewTab === 'ua' ? '#10b981' : 'transparent', color: dockViewTab === 'ua' ? 'white' : (pasoActual.docktestUa ? t.textoSutil.color : 'rgba(0,0,0,0.2)'), fontWeight: 'bold', cursor: pasoActual.docktestUa ? 'pointer' : 'not-allowed', transition: 'all 0.3s' }}>Microamps (uA)</button>
-                </div>
-
-                {currentDockData ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    {[
-                      { label: 'VBUS', value: currentDockData.vbus, color: '#ef4444' },
-                      { label: 'D-', value: currentDockData.dm, color: dockViewTab === 'diodo' ? '#3b82f6' : '#10b981' },
-                      { label: 'D+', value: currentDockData.dp, color: dockViewTab === 'diodo' ? '#3b82f6' : '#10b981' },
-                      { label: 'CC1', value: currentDockData.cc1, color: '#eab308' },
-                      { label: 'CC2', value: currentDockData.cc2, color: '#eab308' },
-                      { label: 'GND', value: '0.000', color: '#6b7280' }
-                    ].map((pin, i) => pin.value ? (
-                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 15px', backgroundColor: t.cristalBgItem.backgroundColor, borderRadius: '10px', border: t.bordeFantasma.border }}>
-                        <span style={{ fontWeight: 'bold', color: pin.color, fontSize: '1.1rem' }}>{pin.label}</span>
-                        <span style={{ fontWeight: '600', ...t.textoPrincipal, fontSize: '1.1rem' }}>{pin.value} {dockViewTab === 'ua' && pin.label !== 'GND' ? 'uA' : ''}</span>
-                      </div>
-                    ) : null)}
-                  </div>
-                ) : (
-                  <p style={{ textAlign: 'center', color: t.textoSutil.color, marginTop: '20px' }}>No hay valores registrados para esta unidad.</p>
-                )}
-              </div>
+              <div style={{ padding: '20px', borderBottom: t.bordeFantasma.border, display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: dockViewTab === 'diodo' ? 'rgba(59, 130, 246, 0.05)' : 'rgba(16, 185, 129, 0.05)' }}><div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><Usb size={24} color={dockViewTab === 'diodo' ? '#3b82f6' : '#10b981'} /><h3 style={{ margin: 0, ...t.textoPrincipal, fontSize: '1.1rem' }}>Valores de Referencia</h3></div><button onClick={() => setPanelMedicionVisible(false)} style={estilos.btnCerrar}><X size={20} color={t.textoSutil.color} /></button></div>
+              <div style={{ padding: '20px', flex: 1, overflowY: 'auto' }}><div style={{ display: 'flex', backgroundColor: 'rgba(0,0,0,0.05)', borderRadius: '20px', padding: '4px', marginBottom: '20px' }}><button onClick={() => setDockViewTab('diodo')} disabled={!pasoActual.docktestDiodo} style={{ flex: 1, padding: '8px', borderRadius: '16px', border: 'none', backgroundColor: dockViewTab === 'diodo' ? '#3b82f6' : 'transparent', color: dockViewTab === 'diodo' ? 'white' : (pasoActual.docktestDiodo ? t.textoSutil.color : 'rgba(0,0,0,0.2)'), fontWeight: 'bold', cursor: pasoActual.docktestDiodo ? 'pointer' : 'not-allowed' }}>Diodo</button><button onClick={() => setDockViewTab('ua')} disabled={!pasoActual.docktestUa} style={{ flex: 1, padding: '8px', borderRadius: '16px', border: 'none', backgroundColor: dockViewTab === 'ua' ? '#10b981' : 'transparent', color: dockViewTab === 'ua' ? 'white' : (pasoActual.docktestUa ? t.textoSutil.color : 'rgba(0,0,0,0.2)'), fontWeight: 'bold', cursor: pasoActual.docktestUa ? 'pointer' : 'not-allowed' }}>uA</button></div>{currentDockData ? (<div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>{[{ label: 'VBUS', value: currentDockData.vbus, color: '#ef4444' }, { label: 'D-', value: currentDockData.dm, color: dockViewTab === 'diodo' ? '#3b82f6' : '#10b981' }, { label: 'D+', value: currentDockData.dp, color: dockViewTab === 'diodo' ? '#3b82f6' : '#10b981' }, { label: 'CC1', value: currentDockData.cc1, color: '#eab308' }, { label: 'CC2', value: currentDockData.cc2, color: '#eab308' }, { label: 'GND', value: '0.000', color: '#6b7280' }].map((pin, i) => pin.value ? (<div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 15px', backgroundColor: t.cristalBgItem.backgroundColor, borderRadius: '10px', border: t.bordeFantasma.border }}><span style={{ fontWeight: 'bold', color: pin.color, fontSize: '1.1rem' }}>{pin.label}</span><span style={{ fontWeight: '600', ...t.textoPrincipal, fontSize: '1.1rem' }}>{pin.value} {dockViewTab === 'ua' && pin.label !== 'GND' ? 'uA' : ''}</span></div>) : null)}</div>) : (<p style={{ textAlign: 'center', color: t.textoSutil.color }}>Sin datos.</p>)}</div>
             </motion.div>
           </>
         )}
       </AnimatePresence>
 
-      <nav style={{ ...estilos.navInferior, ...t.cristalBgNav, ...t.bordeFantasmaTop }}>
-        <div style={{ width: '80px', display: 'flex', justifyContent: 'center' }}>{historial.length > 0 && <button style={{ ...estilos.navBtn, ...t.textoSutil }} onClick={irAtras}><ArrowLeft size={24} /> <span style={estilos.navLabel}>BACK</span></button>}</div>
-        <button style={estilos.navBtnCentro} onClick={() => { setHistorial([]); cargarPaso('inicio'); }}><Home size={24} color="white" /></button>
-        <div style={{ width: '80px', display: 'flex', justifyContent: 'center' }}><button style={{ ...estilos.navBtn, ...t.textoSutil }} onClick={abrirAdmin}><Settings size={24} /> <span style={estilos.navLabel}>ADMIN</span></button></div>
-      </nav>
+      <nav style={{ ...estilos.navInferior, ...t.cristalBgNav, ...t.bordeFantasmaTop }}><div style={{ width: '80px', display: 'flex', justifyContent: 'center' }}>{historial.length > 0 && <button style={{ ...estilos.navBtn, ...t.textoSutil }} onClick={irAtras}><ArrowLeft size={24} /> <span style={estilos.navLabel}>BACK</span></button>}</div><button style={estilos.navBtnCentro} onClick={() => { setHistorial([]); cargarPaso('inicio'); }}><Home size={24} color="white" /></button><div style={{ width: '80px', display: 'flex', justifyContent: 'center' }}><button style={{ ...estilos.navBtn, ...t.textoSutil }} onClick={abrirAdmin}><Settings size={24} /> <span style={estilos.navLabel}>ADMIN</span></button></div></nav>
 
+      {/* PANEL ADMINISTRADOR CON SECCIÓN DE IMÁGENES */}
       <AnimatePresence>
         {mostrarAdmin && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={estilos.modalOverlay}>
             <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} style={{ ...estilos.modalCard, ...t.fondoPrincipal, ...t.bordeFantasma }}>
-              <div style={estilos.modalHeader}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>{vistaAdmin === 'formulario' && <button onClick={() => setVistaAdmin('lista')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0058bc', display: 'flex', alignItems: 'center' }} title="Volver"><ArrowLeft size={20} /></button>}<h3 style={{ ...estilos.modalTitulo, ...t.textoPrincipal }}>{vistaAdmin === 'login' ? 'Autenticación Requerida' : vistaAdmin === 'lista' ? <><Network size={20} style={{ marginRight: '8px', transform: 'translateY(4px)' }} /> Explorador de Flujos</> : '⚙️ Editar Paso'}</h3></div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>{estaAutenticado && vistaAdmin !== 'login' && <button onClick={cerrarSesion} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', display: 'flex', alignItems: 'center' }} title="Cerrar Sesión"><LogOut size={20} /></button>}<button onClick={() => setMostrarAdmin(false)} style={{ ...estilos.btnCerrar, ...t.textoSutil }}><X size={24} /></button></div>
-              </div>
+              <div style={estilos.modalHeader}><div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>{vistaAdmin === 'formulario' && <button onClick={() => setVistaAdmin('lista')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0058bc' }}><ArrowLeft size={20} /></button>}<h3 style={{ ...estilos.modalTitulo, ...t.textoPrincipal }}>{vistaAdmin === 'login' ? '🔐 Acceso' : vistaAdmin === 'lista' ? '📂 Flujos' : '⚙️ Editar'}</h3></div><div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>{estaAutenticado && vistaAdmin !== 'login' && <button onClick={cerrarSesion} style={{ background: 'none', border: 'none', color: '#ef4444' }}><LogOut size={20} /></button>}<button onClick={() => setMostrarAdmin(false)} style={{ ...estilos.btnCerrar, ...t.textoSutil }}><X size={24} /></button></div></div>
 
               {vistaAdmin === 'login' && (
-                <div style={estilos.modalBody}>
-                  <div style={{ textAlign: 'center', marginBottom: '20px', padding: '20px 0' }}><div style={{ display: 'inline-flex', padding: '20px', backgroundColor: 'rgba(0, 88, 188, 0.08)', borderRadius: '50%', marginBottom: '20px' }}><Lock size={40} color="#0058bc" /></div><h4 style={{ ...t.textoPrincipal, margin: '0 0 10px 0', fontSize: '1.2rem' }}>Acceso Restringido</h4><p style={{ ...t.textoSutil, margin: 0, fontSize: '0.9rem' }}>Ingresa tus credenciales maestras.</p></div>
-                  <form onSubmit={iniciarSesion} style={{ display: 'flex', flexDirection: 'column', gap: '15px', maxWidth: '400px', margin: '0 auto', width: '100%' }}>
-                    <div><label style={{ ...estilos.labelForm, ...t.textoPrincipal }}>Correo Electrónico</label><input required type="email" style={{ ...estilos.inputForm, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} value={emailAdmin} onChange={(e) => setEmailAdmin(e.target.value)} /></div>
-                    <div><label style={{ ...estilos.labelForm, ...t.textoPrincipal }}>Contraseña</label><input required type="password" style={{ ...estilos.inputForm, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} value={passAdmin} onChange={(e) => setPassAdmin(e.target.value)} /></div>
-                    {errorLogin && <p style={{ color: '#ef4444', fontSize: '0.85rem', textAlign: 'center', margin: 0, fontWeight: 'bold' }}>{errorLogin}</p>}
-                    <button type="submit" style={{ ...estilos.btnPrimarioGuardar, justifyContent: 'center', width: '100%', marginTop: '10px' }}>Ingresar al Panel</button>
-                  </form>
-                </div>
+                <div style={estilos.modalBody}><form onSubmit={iniciarSesion} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}><div><label style={estilos.labelForm}>Correo</label><input required type="email" style={{ ...estilos.inputForm, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} value={emailAdmin} onChange={(e) => setEmailAdmin(e.target.value)} /></div><div><label style={estilos.labelForm}>Clave</label><input required type="password" style={{ ...estilos.inputForm, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} value={passAdmin} onChange={(e) => setPassAdmin(e.target.value)} /></div><button type="submit" style={estilos.btnPrimarioGuardar}>Entrar</button></form></div>
               )}
 
               {vistaAdmin === 'lista' && (
-                <div style={estilos.modalBody}>
-                  <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}><div style={{ position: 'relative', flex: 1 }}><Search size={18} style={{ position: 'absolute', left: '10px', top: '12px', color: '#9ca3af' }} /><input style={{ ...estilos.inputForm, paddingLeft: '35px', ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} type="text" placeholder="Buscar falla o ID..." value={busqueda} onChange={(e) => setBusqueda(e.target.value)} /></div><button onClick={prepararNuevoPaso} style={estilos.btnPrimarioGuardar} title="Crear nuevo paso"><Plus size={20} /></button></div>
-                  <div style={estilos.listaContainer}>
-                    {busqueda !== '' ? (pasosFiltrados.length === 0 ? <p style={{ textAlign: 'center', color: '#9ca3af', padding: '20px' }}>No se encontraron pasos.</p> : (pasosFiltrados.map((paso) => (<div key={paso.id} style={{ ...estilos.listaItem, ...t.bordeFantasma, ...t.cristalBgItem }}><div style={{ flex: 1, overflow: 'hidden' }}><h4 style={{ margin: '0 0 4px 0', fontSize: '0.9rem', color: '#0058bc', fontWeight: 'bold', display: 'flex', gap: '5px', alignItems: 'center' }}>{paso.id} {(paso.docktestDiodo || paso.docktestUa) && <Usb size={12} color="#3b82f6" />}</h4><p style={{ margin: 0, fontSize: '0.8rem', ...t.textoPrincipal, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{paso.pregunta}</p></div><div style={{ display: 'flex', gap: '5px' }}><button onClick={() => editarPaso(paso)} style={estilos.btnAccionLista}><Edit size={16} color="#eab308" /></button><button onClick={() => eliminarPaso(paso.id)} style={estilos.btnAccionLista}><Trash2 size={16} color="#ef4444" /></button></div></div>)))) : (<div style={{ paddingRight: '10px' }}>{listaPasos.length > 0 ? renderArbol('inicio') : <p style={{ textAlign: 'center', color: '#9ca3af' }}>Cargando árbol...</p>}</div>)}
-                  </div>
-                </div>
+                <div style={estilos.modalBody}><div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}><input style={{ ...estilos.inputForm, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} type="text" placeholder="Buscar..." value={busqueda} onChange={(e) => setBusqueda(e.target.value)} /><button onClick={prepararNuevoPaso} style={estilos.btnPrimarioGuardar}><Plus size={20} /></button></div><div style={estilos.listaContainer}>{listaPasos.length > 0 ? renderArbol('inicio') : <p>Cargando...</p>}</div></div>
               )}
 
               {vistaAdmin === 'formulario' && (
                 <>
                   <div style={estilos.modalBody}>
-                    <label style={{ ...estilos.labelForm, ...t.textoPrincipal }}>ID del Paso</label>
-                    <input style={{ ...estilos.inputForm, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} type="text" value={formId} onChange={(e) => setFormId(e.target.value.replace(/\s+/g, '_').toLowerCase())} readOnly={formId === 'inicio'} />
-                    <label style={{ ...estilos.labelForm, ...t.textoPrincipal, marginTop: '10px' }}>Pregunta o Diagnóstico a mostrar</label>
-                    <textarea style={{ ...estilos.inputForm, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma, minHeight: '80px' }} value={formPregunta} onChange={(e) => setFormPregunta(e.target.value)} />
+                    <label style={estilos.labelForm}>ID y Pregunta</label>
+                    <input style={{ ...estilos.inputForm, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} type="text" value={formId} onChange={(e) => setFormId(e.target.value)} readOnly={formId === 'inicio'} />
+                    <textarea style={{ ...estilos.inputForm, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma, minHeight: '60px', marginTop: '5px' }} value={formPregunta} onChange={(e) => setFormPregunta(e.target.value)} />
 
-                    {/* PANEL DOCKTEST ADMIN CON TOGGLE */}
-                    <div style={{ ...estilos.opcionesContainer, backgroundColor: dockAdminTab === 'diodo' ? 'rgba(59, 130, 246, 0.05)' : 'rgba(16, 185, 129, 0.05)', border: `1px solid ${dockAdminTab === 'diodo' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(16, 185, 129, 0.2)'}`, transition: 'all 0.3s' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-                        <h4 style={{ ...t.textoPrincipal, margin: 0, display: 'flex', alignItems: 'center', gap: '6px', color: dockAdminTab === 'diodo' ? '#3b82f6' : '#10b981' }}><Usb size={18} /> Valores Docktest</h4>
-                        <div style={{ display: 'flex', gap: '5px', backgroundColor: 'rgba(0,0,0,0.05)', padding: '4px', borderRadius: '12px' }}>
-                          <button onClick={(e) => { e.preventDefault(); setDockAdminTab('diodo') }} style={{ padding: '6px 12px', borderRadius: '8px', border: 'none', background: dockAdminTab === 'diodo' ? '#3b82f6' : 'transparent', color: dockAdminTab === 'diodo' ? 'white' : t.textoSutil.color, cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}>Diodo</button>
-                          <button onClick={(e) => { e.preventDefault(); setDockAdminTab('ua') }} style={{ padding: '6px 12px', borderRadius: '8px', border: 'none', background: dockAdminTab === 'ua' ? '#10b981' : 'transparent', color: dockAdminTab === 'ua' ? 'white' : t.textoSutil.color, cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}>uA</button>
-                        </div>
-                      </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                        <div><label style={{ fontSize: '0.8rem', color: t.textoSutil.color }}>VBUS</label><input style={{ ...estilos.inputFormPequeño, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} type="text" placeholder="Ej: 450" value={currentDockInputs.vbus} onChange={(e) => handleDockChange('vbus', e.target.value)} /></div>
-                        <div><label style={{ fontSize: '0.8rem', color: t.textoSutil.color }}>D+</label><input style={{ ...estilos.inputFormPequeño, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} type="text" placeholder="Ej: 650" value={currentDockInputs.dp} onChange={(e) => handleDockChange('dp', e.target.value)} /></div>
-                        <div><label style={{ fontSize: '0.8rem', color: t.textoSutil.color }}>D-</label><input style={{ ...estilos.inputFormPequeño, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} type="text" placeholder="Ej: 650" value={currentDockInputs.dm} onChange={(e) => handleDockChange('dm', e.target.value)} /></div>
-                        <div><label style={{ fontSize: '0.8rem', color: t.textoSutil.color }}>CC1</label><input style={{ ...estilos.inputFormPequeño, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} type="text" placeholder="Ej: 580" value={currentDockInputs.cc1} onChange={(e) => handleDockChange('cc1', e.target.value)} /></div>
-                        <div><label style={{ fontSize: '0.8rem', color: t.textoSutil.color }}>CC2</label><input style={{ ...estilos.inputFormPequeño, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} type="text" placeholder="Ej: 580" value={currentDockInputs.cc2} onChange={(e) => handleDockChange('cc2', e.target.value)} /></div>
+                    {/* SECCIÓN DE IMÁGENES / ESQUEMÁTICOS */}
+                    <div style={{ ...estilos.opcionesContainer, backgroundColor: 'rgba(139, 92, 246, 0.05)', border: '1px solid rgba(139, 92, 246, 0.2)' }}>
+                      <h4 style={{ ...t.textoPrincipal, margin: '0 0 10px 0', display: 'flex', alignItems: 'center', gap: '6px', color: '#8b5cf6' }}><Camera size={18} /> Microscopio Virtual / Esquemático</h4>
+                      <input style={{ ...estilos.inputFormPequeño, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} type="text" placeholder="Pega el URL de la imagen aquí..." value={formImgUrl} onChange={(e) => setFormImgUrl(e.target.value)} />
+                      <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                        <button onClick={(e) => { e.preventDefault(); setFormImgTipo('microscopio') }} style={{ flex: 1, padding: '8px', borderRadius: '8px', border: 'none', backgroundColor: formImgTipo === 'microscopio' ? '#8b5cf6' : 'rgba(0,0,0,0.05)', color: formImgTipo === 'microscopio' ? 'white' : t.textoSutil.color, cursor: 'pointer', fontSize: '0.8rem' }}>📸 Foto Real</button>
+                        <button onClick={(e) => { e.preventDefault(); setFormImgTipo('esquema') }} style={{ flex: 1, padding: '8px', borderRadius: '8px', border: 'none', backgroundColor: formImgTipo === 'esquema' ? '#8b5cf6' : 'rgba(0,0,0,0.05)', color: formImgTipo === 'esquema' ? 'white' : t.textoSutil.color, cursor: 'pointer', fontSize: '0.8rem' }}>🗺️ Esquemático</button>
                       </div>
                     </div>
 
-                    {/* Simulador Fuente y Otros campos (ocultos por espacio pero iguales que antes) */}
-                    <div style={{ ...estilos.opcionesContainer, backgroundColor: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.2)' }}><h4 style={{ ...t.textoPrincipal, margin: '0 0 10px 0', display: 'flex', alignItems: 'center', gap: '6px', color: '#ef4444' }}><Activity size={18} /> Simulador Fuente DC</h4><div style={{ display: 'flex', gap: '10px' }}><div style={{ flex: 1 }}><input style={{ ...estilos.inputFormPequeño, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} type="text" placeholder="Voltaje (ej: 4.2)" value={formSimV} onChange={(e) => setFormSimV(e.target.value)} /></div><div style={{ flex: 2 }}><input style={{ ...estilos.inputFormPequeño, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} type="text" placeholder="Amperaje animado (0.02, 0.08...)" value={formSimA} onChange={(e) => setFormSimA(e.target.value)} /></div></div></div>
-
-                    <label style={{ ...estilos.labelForm, color: '#eab308', marginTop: '10px', display: 'flex', alignItems: 'center', gap: '5px' }}><Lightbulb size={16} /> Nota del Experto (Opcional)</label>
-                    <textarea style={{ ...estilos.inputForm, ...t.cristalBgItem, ...t.textoPrincipal, border: '1px solid rgba(234, 179, 8, 0.3)', minHeight: '60px' }} value={formNota} onChange={(e) => setFormNota(e.target.value)} />
-
-                    <div style={estilos.checkboxGroup}><input type="checkbox" id="esFinal" checked={formEsFinal} onChange={(e) => setFormEsFinal(e.target.checked)} /><label htmlFor="esFinal" style={{ ...t.textoPrincipal, fontWeight: '600' }}>¿Es un diagnóstico final?</label></div>
-                    {!formEsFinal && (
-                      <div style={estilos.opcionesContainer}>
-                        <h4 style={{ ...t.textoPrincipal, marginBottom: '10px' }}>Opciones de Respuesta:</h4>
-                        {formOpciones.map((op, index) => (
-                          <div key={index} style={estilos.opcionRow}><div style={{ flex: 1 }}><input style={{ ...estilos.inputFormPequeño, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} type="text" placeholder="Texto (ej. Sí)" value={op.texto} onChange={(e) => handleCambioOpcion(index, 'texto', e.target.value)} /><input style={{ ...estilos.inputFormPequeño, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma, marginTop: '8px' }} type="text" placeholder="ID Siguiente" value={op.siguientePaso} onChange={(e) => handleCambioOpcion(index, 'siguientePaso', e.target.value.replace(/\s+/g, '_').toLowerCase())} /></div><button onClick={() => handleQuitarOpcion(index)} style={estilos.btnBorrarOp}><Trash2 size={20} color="#ef4444" /></button></div>
-                        ))}
-                        <button onClick={handleAgregarOpcion} style={estilos.btnAgregarOp}><Plus size={18} /> Agregar opción</button>
+                    <div style={{ ...estilos.opcionesContainer, backgroundColor: 'rgba(59, 130, 246, 0.05)', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                        <h4 style={{ ...t.textoPrincipal, margin: 0, color: '#3b82f6' }}>Valores Docktest</h4>
+                        <div style={{ display: 'flex', gap: '5px' }}>
+                          <button onClick={(e) => { e.preventDefault(); setDockAdminTab('diodo') }} style={{ padding: '4px 8px', borderRadius: '6px', border: 'none', background: dockAdminTab === 'diodo' ? '#3b82f6' : 'transparent', color: dockAdminTab === 'diodo' ? 'white' : t.textoSutil.color, fontSize: '0.7rem' }}>Diodo</button>
+                          <button onClick={(e) => { e.preventDefault(); setDockAdminTab('ua') }} style={{ padding: '4px 8px', borderRadius: '6px', border: 'none', background: dockAdminTab === 'ua' ? '#10b981' : 'transparent', color: dockAdminTab === 'ua' ? 'white' : t.textoSutil.color, fontSize: '0.7rem' }}>uA</button>
+                        </div>
                       </div>
-                    )}
-                    {mensajeAdmin && <p style={{ color: mensajeAdmin.includes('❌') ? '#ef4444' : '#22c55e', fontWeight: 'bold', textAlign: 'center', marginTop: '15px' }}>{mensajeAdmin}</p>}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                        <input style={estilos.inputFormPequeño} placeholder="VBUS" value={currentDockInputs.vbus} onChange={(e) => handleDockChange('vbus', e.target.value)} />
+                        <input style={estilos.inputFormPequeño} placeholder="D+" value={currentDockInputs.dp} onChange={(e) => handleDockChange('dp', e.target.value)} />
+                        <input style={estilos.inputFormPequeño} placeholder="D-" value={currentDockInputs.dm} onChange={(e) => handleDockChange('dm', e.target.value)} />
+                        <input style={estilos.inputFormPequeño} placeholder="CC1" value={currentDockInputs.cc1} onChange={(e) => handleDockChange('cc1', e.target.value)} />
+                        <input style={estilos.inputFormPequeño} placeholder="CC2" value={currentDockInputs.cc2} onChange={(e) => handleDockChange('cc2', e.target.value)} />
+                      </div>
+                    </div>
+                    {mensajeAdmin && <p style={{ color: '#22c55e', textAlign: 'center' }}>{mensajeAdmin}</p>}
                   </div>
-                  <div style={estilos.modalFooter}><button onClick={guardarPasoFirebase} style={estilos.btnPrimarioGuardar}><Save size={18} style={{ marginRight: '8px' }} /> Guardar Paso</button></div>
+                  <div style={estilos.modalFooter}><button onClick={guardarPasoFirebase} style={estilos.btnPrimarioGuardar}><Save size={18} /> Guardar</button></div>
                 </>
               )}
             </motion.div>
@@ -393,8 +330,26 @@ export default function AppDiagnostico() {
     </div>
   );
 }
+
 const estilos = {
-  contenedor: { minHeight: '100vh', fontFamily: '"Inter", system-ui, -apple-system, sans-serif', paddingBottom: '100px', display: 'flex', flexDirection: 'column', transition: 'background-color 0.3s' }, header: { paddingTop: '16px', paddingBottom: '16px', position: 'relative' }, headerInner: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', maxWidth: '1200px', margin: '0 auto', padding: '0 24px' }, logoTexto: { fontSize: '0.875rem', fontWeight: '800', letterSpacing: '0.05em', margin: 0 }, btnTema: { background: 'none', border: 'none', cursor: 'pointer', padding: '8px' }, lineaAcento: { height: '3px', width: '30%', background: 'linear-gradient(135deg, #0058bc 0%, #0070eb 100%)', position: 'absolute', bottom: 0, left: 0 }, main: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 20px', maxWidth: '900px', margin: '0 auto', width: '100%' }, tarjetaCristal: { width: '100%', borderRadius: '2.5rem', padding: '50px', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', boxShadow: '0 20px 40px rgba(0, 88, 188, 0.05)', display: 'flex', flexDirection: 'column', alignItems: 'center' }, seccionTitulo: { textAlign: 'center', marginBottom: '40px', maxWidth: '600px', position: 'relative' }, etiquetaPaso: { fontSize: '0.75rem', fontWeight: '800', letterSpacing: '0.1em', textTransform: 'uppercase', display: 'block', marginBottom: '16px' }, tituloPregunta: { fontSize: '2.2rem', fontWeight: '800', letterSpacing: '-0.02em', lineHeight: '1.2', margin: '0 0 16px 0' }, gridOpciones: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px', width: '100%' }, btnOpcion: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px', borderRadius: '1.5rem', cursor: 'pointer', textAlign: 'left', transition: 'all 0.3s ease' }, opcionContenido: { display: 'flex', alignItems: 'center', gap: '16px' }, iconoCirculo: { width: '48px', height: '48px', borderRadius: '50%', backgroundColor: 'rgba(0, 88, 188, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }, textosOpcion: { display: 'flex', flexDirection: 'column', gap: '4px' }, tituloOpcion: { fontSize: '1.05rem', fontWeight: '700' }, descOpcion: { fontSize: '0.8rem' }, estadoFinal: { display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 0', textAlign: 'center' }, iconoFinalBg: { width: '80px', height: '80px', borderRadius: '50%', backgroundColor: 'rgba(0, 88, 188, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '24px' }, textoFinal: { fontSize: '1.5rem', fontWeight: '700', marginBottom: '32px' }, btnPrimario: { background: 'linear-gradient(135deg, #0058bc 0%, #0070eb 100%)', color: 'white', border: 'none', padding: '16px 32px', borderRadius: '1.5rem', fontSize: '1rem', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', boxShadow: '0 10px 20px rgba(0, 88, 188, 0.2)' }, navInferior: { position: 'fixed', bottom: 0, left: 0, right: 0, height: '80px', display: 'flex', justifyContent: 'space-around', alignItems: 'center', padding: '0 20px', backdropFilter: 'blur(25px)', WebkitBackdropFilter: 'blur(25px)', zIndex: 1000 }, navBtn: { background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', cursor: 'pointer', width: '80px' }, navLabel: { fontSize: '0.65rem', fontWeight: '700', letterSpacing: '0.05em' }, navBtnCentro: { width: '56px', height: '56px', borderRadius: '50%', background: 'linear-gradient(135deg, #0058bc 0%, #0070eb 100%)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 10px 25px rgba(0, 88, 188, 0.3)', transform: 'translateY(-15px)' }, modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(5px)', zIndex: 2000, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }, modalCard: { width: '100%', maxWidth: '700px', maxHeight: '90vh', borderRadius: '1.5rem', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' }, notaCard: { width: '100%', maxWidth: '400px', borderRadius: '1.5rem', padding: '25px', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' }, modalHeader: { padding: '20px 30px', borderBottom: '1px solid rgba(150,150,150,0.2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }, modalTitulo: { margin: 0, fontSize: '1.2rem', fontWeight: 'bold' }, btnCerrar: { background: 'none', border: 'none', cursor: 'pointer' }, modalBody: { padding: '20px 30px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '15px', flex: 1 }, listaContainer: { display: 'flex', flexDirection: 'column', gap: '10px', overflowY: 'auto', maxHeight: '500px', paddingRight: '5px' }, listaItem: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 15px', borderRadius: '10px' }, btnAccionLista: { background: 'none', border: 'none', cursor: 'pointer', padding: '6px', borderRadius: '8px', backgroundColor: 'rgba(0,0,0,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center' }, labelForm: { fontSize: '0.9rem', fontWeight: '600', marginBottom: '-5px' }, inputForm: { width: '100%', padding: '12px 15px', borderRadius: '10px', fontSize: '1rem', outline: 'none' }, inputFormPequeño: { width: '100%', padding: '10px 15px', borderRadius: '8px', fontSize: '0.9rem', outline: 'none' }, checkboxGroup: { display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 0' }, opcionesContainer: { backgroundColor: 'rgba(0,0,0,0.03)', padding: '20px', borderRadius: '12px', marginTop: '10px' }, opcionRow: { display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '15px' }, btnBorrarOp: { background: 'none', border: 'none', cursor: 'pointer', padding: '5px' }, btnAgregarOp: { background: 'none', border: 'none', color: '#0058bc', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer', padding: '10px 0' }, modalFooter: { padding: '20px 30px', borderTop: '1px solid rgba(150,150,150,0.2)', display: 'flex', justifyContent: 'flex-end' }, btnPrimarioGuardar: { background: 'linear-gradient(135deg, #0058bc 0%, #0070eb 100%)', color: 'white', border: 'none', padding: '12px 24px', borderRadius: '10px', fontSize: '1rem', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center' }, btnBombillo: { backgroundColor: '#fef08a', border: '1px solid #eab308', borderRadius: '20px', padding: '4px 10px', display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginLeft: '10px' },
+  contenedor: { minHeight: '100vh', paddingBottom: '100px', display: 'flex', flexDirection: 'column' },
+  header: { padding: '16px 0' }, headerInner: { display: 'flex', justifyContent: 'space-between', padding: '0 24px' }, logoTexto: { fontSize: '0.8rem', fontWeight: '800' }, lineaAcento: { height: '3px', width: '30%', background: '#0058bc' },
+  main: { flex: 1, padding: '40px 20px', maxWidth: '900px', margin: '0 auto', width: '100%' }, tarjetaCristal: { width: '100%', borderRadius: '2rem', padding: '40px', display: 'flex', flexDirection: 'column', alignItems: 'center' },
+  seccionTitulo: { textAlign: 'center', marginBottom: '30px', position: 'relative' }, etiquetaPaso: { fontSize: '0.7rem', fontWeight: '800', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '10px' }, tituloPregunta: { fontSize: '1.8rem', fontWeight: '800' },
+  gridOpciones: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '15px', width: '100%' }, btnOpcion: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '15px', borderRadius: '1.2rem', cursor: 'pointer' }, opcionContenido: { display: 'flex', alignItems: 'center', gap: '12px' }, iconoCirculo: { width: '40px', height: '40px', borderRadius: '50%', backgroundColor: 'rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center' }, tituloOpcion: { fontSize: '1rem', fontWeight: '700' }, descOpcion: { fontSize: '0.75rem' },
+  btnPrimario: { background: '#0058bc', color: 'white', border: 'none', padding: '12px 24px', borderRadius: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center' },
+  navInferior: { position: 'fixed', bottom: 0, left: 0, right: 0, height: '70px', display: 'flex', justifyContent: 'space-around', alignItems: 'center', zIndex: 1000 }, navBtn: { background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer' }, navLabel: { fontSize: '0.6rem', fontWeight: '700' }, navBtnCentro: { width: '50px', height: '50px', borderRadius: '50%', background: '#0058bc', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transform: 'translateY(-10px)' },
+  modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.8)', zIndex: 2000, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }, modalCard: { width: '100%', maxWidth: '600px', maxHeight: '90vh', borderRadius: '1.5rem', display: 'flex', flexDirection: 'column', overflow: 'hidden' }, modalHeader: { padding: '15px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }, modalTitulo: { margin: 0, fontSize: '1rem' }, btnCerrar: { background: 'none', border: 'none', cursor: 'pointer' }, modalBody: { padding: '20px', overflowY: 'auto', flex: 1 }, listaContainer: { display: 'flex', flexDirection: 'column', gap: '10px' }, listaItem: { display: 'flex', justifyContent: 'space-between', padding: '10px', borderRadius: '10px' }, btnAccionLista: { background: 'none', border: 'none', cursor: 'pointer' }, labelForm: { fontSize: '0.8rem', fontWeight: '600' }, inputForm: { width: '100%', padding: '10px', borderRadius: '8px' }, inputFormPequeño: { width: '100%', padding: '8px', borderRadius: '6px', fontSize: '0.8rem' }, opcionesContainer: { padding: '15px', borderRadius: '12px', marginTop: '10px' }, modalFooter: { padding: '15px', display: 'flex', justifyContent: 'flex-end' }, btnPrimarioGuardar: { background: '#0058bc', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' },
+  btnBombillo: { backgroundColor: '#fef08a', border: '1px solid #eab308', borderRadius: '20px', padding: '4px 10px', display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer' },
+
+  // ESTILOS VISUALIZADOR
+  btnImgFlotante: { background: '#8b5cf6', border: 'none', borderRadius: '20px', padding: '4px 10px', display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer', boxShadow: '0 4px 10px rgba(139, 92, 246, 0.3)' },
+  visualizadorContenedor: { width: '95vw', maxWidth: '1000px', height: '80vh', backgroundColor: '#111827', borderRadius: '1.5rem', display: 'flex', flexDirection: 'column', overflow: 'hidden', border: '2px solid #374151' },
+  visualizadorHeader: { padding: '15px 20px', borderBottom: '1px solid #374151', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+  visualizadorCuerpo: { flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden', padding: '10px', backgroundColor: '#000' },
+  imagenTecnica: { maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' },
+  visualizadorFooter: { padding: '10px', textAlign: 'center', color: '#6b7280', fontSize: '0.8rem', borderTop: '1px solid #374151' },
+
   dark: { fondoPrincipal: { backgroundColor: '#2f3034' }, cristalBg: { backgroundColor: 'rgba(47, 48, 52, 0.7)' }, cristalBgItem: { backgroundColor: 'rgba(255, 255, 255, 0.03)' }, cristalBgNav: { backgroundColor: 'rgba(47, 48, 52, 0.85)' }, textoPrincipal: { color: '#ffffff' }, textoSutil: { color: '#9ca3af' }, bordeFantasma: { border: '1px solid rgba(255, 255, 255, 0.08)' }, bordeFantasmaBottom: { borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }, bordeFantasmaTop: { borderTop: '1px solid rgba(255, 255, 255, 0.08)' }, hoverBg: 'rgba(255, 255, 255, 0.06)' },
   light: { fondoPrincipal: { backgroundColor: '#faf9fe' }, cristalBg: { backgroundColor: 'rgba(255, 255, 255, 0.8)' }, cristalBgItem: { backgroundColor: 'rgba(255, 255, 255, 1)' }, cristalBgNav: { backgroundColor: 'rgba(250, 249, 254, 0.85)' }, textoPrincipal: { color: '#111827' }, textoSutil: { color: '#6b7280' }, bordeFantasma: { border: '1px solid rgba(0, 0, 0, 0.05)' }, bordeFantasmaBottom: { borderBottom: '1px solid rgba(0, 0, 0, 0.05)' }, bordeFantasmaTop: { borderTop: '1px solid rgba(0, 0, 0, 0.05)' }, hoverBg: 'rgba(0, 88, 188, 0.02)' }
 };
