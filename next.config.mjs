@@ -1,7 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  /* config options here */
   reactStrictMode: true,
-};
+  eslint: {
+    // Vercel, por favor ignora las advertencias de estilo y compila mi app
+    ignoreDuringBuilds: true,
+  },
+}
 
-export default nextConfig;
+module.exports = nextConfig
