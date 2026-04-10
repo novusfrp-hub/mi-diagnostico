@@ -2,7 +2,6 @@
 const nextConfig = {
   reactStrictMode: true,
   eslint: {
-    // Vercel, ignora los errores de estilo y publica la página
     ignoreDuringBuilds: true,
   },
 };
