@@ -434,8 +434,7 @@ export default function AppDiagnostico() {
                   {casoReporte.imgUrl && (
                     <div style={{ marginTop: '30px', textAlign: 'center', background: '#f9fafb', padding: '20px', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
                       <strong style={{ color: '#111827', display: 'block', marginBottom: '10px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px' }}>Evidencia Técnica Adjunta</strong>
-                      <img src={casoReporte.imgUrl} alt="Evidencia" style={{ maxWidth: '100%', maxHeight: '350px', borderRadius: '8px', objectFit: 'contain' }} />
-                    </div>
+                    <img src={casoReporte.imgUrl} alt="Evidencia" referrerPolicy="no-referrer" style={{ maxWidth: '100%', maxHeight: '350px', borderRadius: '8px', objectFit: 'contain' }} />
                   )}
 
                   <div style={{ marginTop: '50px', textAlign: 'center', fontSize: '12px', color: '#9ca3af', borderTop: '1px solid #e5e7eb', paddingTop: '20px' }}>
