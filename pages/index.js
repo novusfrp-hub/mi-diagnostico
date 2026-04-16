@@ -54,8 +54,12 @@ export default function AppDiagnostico() {
   const [listaPasos, setListaPasos] = useState([]);
   const [busqueda, setBusqueda] = useState('');
   const [pasosExpandidos, setPasosExpandidos] = useState({});
+
+  // ESTADOS DEL TIP EXPERTO (NUEVO)
   const [notaVisible, setNotaVisible] = useState(false);
   const [tipVisto, setTipVisto] = useState(false);
+  const [tipTabActiva, setTipTabActiva] = useState(0);
+
   const [mostrarTablaConsumos, setMostrarTablaConsumos] = useState(false);
   const [panelMedicionVisible, setPanelMedicionVisible] = useState(false);
   const [dockViewTab, setDockViewTab] = useState('diodo');
@@ -77,7 +81,7 @@ export default function AppDiagnostico() {
 
   const [formId, setFormId] = useState('');
   const [formPregunta, setFormPregunta] = useState('');
-  const [formNota, setFormNota] = useState('');
+  const [formTabsNota, setFormTabsNota] = useState([{ titulo: 'General', contenido: '' }]); // NUEVO ESTADO PARA TABS ADMIN
   const [formEsFinal, setFormEsFinal] = useState(false);
   const [formOpciones, setFormOpciones] = useState([{ texto: '', siguientePaso: '' }]);
   const [formTabla, setFormTabla] = useState([]);
@@ -116,7 +120,7 @@ export default function AppDiagnostico() {
         return datos;
       });
 
-      setNotaVisible(false); setTipVisto(false); setMostrarTablaConsumos(false); setPanelMedicionVisible(false); setImgModalVisible(false); setVideoModalVisible(false);
+      setNotaVisible(false); setTipVisto(false); setTipTabActiva(0); setMostrarTablaConsumos(false); setPanelMedicionVisible(false); setImgModalVisible(false); setVideoModalVisible(false);
       if (datos.docktestDiodo) setDockViewTab('diodo'); else if (datos.docktestUa) setDockViewTab('ua');
     } catch (error) { alert("Hubo un error al cargar el diagnóstico"); }
     setCargando(false);
@@ -218,8 +222,24 @@ export default function AppDiagnostico() {
     window.open(url, '_blank');
   };
 
-  const prepararNuevoPaso = () => { setFormId(''); setFormPregunta(''); setFormNota(''); setFormEsFinal(false); setFormOpciones([{ texto: '', siguientePaso: '' }]); setFormTabla([]); setFormSimV(''); setFormSimA(''); setFormImgUrl(''); setFormImgTipo('microscopio'); setFormVideoUrl(''); setFormDockDiodo({ vbus: '', dp: '', dm: '', cc1: '', cc2: '' }); setFormDockUa({ vbus: '', dp: '', dm: '', cc1: '', cc2: '' }); setDockAdminTab('diodo'); setFormEsFallaSerie(false); setFormTituloSerie(''); setFormDescSerie(''); setMensajeAdmin(''); setVistaAdmin('formulario'); };
-  const editarPaso = (paso) => { setFormId(paso.id); setFormPregunta(paso.pregunta || ''); setFormNota(paso.notaExperta || ''); setFormEsFinal(!!paso.esFinal); setFormOpciones(paso.opciones && paso.opciones.length > 0 ? paso.opciones : [{ texto: '', siguientePaso: '' }]); setFormTabla(paso.tablaReferencia || []); setFormSimV(paso.simVoltaje || ''); setFormSimA(paso.simAmperaje || ''); setFormImgUrl(paso.imgUrl || ''); setFormImgTipo(paso.imgTipo || 'microscopio'); setFormVideoUrl(paso.videoUrl || ''); setFormDockDiodo(paso.docktestDiodo || { vbus: '', dp: '', dm: '', cc1: '', cc2: '' }); setFormDockUa(paso.docktestUa || { vbus: '', dp: '', dm: '', cc1: '', cc2: '' }); setDockAdminTab('diodo'); setFormEsFallaSerie(!!paso.esFallaEnSerie); setFormTituloSerie(paso.tituloFallaSerie || ''); setFormDescSerie(paso.descFallaSerie || ''); setMensajeAdmin(''); setVistaAdmin('formulario'); };
+  const prepararNuevoPaso = () => { setFormId(''); setFormPregunta(''); setFormTabsNota([{ titulo: 'General', contenido: '' }]); setFormEsFinal(false); setFormOpciones([{ texto: '', siguientePaso: '' }]); setFormTabla([]); setFormSimV(''); setFormSimA(''); setFormImgUrl(''); setFormImgTipo('microscopio'); setFormVideoUrl(''); setFormDockDiodo({ vbus: '', dp: '', dm: '', cc1: '', cc2: '' }); setFormDockUa({ vbus: '', dp: '', dm: '', cc1: '', cc2: '' }); setDockAdminTab('diodo'); setFormEsFallaSerie(false); setFormTituloSerie(''); setFormDescSerie(''); setMensajeAdmin(''); setVistaAdmin('formulario'); };
+
+  const editarPaso = (paso) => {
+    setFormId(paso.id);
+    setFormPregunta(paso.pregunta || '');
+    // Adaptador para notas antiguas vs nuevas tabs
+    if (paso.tabsNota && paso.tabsNota.length > 0) {
+      setFormTabsNota(paso.tabsNota);
+    } else if (paso.notaExperta) {
+      setFormTabsNota([{ titulo: 'General', contenido: paso.notaExperta }]);
+    } else {
+      setFormTabsNota([{ titulo: 'General', contenido: '' }]);
+    }
+    setFormEsFinal(!!paso.esFinal);
+    setFormOpciones(paso.opciones && paso.opciones.length > 0 ? paso.opciones : [{ texto: '', siguientePaso: '' }]);
+    setFormTabla(paso.tablaReferencia || []); setFormSimV(paso.simVoltaje || ''); setFormSimA(paso.simAmperaje || ''); setFormImgUrl(paso.imgUrl || ''); setFormImgTipo(paso.imgTipo || 'microscopio'); setFormVideoUrl(paso.videoUrl || ''); setFormDockDiodo(paso.docktestDiodo || { vbus: '', dp: '', dm: '', cc1: '', cc2: '' }); setFormDockUa(paso.docktestUa || { vbus: '', dp: '', dm: '', cc1: '', cc2: '' }); setDockAdminTab('diodo'); setFormEsFallaSerie(!!paso.esFallaEnSerie); setFormTituloSerie(paso.tituloFallaSerie || ''); setFormDescSerie(paso.descFallaSerie || ''); setMensajeAdmin(''); setVistaAdmin('formulario');
+  };
+
   const eliminarPaso = async (id) => { if (id === 'inicio') { alert("No puedes eliminar la raíz."); return; } if (window.confirm(`¿Seguro de eliminar "${id}"?`)) { try { await deleteDoc(doc(db, "pasos", id)); cargarTodosLosPasos(); cargarFallasEnSerie(); } catch (error) { alert("Error al eliminar: " + error.message); } } };
   const handleAgregarOpcion = () => setFormOpciones([...formOpciones, { texto: '', siguientePaso: '' }]); const handleQuitarOpcion = (index) => { const nuevas = [...formOpciones]; nuevas.splice(index, 1); setFormOpciones(nuevas); }; const handleCambioOpcion = (index, campo, valor) => { const nuevas = [...formOpciones]; nuevas[index][campo] = valor; setFormOpciones(nuevas); }; const handleAgregarFilaTabla = () => setFormTabla([...formTabla, { valor: '', descripcion: '' }]); const handleQuitarFilaTabla = (index) => { const nuevas = [...formTabla]; nuevas.splice(index, 1); setFormTabla(nuevas); }; const handleCambioFilaTabla = (index, campo, valor) => { const nuevas = [...formTabla]; nuevas[index][campo] = valor; setFormTabla(nuevas); }; const handleDockChange = (campo, valor) => { if (dockAdminTab === 'diodo') setFormDockDiodo({ ...formDockDiodo, [campo]: valor }); else setFormDockUa({ ...formDockUa, [campo]: valor }); };
 
@@ -228,7 +248,17 @@ export default function AppDiagnostico() {
     setMensajeAdmin('Guardando...');
     try {
       const datosAGuardar = { pregunta: formPregunta, esFinal: formEsFinal };
-      if (formNota.trim() !== '') datosAGuardar.notaExperta = formNota;
+
+      // Limpieza y guardado de Tabs
+      const tabsValidas = formTabsNota.filter(t => t.titulo.trim() !== '' && t.contenido.trim() !== '');
+      if (tabsValidas.length > 0) {
+        datosAGuardar.tabsNota = tabsValidas;
+        datosAGuardar.notaExperta = null; // Limpiamos la nota antigua si existía
+      } else {
+        datosAGuardar.tabsNota = [];
+        datosAGuardar.notaExperta = null;
+      }
+
       if (formSimV.trim() !== '') datosAGuardar.simVoltaje = formSimV;
       if (formSimA.trim() !== '') datosAGuardar.simAmperaje = formSimA;
       if (formImgUrl.trim() !== '') { datosAGuardar.imgUrl = formImgUrl; datosAGuardar.imgTipo = formImgTipo; } else { datosAGuardar.imgUrl = null; }
@@ -285,6 +315,12 @@ export default function AppDiagnostico() {
   const currentDockData = dockViewTab === 'diodo' ? pasoActual.docktestDiodo : pasoActual.docktestUa;
   const currentDockInputs = dockAdminTab === 'diodo' ? formDockDiodo : formDockUa;
 
+  // Lógica para saber si este paso tiene algún Tip que mostrar
+  const arrayTips = pasoActual.tabsNota && pasoActual.tabsNota.length > 0
+    ? pasoActual.tabsNota
+    : (pasoActual.notaExperta ? [{ titulo: 'General', contenido: pasoActual.notaExperta }] : []);
+  const tieneTips = arrayTips.length > 0;
+
   return (
     <div style={{ ...estilos.contenedor, ...t.fondoPrincipal }}>
 
@@ -327,7 +363,7 @@ export default function AppDiagnostico() {
             <div style={estilos.seccionTitulo}>
               <span style={{ ...estilos.etiquetaPaso, color: '#0058bc', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', flexWrap: 'wrap' }}>
                 PASO {String(historial.length + 1).padStart(2, '0')}
-                {pasoActual.notaExperta && (<motion.button onClick={() => { setNotaVisible(true); setTipVisto(true); }} animate={!tipVisto ? { scale: [1, 1.1, 1], boxShadow: ["0px 0px 0px rgba(234, 179, 8, 0)", "0px 0px 15px rgba(234, 179, 8, 0.7)", "0px 0px 0px rgba(234, 179, 8, 0)"] } : { scale: 1, boxShadow: "none" }} transition={!tipVisto ? { duration: 1.5, repeat: Infinity, ease: "easeInOut" } : { duration: 0.3 }} style={estilos.btnBombillo} title="Tip del Experto"><Lightbulb size={16} color="#a16207" /> <span style={{ fontSize: '0.75rem', fontWeight: '800', color: '#a16207' }}>TIP</span></motion.button>)}
+                {tieneTips && (<motion.button onClick={() => { setNotaVisible(true); setTipVisto(true); setTipTabActiva(0); }} animate={!tipVisto ? { scale: [1, 1.1, 1], boxShadow: ["0px 0px 0px rgba(234, 179, 8, 0)", "0px 0px 15px rgba(234, 179, 8, 0.7)", "0px 0px 0px rgba(234, 179, 8, 0)"] } : { scale: 1, boxShadow: "none" }} transition={!tipVisto ? { duration: 1.5, repeat: Infinity, ease: "easeInOut" } : { duration: 0.3 }} style={estilos.btnBombillo} title="Wiki Técnica"><Lightbulb size={16} color="#a16207" /> <span style={{ fontSize: '0.75rem', fontWeight: '800', color: '#a16207' }}>TIPS ({arrayTips.length})</span></motion.button>)}
                 {pasoActual.imgUrl && (<button onClick={() => setImgModalVisible(true)} style={estilos.btnImgFlotante} title="Ver Imagen"><Camera size={16} color="white" /> <span style={{ fontSize: '0.7rem', fontWeight: '800', color: 'white' }}>{pasoActual.imgTipo === 'microscopio' ? 'FOTO' : 'PLANO'}</span></button>)}
                 {pasoActual.videoUrl && (<button onClick={() => setVideoModalVisible(true)} style={{ ...estilos.btnImgFlotante, background: '#ef4444', boxShadow: '0 4px 10px rgba(239, 68, 68, 0.3)' }} title="Ver Video"><Play size={16} color="white" /> <span style={{ fontSize: '0.7rem', fontWeight: '800', color: 'white' }}>VIDEO</span></button>)}
               </span>
@@ -351,7 +387,51 @@ export default function AppDiagnostico() {
         </AnimatePresence>
       </main>
 
-      {/* MODAL: BITÁCORA - VUELVE A LA CAJA DE TEXTO SIMPLE */}
+      {/* NUEVO MODAL: WIKI TÉCNICA (TIPS CON PESTAÑAS) */}
+      <AnimatePresence>
+        {notaVisible && tieneTips && (
+          <motion.div className="no-print" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={estilos.modalOverlay}>
+            <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} style={{ ...estilos.modalCard, ...t.fondoPrincipal, ...t.bordeFantasma, maxWidth: '700px' }}>
+              <div style={{ ...estilos.modalHeader, backgroundColor: '#fef08a', borderBottom: '1px solid #fde047' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#854d0e' }}>
+                  <Lightbulb size={24} />
+                  <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 'bold' }}>Wiki Técnica</h3>
+                </div>
+                <button onClick={() => setNotaVisible(false)} style={{ ...estilos.btnCerrar, color: '#854d0e' }}><X size={24} /></button>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', maxHeight: '70vh' }}>
+                {/* CABECERA DE PESTAÑAS */}
+                <div style={{ display: 'flex', overflowX: 'auto', borderBottom: t.bordeFantasma.border, backgroundColor: 'rgba(0,0,0,0.03)', scrollbarWidth: 'none' }}>
+                  {arrayTips.map((tab, index) => (
+                    <button
+                      key={index}
+                      onClick={() => setTipTabActiva(index)}
+                      style={{
+                        padding: '14px 24px',
+                        border: 'none',
+                        background: 'none',
+                        borderBottom: tipTabActiva === index ? '3px solid #eab308' : '3px solid transparent',
+                        color: tipTabActiva === index ? '#ca8a04' : t.textoSutil.color,
+                        fontWeight: 'bold',
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap',
+                        transition: 'all 0.2s'
+                      }}>
+                      {tab.titulo}
+                    </button>
+                  ))}
+                </div>
+                {/* CONTENIDO DE LA PESTAÑA */}
+                <div style={{ padding: '25px', overflowY: 'auto', flex: 1, color: t.textoPrincipal.color, lineHeight: '1.6', fontSize: '1rem', whiteSpace: 'pre-wrap' }}>
+                  {arrayTips[tipTabActiva]?.contenido}
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* MODAL: BITÁCORA */}
       <AnimatePresence>
         {bitacoraVisible && (
           <motion.div className="no-print" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={estilos.modalOverlay}>
@@ -362,13 +442,10 @@ export default function AppDiagnostico() {
                   <div style={{ display: 'flex', gap: '10px' }}><div style={{ flex: 1 }}><label style={{ ...estilos.labelForm, ...t.textoPrincipal }}>Marca *</label><input required type="text" placeholder="Ej: Samsung" style={{ ...estilos.inputForm, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} value={formCaso.marca} onChange={(e) => setFormCaso({ ...formCaso, marca: e.target.value })} /></div><div style={{ flex: 1 }}><label style={{ ...estilos.labelForm, ...t.textoPrincipal }}>Modelo *</label><input required type="text" placeholder="Ej: Galaxy A54" style={{ ...estilos.inputForm, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} value={formCaso.modelo} onChange={(e) => setFormCaso({ ...formCaso, modelo: e.target.value })} /></div></div>
                   <div><label style={{ ...estilos.labelForm, ...t.textoPrincipal }}>Síntomas *</label><textarea required style={{ ...estilos.inputForm, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma, minHeight: '60px' }} value={formCaso.sintomas} onChange={(e) => setFormCaso({ ...formCaso, sintomas: e.target.value })} /></div>
                   <div><label style={{ ...estilos.labelForm, ...t.textoPrincipal }}>Protocolo / Diagnóstico</label><textarea style={{ ...estilos.inputForm, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma, minHeight: '60px' }} value={formCaso.protocolo} onChange={(e) => setFormCaso({ ...formCaso, protocolo: e.target.value })} /></div>
-
-                  {/* CAJA SIMPLE DE ENLACE */}
                   <div>
                     <label style={{ ...estilos.labelForm, ...t.textoPrincipal }}>Enlace Imagen (Opcional - Recomendado Postimages)</label>
                     <input type="text" placeholder="https://i.postimg.cc/..." style={{ ...estilos.inputForm, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} value={formCaso.imgUrl} onChange={(e) => setFormCaso({ ...formCaso, imgUrl: e.target.value })} />
                   </div>
-
                   {mensajeCaso && <p style={{ color: mensajeCaso.includes('❌') || mensajeCaso.includes('⚠️') ? '#ef4444' : '#10b981', fontWeight: 'bold', textAlign: 'center', margin: 0 }}>{mensajeCaso}</p>}
                   <button type="submit" style={{ ...estilos.btnPrimarioGuardar, background: '#10b981', justifyContent: 'center', padding: '15px' }}><Save size={20} style={{ marginRight: '8px' }} /> {casoEditando ? 'Actualizar Caso' : 'Guardar Caso en Historial'}</button>
                 </form>
@@ -418,7 +495,6 @@ export default function AppDiagnostico() {
         )}
       </AnimatePresence>
 
-      {/* VISUALIZADORES MULTIMEDIA Y OTROS MODALES */}
       <AnimatePresence>{imgModalVisible && pasoActual.imgUrl && (<motion.div className="no-print" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={estilos.modalOverlay} onClick={() => setImgModalVisible(false)}><motion.div initial={{ scale: 0.8 }} animate={{ scale: 1 }} exit={{ scale: 0.8 }} style={estilos.visualizadorContenedor} onClick={(e) => e.stopPropagation()}><div style={estilos.visualizadorHeader}><div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>{pasoActual.imgTipo === 'microscopio' ? <Camera size={20} color="white" /> : <Map size={20} color="white" />}<span style={{ color: 'white', fontWeight: 'bold' }}>{pasoActual.imgTipo === 'microscopio' ? 'Vista' : 'Plano'}</span></div><button onClick={() => setImgModalVisible(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={24} color="white" /></button></div><div style={estilos.visualizadorCuerpo}><img src={pasoActual.imgUrl} alt="Visualización técnica" referrerPolicy="no-referrer" style={estilos.imagenTecnica} /></div><div style={estilos.visualizadorFooter}>Tip: Usa el zoom de tu pantalla para ver detalles.</div></motion.div></motion.div>)}</AnimatePresence>
       <AnimatePresence>{videoModalVisible && pasoActual.videoUrl && (<motion.div className="no-print" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={estilos.modalOverlay} onClick={() => setVideoModalVisible(false)}><motion.div initial={{ scale: 0.8 }} animate={{ scale: 1 }} exit={{ scale: 0.8 }} style={{ ...estilos.visualizadorContenedor, maxWidth: '800px', height: 'auto', aspectRatio: '16/9' }} onClick={(e) => e.stopPropagation()}><div style={{ ...estilos.visualizadorHeader, borderBottom: 'none' }}><div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><Play size={20} color="white" /><span style={{ color: 'white', fontWeight: 'bold' }}>Video</span></div><button onClick={() => setVideoModalVisible(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={24} color="white" /></button></div><div style={{ flex: 1, backgroundColor: '#000', width: '100%', height: '100%' }}><iframe width="100%" height="100%" src={obtenerUrlVideo(pasoActual.videoUrl)} title="YouTube" frameBorder="0" allowFullScreen style={{ display: 'block' }}></iframe></div></motion.div></motion.div>)}</AnimatePresence>
       <AnimatePresence>{tieneDocktest && (<motion.button className="no-print" initial={{ x: 100, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 100, opacity: 0 }} onClick={() => setPanelMedicionVisible(true)} style={{ position: 'fixed', right: 0, top: '40%', transform: 'translateY(-50%)', backgroundColor: dockViewTab === 'diodo' ? '#3b82f6' : '#10b981', color: 'white', border: 'none', padding: '15px 10px 15px 15px', borderRadius: '15px 0 0 15px', cursor: 'pointer', zIndex: 900, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', boxShadow: `-5px 0 15px ${dockViewTab === 'diodo' ? 'rgba(59, 130, 246, 0.4)' : 'rgba(16, 185, 129, 0.4)'}` }}><motion.div animate={{ opacity: [1, 0.5, 1] }} transition={{ duration: 1.5, repeat: Infinity }}><Usb size={24} /></motion.div><span style={{ fontSize: '0.7rem', fontWeight: 'bold', writingMode: 'vertical-rl', transform: 'rotate(180deg)', marginTop: '5px' }}>DOCKTEST</span></motion.button>)}</AnimatePresence>
@@ -450,7 +526,22 @@ export default function AppDiagnostico() {
                     <div style={{ ...estilos.opcionesContainer, backgroundColor: 'rgba(59, 130, 246, 0.05)', border: '1px solid rgba(59, 130, 246, 0.2)' }}><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}><h4 style={{ ...t.textoPrincipal, margin: 0, color: '#3b82f6' }}>Docktest</h4><div style={{ display: 'flex', gap: '5px' }}><button onClick={(e) => { e.preventDefault(); setDockAdminTab('diodo') }} style={{ padding: '4px 8px', borderRadius: '6px', border: 'none', background: dockAdminTab === 'diodo' ? '#3b82f6' : 'transparent', color: dockAdminTab === 'diodo' ? 'white' : t.textoSutil.color }}>Diodo</button><button onClick={(e) => { e.preventDefault(); setDockAdminTab('ua') }} style={{ padding: '4px 8px', borderRadius: '6px', border: 'none', background: dockAdminTab === 'ua' ? '#10b981' : 'transparent', color: dockAdminTab === 'ua' ? 'white' : t.textoSutil.color }}>uA</button></div></div><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}><input style={estilos.inputFormPequeño} placeholder="VBUS" value={currentDockInputs.vbus} onChange={(e) => handleDockChange('vbus', e.target.value)} /><input style={estilos.inputFormPequeño} placeholder="D+" value={currentDockInputs.dp} onChange={(e) => handleDockChange('dp', e.target.value)} /><input style={estilos.inputFormPequeño} placeholder="D-" value={currentDockInputs.dm} onChange={(e) => handleDockChange('dm', e.target.value)} /><input style={estilos.inputFormPequeño} placeholder="CC1" value={currentDockInputs.cc1} onChange={(e) => handleDockChange('cc1', e.target.value)} /><input style={estilos.inputFormPequeño} placeholder="CC2" value={currentDockInputs.cc2} onChange={(e) => handleDockChange('cc2', e.target.value)} /></div></div>
                     <div style={{ ...estilos.opcionesContainer, backgroundColor: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.2)' }}><h4 style={{ ...t.textoPrincipal, margin: '0 0 10px 0', color: '#ef4444' }}>Simulador Fuente</h4><div style={{ display: 'flex', gap: '10px' }}><input style={{ ...estilos.inputFormPequeño, flex: 1 }} type="text" placeholder="Voltaje" value={formSimV} onChange={(e) => setFormSimV(e.target.value)} /><input style={{ ...estilos.inputFormPequeño, flex: 2 }} type="text" placeholder="Amperaje" value={formSimA} onChange={(e) => setFormSimA(e.target.value)} /></div></div>
                     <div style={{ ...estilos.opcionesContainer, backgroundColor: 'rgba(16, 185, 129, 0.05)', border: '1px solid rgba(16, 185, 129, 0.2)' }}><h4 style={{ ...t.textoPrincipal, margin: '0 0 10px 0', color: '#10b981' }}>Tabla</h4>{formTabla.map((fila, index) => (<div key={index} style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}><input style={{ ...estilos.inputFormPequeño, flex: 0.35 }} type="text" placeholder="Valor" value={fila.valor} onChange={(e) => handleCambioFilaTabla(index, 'valor', e.target.value)} /><input style={{ ...estilos.inputFormPequeño, flex: 0.65 }} type="text" placeholder="Diagnóstico" value={fila.descripcion} onChange={(e) => handleCambioFilaTabla(index, 'descripcion', e.target.value)} /><button onClick={(e) => { e.preventDefault(); handleQuitarFilaTabla(index) }} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}><Trash2 size={18} /></button></div>))}<button onClick={(e) => { e.preventDefault(); handleAgregarFilaTabla() }} style={{ background: 'none', border: 'none', color: '#10b981', fontWeight: 'bold', cursor: 'pointer' }}>+ Fila</button></div>
-                    <label style={{ ...estilos.labelForm, color: '#eab308', marginTop: '10px', display: 'flex', alignItems: 'center', gap: '5px' }}><Lightbulb size={16} /> Nota Experto</label><textarea style={{ ...estilos.inputForm, ...t.cristalBgItem, ...t.textoPrincipal, border: '1px solid rgba(234, 179, 8, 0.3)', minHeight: '40px' }} value={formNota} onChange={(e) => setFormNota(e.target.value)} />
+
+                    {/* NUEVO PANEL ADMIN PARA WIKI TÉCNICA (PESTAÑAS) */}
+                    <div style={{ ...estilos.opcionesContainer, backgroundColor: 'rgba(234, 179, 8, 0.05)', border: '1px solid rgba(234, 179, 8, 0.2)' }}>
+                      <h4 style={{ ...t.textoPrincipal, margin: '0 0 10px 0', color: '#eab308', display: 'flex', alignItems: 'center', gap: '6px' }}><Lightbulb size={18} /> Wiki Técnica (Tips)</h4>
+                      {formTabsNota.map((tab, index) => (
+                        <div key={index} style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '15px', padding: '10px', backgroundColor: 'rgba(0,0,0,0.02)', borderRadius: '8px' }}>
+                          <div style={{ display: 'flex', gap: '10px' }}>
+                            <input style={{ ...estilos.inputFormPequeño, flex: 1, fontWeight: 'bold' }} placeholder="Título (Ej: Teoría, Precaución)" value={tab.titulo} onChange={(e) => { const n = [...formTabsNota]; n[index].titulo = e.target.value; setFormTabsNota(n); }} />
+                            <button onClick={(e) => { e.preventDefault(); const n = [...formTabsNota]; n.splice(index, 1); setFormTabsNota(n); }} style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer' }}><Trash2 size={18} /></button>
+                          </div>
+                          <textarea style={{ ...estilos.inputForm, minHeight: '60px' }} placeholder="Contenido del tip..." value={tab.contenido} onChange={(e) => { const n = [...formTabsNota]; n[index].contenido = e.target.value; setFormTabsNota(n); }} />
+                        </div>
+                      ))}
+                      <button onClick={(e) => { e.preventDefault(); setFormTabsNota([...formTabsNota, { titulo: 'Nueva Pestaña', contenido: '' }]); }} style={estilos.btnAgregarOp}><Plus size={18} /> Agregar Pestaña</button>
+                    </div>
+
                     <div style={estilos.checkboxGroup}><input type="checkbox" id="esFinal" checked={formEsFinal} onChange={(e) => setFormEsFinal(e.target.checked)} /><label htmlFor="esFinal" style={{ ...t.textoPrincipal, fontWeight: '600' }}>¿Final?</label></div>
                     {!formEsFinal && (<div style={estilos.opcionesContainer}><h4 style={{ ...t.textoPrincipal, marginBottom: '10px' }}>Opciones:</h4>{formOpciones.map((op, index) => (<div key={index} style={estilos.opcionRow}><div style={{ flex: 1 }}><input style={{ ...estilos.inputFormPequeño, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} type="text" placeholder="Texto" value={op.texto} onChange={(e) => handleCambioOpcion(index, 'texto', e.target.value)} /><input style={{ ...estilos.inputFormPequeño, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma, marginTop: '4px' }} type="text" placeholder="ID Sig." value={op.siguientePaso} onChange={(e) => handleCambioOpcion(index, 'siguientePaso', e.target.value.replace(/\s+/g, '_').toLowerCase())} /></div><button onClick={(e) => { e.preventDefault(); handleQuitarOpcion(index) }} style={estilos.btnBorrarOp}><Trash2 size={20} color="#ef4444" /></button></div>))}<button onClick={(e) => { e.preventDefault(); handleAgregarOpcion() }} style={estilos.btnAgregarOp}><Plus size={18} /> Agregar</button></div>)}
                     {mensajeAdmin && <p style={{ color: mensajeAdmin.includes('❌') ? '#ef4444' : '#22c55e', fontWeight: 'bold', textAlign: 'center' }}>{mensajeAdmin}</p>}
