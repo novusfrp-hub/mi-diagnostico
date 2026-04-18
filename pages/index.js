@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { doc, setDoc, addDoc, collection, getDocs, deleteDoc, updateDoc } from 'firebase/firestore';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth'; 
 import { db, auth } from '../firebase'; 
-import { Sun, Moon, ArrowLeft, RefreshCcw, Zap, Smartphone, AlertTriangle, ChevronRight, Home, ShieldCheck, Camera, CheckCircle2, XCircle, Settings, Plus, Save, X, Trash2, Edit, ChevronDown, CornerDownRight, LogOut, Lightbulb, Usb, Map, Play, Flame, ClipboardList, History, Printer, FileText, MessageCircle } from 'lucide-react'; 
+import { Sun, Moon, ArrowLeft, RefreshCcw, Zap, Smartphone, AlertTriangle, ChevronRight, Home, ShieldCheck, Camera, CheckCircle2, XCircle, Settings, Plus, Save, X, Trash2, Edit, ChevronDown, CornerDownRight, LogOut, Lightbulb, Usb, Map, Play, Flame, ClipboardList, History, Printer, FileText, MessageCircle, Link } from 'lucide-react'; 
 
 const obtenerUrlVideo = (url) => {
   if (!url) return '';
@@ -75,6 +75,10 @@ export default function AppDiagnostico() {
   const [reporteVisible, setReporteVisible] = useState(false);
   const [casoReporte, setCasoReporte] = useState(null);
 
+  // --- ESTADOS NUEVOS PARA EL MULTÍMETRO USB ---
+  const [usbConectado, setUsbConectado] = useState(false);
+  const [lecturaUsb, setLecturaUsb] = useState('---');
+
   const [formId, setFormId] = useState('');
   const [formPregunta, setFormPregunta] = useState('');
   const [formTabsNota, setFormTabsNota] = useState([{ titulo: 'General', contenido: '' }]); 
@@ -93,6 +97,52 @@ export default function AppDiagnostico() {
   const [formTituloSerie, setFormTituloSerie] = useState('');
   const [formDescSerie, setFormDescSerie] = useState('');
   const [mensajeAdmin, setMensajeAdmin] = useState('');
+
+  // --- FUNCIÓN MÁGICA: WEBHID API ---
+  const conectarMultimetroUSB = async () => {
+    try {
+      // 1. Pedir permiso al navegador (usando los IDs de tu Python)
+      const devices = await navigator.hid.requestDevice({
+        filters: [{ vendorId: 0x1A86, productId: 0xE429 }]
+      });
+      
+      if (devices.length === 0) return; // El usuario canceló
+      
+      const myMultimeter = devices[0];
+      await myMultimeter.open();
+      setUsbConectado(true);
+      console.log("¡UT61E+ Conectado!");
+
+      // 2. Escuchar los datos (Traducción de tu función 'procesar_datos_v22')
+      myMultimeter.addEventListener("inputreport", event => {
+        const { data } = event;
+        // Convertir la trama de bytes a texto
+        const text = new TextDecoder().decode(data);
+        
+        if (text.includes("OL") || text.includes("?0")) {
+          setLecturaUsb("OL");
+        } else {
+          // Extraer el número con regex, igual que en tu Python
+          const match = text.match(/([-+]?\d+\.\d+)/);
+          if (match) {
+            const valorExtraido = parseFloat(match[1]).toFixed(3);
+            setLecturaUsb(valorExtraido);
+            
+            // AUTO-LLENADO: Si el admin está abierto en la pestaña 'diodo', llena VBUS
+            setFormDockDiodo(prev => {
+                if (prev.vbus !== valorExtraido) {
+                    return { ...prev, vbus: valorExtraido };
+                }
+                return prev;
+            });
+          }
+        }
+      });
+    } catch (error) {
+      console.error("Error conectando USB:", error);
+      alert("Error al conectar el multímetro. Asegúrate de usar Chrome o Edge en PC.");
+    }
+  };
 
   const cargarFallasEnSerie = async () => {
     try {
@@ -322,6 +372,17 @@ export default function AppDiagnostico() {
         <div style={estilos.headerInner}>
           <h1 style={{ ...estilos.logoTexto, ...t.textoPrincipal }}>MARSHALL CELL CRM</h1>
           <div style={{display: 'flex', gap: '10px', alignItems: 'center'}}>
+            
+            {/* --- VISOR USB --- */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 10px', backgroundColor: '#111827', borderRadius: '8px', border: `1px solid ${usbConectado ? '#00ffff' : '#374151'}` }}>
+              <button onClick={conectarMultimetroUSB} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: usbConectado ? '#00ffff' : '#6b7280' }} title="Conectar UT61E+">
+                <Link size={16} />
+              </button>
+              <span style={{ color: usbConectado ? '#00ffff' : '#6b7280', fontFamily: 'Consolas', fontWeight: 'bold', fontSize: '0.8rem', minWidth: '45px', textAlign: 'right' }}>
+                {lecturaUsb}
+              </span>
+            </div>
+
             <button onClick={abrirHistorial} style={{...estilos.btnHeader, backgroundColor: t.cristalBgItem.backgroundColor, color: t.textoPrincipal.color, border: t.bordeFantasma.border}} title="Ver Historial">
               <History size={16} /> <span style={{fontSize: '0.7rem', fontWeight: 'bold'}}>HISTORIAL</span>
             </button>
@@ -381,6 +442,7 @@ export default function AppDiagnostico() {
         </AnimatePresence>
       </main>
 
+      {/* WIKI TÉCNICA (TIPS CON PESTAÑAS) */}
       <AnimatePresence>
         {notaVisible && tieneTips && (
             <motion.div className="no-print" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={estilos.modalOverlay}>
@@ -422,6 +484,7 @@ export default function AppDiagnostico() {
         )}
       </AnimatePresence>
 
+      {/* MODAL: BITÁCORA */}
       <AnimatePresence>
         {bitacoraVisible && (
           <motion.div className="no-print" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={estilos.modalOverlay}>
@@ -445,6 +508,7 @@ export default function AppDiagnostico() {
         )}
       </AnimatePresence>
 
+      {/* MODAL: HISTORIAL */}
       <AnimatePresence>
         {historialCasosVisible && (
           <motion.div className="no-print" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={estilos.modalOverlay}>
