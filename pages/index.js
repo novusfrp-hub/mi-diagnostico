@@ -424,7 +424,7 @@ export default function AppDiagnostico() {
             {!mostrarAdmin && (
               <div 
                 onClick={conectarMultimetroUSB} 
-                style={{ display: 'flex', alignItems: 'center', gap: '20px', padding: '4px 15px', backgroundColor: '#0a0a0a', borderRadius: '10px', border: `2px solid ${usbConectado ? 'rgba(0, 255, 255, 0.4)' : '#374151'}`, cursor: 'pointer', boxShadow: usbConectado ? 'inset 0 0 15px rgba(0,255,255,0.1)' : 'none', minWidth: '150px', justifyContent: 'space-between' }} 
+                style={{ display: 'flex', alignItems: 'center', gap: '30px', padding: '4px 15px', backgroundColor: '#0a0a0a', borderRadius: '10px', border: `2px solid ${usbConectado ? 'rgba(0, 255, 255, 0.4)' : '#374151'}`, cursor: 'pointer', boxShadow: usbConectado ? 'inset 0 0 15px rgba(0,255,255,0.1)' : 'none', minWidth: '150px', justifyContent: 'space-between' }} 
                 title={usbConectado ? "Multímetro Conectado" : "Clic para conectar UT61E+"}
               >
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
