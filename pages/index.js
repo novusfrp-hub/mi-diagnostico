@@ -418,15 +418,27 @@ export default function AppDiagnostico() {
       <header className="no-print" style={{ ...estilos.header, ...t.bordeFantasmaBottom }}>
         <div style={estilos.headerInner}>
           <h1 style={{ ...estilos.logoTexto, ...t.textoPrincipal }}>MARSHALL CELL CRM</h1>
-          <div style={{display: 'flex', gap: '10px', alignItems: 'center'}}>
+          <div style={{display: 'flex', gap: '15px', alignItems: 'center'}}>
             
-            {/* MINI VISOR USB EN CABECERA PARA MODO NORMAL */}
+            {/* --- NUEVO DISPLAY DIGITAL USB EN CABECERA --- */}
             {!mostrarAdmin && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 10px', backgroundColor: '#111827', borderRadius: '8px', border: `1px solid ${usbConectado ? '#00ffff' : '#374151'}`, cursor: 'pointer' }} onClick={conectarMultimetroUSB} title="Clic para conectar UT61E+">
-                <Link size={16} color={usbConectado ? '#00ffff' : '#6b7280'} />
-                <span style={{ color: lecturaUsb.valor === 'OL' ? '#ff0000' : (usbConectado ? '#00ffff' : '#6b7280'), fontFamily: 'Consolas', fontWeight: 'bold', fontSize: '0.8rem', minWidth: '45px', textAlign: 'right' }}>
-                  {usbConectado ? lecturaUsb.valor : 'USB'}
-                </span>
+              <div 
+                onClick={conectarMultimetroUSB} 
+                style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '4px 15px', backgroundColor: '#0a0a0a', borderRadius: '10px', border: `2px solid ${usbConectado ? 'rgba(0, 255, 255, 0.4)' : '#374151'}`, cursor: 'pointer', boxShadow: usbConectado ? 'inset 0 0 15px rgba(0,255,255,0.1)' : 'none', minWidth: '150px', justifyContent: 'space-between' }} 
+                title={usbConectado ? "Multímetro Conectado" : "Clic para conectar UT61E+"}
+              >
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                  <Link size={16} color={usbConectado ? '#00ffff' : '#6b7280'} />
+                  <span style={{ fontSize: '0.5rem', color: '#6b7280', fontWeight: 'bold', marginTop: '2px', letterSpacing: '1px' }}>UT61E+</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+                  <span style={{ color: lecturaUsb.valor === 'OL' ? '#ff0000' : (usbConectado ? '#00ffff' : '#6b7280'), fontFamily: 'Consolas, monospace', fontWeight: 'bold', fontSize: '1.5rem', textShadow: usbConectado && lecturaUsb.valor !== 'OL' ? '0 0 10px rgba(0,255,255,0.5)' : 'none' }}>
+                    {usbConectado ? lecturaUsb.valor : 'OFF'}
+                  </span>
+                  {usbConectado && lecturaUsb.valor !== 'OL' && (
+                    <span style={{ color: '#888', fontSize: '0.8rem', fontWeight: 'bold' }}>{lecturaUsb.unidad}</span>
+                  )}
+                </div>
               </div>
             )}
 
