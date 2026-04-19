@@ -413,44 +413,41 @@ export default function AppDiagnostico() {
   const tieneTips = arrayTips.length > 0;
 
   return (
-    <><div style={{ ...estilos.contenedor, ...t.fondoPrincipal }}>
-
+    <div style={{ ...estilos.contenedor, ...t.fondoPrincipal }}>
+      
       <header className="no-print" style={{ ...estilos.header, ...t.bordeFantasmaBottom }}>
         <div style={estilos.headerInner}>
           <h1 style={{ ...estilos.logoTexto, ...t.textoPrincipal }}>MARSHALL CELL CRM</h1>
-          <div style={{ display: 'flex', gap: '18px', alignItems: 'center' }}>
-
+          <div style={{display: 'flex', gap: '18px', alignItems: 'center'}}>
+            
             {/* --- NUEVO DISPLAY DIGITAL USB EN CABECERA --- */}
             {!mostrarAdmin && (
-              <div
-                onClick={conectarMultimetroUSB}
-                style={{ display: 'flex', alignItems: 'center', gap: '20px', padding: '10px 25px', backgroundColor: '#0a0a0a', borderRadius: '10px', border: `2px solid ${usbConectado ? 'rgba(0, 255, 255, 0.4)' : '#374151'}`, cursor: 'pointer', boxShadow: usbConectado ? 'inset 0 0 15px rgba(0,255,255,0.1)' : 'none', minWidth: '150px', justifyContent: 'space-between' }}
+              <div 
+                onClick={conectarMultimetroUSB} 
+                style={{ display: 'flex', alignItems: 'center', gap: '20px', padding: '10px 25px', backgroundColor: '#0a0a0a', borderRadius: '10px', border: `2px solid ${usbConectado ? 'rgba(0, 255, 255, 0.4)' : '#374151'}`, cursor: 'pointer', boxShadow: usbConectado ? 'inset 0 0 15px rgba(0,255,255,0.1)' : 'none', minWidth: '150px', justifyContent: 'space-between' }} 
                 title={usbConectado ? "Multímetro Conectado" : "Clic para conectar UT61E+"}
               >
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                  {/* Ícono más grande */}
-                  <Link size={24} color={usbConectado ? '#00ffff' : '#6b7280'} />
-                  {/* Texto de marca pequeñito y elegante */}
-                  <span style={{ fontSize: '0.7rem', color: '#6b7280', fontWeight: 'bold', marginTop: '4px', letterSpacing: '1px' }}>UT61E+</span>
+                  <Link size={20} color={usbConectado ? '#00ffff' : '#6b7280'} />
+                  <span style={{ fontSize: '1.5rem', color: '#6b7280', fontWeight: 'bold', marginTop: '2px', letterSpacing: '1px' }}>UT61E+</span>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-                  {/* NÚMEROS GIGANTES (2.5rem) */}
-                  <span style={{ color: lecturaUsb.valor === 'OL' ? '#ff0000' : (usbConectado ? '#00ffff' : '#6b7280'), fontFamily: 'Consolas, monospace', fontWeight: 'bold', fontSize: '2.5rem', textShadow: usbConectado && lecturaUsb.valor !== 'OL' ? '0 0 10px rgba(0,255,255,0.5)' : 'none' }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+                  <span style={{ color: lecturaUsb.valor === 'OL' ? '#ff0000' : (usbConectado ? '#00ffff' : '#6b7280'), fontFamily: 'Consolas, monospace', fontWeight: 'bold', fontSize: '1.5rem', textShadow: usbConectado && lecturaUsb.valor !== 'OL' ? '0 0 10px rgba(0,255,255,0.5)' : 'none' }}>
                     {usbConectado ? lecturaUsb.valor : 'OFF'}
                   </span>
                   {usbConectado && lecturaUsb.valor !== 'OL' && (
-                    { /* Unidad (V, Ohm) de tamaño mediano */ }
-                    < span)} style={{ color: '#888', fontSize: '1.2rem', fontWeight: 'bold' }}>{lecturaUsb.unidad}</span>
-                )}
-              </div>)}
-          </div>
-          )}
+                    <span style={{ color: '#888', fontSize: '0.8rem', fontWeight: 'bold' }}>{lecturaUsb.unidad}</span>
+                  )}
+                </div>
+              </div>
+            )}
 
-          <button onClick={abrirHistorial} style={{ ...estilos.btnHeader, backgroundColor: t.cristalBgItem.backgroundColor, color: t.textoPrincipal.color, border: t.bordeFantasma.border }} title="Ver Historial"><History size={16} /> <span style={{ fontSize: '0.7rem', fontWeight: 'bold' }}>HISTORIAL</span></button>
-          <button onClick={prepararNuevoCaso} style={{ ...estilos.btnHeader, backgroundColor: '#10b981', color: 'white', border: 'none' }} title="Registrar Nuevo Caso"><ClipboardList size={16} /> <span style={{ fontSize: '0.7rem', fontWeight: 'bold' }}>INGRESO</span></button>
-          <button onClick={toggleTema} style={{ ...estilos.btnTema, ...t.textoSutil, marginLeft: '5px' }}>{tema === 'light' ? <Moon size={20} /> : <Sun size={20} />}</button>
+            <button onClick={abrirHistorial} style={{...estilos.btnHeader, backgroundColor: t.cristalBgItem.backgroundColor, color: t.textoPrincipal.color, border: t.bordeFantasma.border}} title="Ver Historial"><History size={16} /> <span style={{fontSize: '0.7rem', fontWeight: 'bold'}}>HISTORIAL</span></button>
+            <button onClick={prepararNuevoCaso} style={{...estilos.btnHeader, backgroundColor: '#10b981', color: 'white', border: 'none'}} title="Registrar Nuevo Caso"><ClipboardList size={16} /> <span style={{fontSize: '0.7rem', fontWeight: 'bold'}}>INGRESO</span></button>
+            <button onClick={toggleTema} style={{ ...estilos.btnTema, ...t.textoSutil, marginLeft: '5px' }}>{tema === 'light' ? <Moon size={20} /> : <Sun size={20} />}</button>
+          </div>
         </div>
-      </></div><div style={estilos.lineaAcento}></div></>
+        <div style={estilos.lineaAcento}></div>
       </header>
 
       <main className="no-print" style={estilos.main}>
