@@ -429,7 +429,7 @@ export default function AppDiagnostico() {
               >
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
                   <Link size={16} color={usbConectado ? '#00ffff' : '#6b7280'} />
-                  <span style={{ fontSize: '0.5rem', color: '#6b7280', fontWeight: 'bold', marginTop: '2px', letterSpacing: '1px' }}>UT61E+</span>
+                  <span style={{ fontSize: '1rem', color: '#6b7280', fontWeight: 'bold', marginTop: '2px', letterSpacing: '1px' }}>UT61E+</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
                   <span style={{ color: lecturaUsb.valor === 'OL' ? '#ff0000' : (usbConectado ? '#00ffff' : '#6b7280'), fontFamily: 'Consolas, monospace', fontWeight: 'bold', fontSize: '1.5rem', textShadow: usbConectado && lecturaUsb.valor !== 'OL' ? '0 0 10px rgba(0,255,255,0.5)' : 'none' }}>
