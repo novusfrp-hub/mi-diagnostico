@@ -418,7 +418,7 @@ export default function AppDiagnostico() {
       <header className="no-print" style={{ ...estilos.header, ...t.bordeFantasmaBottom }}>
         <div style={estilos.headerInner}>
           <h1 style={{ ...estilos.logoTexto, ...t.textoPrincipal }}>MARSHALL CELL CRM</h1>
-          <div style={{display: 'flex', gap: '15px', alignItems: 'center'}}>
+          <div style={{display: 'flex', gap: '18px', alignItems: 'center'}}>
             
             {/* --- NUEVO DISPLAY DIGITAL USB EN CABECERA --- */}
             {!mostrarAdmin && (
