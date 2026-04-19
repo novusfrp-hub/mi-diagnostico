@@ -428,7 +428,7 @@ export default function AppDiagnostico() {
                 title={usbConectado ? "Multímetro Conectado" : "Clic para conectar UT61E+"}
               >
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                  <Link size={16} color={usbConectado ? '#00ffff' : '#6b7280'} />
+                  <Link size={20} color={usbConectado ? '#00ffff' : '#6b7280'} />
                   <span style={{ fontSize: '1.5rem', color: '#6b7280', fontWeight: 'bold', marginTop: '2px', letterSpacing: '1px' }}>UT61E+</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
