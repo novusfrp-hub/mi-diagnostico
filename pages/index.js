@@ -15,7 +15,7 @@ const obtenerUrlVideo = (url) => {
   return videoId ? `https://www.youtube.com/embed/${videoId}` : url;
 };
 
-// --- VISOR GIGANTE DEL MULTÍMETRO ---
+// --- VISOR GIGANTE DEL MULTÍMETRO (Para el Admin) ---
 const VisorHUD = ({ valor, unidad, conectado, conectarFn }) => (
   <div style={{ backgroundColor: '#1a1a1a', border: '2px solid #333333', borderRadius: '15px', padding: '20px', display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '20px', position: 'relative', overflow: 'hidden', boxShadow: conectado ? '0 0 20px rgba(0, 255, 255, 0.2)' : 'none' }}>
     <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
@@ -33,23 +33,67 @@ const VisorHUD = ({ valor, unidad, conectado, conectarFn }) => (
   </div>
 );
 
-const SimuladorFuente = ({ voltaje, amperaje }) => {
-  const [ampVisible, setAmpVisible] = useState('0.000');
-  useEffect(() => {
-    if (!amperaje) return;
-    const valores = amperaje.split(',').map(v => v.trim());
-    if (valores.length === 1) { setAmpVisible(valores[0]); return; }
-    let index = 0;
-    setAmpVisible(valores[0]);
-    const intervalo = setInterval(() => { index = (index + 1) % valores.length; setAmpVisible(valores[index]); }, 800);
-    return () => clearInterval(intervalo);
-  }, [amperaje]);
+// --- COMPONENTE: FPC INTELIGENTE (ESTILO ZXW) ---
+const FPCInteligente = ({ pines, setPines, pinActivo, setPinActivo, modo = 'diagnostico' }) => {
+  const mitad = Math.ceil(pines.length / 2);
+  const filaSup = pines.slice(0, mitad);
+  const filaInf = pines.slice(mitad);
+
+  const obtenerColorPin = (pin) => {
+    if (modo === 'crear') {
+      return pinActivo === pin.id ? '#00ffff' : '#374151'; 
+    }
+    if (!pin.valorActual || pin.valorActual === '---') return '#374151'; 
+    if (pin.valorActual === 'OL' && pin.valorSano !== 'OL') return '#f97316'; 
+    if (parseFloat(pin.valorActual) < 0.050) return '#ef4444'; 
+    
+    const diferencia = Math.abs(parseFloat(pin.valorActual) - parseFloat(pin.valorSano));
+    if (diferencia <= 0.030) return '#10b981'; 
+    return '#eab308'; 
+  };
+
+  const actualizarNombrePin = (id, nuevoNombre) => {
+    setPines(prev => prev.map(p => p.id === id ? { ...p, nombre: nuevoNombre } : p));
+  };
 
   return (
-    <div style={{ backgroundColor: '#111827', padding: '15px 25px', borderRadius: '15px', border: '2px solid #374151', display: 'flex', justifyContent: 'space-around', alignItems: 'center', marginBottom: '25px', boxShadow: 'inset 0 4px 10px rgba(0,0,0,0.5), 0 10px 15px -3px rgba(0,0,0,0.1)', fontFamily: '"Courier New", Courier, monospace', width: '100%', maxWidth: '400px', margin: '0 auto 25px auto' }}>
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}><span style={{ color: '#6b7280', fontSize: '0.7rem', fontWeight: 'bold', letterSpacing: '2px', marginBottom: '5px' }}>VOLTAGE</span><div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}><span style={{ color: '#ef4444', fontSize: '2.5rem', fontWeight: 'bold', textShadow: '0 0 10px rgba(239,68,68,0.5)' }}>{voltaje || '0.0'}</span><span style={{ color: '#ef4444', fontSize: '1rem', fontWeight: 'bold' }}>V</span></div></div>
-      <div style={{ width: '2px', height: '50px', backgroundColor: '#374151' }}></div>
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}><span style={{ color: '#6b7280', fontSize: '0.7rem', fontWeight: 'bold', letterSpacing: '2px', marginBottom: '5px' }}>CURRENT</span><div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}><span style={{ color: '#10b981', fontSize: '2.5rem', fontWeight: 'bold', textShadow: '0 0 10px rgba(16,185,129,0.5)' }}>{ampVisible}</span><span style={{ color: '#10b981', fontSize: '1rem', fontWeight: 'bold' }}>A</span></div></div>
+    <div style={{ backgroundColor: '#111827', padding: '20px', borderRadius: '15px', border: '2px solid #374151', width: '100%', overflowX: 'auto' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', backgroundColor: '#000', padding: '15px', borderRadius: '10px', minWidth: 'max-content' }}>
+        <div style={{ display: 'flex', gap: '4px' }}>
+          {filaSup.map(pin => (
+            <div key={pin.id} onClick={() => setPinActivo(pin.id)} style={{ width: '40px', display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer' }}>
+              <span style={{ fontSize: '0.6rem', color: 'gray', marginBottom: '2px' }}>{pin.id}</span>
+              <div style={{ width: '100%', height: '25px', backgroundColor: obtenerColorPin(pin), border: pinActivo === pin.id ? '2px solid #fff' : '1px solid #222', borderRadius: '4px', transition: 'all 0.2s' }} />
+            </div>
+          ))}
+        </div>
+        <div style={{ height: '10px', backgroundColor: '#1a1a1a', borderRadius: '2px', width: '100%' }} />
+        <div style={{ display: 'flex', gap: '4px' }}>
+          {filaInf.map(pin => (
+            <div key={pin.id} onClick={() => setPinActivo(pin.id)} style={{ width: '40px', display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer' }}>
+              <div style={{ width: '100%', height: '25px', backgroundColor: obtenerColorPin(pin), border: pinActivo === pin.id ? '2px solid #fff' : '1px solid #222', borderRadius: '4px', transition: 'all 0.2s' }} />
+              <span style={{ fontSize: '0.6rem', color: 'gray', marginTop: '2px' }}>{pin.id}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#1a1a1a', borderRadius: '10px', borderLeft: `4px solid ${obtenerColorPin(pines.find(p => p.id === pinActivo) || {})}` }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            <span style={{ color: '#00ffff', fontWeight: 'bold', fontSize: '1.2rem' }}>PIN {pinActivo}</span>
+            {modo === 'crear' ? (
+               <input value={pines.find(p => p.id === pinActivo)?.nombre || ''} onChange={(e) => actualizarNombrePin(pinActivo, e.target.value)} placeholder="Nombre (Ej: MIPI_DSI_CLK)" style={{ display: 'block', marginTop: '5px', background: '#000', color: 'white', border: '1px solid #333', padding: '5px', borderRadius: '5px', width: '200px', outline:'none' }} />
+            ) : (
+               <span style={{ display: 'block', color: '#fff', fontSize: '0.9rem', marginTop: '5px' }}>{pines.find(p => p.id === pinActivo)?.nombre || 'Línea sin nombre'}</span>
+            )}
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <span style={{ color: 'gray', fontSize: '0.8rem', display: 'block' }}>Valor Sano: <strong style={{color:'#fff'}}>{pines.find(p => p.id === pinActivo)?.valorSano || '---'} V</strong></span>
+            <span style={{ color: 'gray', fontSize: '0.8rem', display: 'block', marginTop: '4px' }}>Actual: <strong style={{color: '#fff', fontSize: '1.5rem'}}>{pines.find(p => p.id === pinActivo)?.valorActual || '---'} V</strong></span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
@@ -69,7 +113,6 @@ export default function AppDiagnostico() {
   const [listaPasos, setListaPasos] = useState([]);
   const [pasosExpandidos, setPasosExpandidos] = useState({}); 
   
-  // ESTADOS DEL TIP EXPERTO
   const [notaVisible, setNotaVisible] = useState(false);
   const [tipVisto, setTipVisto] = useState(false);
   const [tipTabActiva, setTipTabActiva] = useState(0);
@@ -80,7 +123,6 @@ export default function AppDiagnostico() {
   const [videoModalVisible, setVideoModalVisible] = useState(false);
   const [fallasEnSerie, setFallasEnSerie] = useState([]);
 
-  // ESTADOS BITÁCORA / REPORTE
   const [bitacoraVisible, setBitacoraVisible] = useState(false);
   const [historialCasosVisible, setHistorialCasosVisible] = useState(false);
   const [casosGuardados, setCasosGuardados] = useState([]);
@@ -95,48 +137,24 @@ export default function AppDiagnostico() {
   const [lecturaUsb, setLecturaUsb] = useState({ valor: '----', unidad: '---' });
   const [dispositivoUsb, setDispositivoUsb] = useState(null);
   
-// --- ESTADOS DEL FPC INTELIGENTE ---
+  const ordenCamposDock = ['vbus', 'dp', 'dm', 'cc1', 'cc2'];
+  const [campoActivoDock, setCampoActivoDock] = useState('vbus');
+  const campoActivoRef = useRef(campoActivoDock);
+  useEffect(() => { campoActivoRef.current = campoActivoDock; }, [campoActivoDock]);
+
+  // --- ESTADOS DEL FPC INTELIGENTE ---
   const pinesIniciales = Array.from({ length: 40 }, (_, i) => ({
-    id: i + 1,
-    nombre: `Linea_${i + 1}`,
-    valorSano: '---',
-    valorActual: '---'
+    id: i + 1, nombre: `Linea_${i + 1}`, valorSano: '---', valorActual: '---'
   }));
   const [fpcPines, setFpcPines] = useState(pinesIniciales);
   const [pinActivoFpc, setPinActivoFpc] = useState(1);
-  const [modoFpc, setModoFpc] = useState('crear'); // 'crear' o 'diagnostico'
-  
+  const [modoFpc, setModoFpc] = useState('crear');
   const pinActivoFpcRef = useRef(pinActivoFpc);
   const modoFpcRef = useRef(modoFpc);
   useEffect(() => { pinActivoFpcRef.current = pinActivoFpc; }, [pinActivoFpc]);
   useEffect(() => { modoFpcRef.current = modoFpc; }, [modoFpc]);
 
-  const ordenCamposDock = ['vbus', 'dp', 'dm', 'cc1', 'cc2'];
-  const [campoActivoDock, setCampoActivoDock] = useState('vbus');
-  
-  // REF para que la función USB siempre sepa cuál es el campo activo actual
-  const campoActivoRef = useRef(campoActivoDock);
-  // --- AUTO-AVANCE CON TECLADO (DOCKTEST Y FPC) ---
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if ((e.code === 'Space' || e.key === 'Enter') && mostrarAdmin && vistaAdmin === 'formulario') {
-        e.preventDefault(); 
-        // 1. Avance del Docktest
-        const indiceActual = ordenCamposDock.indexOf(campoActivoDock);
-        if (indiceActual >= 0 && indiceActual < ordenCamposDock.length - 1) {
-          setCampoActivoDock(ordenCamposDock[indiceActual + 1]);
-        }
-        // 2. Avance del FPC Inteligente
-        setPinActivoFpc(prev => {
-          if (prev < fpcPines.length) return prev + 1;
-          return prev;
-        });
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [campoActivoDock, mostrarAdmin, vistaAdmin, fpcPines.length]);
-
+  // --- ESTADOS DEL FORMULARIO ADMIN ---
   const [formId, setFormId] = useState('');
   const [formPregunta, setFormPregunta] = useState('');
   const [formTabsNota, setFormTabsNota] = useState([{ titulo: 'General', contenido: '' }]); 
@@ -147,31 +165,6 @@ export default function AppDiagnostico() {
   const [formSimA, setFormSimA] = useState('');
   const [dockAdminTab, setDockAdminTab] = useState('diodo');
   const [formDockDiodo, setFormDockDiodo] = useState({ vbus: '', dp: '', dm: '', cc1: '', cc2: '' });
-  // Inyección al Docktest
-        setFormDockDiodo(prev => {
-          const campoActual = campoActivoRef.current;
-          if (valStr !== "---" && prev[campoActual] !== valStr) {
-             return { ...prev, [campoActual]: valStr };
-          }
-          return prev;
-        });
-
-        // --- INYECCIÓN AL FPC INTELIGENTE ---
-        setFpcPines(prevPines => {
-          const pinActualId = pinActivoFpcRef.current;
-          const modoActual = modoFpcRef.current;
-
-          return prevPines.map(pin => {
-              if (pin.id === pinActualId) {
-                  if (modoActual === 'crear' && valStr !== "---" && pin.valorSano !== valStr) {
-                      return { ...pin, valorSano: valStr };
-                  } else if (modoActual === 'diagnostico' && valStr !== "---" && pin.valorActual !== valStr) {
-                      return { ...pin, valorActual: valStr };
-                  }
-              }
-              return pin;
-          });
-        });
   const [formDockUa, setFormDockUa] = useState({ vbus: '', dp: '', dm: '', cc1: '', cc2: '' });
   const [formImgUrl, setFormImgUrl] = useState('');
   const [formImgTipo, setFormImgTipo] = useState('microscopio');
@@ -181,11 +174,10 @@ export default function AppDiagnostico() {
   const [formDescSerie, setFormDescSerie] = useState('');
   const [mensajeAdmin, setMensajeAdmin] = useState('');
 
-  // --- MAGIA WEBHID BLINDADA ---
+  // --- MAGIA WEBHID ---
   const conectarMultimetroUSB = async () => {
     if (typeof navigator === 'undefined' || !navigator.hid) {
-        alert("Tu navegador no soporta WebHID. Por favor usa Google Chrome o Microsoft Edge en PC.");
-        return;
+        alert("Navegador no compatible. Usa Google Chrome o Edge en PC."); return;
     }
     try {
       const devices = await navigator.hid.requestDevice({ filters: [{ vendorId: 0x1A86, productId: 0xE429 }] });
@@ -198,12 +190,10 @@ export default function AppDiagnostico() {
 
       device.addEventListener("inputreport", event => {
         const text = new TextDecoder().decode(event.data);
-        let valStr = "---";
-        let uniStr = "";
+        let valStr = "---"; let uniStr = "";
 
         if (text.includes("OL") || text.includes("?0")) {
-          valStr = "OL";
-          uniStr = "---";
+          valStr = "OL"; uniStr = "---";
         } else {
           const match = text.match(/([-+]?\d+\.\d+)/);
           if (match) {
@@ -217,7 +207,7 @@ export default function AppDiagnostico() {
         
         setLecturaUsb({ valor: valStr, unidad: uniStr });
 
-        // Inyección directa usando la memoria Ref (ahora sí funcionará el auto-avance)
+        // Inyecta en el Docktest
         setFormDockDiodo(prev => {
           const campoActual = campoActivoRef.current;
           if (valStr !== "---" && prev[campoActual] !== valStr) {
@@ -225,28 +215,37 @@ export default function AppDiagnostico() {
           }
           return prev;
         });
+
+        // Inyecta en el FPC
+        setFpcPines(prevPines => {
+          const pinActualId = pinActivoFpcRef.current;
+          const mActual = modoFpcRef.current;
+          return prevPines.map(pin => {
+              if (pin.id === pinActualId) {
+                  if (mActual === 'crear' && valStr !== "---" && pin.valorSano !== valStr) return { ...pin, valorSano: valStr };
+                  else if (mActual === 'diagnostico' && valStr !== "---" && pin.valorActual !== valStr) return { ...pin, valorActual: valStr };
+              }
+              return pin;
+          });
+        });
       });
-    } catch (error) {
-      console.error(error);
-      alert("Error USB. Verifica que el multímetro no esté abierto en tu programa de Python.");
-    }
+    } catch (error) { alert("Error USB. Verifica que no esté abierto en Python."); }
   };
 
   // --- AUTO-AVANCE CON TECLADO ---
   useEffect(() => {
     const handleKeyDown = (e) => {
-      // Evitamos que esta lógica rompa el formulario de inicio de sesión
       if ((e.code === 'Space' || e.key === 'Enter') && mostrarAdmin && vistaAdmin === 'formulario') {
         e.preventDefault(); 
         const indiceActual = ordenCamposDock.indexOf(campoActivoDock);
-        if (indiceActual >= 0 && indiceActual < ordenCamposDock.length - 1) {
-          setCampoActivoDock(ordenCamposDock[indiceActual + 1]);
-        }
+        if (indiceActual >= 0 && indiceActual < ordenCamposDock.length - 1) setCampoActivoDock(ordenCamposDock[indiceActual + 1]);
+        
+        setPinActivoFpc(prev => prev < fpcPines.length ? prev + 1 : prev);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [campoActivoDock, mostrarAdmin, vistaAdmin]);
+  }, [campoActivoDock, mostrarAdmin, vistaAdmin, fpcPines.length]);
 
 
   const cargarFallasEnSerie = async () => {
@@ -298,43 +297,15 @@ export default function AppDiagnostico() {
   };
 
   const iniciarSesion = async (e) => { 
-    e.preventDefault(); 
-    setErrorLogin(''); 
+    e.preventDefault(); setErrorLogin(''); 
     try { 
         await signInWithEmailAndPassword(auth, emailAdmin, passAdmin); 
-        setEstaAutenticado(true); 
-        setEmailAdmin(''); 
-        setPassAdmin(''); 
-        setVistaAdmin('lista'); 
-        cargarTodosLosPasos(); 
-    } catch (error) { 
-        console.error("Error Firebase:", error);
-        setErrorLogin('❌ Correo o Contraseña incorrectos.'); 
-    } 
+        setEstaAutenticado(true); setEmailAdmin(''); setPassAdmin(''); setVistaAdmin('lista'); cargarTodosLosPasos(); 
+    } catch (error) { setErrorLogin('❌ Correo o Contraseña incorrectos.'); } 
   };
-
   const cerrarSesion = async () => { await signOut(auth); setEstaAutenticado(false); setMostrarAdmin(false); };
-  
-  const cargarTodosLosPasos = async () => { 
-      try { 
-          const querySnapshot = await getDocs(collection(db, "pasos")); 
-          const pasosArray = []; 
-          querySnapshot.forEach((doc) => pasosArray.push({ id: doc.id, ...doc.data() })); 
-          setListaPasos(pasosArray); 
-          setPasosExpandidos({ inicio: true }); 
-      } catch (error) { console.error(error); } 
-  };
-  
-  const abrirAdmin = () => { 
-      setMostrarAdmin(true); 
-      if (estaAutenticado) { 
-          setVistaAdmin('lista'); 
-          cargarTodosLosPasos(); 
-      } else { 
-          setVistaAdmin('login'); 
-          setErrorLogin('');
-      } 
-  };
+  const cargarTodosLosPasos = async () => { try { const querySnapshot = await getDocs(collection(db, "pasos")); const pasosArray = []; querySnapshot.forEach((doc) => pasosArray.push({ id: doc.id, ...doc.data() })); setListaPasos(pasosArray); setPasosExpandidos({ inicio: true }); } catch (error) { console.error(error); } };
+  const abrirAdmin = () => { setMostrarAdmin(true); if (estaAutenticado) { setVistaAdmin('lista'); cargarTodosLosPasos(); } else { setVistaAdmin('login'); setErrorLogin(''); } };
 
   const cargarHistorialCasos = async () => {
     try {
@@ -367,7 +338,6 @@ export default function AppDiagnostico() {
   };
 
   const eliminarCaso = async (id) => { if (window.confirm('¿Seguro de eliminar este caso del historial?')) { try { await deleteDoc(doc(db, "historial_reparaciones", id)); cargarHistorialCasos(); } catch (error) { alert("Error: " + error.message); } } };
-
   const abrirReporte = (caso) => { setCasoReporte(caso); setReporteVisible(true); setHistorialCasosVisible(false); };
   
   const imprimirReporte = async () => {
@@ -454,7 +424,6 @@ export default function AppDiagnostico() {
     );
   };
 
-  // --- SOLUCIÓN DE PANTALLA DE CARGA (Para que Vercel no falle en el SSR) ---
   if (!pasoActual) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '100vh', backgroundColor: '#111827', color: '#00ffff', fontFamily: 'system-ui, sans-serif' }}>
@@ -478,30 +447,23 @@ export default function AppDiagnostico() {
       <header className="no-print" style={{ ...estilos.header, ...t.bordeFantasmaBottom }}>
         <div style={estilos.headerInner}>
           <h1 style={{ ...estilos.logoTexto, ...t.textoPrincipal }}>MARSHALL CELL CRM</h1>
-          <div style={{display: 'flex', gap: '18px', alignItems: 'center'}}>
-            
-            {/* --- NUEVO DISPLAY DIGITAL USB EN CABECERA --- */}
+          <div style={{display: 'flex', gap: '15px', alignItems: 'center'}}>
             {!mostrarAdmin && (
-              <div 
-                onClick={conectarMultimetroUSB} 
-                style={{ display: 'flex', alignItems: 'center', gap: '20px', padding: '10px 25px', backgroundColor: '#0a0a0a', borderRadius: '10px', border: `2px solid ${usbConectado ? 'rgba(0, 255, 255, 0.4)' : '#374151'}`, cursor: 'pointer', boxShadow: usbConectado ? 'inset 0 0 15px rgba(0,255,255,0.1)' : 'none', minWidth: '150px', justifyContent: 'space-between' }} 
-                title={usbConectado ? "Multímetro Conectado" : "Clic para conectar UT61E+"}
-              >
+              <div onClick={conectarMultimetroUSB} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '4px 15px', backgroundColor: '#0a0a0a', borderRadius: '10px', border: `2px solid ${usbConectado ? 'rgba(0, 255, 255, 0.4)' : '#374151'}`, cursor: 'pointer', boxShadow: usbConectado ? 'inset 0 0 15px rgba(0,255,255,0.1)' : 'none', minWidth: '150px', justifyContent: 'space-between' }} title={usbConectado ? "Multímetro Conectado" : "Clic para conectar UT61E+"}>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                  <Link size={20} color={usbConectado ? '#00ffff' : '#6b7280'} />
-                  <span style={{ fontSize: '1.5rem', color: '#6b7280', fontWeight: 'bold', marginTop: '2px', letterSpacing: '1px' }}>UT61E+</span>
+                  <Link size={24} color={usbConectado ? '#00ffff' : '#6b7280'} />
+                  <span style={{ fontSize: '0.7rem', color: '#6b7280', fontWeight: 'bold', marginTop: '4px', letterSpacing: '1px' }}>UT61E+</span>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
-                  <span style={{ color: lecturaUsb.valor === 'OL' ? '#ff0000' : (usbConectado ? '#00ffff' : '#6b7280'), fontFamily: 'Consolas, monospace', fontWeight: 'bold', fontSize: '1.5rem', textShadow: usbConectado && lecturaUsb.valor !== 'OL' ? '0 0 10px rgba(0,255,255,0.5)' : 'none' }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                  <span style={{ color: lecturaUsb.valor === 'OL' ? '#ff0000' : (usbConectado ? '#00ffff' : '#6b7280'), fontFamily: 'Consolas, monospace', fontWeight: 'bold', fontSize: '2.5rem', textShadow: usbConectado && lecturaUsb.valor !== 'OL' ? '0 0 10px rgba(0,255,255,0.5)' : 'none' }}>
                     {usbConectado ? lecturaUsb.valor : 'OFF'}
                   </span>
                   {usbConectado && lecturaUsb.valor !== 'OL' && (
-                    <span style={{ color: '#888', fontSize: '0.8rem', fontWeight: 'bold' }}>{lecturaUsb.unidad}</span>
+                    <span style={{ color: '#888', fontSize: '1.2rem', fontWeight: 'bold' }}>{lecturaUsb.unidad}</span>
                   )}
                 </div>
               </div>
             )}
-
             <button onClick={abrirHistorial} style={{...estilos.btnHeader, backgroundColor: t.cristalBgItem.backgroundColor, color: t.textoPrincipal.color, border: t.bordeFantasma.border}} title="Ver Historial"><History size={16} /> <span style={{fontSize: '0.7rem', fontWeight: 'bold'}}>HISTORIAL</span></button>
             <button onClick={prepararNuevoCaso} style={{...estilos.btnHeader, backgroundColor: '#10b981', color: 'white', border: 'none'}} title="Registrar Nuevo Caso"><ClipboardList size={16} /> <span style={{fontSize: '0.7rem', fontWeight: 'bold'}}>INGRESO</span></button>
             <button onClick={toggleTema} style={{ ...estilos.btnTema, ...t.textoSutil, marginLeft: '5px' }}>{tema === 'light' ? <Moon size={20} /> : <Sun size={20} />}</button>
@@ -540,8 +502,6 @@ export default function AppDiagnostico() {
               <h2 style={{ ...estilos.tituloPregunta, ...t.textoPrincipal }}>{pasoActual.pregunta}</h2>
             </div>
             
-            {(pasoActual.simVoltaje || pasoActual.simAmperaje) && (<SimuladorFuente voltaje={pasoActual.simVoltaje} amperaje={pasoActual.simAmperaje} />)}
-
             {pasoActual.esFinal ? (
               <div style={estilos.estadoFinal}><div style={estilos.iconoFinalBg}><ShieldCheck size={48} color="#0058bc" /></div><h3 style={{ ...estilos.textoFinal, ...t.textoPrincipal }}>Diagnóstico Completado</h3><button style={estilos.btnPrimario} onClick={() => { setHistorial([]); cargarPaso('inicio'); }}><RefreshCcw size={18} style={{ marginRight: '8px' }} /> Iniciar Nueva Evaluación</button></div>
             ) : (
@@ -557,113 +517,10 @@ export default function AppDiagnostico() {
         </AnimatePresence>
       </main>
 
-      {/* WIKI TÉCNICA */}
-      <AnimatePresence>
-        {notaVisible && tieneTips && (
-            <motion.div className="no-print" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={estilos.modalOverlay}>
-                <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} style={{ ...estilos.modalCard, ...t.fondoPrincipal, ...t.bordeFantasma, maxWidth: '700px' }}>
-                    <div style={{...estilos.modalHeader, backgroundColor: '#fef08a', borderBottom: '1px solid #fde047'}}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#854d0e' }}>
-                            <Lightbulb size={24} />
-                            <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 'bold' }}>Wiki Técnica</h3>
-                        </div>
-                        <button onClick={() => setNotaVisible(false)} style={{...estilos.btnCerrar, color: '#854d0e'}}><X size={24} /></button>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', maxHeight: '70vh' }}>
-                        <div style={{ display: 'flex', overflowX: 'auto', borderBottom: t.bordeFantasma.border, backgroundColor: 'rgba(0,0,0,0.03)', scrollbarWidth: 'none' }}>
-                            {arrayTips.map((tab, index) => (
-                                <button 
-                                    key={index} 
-                                    onClick={() => setTipTabActiva(index)}
-                                    style={{ 
-                                        padding: '14px 24px', 
-                                        border: 'none', 
-                                        background: 'none', 
-                                        borderBottom: tipTabActiva === index ? '3px solid #eab308' : '3px solid transparent', 
-                                        color: tipTabActiva === index ? '#ca8a04' : t.textoSutil.color, 
-                                        fontWeight: 'bold', 
-                                        cursor: 'pointer',
-                                        whiteSpace: 'nowrap',
-                                        transition: 'all 0.2s'
-                                    }}>
-                                    {tab.titulo}
-                                </button>
-                            ))}
-                        </div>
-                        <div style={{ padding: '25px', overflowY: 'auto', flex: 1, color: t.textoPrincipal.color, lineHeight: '1.6', fontSize: '1rem', whiteSpace: 'pre-wrap' }}>
-                            {arrayTips[tipTabActiva]?.contenido}
-                        </div>
-                    </div>
-                </motion.div>
-            </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* MODAL: BITÁCORA */}
-      <AnimatePresence>
-        {bitacoraVisible && (
-          <motion.div className="no-print" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={estilos.modalOverlay}>
-            <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} style={{ ...estilos.modalCard, ...t.fondoPrincipal, ...t.bordeFantasma }}>
-              <div style={estilos.modalHeader}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><ClipboardList size={24} color="#10b981" /><h3 style={{ margin: 0, ...t.textoPrincipal, fontSize: '1.2rem' }}>{casoEditando ? 'Editar Caso' : 'Nueva Bitácora'}</h3></div>
-                  <button onClick={() => setBitacoraVisible(false)} style={estilos.btnCerrar}><X size={24} color={t.textoSutil.color} /></button>
-              </div>
-              <div style={estilos.modalBody}>
-                <form onSubmit={guardarBitacora} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                  <div style={{ display: 'flex', gap: '10px' }}>
-                      <div style={{ flex: 1 }}><label style={{...estilos.labelForm, ...t.textoPrincipal}}>Marca *</label><input required type="text" placeholder="Ej: Samsung" style={{ ...estilos.inputForm, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} value={formCaso.marca} onChange={(e) => setFormCaso({...formCaso, marca: e.target.value})} /></div>
-                      <div style={{ flex: 1 }}><label style={{...estilos.labelForm, ...t.textoPrincipal}}>Modelo *</label><input required type="text" placeholder="Ej: Galaxy A54" style={{ ...estilos.inputForm, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} value={formCaso.modelo} onChange={(e) => setFormCaso({...formCaso, modelo: e.target.value})} /></div>
-                  </div>
-                  <div><label style={{...estilos.labelForm, ...t.textoPrincipal}}>Síntomas *</label><textarea required style={{ ...estilos.inputForm, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma, minHeight: '60px' }} value={formCaso.sintomas} onChange={(e) => setFormCaso({...formCaso, sintomas: e.target.value})} /></div>
-                  <div><label style={{...estilos.labelForm, ...t.textoPrincipal}}>Protocolo / Diagnóstico</label><textarea style={{ ...estilos.inputForm, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma, minHeight: '60px' }} value={formCaso.protocolo} onChange={(e) => setFormCaso({...formCaso, protocolo: e.target.value})} /></div>
-                  <div><label style={{...estilos.labelForm, ...t.textoPrincipal}}>Enlace Imagen (Opcional - Recomendado Postimages)</label><input type="text" placeholder="https://i.postimg.cc/..." style={{ ...estilos.inputForm, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} value={formCaso.imgUrl} onChange={(e) => setFormCaso({...formCaso, imgUrl: e.target.value})} /></div>
-                  {mensajeCaso && <p style={{ color: mensajeCaso.includes('❌') || mensajeCaso.includes('⚠️') ? '#ef4444' : '#10b981', fontWeight: 'bold', textAlign: 'center', margin: 0 }}>{mensajeCaso}</p>}
-                  <button type="submit" style={{ ...estilos.btnPrimarioGuardar, background: '#10b981', justifyContent: 'center', padding: '15px' }}><Save size={20} style={{marginRight:'8px'}}/> {casoEditando ? 'Actualizar Caso' : 'Guardar Caso en Historial'}</button>
-                </form>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* MODAL: HISTORIAL */}
-      <AnimatePresence>
-        {historialCasosVisible && (
-          <motion.div className="no-print" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={estilos.modalOverlay}>
-            <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} style={{ ...estilos.modalCard, maxWidth: '800px', ...t.fondoPrincipal, ...t.bordeFantasma }}>
-              <div style={estilos.modalHeader}><div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><History size={24} color="#0058bc" /><h3 style={{ margin: 0, ...t.textoPrincipal, fontSize: '1.2rem' }}>Historial</h3></div><button onClick={() => setHistorialCasosVisible(false)} style={estilos.btnCerrar}><X size={24} color={t.textoSutil.color} /></button></div>
-              <div style={{ ...estilos.modalBody, padding: '15px' }}>
-                {casosGuardados.length === 0 ? (<div style={{ textAlign: 'center', padding: '40px', color: t.textoSutil.color }}><FileText size={48} style={{opacity: 0.5, marginBottom:'10px'}}/><p>No hay casos registrados aún.</p></div>) : (<div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>{casosGuardados.map(caso => (<div key={caso.id} style={{ backgroundColor: t.cristalBgItem.backgroundColor, border: t.bordeFantasma.border, borderRadius: '12px', padding: '15px', display: 'flex', flexDirection: 'column', gap: '10px' }}><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}><div><h4 style={{ margin: '0 0 5px 0', ...t.textoPrincipal, fontSize: '1.1rem' }}>{caso.marca} {caso.modelo}</h4><span style={{ fontSize: '0.75rem', color: t.textoSutil.color }}>Ingreso: {new Date(caso.fecha).toLocaleDateString()}</span></div><div style={{ display: 'flex', gap: '8px' }}><button onClick={() => abrirReporte(caso)} style={{ ...estilos.btnAccionLista, backgroundColor: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', padding: '5px 12px', display: 'flex', gap: '5px', alignItems: 'center' }} title="Ver Reporte"><FileText size={16} /> <span>Reporte</span></button><button onClick={() => {setHistorialCasosVisible(false); editarCasoExistente(caso);}} style={{ ...estilos.btnAccionLista, backgroundColor: 'rgba(234, 179, 8, 0.1)', color: '#eab308' }} title="Editar"><Edit size={18} /></button><button onClick={() => eliminarCaso(caso.id)} style={{ ...estilos.btnAccionLista, backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' }} title="Eliminar"><Trash2 size={18} /></button></div></div><div style={{ fontSize: '0.85rem', ...t.textoPrincipal, backgroundColor: 'rgba(0,0,0,0.02)', padding: '10px', borderRadius: '8px' }}><strong>Síntoma:</strong> {caso.sintomas}</div>{caso.protocolo && <div style={{ fontSize: '0.85rem', ...t.textoPrincipal }}><strong>Diagnóstico:</strong> {caso.protocolo}</div>}</div>))}</div>)}
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {reporteVisible && casoReporte && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{...estilos.modalOverlay, backgroundColor: 'rgba(0,0,0,0.9)'}}>
-            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} style={{ width: '100%', maxWidth: '800px', display: 'flex', flexDirection: 'column', gap: '20px', alignItems: 'center', height: '90vh' }}>
-              <div className="no-print" style={{ display: 'flex', gap: '15px', width: '100%', justifyContent: 'flex-end', padding: '10px 0' }}>
-                <button onClick={enviarWhatsApp} style={{ background: '#25D366', color: 'white', padding: '10px 20px', borderRadius: '10px', border: 'none', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 4px 10px rgba(37, 211, 102, 0.3)' }}><MessageCircle size={20} /> WhatsApp</button>
-                <button onClick={imprimirReporte} style={{ background: '#0058bc', color: 'white', padding: '10px 20px', borderRadius: '10px', border: 'none', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 4px 10px rgba(0, 88, 188, 0.3)' }}><Printer size={20} /> Imprimir / PDF nativo</button>
-                <button onClick={() => setReporteVisible(false)} style={{ background: '#374151', color: 'white', padding: '10px', borderRadius: '10px', border: 'none', cursor: 'pointer' }}><X size={20} /></button>
-              </div>
-              <div style={{ flex: 1, width: '100%', overflowY: 'auto', borderRadius: '8px' }}>
-                <div id="seccion-reporte" style={{ backgroundColor: 'white', width: '100%', maxWidth: '210mm', minHeight: '297mm', margin: '0 auto', padding: '40px', boxSizing: 'border-box', boxShadow: '0 10px 25px rgba(0,0,0,0.5)', color: '#111827', fontFamily: 'system-ui, sans-serif' }}>
-                  <div style={{ textAlign: 'center', borderBottom: '3px solid #0058bc', paddingBottom: '20px', marginBottom: '30px' }}><h1 style={{ color: '#0058bc', margin: 0, fontSize: '28px', textTransform: 'uppercase', letterSpacing: '2px' }}>MARSHALL CELL</h1><h2 style={{ color: '#4b5563', margin: '5px 0 0 0', fontSize: '16px', fontWeight: 'normal' }}>Reporte Técnico Oficial de Diagnóstico</h2></div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '30px' }}><div style={{ background: '#f9fafb', padding: '15px', borderRadius: '8px', border: '1px solid #e5e7eb' }}><strong style={{ color: '#111827', display: 'block', marginBottom: '5px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px' }}>Fecha de Ingreso</strong><p style={{ margin: 0, fontSize: '15px' }}>{new Date(casoReporte.fecha).toLocaleDateString()}</p></div><div style={{ background: '#f9fafb', padding: '15px', borderRadius: '8px', border: '1px solid #e5e7eb' }}><strong style={{ color: '#111827', display: 'block', marginBottom: '5px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px' }}>ID de Caso</strong><p style={{ margin: 0, fontSize: '15px' }}>#{casoReporte.id.substring(0, 8).toUpperCase()}</p></div><div style={{ background: '#f9fafb', padding: '15px', borderRadius: '8px', border: '1px solid #e5e7eb' }}><strong style={{ color: '#111827', display: 'block', marginBottom: '5px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px' }}>Marca</strong><p style={{ margin: 0, fontSize: '15px' }}>{casoReporte.marca}</p></div><div style={{ background: '#f9fafb', padding: '15px', borderRadius: '8px', border: '1px solid #e5e7eb' }}><strong style={{ color: '#111827', display: 'block', marginBottom: '5px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px' }}>Modelo</strong><p style={{ margin: 0, fontSize: '15px' }}>{casoReporte.modelo}</p></div></div>
-                  <div style={{ background: '#f9fafb', padding: '15px', borderRadius: '8px', border: '1px solid #e5e7eb', marginBottom: '20px' }}><strong style={{ color: '#111827', display: 'block', marginBottom: '5px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px' }}>Síntomas Reportados</strong><p style={{ margin: 0, fontSize: '15px', whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>{casoReporte.sintomas}</p></div>
-                  <div style={{ background: '#f9fafb', padding: '15px', borderRadius: '8px', border: '1px solid #e5e7eb' }}><strong style={{ color: '#111827', display: 'block', marginBottom: '5px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px' }}>Protocolo de Reparación / Diagnóstico</strong><p style={{ margin: 0, fontSize: '15px', whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>{casoReporte.protocolo || 'Pendiente de evaluación técnica profunda.'}</p></div>
-                  {casoReporte.imgUrl && (<div style={{ marginTop: '30px', textAlign: 'center', background: '#f9fafb', padding: '20px', borderRadius: '8px', border: '1px solid #e5e7eb' }}><strong style={{ color: '#111827', display: 'block', marginBottom: '10px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px' }}>Evidencia Técnica Adjunta</strong><img src={casoReporte.imgUrl} alt="Evidencia" referrerPolicy="no-referrer" style={{ maxWidth: '100%', maxHeight: '350px', borderRadius: '8px', objectFit: 'contain' }} /></div>)}
-                  <div style={{ marginTop: '50px', textAlign: 'center', fontSize: '12px', color: '#9ca3af', borderTop: '1px solid #e5e7eb', paddingTop: '20px' }}>Generado por Marshall Cell CRM<br/>Laboratorio de Microelectrónica - Oropesa, Cusco, Perú</div>
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
+      <AnimatePresence>{notaVisible && tieneTips && (<motion.div className="no-print" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={estilos.modalOverlay}><motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} style={{ ...estilos.modalCard, ...t.fondoPrincipal, ...t.bordeFantasma, maxWidth: '700px' }}><div style={{...estilos.modalHeader, backgroundColor: '#fef08a', borderBottom: '1px solid #fde047'}}><div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#854d0e' }}><Lightbulb size={24} /><h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 'bold' }}>Wiki Técnica</h3></div><button onClick={() => setNotaVisible(false)} style={{...estilos.btnCerrar, color: '#854d0e'}}><X size={24} /></button></div><div style={{ display: 'flex', flexDirection: 'column', maxHeight: '70vh' }}><div style={{ display: 'flex', overflowX: 'auto', borderBottom: t.bordeFantasma.border, backgroundColor: 'rgba(0,0,0,0.03)', scrollbarWidth: 'none' }}>{arrayTips.map((tab, index) => (<button key={index} onClick={() => setTipTabActiva(index)} style={{ padding: '14px 24px', border: 'none', background: 'none', borderBottom: tipTabActiva === index ? '3px solid #eab308' : '3px solid transparent', color: tipTabActiva === index ? '#ca8a04' : t.textoSutil.color, fontWeight: 'bold', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.2s' }}>{tab.titulo}</button>))}</div><div style={{ padding: '25px', overflowY: 'auto', flex: 1, color: t.textoPrincipal.color, lineHeight: '1.6', fontSize: '1rem', whiteSpace: 'pre-wrap' }}>{arrayTips[tipTabActiva]?.contenido}</div></div></motion.div></motion.div>)}</AnimatePresence>
+      <AnimatePresence>{bitacoraVisible && (<motion.div className="no-print" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={estilos.modalOverlay}><motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} style={{ ...estilos.modalCard, ...t.fondoPrincipal, ...t.bordeFantasma }}><div style={estilos.modalHeader}><div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><ClipboardList size={24} color="#10b981" /><h3 style={{ margin: 0, ...t.textoPrincipal, fontSize: '1.2rem' }}>{casoEditando ? 'Editar Caso' : 'Nueva Bitácora'}</h3></div><button onClick={() => setBitacoraVisible(false)} style={estilos.btnCerrar}><X size={24} color={t.textoSutil.color} /></button></div><div style={estilos.modalBody}><form onSubmit={guardarBitacora} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}><div style={{ display: 'flex', gap: '10px' }}><div style={{ flex: 1 }}><label style={{...estilos.labelForm, ...t.textoPrincipal}}>Marca *</label><input required type="text" placeholder="Ej: Samsung" style={{ ...estilos.inputForm, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} value={formCaso.marca} onChange={(e) => setFormCaso({...formCaso, marca: e.target.value})} /></div><div style={{ flex: 1 }}><label style={{...estilos.labelForm, ...t.textoPrincipal}}>Modelo *</label><input required type="text" placeholder="Ej: Galaxy A54" style={{ ...estilos.inputForm, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} value={formCaso.modelo} onChange={(e) => setFormCaso({...formCaso, modelo: e.target.value})} /></div></div><div><label style={{...estilos.labelForm, ...t.textoPrincipal}}>Síntomas *</label><textarea required style={{ ...estilos.inputForm, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma, minHeight: '60px' }} value={formCaso.sintomas} onChange={(e) => setFormCaso({...formCaso, sintomas: e.target.value})} /></div><div><label style={{...estilos.labelForm, ...t.textoPrincipal}}>Protocolo / Diagnóstico</label><textarea style={{ ...estilos.inputForm, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma, minHeight: '60px' }} value={formCaso.protocolo} onChange={(e) => setFormCaso({...formCaso, protocolo: e.target.value})} /></div><div><label style={{...estilos.labelForm, ...t.textoPrincipal}}>Enlace Imagen (Opcional - Recomendado Postimages)</label><input type="text" placeholder="https://i.postimg.cc/..." style={{ ...estilos.inputForm, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} value={formCaso.imgUrl} onChange={(e) => setFormCaso({...formCaso, imgUrl: e.target.value})} /></div>{mensajeCaso && <p style={{ color: mensajeCaso.includes('❌') || mensajeCaso.includes('⚠️') ? '#ef4444' : '#10b981', fontWeight: 'bold', textAlign: 'center', margin: 0 }}>{mensajeCaso}</p>}<button type="submit" style={{ ...estilos.btnPrimarioGuardar, background: '#10b981', justifyContent: 'center', padding: '15px' }}><Save size={20} style={{marginRight:'8px'}}/> {casoEditando ? 'Actualizar Caso' : 'Guardar Caso en Historial'}</button></form></div></motion.div></motion.div>)}</AnimatePresence>
+      <AnimatePresence>{historialCasosVisible && (<motion.div className="no-print" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={estilos.modalOverlay}><motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} style={{ ...estilos.modalCard, maxWidth: '800px', ...t.fondoPrincipal, ...t.bordeFantasma }}><div style={estilos.modalHeader}><div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><History size={24} color="#0058bc" /><h3 style={{ margin: 0, ...t.textoPrincipal, fontSize: '1.2rem' }}>Historial</h3></div><button onClick={() => setHistorialCasosVisible(false)} style={estilos.btnCerrar}><X size={24} color={t.textoSutil.color} /></button></div><div style={{ ...estilos.modalBody, padding: '15px' }}>{casosGuardados.length === 0 ? (<div style={{ textAlign: 'center', padding: '40px', color: t.textoSutil.color }}><FileText size={48} style={{opacity: 0.5, marginBottom:'10px'}}/><p>No hay casos registrados aún.</p></div>) : (<div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>{casosGuardados.map(caso => (<div key={caso.id} style={{ backgroundColor: t.cristalBgItem.backgroundColor, border: t.bordeFantasma.border, borderRadius: '12px', padding: '15px', display: 'flex', flexDirection: 'column', gap: '10px' }}><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}><div><h4 style={{ margin: '0 0 5px 0', ...t.textoPrincipal, fontSize: '1.1rem' }}>{caso.marca} {caso.modelo}</h4><span style={{ fontSize: '0.75rem', color: t.textoSutil.color }}>Ingreso: {new Date(caso.fecha).toLocaleDateString()}</span></div><div style={{ display: 'flex', gap: '8px' }}><button onClick={() => abrirReporte(caso)} style={{ ...estilos.btnAccionLista, backgroundColor: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', padding: '5px 12px', display: 'flex', gap: '5px', alignItems: 'center' }} title="Ver Reporte"><FileText size={16} /> <span>Reporte</span></button><button onClick={() => {setHistorialCasosVisible(false); editarCasoExistente(caso);}} style={{ ...estilos.btnAccionLista, backgroundColor: 'rgba(234, 179, 8, 0.1)', color: '#eab308' }} title="Editar"><Edit size={18} /></button><button onClick={() => eliminarCaso(caso.id)} style={{ ...estilos.btnAccionLista, backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' }} title="Eliminar"><Trash2 size={18} /></button></div></div><div style={{ fontSize: '0.85rem', ...t.textoPrincipal, backgroundColor: 'rgba(0,0,0,0.02)', padding: '10px', borderRadius: '8px' }}><strong>Síntoma:</strong> {caso.sintomas}</div>{caso.protocolo && <div style={{ fontSize: '0.85rem', ...t.textoPrincipal }}><strong>Diagnóstico:</strong> {caso.protocolo}</div>}</div>))}</div>)}</div></motion.div></motion.div>)}</AnimatePresence>
+      <AnimatePresence>{reporteVisible && casoReporte && (<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{...estilos.modalOverlay, backgroundColor: 'rgba(0,0,0,0.9)'}}><motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} style={{ width: '100%', maxWidth: '800px', display: 'flex', flexDirection: 'column', gap: '20px', alignItems: 'center', height: '90vh' }}><div className="no-print" style={{ display: 'flex', gap: '15px', width: '100%', justifyContent: 'flex-end', padding: '10px 0' }}><button onClick={enviarWhatsApp} style={{ background: '#25D366', color: 'white', padding: '10px 20px', borderRadius: '10px', border: 'none', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 4px 10px rgba(37, 211, 102, 0.3)' }}><MessageCircle size={20} /> WhatsApp</button><button onClick={imprimirReporte} style={{ background: '#0058bc', color: 'white', padding: '10px 20px', borderRadius: '10px', border: 'none', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 4px 10px rgba(0, 88, 188, 0.3)' }}><Printer size={20} /> Imprimir / PDF nativo</button><button onClick={() => setReporteVisible(false)} style={{ background: '#374151', color: 'white', padding: '10px', borderRadius: '10px', border: 'none', cursor: 'pointer' }}><X size={20} /></button></div><div style={{ flex: 1, width: '100%', overflowY: 'auto', borderRadius: '8px' }}><div id="seccion-reporte" style={{ backgroundColor: 'white', width: '100%', maxWidth: '210mm', minHeight: '297mm', margin: '0 auto', padding: '40px', boxSizing: 'border-box', boxShadow: '0 10px 25px rgba(0,0,0,0.5)', color: '#111827', fontFamily: 'system-ui, sans-serif' }}><div style={{ textAlign: 'center', borderBottom: '3px solid #0058bc', paddingBottom: '20px', marginBottom: '30px' }}><h1 style={{ color: '#0058bc', margin: 0, fontSize: '28px', textTransform: 'uppercase', letterSpacing: '2px' }}>MARSHALL CELL</h1><h2 style={{ color: '#4b5563', margin: '5px 0 0 0', fontSize: '16px', fontWeight: 'normal' }}>Reporte Técnico Oficial de Diagnóstico</h2></div><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '30px' }}><div style={{ background: '#f9fafb', padding: '15px', borderRadius: '8px', border: '1px solid #e5e7eb' }}><strong style={{ color: '#111827', display: 'block', marginBottom: '5px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px' }}>Fecha de Ingreso</strong><p style={{ margin: 0, fontSize: '15px' }}>{new Date(casoReporte.fecha).toLocaleDateString()}</p></div><div style={{ background: '#f9fafb', padding: '15px', borderRadius: '8px', border: '1px solid #e5e7eb' }}><strong style={{ color: '#111827', display: 'block', marginBottom: '5px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px' }}>ID de Caso</strong><p style={{ margin: 0, fontSize: '15px' }}>#{casoReporte.id.substring(0, 8).toUpperCase()}</p></div><div style={{ background: '#f9fafb', padding: '15px', borderRadius: '8px', border: '1px solid #e5e7eb' }}><strong style={{ color: '#111827', display: 'block', marginBottom: '5px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px' }}>Marca</strong><p style={{ margin: 0, fontSize: '15px' }}>{casoReporte.marca}</p></div><div style={{ background: '#f9fafb', padding: '15px', borderRadius: '8px', border: '1px solid #e5e7eb' }}><strong style={{ color: '#111827', display: 'block', marginBottom: '5px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px' }}>Modelo</strong><p style={{ margin: 0, fontSize: '15px' }}>{casoReporte.modelo}</p></div></div><div style={{ background: '#f9fafb', padding: '15px', borderRadius: '8px', border: '1px solid #e5e7eb', marginBottom: '20px' }}><strong style={{ color: '#111827', display: 'block', marginBottom: '5px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px' }}>Síntomas Reportados</strong><p style={{ margin: 0, fontSize: '15px', whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>{casoReporte.sintomas}</p></div><div style={{ background: '#f9fafb', padding: '15px', borderRadius: '8px', border: '1px solid #e5e7eb' }}><strong style={{ color: '#111827', display: 'block', marginBottom: '5px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px' }}>Protocolo de Reparación / Diagnóstico</strong><p style={{ margin: 0, fontSize: '15px', whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>{casoReporte.protocolo || 'Pendiente de evaluación técnica profunda.'}</p></div>{casoReporte.imgUrl && (<div style={{ marginTop: '30px', textAlign: 'center', background: '#f9fafb', padding: '20px', borderRadius: '8px', border: '1px solid #e5e7eb' }}><strong style={{ color: '#111827', display: 'block', marginBottom: '10px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px' }}>Evidencia Técnica Adjunta</strong><img src={casoReporte.imgUrl} alt="Evidencia" referrerPolicy="no-referrer" style={{ maxWidth: '100%', maxHeight: '350px', borderRadius: '8px', objectFit: 'contain' }} /></div>)}<div style={{ marginTop: '50px', textAlign: 'center', fontSize: '12px', color: '#9ca3af', borderTop: '1px solid #e5e7eb', paddingTop: '20px' }}>Generado por Marshall Cell CRM<br/>Laboratorio de Microelectrónica - Oropesa, Cusco, Perú</div></div></div></motion.div></motion.div>)}</AnimatePresence>
       <AnimatePresence>{imgModalVisible && pasoActual.imgUrl && (<motion.div className="no-print" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={estilos.modalOverlay} onClick={() => setImgModalVisible(false)}><motion.div initial={{ scale: 0.8 }} animate={{ scale: 1 }} exit={{ scale: 0.8 }} style={estilos.visualizadorContenedor} onClick={(e) => e.stopPropagation()}><div style={estilos.visualizadorHeader}><div style={{display:'flex', alignItems:'center', gap:'10px'}}>{pasoActual.imgTipo === 'microscopio' ? <Camera size={20} color="white" /> : <Map size={20} color="white" />}<span style={{color:'white', fontWeight:'bold'}}>{pasoActual.imgTipo === 'microscopio' ? 'Vista' : 'Plano'}</span></div><button onClick={() => setImgModalVisible(false)} style={{background:'none', border:'none', cursor:'pointer'}}><X size={24} color="white" /></button></div><div style={estilos.visualizadorCuerpo}><img src={pasoActual.imgUrl} alt="Visualización técnica" referrerPolicy="no-referrer" style={estilos.imagenTecnica} /></div><div style={estilos.visualizadorFooter}>Tip: Usa el zoom de tu pantalla para ver detalles.</div></motion.div></motion.div>)}</AnimatePresence>
       <AnimatePresence>{videoModalVisible && pasoActual.videoUrl && (<motion.div className="no-print" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={estilos.modalOverlay} onClick={() => setVideoModalVisible(false)}><motion.div initial={{ scale: 0.8 }} animate={{ scale: 1 }} exit={{ scale: 0.8 }} style={{...estilos.visualizadorContenedor, maxWidth: '800px', height: 'auto', aspectRatio: '16/9'}} onClick={(e) => e.stopPropagation()}><div style={{...estilos.visualizadorHeader, borderBottom: 'none'}}><div style={{display:'flex', alignItems:'center', gap:'10px'}}><Play size={20} color="white" /><span style={{color:'white', fontWeight:'bold'}}>Video</span></div><button onClick={() => setVideoModalVisible(false)} style={{background:'none', border:'none', cursor:'pointer'}}><X size={24} color="white" /></button></div><div style={{ flex: 1, backgroundColor: '#000', width: '100%', height: '100%' }}><iframe width="100%" height="100%" src={obtenerUrlVideo(pasoActual.videoUrl)} title="YouTube" frameBorder="0" allowFullScreen style={{display: 'block'}}></iframe></div></motion.div></motion.div>)}</AnimatePresence>
       <AnimatePresence>{tieneDocktest && (<motion.button className="no-print" initial={{ x: 100, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 100, opacity: 0 }} onClick={() => setPanelMedicionVisible(true)} style={{ position: 'fixed', right: 0, top: '40%', transform: 'translateY(-50%)', backgroundColor: dockViewTab === 'diodo' ? '#3b82f6' : '#10b981', color: 'white', border: 'none', padding: '15px 10px 15px 15px', borderRadius: '15px 0 0 15px', cursor: 'pointer', zIndex: 900, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', boxShadow: `-5px 0 15px ${dockViewTab === 'diodo' ? 'rgba(59, 130, 246, 0.4)' : 'rgba(16, 185, 129, 0.4)'}` }}><motion.div animate={{ opacity: [1, 0.5, 1] }} transition={{ duration: 1.5, repeat: Infinity }}><Usb size={24} /></motion.div><span style={{ fontSize: '0.7rem', fontWeight: 'bold', writingMode: 'vertical-rl', transform: 'rotate(180deg)', marginTop: '5px' }}>DOCKTEST</span></motion.button>)}</AnimatePresence>
@@ -681,25 +538,10 @@ export default function AppDiagnostico() {
               {vistaAdmin === 'login' && (
                 <div style={estilos.modalBody}>
                   <form onSubmit={iniciarSesion} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                    <div>
-                      <label style={estilos.labelForm}>Correo</label>
-                      <input required type="email" style={{ ...estilos.inputForm, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} value={emailAdmin} onChange={(e) => setEmailAdmin(e.target.value)} />
-                    </div>
-                    <div>
-                      <label style={estilos.labelForm}>Clave</label>
-                      <input required type="password" style={{ ...estilos.inputForm, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} value={passAdmin} onChange={(e) => setPassAdmin(e.target.value)} />
-                    </div>
-                    
-                    {/* MENSAJE DE ERROR RESTAURADO */}
-                    {errorLogin && (
-                      <p style={{ color: '#ef4444', fontWeight: 'bold', textAlign: 'center', margin: '5px 0' }}>
-                        {errorLogin}
-                      </p>
-                    )}
-                    
-                    <button type="submit" style={{...estilos.btnPrimarioGuardar, justifyContent: 'center', padding: '12px'}}>
-                      Entrar
-                    </button>
+                    <div><label style={estilos.labelForm}>Correo</label><input required type="email" style={{ ...estilos.inputForm, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} value={emailAdmin} onChange={(e) => setEmailAdmin(e.target.value)} /></div>
+                    <div><label style={estilos.labelForm}>Clave</label><input required type="password" style={{ ...estilos.inputForm, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} value={passAdmin} onChange={(e) => setPassAdmin(e.target.value)} /></div>
+                    {errorLogin && <p style={{ color: '#ef4444', fontWeight: 'bold', textAlign: 'center', margin: '5px 0' }}>{errorLogin}</p>}
+                    <button type="submit" style={{...estilos.btnPrimarioGuardar, justifyContent: 'center', padding: '12px'}}>Entrar</button>
                   </form>
                 </div>
               )}
@@ -777,10 +619,7 @@ export default function AppDiagnostico() {
                     <div style={estilos.checkboxGroup}><input type="checkbox" id="esFinal" checked={formEsFinal} onChange={(e) => setFormEsFinal(e.target.checked)} /><label htmlFor="esFinal" style={{ ...t.textoPrincipal, fontWeight: '600' }}>¿Este paso es el Final del diagnóstico?</label></div>
                     {!formEsFinal && (<div style={estilos.opcionesContainer}><h4 style={{ ...t.textoPrincipal, marginBottom: '10px' }}>Botones de Respuesta (Rutas):</h4>{formOpciones.map((op, index) => (<div key={index} style={estilos.opcionRow}><div style={{ flex: 1 }}><input style={{ ...estilos.inputFormPequeño, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} type="text" placeholder="Texto del botón (Ej: Sí, cargar a 1.2A)" value={op.texto} onChange={(e) => handleCambioOpcion(index, 'texto', e.target.value)} /><input style={{ ...estilos.inputFormPequeño, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma, marginTop: '4px' }} type="text" placeholder="ID del siguiente paso (Ej: revisar_ic_carga)" value={op.siguientePaso} onChange={(e) => handleCambioOpcion(index, 'siguientePaso', e.target.value.replace(/\s+/g, '_').toLowerCase())} /></div><button onClick={(e) => {e.preventDefault(); handleQuitarOpcion(index)}} style={estilos.btnBorrarOp}><Trash2 size={20} color="#ef4444" /></button></div>))}<button onClick={(e) => {e.preventDefault(); handleAgregarOpcion()}} style={estilos.btnAgregarOp}><Plus size={18} /> Agregar otra ruta</button></div>)}
                     {mensajeAdmin && <p style={{ color: mensajeAdmin.includes('❌') ? '#ef4444' : '#22c55e', fontWeight: 'bold', textAlign: 'center', padding: '10px', background: 'rgba(0,0,0,0.05)', borderRadius: '8px' }}>{mensajeAdmin}</p>}
-                   
-                   {!formEsFinal && (<div style={estilos.opcionesContainer}><h4 style={{ ...t.textoPrincipal, marginBottom: '10px' }}>Botones de Respuesta (Rutas):</h4>{formOpciones.map((op, index) => (<div key={index} style={estilos.opcionRow}><div style={{ flex: 1 }}><input style={{ ...estilos.inputFormPequeño, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} type="text" placeholder="Texto del botón (Ej: Sí, cargar a 1.2A)" value={op.texto} onChange={(e) => handleCambioOpcion(index, 'texto', e.target.value)} /><input style={{ ...estilos.inputFormPequeño, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma, marginTop: '4px' }} type="text" placeholder="ID del siguiente paso (Ej: revisar_ic_carga)" value={op.siguientePaso} onChange={(e) => handleCambioOpcion(index, 'siguientePaso', e.target.value.replace(/\s+/g, '_').toLowerCase())} /></div><button onClick={(e) => {e.preventDefault(); handleQuitarOpcion(index)}} style={estilos.btnBorrarOp}><Trash2 size={20} color="#ef4444" /></button></div>))}<button onClick={(e) => {e.preventDefault(); handleAgregarOpcion()}} style={estilos.btnAgregarOp}><Plus size={18} /> Agregar otra ruta</button></div>)}
-                    {mensajeAdmin && <p style={{ color: mensajeAdmin.includes('❌') ? '#ef4444' : '#22c55e', fontWeight: 'bold', textAlign: 'center', padding: '10px', background: 'rgba(0,0,0,0.05)', borderRadius: '8px' }}>{mensajeAdmin}</p>}
-                    
+
                     {/* --- RENDERIZADO DEL FPC EN PANTALLA --- */}
                     <div style={{ ...estilos.opcionesContainer, backgroundColor: 'rgba(139, 92, 246, 0.05)', border: '2px solid rgba(139, 92, 246, 0.3)', marginTop: '20px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
@@ -795,8 +634,9 @@ export default function AppDiagnostico() {
                       
                       <FPCInteligente 
                         pines={fpcPines} 
-                        setPinActivo={setPinActivoFpc} 
+                        setPines={setFpcPines}
                         pinActivo={pinActivoFpc} 
+                        setPinActivo={setPinActivoFpc} 
                         modo={modoFpc} 
                       />
                     </div>
@@ -812,84 +652,7 @@ export default function AppDiagnostico() {
       </AnimatePresence>
     </div>
   );
-}// --- NUEVO MÓDULO: COMPARADOR INTELIGENTE FPC (ZXW STYLE) ---
-const FPCInteligente = ({ pines, pinActivo, setPinActivo, modo = 'diagnostico' }) => {
-  // Dividimos los pines en dos filas para simular el conector real
-  const mitad = Math.ceil(pines.length / 2);
-  const filaSup = pines.slice(0, mitad);
-  const filaInf = pines.slice(mitad);
-
-  // Función matemática para decidir el color del pin
-  const obtenerColorPin = (pin) => {
-    if (modo === 'crear') {
-      return pinActivo === pin.id ? '#00ffff' : '#374151'; // Cian si está activo, gris si no
-    }
-    // MODO DIAGNÓSTICO
-    if (!pin.valorActual) return '#374151'; // Gris (no medido aún)
-    if (pin.valorActual === 'OL' && pin.valorSano !== 'OL') return '#f97316'; // Naranja (Línea abierta)
-    if (parseFloat(pin.valorActual) < 0.050) return '#ef4444'; // Rojo (Corto grave)
-    
-    // Comparación de tolerancia (Ej: ± 0.030V es aceptable)
-    const diferencia = Math.abs(parseFloat(pin.valorActual) - parseFloat(pin.valorSano));
-    if (diferencia <= 0.030) return '#10b981'; // Verde (Línea perfecta)
-    return '#eab308'; // Amarillo (Fuga leve)
-  };
-
-  return (
-    <div style={{ backgroundColor: '#111827', padding: '20px', borderRadius: '15px', border: '2px solid #374151', width: '100%', overflowX: 'auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px' }}>
-        <h4 style={{ color: '#8b5cf6', margin: 0 }}>Smart FPC Mapper</h4>
-        <span style={{ color: 'gray', fontSize: '0.8rem' }}>{modo === 'crear' ? 'MODO GRABACIÓN (PLACA SANA)' : 'MODO DIAGNÓSTICO'}</span>
-      </div>
-
-      {/* DIBUJO DEL CONECTOR FPC */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', backgroundColor: '#000', padding: '15px', borderRadius: '10px', minWidth: 'max-content' }}>
-        
-        {/* FILA SUPERIOR */}
-        <div style={{ display: 'flex', gap: '4px' }}>
-          {filaSup.map(pin => (
-            <div key={pin.id} onClick={() => setPinActivo(pin.id)} style={{ width: '40px', display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer' }}>
-              <span style={{ fontSize: '0.6rem', color: 'gray', marginBottom: '2px' }}>{pin.id}</span>
-              <div style={{ width: '100%', height: '25px', backgroundColor: obtenerColorPin(pin), border: pinActivo === pin.id ? '2px solid #fff' : '1px solid #222', borderRadius: '4px', transition: 'all 0.2s' }} />
-            </div>
-          ))}
-        </div>
-
-        {/* ESPACIO CENTRAL DEL CONECTOR */}
-        <div style={{ height: '10px', backgroundColor: '#1a1a1a', borderRadius: '2px', width: '100%' }} />
-
-        {/* FILA INFERIOR */}
-        <div style={{ display: 'flex', gap: '4px' }}>
-          {filaInf.map(pin => (
-            <div key={pin.id} onClick={() => setPinActivo(pin.id)} style={{ width: '40px', display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer' }}>
-              <div style={{ width: '100%', height: '25px', backgroundColor: obtenerColorPin(pin), border: pinActivo === pin.id ? '2px solid #fff' : '1px solid #222', borderRadius: '4px', transition: 'all 0.2s' }} />
-              <span style={{ fontSize: '0.6rem', color: 'gray', marginTop: '2px' }}>{pin.id}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* PANEL DE INFORMACIÓN DE LA LÍNEA (El Pin que estás tocando) */}
-      <div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#1a1a1a', borderRadius: '10px', borderLeft: `4px solid ${obtenerColorPin(pines.find(p => p.id === pinActivo) || {})}` }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div>
-            <span style={{ color: '#00ffff', fontWeight: 'bold', fontSize: '1.2rem' }}>PIN {pinActivo}</span>
-            {/* Si estamos creando, mostramos un Input para escribir el nombre de la línea. Si no, solo el texto */}
-            {modo === 'crear' ? (
-               <input placeholder="Nombre (Ej: MIPI_DSI_CLK)" style={{ display: 'block', marginTop: '5px', background: '#000', color: 'white', border: '1px solid #333', padding: '5px', borderRadius: '5px', width: '200px' }} />
-            ) : (
-               <span style={{ display: 'block', color: '#fff', fontSize: '0.9rem', marginTop: '5px' }}>{pines.find(p => p.id === pinActivo)?.nombre || 'Línea sin nombre'}</span>
-            )}
-          </div>
-          <div style={{ textAlign: 'right' }}>
-            <span style={{ color: 'gray', fontSize: '0.8rem', display: 'block' }}>Valor Sano: {pines.find(p => p.id === pinActivo)?.valorSano || '---'} V</span>
-            <span style={{ color: 'white', fontSize: '1.5rem', fontWeight: 'bold', display: 'block' }}>Actual: {pines.find(p => p.id === pinActivo)?.valorActual || '---'} V</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
+}
 
 const estilos = {
   contenedor: { minHeight: '100vh', paddingBottom: '100px', display: 'flex', flexDirection: 'column' },
