@@ -727,7 +727,84 @@ export default function AppDiagnostico() {
       </AnimatePresence>
     </div>
   );
-}
+}// --- NUEVO MÓDULO: COMPARADOR INTELIGENTE FPC (ZXW STYLE) ---
+const FPCInteligente = ({ pines, pinActivo, setPinActivo, modo = 'diagnostico' }) => {
+  // Dividimos los pines en dos filas para simular el conector real
+  const mitad = Math.ceil(pines.length / 2);
+  const filaSup = pines.slice(0, mitad);
+  const filaInf = pines.slice(mitad);
+
+  // Función matemática para decidir el color del pin
+  const obtenerColorPin = (pin) => {
+    if (modo === 'crear') {
+      return pinActivo === pin.id ? '#00ffff' : '#374151'; // Cian si está activo, gris si no
+    }
+    // MODO DIAGNÓSTICO
+    if (!pin.valorActual) return '#374151'; // Gris (no medido aún)
+    if (pin.valorActual === 'OL' && pin.valorSano !== 'OL') return '#f97316'; // Naranja (Línea abierta)
+    if (parseFloat(pin.valorActual) < 0.050) return '#ef4444'; // Rojo (Corto grave)
+    
+    // Comparación de tolerancia (Ej: ± 0.030V es aceptable)
+    const diferencia = Math.abs(parseFloat(pin.valorActual) - parseFloat(pin.valorSano));
+    if (diferencia <= 0.030) return '#10b981'; // Verde (Línea perfecta)
+    return '#eab308'; // Amarillo (Fuga leve)
+  };
+
+  return (
+    <div style={{ backgroundColor: '#111827', padding: '20px', borderRadius: '15px', border: '2px solid #374151', width: '100%', overflowX: 'auto' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px' }}>
+        <h4 style={{ color: '#8b5cf6', margin: 0 }}>Smart FPC Mapper</h4>
+        <span style={{ color: 'gray', fontSize: '0.8rem' }}>{modo === 'crear' ? 'MODO GRABACIÓN (PLACA SANA)' : 'MODO DIAGNÓSTICO'}</span>
+      </div>
+
+      {/* DIBUJO DEL CONECTOR FPC */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', backgroundColor: '#000', padding: '15px', borderRadius: '10px', minWidth: 'max-content' }}>
+        
+        {/* FILA SUPERIOR */}
+        <div style={{ display: 'flex', gap: '4px' }}>
+          {filaSup.map(pin => (
+            <div key={pin.id} onClick={() => setPinActivo(pin.id)} style={{ width: '40px', display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer' }}>
+              <span style={{ fontSize: '0.6rem', color: 'gray', marginBottom: '2px' }}>{pin.id}</span>
+              <div style={{ width: '100%', height: '25px', backgroundColor: obtenerColorPin(pin), border: pinActivo === pin.id ? '2px solid #fff' : '1px solid #222', borderRadius: '4px', transition: 'all 0.2s' }} />
+            </div>
+          ))}
+        </div>
+
+        {/* ESPACIO CENTRAL DEL CONECTOR */}
+        <div style={{ height: '10px', backgroundColor: '#1a1a1a', borderRadius: '2px', width: '100%' }} />
+
+        {/* FILA INFERIOR */}
+        <div style={{ display: 'flex', gap: '4px' }}>
+          {filaInf.map(pin => (
+            <div key={pin.id} onClick={() => setPinActivo(pin.id)} style={{ width: '40px', display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer' }}>
+              <div style={{ width: '100%', height: '25px', backgroundColor: obtenerColorPin(pin), border: pinActivo === pin.id ? '2px solid #fff' : '1px solid #222', borderRadius: '4px', transition: 'all 0.2s' }} />
+              <span style={{ fontSize: '0.6rem', color: 'gray', marginTop: '2px' }}>{pin.id}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* PANEL DE INFORMACIÓN DE LA LÍNEA (El Pin que estás tocando) */}
+      <div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#1a1a1a', borderRadius: '10px', borderLeft: `4px solid ${obtenerColorPin(pines.find(p => p.id === pinActivo) || {})}` }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            <span style={{ color: '#00ffff', fontWeight: 'bold', fontSize: '1.2rem' }}>PIN {pinActivo}</span>
+            {/* Si estamos creando, mostramos un Input para escribir el nombre de la línea. Si no, solo el texto */}
+            {modo === 'crear' ? (
+               <input placeholder="Nombre (Ej: MIPI_DSI_CLK)" style={{ display: 'block', marginTop: '5px', background: '#000', color: 'white', border: '1px solid #333', padding: '5px', borderRadius: '5px', width: '200px' }} />
+            ) : (
+               <span style={{ display: 'block', color: '#fff', fontSize: '0.9rem', marginTop: '5px' }}>{pines.find(p => p.id === pinActivo)?.nombre || 'Línea sin nombre'}</span>
+            )}
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <span style={{ color: 'gray', fontSize: '0.8rem', display: 'block' }}>Valor Sano: {pines.find(p => p.id === pinActivo)?.valorSano || '---'} V</span>
+            <span style={{ color: 'white', fontSize: '1.5rem', fontWeight: 'bold', display: 'block' }}>Actual: {pines.find(p => p.id === pinActivo)?.valorActual || '---'} V</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const estilos = {
   contenedor: { minHeight: '100vh', paddingBottom: '100px', display: 'flex', flexDirection: 'column' },
