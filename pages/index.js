@@ -95,12 +95,47 @@ export default function AppDiagnostico() {
   const [lecturaUsb, setLecturaUsb] = useState({ valor: '----', unidad: '---' });
   const [dispositivoUsb, setDispositivoUsb] = useState(null);
   
+// --- ESTADOS DEL FPC INTELIGENTE ---
+  const pinesIniciales = Array.from({ length: 40 }, (_, i) => ({
+    id: i + 1,
+    nombre: `Linea_${i + 1}`,
+    valorSano: '---',
+    valorActual: '---'
+  }));
+  const [fpcPines, setFpcPines] = useState(pinesIniciales);
+  const [pinActivoFpc, setPinActivoFpc] = useState(1);
+  const [modoFpc, setModoFpc] = useState('crear'); // 'crear' o 'diagnostico'
+  
+  const pinActivoFpcRef = useRef(pinActivoFpc);
+  const modoFpcRef = useRef(modoFpc);
+  useEffect(() => { pinActivoFpcRef.current = pinActivoFpc; }, [pinActivoFpc]);
+  useEffect(() => { modoFpcRef.current = modoFpc; }, [modoFpc]);
+
   const ordenCamposDock = ['vbus', 'dp', 'dm', 'cc1', 'cc2'];
   const [campoActivoDock, setCampoActivoDock] = useState('vbus');
   
   // REF para que la función USB siempre sepa cuál es el campo activo actual
   const campoActivoRef = useRef(campoActivoDock);
-  useEffect(() => { campoActivoRef.current = campoActivoDock; }, [campoActivoDock]);
+  // --- AUTO-AVANCE CON TECLADO (DOCKTEST Y FPC) ---
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.code === 'Space' || e.key === 'Enter') && mostrarAdmin && vistaAdmin === 'formulario') {
+        e.preventDefault(); 
+        // 1. Avance del Docktest
+        const indiceActual = ordenCamposDock.indexOf(campoActivoDock);
+        if (indiceActual >= 0 && indiceActual < ordenCamposDock.length - 1) {
+          setCampoActivoDock(ordenCamposDock[indiceActual + 1]);
+        }
+        // 2. Avance del FPC Inteligente
+        setPinActivoFpc(prev => {
+          if (prev < fpcPines.length) return prev + 1;
+          return prev;
+        });
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [campoActivoDock, mostrarAdmin, vistaAdmin, fpcPines.length]);
 
   const [formId, setFormId] = useState('');
   const [formPregunta, setFormPregunta] = useState('');
@@ -112,6 +147,31 @@ export default function AppDiagnostico() {
   const [formSimA, setFormSimA] = useState('');
   const [dockAdminTab, setDockAdminTab] = useState('diodo');
   const [formDockDiodo, setFormDockDiodo] = useState({ vbus: '', dp: '', dm: '', cc1: '', cc2: '' });
+  // Inyección al Docktest
+        setFormDockDiodo(prev => {
+          const campoActual = campoActivoRef.current;
+          if (valStr !== "---" && prev[campoActual] !== valStr) {
+             return { ...prev, [campoActual]: valStr };
+          }
+          return prev;
+        });
+
+        // --- INYECCIÓN AL FPC INTELIGENTE ---
+        setFpcPines(prevPines => {
+          const pinActualId = pinActivoFpcRef.current;
+          const modoActual = modoFpcRef.current;
+
+          return prevPines.map(pin => {
+              if (pin.id === pinActualId) {
+                  if (modoActual === 'crear' && valStr !== "---" && pin.valorSano !== valStr) {
+                      return { ...pin, valorSano: valStr };
+                  } else if (modoActual === 'diagnostico' && valStr !== "---" && pin.valorActual !== valStr) {
+                      return { ...pin, valorActual: valStr };
+                  }
+              }
+              return pin;
+          });
+        });
   const [formDockUa, setFormDockUa] = useState({ vbus: '', dp: '', dm: '', cc1: '', cc2: '' });
   const [formImgUrl, setFormImgUrl] = useState('');
   const [formImgTipo, setFormImgTipo] = useState('microscopio');
@@ -717,6 +777,31 @@ export default function AppDiagnostico() {
                     <div style={estilos.checkboxGroup}><input type="checkbox" id="esFinal" checked={formEsFinal} onChange={(e) => setFormEsFinal(e.target.checked)} /><label htmlFor="esFinal" style={{ ...t.textoPrincipal, fontWeight: '600' }}>¿Este paso es el Final del diagnóstico?</label></div>
                     {!formEsFinal && (<div style={estilos.opcionesContainer}><h4 style={{ ...t.textoPrincipal, marginBottom: '10px' }}>Botones de Respuesta (Rutas):</h4>{formOpciones.map((op, index) => (<div key={index} style={estilos.opcionRow}><div style={{ flex: 1 }}><input style={{ ...estilos.inputFormPequeño, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} type="text" placeholder="Texto del botón (Ej: Sí, cargar a 1.2A)" value={op.texto} onChange={(e) => handleCambioOpcion(index, 'texto', e.target.value)} /><input style={{ ...estilos.inputFormPequeño, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma, marginTop: '4px' }} type="text" placeholder="ID del siguiente paso (Ej: revisar_ic_carga)" value={op.siguientePaso} onChange={(e) => handleCambioOpcion(index, 'siguientePaso', e.target.value.replace(/\s+/g, '_').toLowerCase())} /></div><button onClick={(e) => {e.preventDefault(); handleQuitarOpcion(index)}} style={estilos.btnBorrarOp}><Trash2 size={20} color="#ef4444" /></button></div>))}<button onClick={(e) => {e.preventDefault(); handleAgregarOpcion()}} style={estilos.btnAgregarOp}><Plus size={18} /> Agregar otra ruta</button></div>)}
                     {mensajeAdmin && <p style={{ color: mensajeAdmin.includes('❌') ? '#ef4444' : '#22c55e', fontWeight: 'bold', textAlign: 'center', padding: '10px', background: 'rgba(0,0,0,0.05)', borderRadius: '8px' }}>{mensajeAdmin}</p>}
+                   
+                   {!formEsFinal && (<div style={estilos.opcionesContainer}><h4 style={{ ...t.textoPrincipal, marginBottom: '10px' }}>Botones de Respuesta (Rutas):</h4>{formOpciones.map((op, index) => (<div key={index} style={estilos.opcionRow}><div style={{ flex: 1 }}><input style={{ ...estilos.inputFormPequeño, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} type="text" placeholder="Texto del botón (Ej: Sí, cargar a 1.2A)" value={op.texto} onChange={(e) => handleCambioOpcion(index, 'texto', e.target.value)} /><input style={{ ...estilos.inputFormPequeño, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma, marginTop: '4px' }} type="text" placeholder="ID del siguiente paso (Ej: revisar_ic_carga)" value={op.siguientePaso} onChange={(e) => handleCambioOpcion(index, 'siguientePaso', e.target.value.replace(/\s+/g, '_').toLowerCase())} /></div><button onClick={(e) => {e.preventDefault(); handleQuitarOpcion(index)}} style={estilos.btnBorrarOp}><Trash2 size={20} color="#ef4444" /></button></div>))}<button onClick={(e) => {e.preventDefault(); handleAgregarOpcion()}} style={estilos.btnAgregarOp}><Plus size={18} /> Agregar otra ruta</button></div>)}
+                    {mensajeAdmin && <p style={{ color: mensajeAdmin.includes('❌') ? '#ef4444' : '#22c55e', fontWeight: 'bold', textAlign: 'center', padding: '10px', background: 'rgba(0,0,0,0.05)', borderRadius: '8px' }}>{mensajeAdmin}</p>}
+                    
+                    {/* --- RENDERIZADO DEL FPC EN PANTALLA --- */}
+                    <div style={{ ...estilos.opcionesContainer, backgroundColor: 'rgba(139, 92, 246, 0.05)', border: '2px solid rgba(139, 92, 246, 0.3)', marginTop: '20px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                        <h4 style={{ margin: 0, color: '#8b5cf6', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                           <Map size={20} /> Mapeo de FPC (Modo ZXW)
+                        </h4>
+                        <div style={{display:'flex', gap:'5px', backgroundColor: 'rgba(0,0,0,0.1)', padding:'4px', borderRadius:'8px'}}>
+                          <button onClick={(e) => {e.preventDefault(); setModoFpc('crear')}} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: modoFpc === 'crear' ? '#8b5cf6' : 'transparent', color: modoFpc === 'crear' ? 'white' : 'gray', fontWeight: 'bold' }}>Grabar Sano</button>
+                          <button onClick={(e) => {e.preventDefault(); setModoFpc('diagnostico')}} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: modoFpc === 'diagnostico' ? '#ef4444' : 'transparent', color: modoFpc === 'diagnostico' ? 'white' : 'gray', fontWeight: 'bold' }}>Diagnóstico</button>
+                        </div>
+                      </div>
+                      
+                      <FPCInteligente 
+                        pines={fpcPines} 
+                        setPinActivo={setPinActivoFpc} 
+                        pinActivo={pinActivoFpc} 
+                        modo={modoFpc} 
+                      />
+                    </div>
+                    {/* --- FIN RENDERIZADO DEL FPC --- */}
+
                   </div>
                   <div style={estilos.modalFooter}><button onClick={guardarPasoFirebase} style={{...estilos.btnPrimarioGuardar, padding: '12px 30px', fontSize: '1.1rem'}}><Save size={20} /> Guardar Paso a la Nube</button></div>
                 </>
