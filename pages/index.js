@@ -15,7 +15,7 @@ const obtenerUrlVideo = (url) => {
   return videoId ? `https://www.youtube.com/embed/${videoId}` : url;
 };
 
-// --- VISOR GIGANTE DEL MULTÍMETRO (Para el Admin con Micrófono) ---
+// --- VISOR GIGANTE DEL MULTÍMETRO ---
 const VisorHUD = ({ valor, unidad, conectado, conectarFn, vozActiva, toggleVozFn }) => (
   <div style={{ backgroundColor: '#1a1a1a', border: '2px solid #333333', borderRadius: '15px', padding: '20px', display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '20px', position: 'relative', overflow: 'hidden', boxShadow: conectado ? '0 0 20px rgba(0, 255, 255, 0.2)' : 'none' }}>
     <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
@@ -38,8 +38,8 @@ const VisorHUD = ({ valor, unidad, conectado, conectarFn, vozActiva, toggleVozFn
   </div>
 );
 
-// --- COMPONENTE: FPC INTELIGENTE (ESTILO ZXW) ---
-const FPCInteligente = ({ pines, setPines, pinActivo, setPinActivo, modo = 'diagnostico' }) => {
+// --- FPC INTELIGENTE MEJORADO (Textos dentro de pines) ---
+const FPCInteligente = ({ pines, setPines, pinActivo, setPinActivo, modo = 'diagnostico', escala = 'diodo', lecturaEnVivo }) => {
   const mitad = Math.ceil(pines.length / 2);
   const filaSup = pines.slice(0, mitad);
   const filaInf = pines.slice(mitad);
@@ -47,38 +47,44 @@ const FPCInteligente = ({ pines, setPines, pinActivo, setPinActivo, modo = 'diag
   const obtenerColorPin = (pin) => {
     if (modo === 'crear') return pinActivo === pin.id ? '#00ffff' : '#374151'; 
     if (!pin.valorActual || pin.valorActual === '---') return '#374151'; 
-    if (pin.valorActual === 'OL' && pin.valorSano !== 'OL') return '#f97316'; 
-    if (parseFloat(pin.valorActual) < 0.050) return '#ef4444'; 
+    if (pin.valorActual === 'OL' && pin.valorSano !== 'OL') return '#f97316'; // Línea Abierta
     
-    const diferencia = Math.abs(parseFloat(pin.valorActual) - parseFloat(pin.valorSano));
-    if (diferencia <= 0.030) return '#10b981'; 
-    return '#eab308'; 
+    const vActual = parseFloat(pin.valorActual);
+    const vSano = parseFloat(pin.valorSano);
+    
+    if (escala === 'diodo') {
+      if (vActual < 0.050) return '#ef4444'; // Corto a GND
+      if (!isNaN(vActual) && !isNaN(vSano) && Math.abs(vActual - vSano) <= 0.040) return '#10b981'; // OK
+    } else {
+      // Lógica para uA (Microamperios)
+      if (vActual > 2000) return '#ef4444'; // Consumo altísimo
+      if (!isNaN(vActual) && !isNaN(vSano) && Math.abs(vActual - vSano) <= 50) return '#10b981'; // OK
+    }
+    return '#eab308'; // Fuga o alteración
   };
 
-  const actualizarNombrePin = (id, nuevoNombre) => {
-    setPines(prev => prev.map(p => p.id === id ? { ...p, nombre: nuevoNombre } : p));
+  const formatearNumeroPin = (val) => {
+    if (!val || val === '---') return '';
+    if (val === 'OL') return 'OL';
+    return val.startsWith('0.') ? val.substring(1) : val; // Transforma "0.364" a ".364" para que quepa
   };
+
+  const renderPin = (pin, esArriba) => (
+    <div key={pin.id} onClick={() => setPinActivo(pin.id)} style={{ width: '55px', display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer' }}>
+      {esArriba && <span style={{ fontSize: '0.6rem', color: 'gray', marginBottom: '2px' }}>{pin.id}</span>}
+      <div style={{ width: '100%', height: '35px', backgroundColor: obtenerColorPin(pin), border: pinActivo === pin.id ? '2px solid #fff' : '1px solid #222', borderRadius: '4px', transition: 'all 0.2s', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
+         <span style={{ fontSize: '0.6rem', fontWeight: 'bold', color: '#fff', textShadow: '1px 1px 2px #000' }}>{modo === 'crear' ? formatearNumeroPin(pin.valorSano) : formatearNumeroPin(pin.valorActual)}</span>
+      </div>
+      {!esArriba && <span style={{ fontSize: '0.6rem', color: 'gray', marginTop: '2px' }}>{pin.id}</span>}
+    </div>
+  );
 
   return (
     <div style={{ backgroundColor: '#111827', padding: '20px', borderRadius: '15px', border: '2px solid #374151', width: '100%', overflowX: 'auto' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', backgroundColor: '#000', padding: '15px', borderRadius: '10px', minWidth: 'max-content' }}>
-        <div style={{ display: 'flex', gap: '4px' }}>
-          {filaSup.map(pin => (
-            <div key={pin.id} onClick={() => setPinActivo(pin.id)} style={{ width: '40px', display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer' }}>
-              <span style={{ fontSize: '0.6rem', color: 'gray', marginBottom: '2px' }}>{pin.id}</span>
-              <div style={{ width: '100%', height: '25px', backgroundColor: obtenerColorPin(pin), border: pinActivo === pin.id ? '2px solid #fff' : '1px solid #222', borderRadius: '4px', transition: 'all 0.2s' }} />
-            </div>
-          ))}
-        </div>
+        <div style={{ display: 'flex', gap: '4px' }}>{filaSup.map(pin => renderPin(pin, true))}</div>
         <div style={{ height: '10px', backgroundColor: '#1a1a1a', borderRadius: '2px', width: '100%' }} />
-        <div style={{ display: 'flex', gap: '4px' }}>
-          {filaInf.map(pin => (
-            <div key={pin.id} onClick={() => setPinActivo(pin.id)} style={{ width: '40px', display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer' }}>
-              <div style={{ width: '100%', height: '25px', backgroundColor: obtenerColorPin(pin), border: pinActivo === pin.id ? '2px solid #fff' : '1px solid #222', borderRadius: '4px', transition: 'all 0.2s' }} />
-              <span style={{ fontSize: '0.6rem', color: 'gray', marginTop: '2px' }}>{pin.id}</span>
-            </div>
-          ))}
-        </div>
+        <div style={{ display: 'flex', gap: '4px' }}>{filaInf.map(pin => renderPin(pin, false))}</div>
       </div>
 
       <div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#1a1a1a', borderRadius: '10px', borderLeft: `4px solid ${obtenerColorPin(pines.find(p => p.id === pinActivo) || {})}` }}>
@@ -86,14 +92,15 @@ const FPCInteligente = ({ pines, setPines, pinActivo, setPinActivo, modo = 'diag
           <div>
             <span style={{ color: '#00ffff', fontWeight: 'bold', fontSize: '1.2rem' }}>PIN {pinActivo}</span>
             {modo === 'crear' ? (
-               <input value={pines.find(p => p.id === pinActivo)?.nombre || ''} onChange={(e) => actualizarNombrePin(pinActivo, e.target.value)} placeholder="Nombre (Ej: MIPI_DSI_CLK)" style={{ display: 'block', marginTop: '5px', background: '#000', color: 'white', border: '1px solid #333', padding: '5px', borderRadius: '5px', width: '200px', outline:'none' }} />
+               <input value={pines.find(p => p.id === pinActivo)?.nombre || ''} onChange={(e) => setPines(prev => prev.map(p => p.id === pinActivo ? { ...p, nombre: e.target.value } : p))} placeholder="Nombre (Ej: MIPI_DSI_CLK)" style={{ display: 'block', marginTop: '5px', background: '#000', color: 'white', border: '1px solid #333', padding: '5px', borderRadius: '5px', width: '200px', outline:'none' }} />
             ) : (
                <span style={{ display: 'block', color: '#fff', fontSize: '0.9rem', marginTop: '5px' }}>{pines.find(p => p.id === pinActivo)?.nombre || 'Línea sin nombre'}</span>
             )}
           </div>
           <div style={{ textAlign: 'right' }}>
-            <span style={{ color: 'gray', fontSize: '0.8rem', display: 'block' }}>Valor Sano: <strong style={{color:'#fff'}}>{pines.find(p => p.id === pinActivo)?.valorSano || '---'} V</strong></span>
-            <span style={{ color: 'gray', fontSize: '0.8rem', display: 'block', marginTop: '4px' }}>Actual: <strong style={{color: '#fff', fontSize: '1.5rem'}}>{pines.find(p => p.id === pinActivo)?.valorActual || '---'} V</strong></span>
+            <span style={{ color: 'gray', fontSize: '0.8rem', display: 'block' }}>Valor Sano: <strong style={{color:'#fff'}}>{pines.find(p => p.id === pinActivo)?.valorSano || '---'} {escala==='diodo'?'V':'uA'}</strong></span>
+            {/* Si es el pin activo, mostramos la lectura EN VIVO del multímetro. Si no, mostramos lo guardado */}
+            <span style={{ color: 'gray', fontSize: '0.8rem', display: 'block', marginTop: '4px' }}>Actual: <strong style={{color: '#fff', fontSize: '1.5rem'}}>{(pinActivo === pines.find(p => p.id === pinActivo)?.id && lecturaEnVivo !== '----') ? lecturaEnVivo : (pines.find(p => p.id === pinActivo)?.valorActual || '---')} {escala==='diodo'?'V':'uA'}</strong></span>
           </div>
         </div>
       </div>
@@ -139,11 +146,11 @@ export default function AppDiagnostico() {
   const [usbConectado, setUsbConectado] = useState(false);
   const [lecturaUsb, setLecturaUsb] = useState({ valor: '----', unidad: '---' });
   const [dispositivoUsb, setDispositivoUsb] = useState(null);
+  const lecturaUsbRef = useRef(lecturaUsb);
+  useEffect(() => { lecturaUsbRef.current = lecturaUsb; }, [lecturaUsb]);
   
   const ordenCamposDock = ['vbus', 'dp', 'dm', 'cc1', 'cc2'];
   const [campoActivoDock, setCampoActivoDock] = useState('vbus');
-  const campoActivoRef = useRef(campoActivoDock);
-  useEffect(() => { campoActivoRef.current = campoActivoDock; }, [campoActivoDock]);
 
   const pinesIniciales = Array.from({ length: 40 }, (_, i) => ({
     id: i + 1, nombre: `Linea_${i + 1}`, valorSano: '---', valorActual: '---'
@@ -151,10 +158,7 @@ export default function AppDiagnostico() {
   const [fpcPines, setFpcPines] = useState(pinesIniciales);
   const [pinActivoFpc, setPinActivoFpc] = useState(1);
   const [modoFpc, setModoFpc] = useState('crear');
-  const pinActivoFpcRef = useRef(pinActivoFpc);
-  const modoFpcRef = useRef(modoFpc);
-  useEffect(() => { pinActivoFpcRef.current = pinActivoFpc; }, [pinActivoFpc]);
-  useEffect(() => { modoFpcRef.current = modoFpc; }, [modoFpc]);
+  const [escalaFpc, setEscalaFpc] = useState('diodo'); // 'diodo' o 'ua'
 
   // --- ESTADOS DEL FORMULARIO ADMIN ---
   const [formId, setFormId] = useState('');
@@ -178,16 +182,12 @@ export default function AppDiagnostico() {
 
   // --- MAGIA WEBHID ---
   const conectarMultimetroUSB = async () => {
-    if (typeof navigator === 'undefined' || !navigator.hid) {
-        alert("Navegador no compatible. Usa Google Chrome o Edge en PC."); return;
-    }
+    if (typeof navigator === 'undefined' || !navigator.hid) { alert("Navegador no compatible."); return; }
     try {
       const devices = await navigator.hid.requestDevice({ filters: [{ vendorId: 0x1A86, productId: 0xE429 }] });
       if (devices.length === 0) return; 
-      const device = devices[0];
-      await device.open();
-      setDispositivoUsb(device);
-      setUsbConectado(true);
+      const device = devices[0]; await device.open();
+      setDispositivoUsb(device); setUsbConectado(true);
 
       device.addEventListener("inputreport", event => {
         const text = new TextDecoder().decode(event.data);
@@ -197,53 +197,54 @@ export default function AppDiagnostico() {
           const match = text.match(/([-+]?\d+\.\d+)/);
           if (match) {
             valStr = parseFloat(match[1]).toFixed(3);
-            if (text.includes("V")) uniStr = "V"; else if (text.includes("Ohm") || text.includes("kOhm") || text.includes("MOhm")) uniStr = "Ω"; else if (text.includes("A") || text.includes("mA") || text.includes("uA")) uniStr = "A"; else uniStr = "Diod"; 
+            if (text.includes("V")) uniStr = "V"; else if (text.includes("Ohm") || text.includes("kOhm")) uniStr = "Ω"; else if (text.includes("A") || text.includes("uA")) uniStr = "A"; else uniStr = "Diod"; 
           }
         }
+        // SOLAMENTE ACTUALIZA LA LECTURA EN VIVO (No escribe en memoria automáticamente)
         setLecturaUsb({ valor: valStr, unidad: uniStr });
-
-        setFormDockDiodo(prev => {
-          const campoActual = campoActivoRef.current;
-          if (valStr !== "---" && prev[campoActual] !== valStr) return { ...prev, [campoActual]: valStr };
-          return prev;
-        });
-
-        setFpcPines(prevPines => {
-          const pinActualId = pinActivoFpcRef.current; const mActual = modoFpcRef.current;
-          return prevPines.map(pin => {
-              if (pin.id === pinActualId) {
-                  if (mActual === 'crear' && valStr !== "---" && pin.valorSano !== valStr) return { ...pin, valorSano: valStr };
-                  else if (mActual === 'diagnostico' && valStr !== "---" && pin.valorActual !== valStr) return { ...pin, valorActual: valStr };
-              }
-              return pin;
-          });
-        });
       });
-    } catch (error) { alert("Error USB. Verifica que no esté abierto en Python."); }
+    } catch (error) { alert("Error USB."); }
   };
 
-  // --- MOTOR DE AVANCE (TECLADO Y VOZ COMPARTEN ESTO) ---
+  // --- MOTOR DE GUARDADO Y AVANCE (TECLADO Y VOZ) ---
   const avanzarPinMagico = () => {
-    // 1. Avanza el Docktest
+    const valVivo = lecturaUsbRef.current.valor;
+
+    // 1. Guardar y Avanzar Docktest
+    setFormDockDiodo(prev => {
+        if(dockAdminTab === 'diodo') return { ...prev, [campoActivoDock]: valVivo };
+        return prev;
+    });
+    setFormDockUa(prev => {
+        if(dockAdminTab === 'ua') return { ...prev, [campoActivoDock]: valVivo };
+        return prev;
+    });
+
     setCampoActivoDock(prev => {
       const indiceActual = ordenCamposDock.indexOf(prev);
       return (indiceActual >= 0 && indiceActual < ordenCamposDock.length - 1) ? ordenCamposDock[indiceActual + 1] : prev;
     });
-    // 2. Avanza el FPC
+
+    // 2. Guardar y Avanzar FPC
+    setFpcPines(prev => prev.map(p => {
+        if (p.id === pinActivoFpc) {
+            if (modoFpc === 'crear') return { ...p, valorSano: valVivo };
+            return { ...p, valorActual: valVivo };
+        }
+        return p;
+    }));
     setPinActivoFpc(prev => prev < fpcPines.length ? prev + 1 : prev);
   };
 
-  // --- AUTO-AVANCE CON TECLADO ---
   useEffect(() => {
     const handleKeyDown = (e) => {
       if ((e.code === 'Space' || e.key === 'Enter') && mostrarAdmin && vistaAdmin === 'formulario') {
-        e.preventDefault(); 
-        avanzarPinMagico();
+        e.preventDefault(); avanzarPinMagico();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [mostrarAdmin, vistaAdmin, fpcPines.length]);
+  }, [mostrarAdmin, vistaAdmin, fpcPines.length, campoActivoDock, dockAdminTab, pinActivoFpc, modoFpc]);
 
   // --- INTELIGENCIA ARTIFICIAL: COMANDOS DE VOZ ---
   const [vozActiva, setVozActiva] = useState(false);
@@ -255,53 +256,30 @@ export default function AppDiagnostico() {
     try {
       const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       const oscillator = audioCtx.createOscillator();
-      oscillator.type = 'sine';
-      oscillator.frequency.setValueAtTime(1000, audioCtx.currentTime); // Frecuencia del Bip
-      oscillator.connect(audioCtx.destination);
-      oscillator.start();
-      oscillator.stop(audioCtx.currentTime + 0.1); // Duración: 100ms
-    } catch(e) { console.error("Audio no soportado"); }
+      oscillator.type = 'sine'; oscillator.frequency.setValueAtTime(1000, audioCtx.currentTime); 
+      oscillator.connect(audioCtx.destination); oscillator.start(); oscillator.stop(audioCtx.currentTime + 0.1); 
+    } catch(e) {}
   };
 
   const toggleVoz = () => {
     if (typeof window === 'undefined') return;
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) { alert("Tu navegador no soporta comandos de voz. Usa Chrome en PC."); return; }
+    if (!SpeechRecognition) { alert("Navegador no soporta voz."); return; }
 
     if (vozActiva) {
-      if (recognitionRef.current) {
-        recognitionRef.current.onend = null; 
-        recognitionRef.current.stop();
-      }
+      if (recognitionRef.current) { recognitionRef.current.onend = null; recognitionRef.current.stop(); }
       setVozActiva(false);
     } else {
       const recognition = new SpeechRecognition();
-      recognition.continuous = true;
-      recognition.lang = 'es-PE'; // Configurado para acento peruano
-      recognition.interimResults = false;
-
+      recognition.continuous = true; recognition.lang = 'es-PE'; recognition.interimResults = false;
       recognition.onresult = (event) => {
-        const current = event.resultIndex;
-        const transcript = event.results[current][0].transcript.toLowerCase().trim();
-        console.log("🗣️ Escuchado:", transcript);
-        
-        // Palabras gatillo
+        const transcript = event.results[event.resultIndex][0].transcript.toLowerCase().trim();
         if (transcript.includes('ok') || transcript.includes('okay') || transcript.includes('siguiente') || transcript.includes('listo') || transcript.includes('ya')) {
-          reproducirBip();
-          avanzarPinMagico();
+          reproducirBip(); avanzarPinMagico();
         }
       };
-
-      recognition.onend = () => {
-        // Si se detiene por silencio prolongado, lo volvemos a encender automáticamente
-        if (vozActivaRef.current) {
-          try { recognition.start(); } catch(e) {}
-        }
-      };
-
-      recognition.start();
-      recognitionRef.current = recognition;
-      setVozActiva(true);
+      recognition.onend = () => { if (vozActivaRef.current) { try { recognition.start(); } catch(e) {} } };
+      recognition.start(); recognitionRef.current = recognition; setVozActiva(true);
     }
   };
 
@@ -426,8 +404,7 @@ export default function AppDiagnostico() {
 
   const eliminarPaso = async (id) => { if (id === 'inicio') return; if (window.confirm(`¿Eliminar "${id}"?`)) { try { await deleteDoc(doc(db, "pasos", id)); cargarTodosLosPasos(); cargarFallasEnSerie(); } catch (error) { alert("Error: " + error.message); } } };
   const handleAgregarOpcion = () => setFormOpciones([...formOpciones, { texto: '', siguientePaso: '' }]); const handleQuitarOpcion = (index) => { const nuevas = [...formOpciones]; nuevas.splice(index, 1); setFormOpciones(nuevas); }; const handleCambioOpcion = (index, campo, valor) => { const nuevas = [...formOpciones]; nuevas[index][campo] = valor; setFormOpciones(nuevas); }; const handleAgregarFilaTabla = () => setFormTabla([...formTabla, { valor: '', descripcion: '' }]); const handleQuitarFilaTabla = (index) => { const nuevas = [...formTabla]; nuevas.splice(index, 1); setFormTabla(nuevas); }; const handleCambioFilaTabla = (index, campo, valor) => { const nuevas = [...formTabla]; nuevas[index][campo] = valor; setFormTabla(nuevas); }; 
-  const handleDockChangeManual = (campo, valor) => { if (dockAdminTab === 'diodo') setFormDockDiodo({ ...formDockDiodo, [campo]: valor }); else setFormDockUa({ ...formDockUa, [campo]: valor }); setCampoActivoDock(campo); };
-
+  
   const guardarPasoFirebase = async () => {
     if (!formId || !formPregunta) { setMensajeAdmin('⚠️ ID y pregunta obligatorios.'); return; }
     setMensajeAdmin('Guardando...');
@@ -629,7 +606,7 @@ export default function AppDiagnostico() {
                       <VisorHUD valor={lecturaUsb.valor} unidad={lecturaUsb.unidad} conectado={usbConectado} conectarFn={(e) => {e.preventDefault(); conectarMultimetroUSB();}} vozActiva={vozActiva} toggleVozFn={(e) => {e.preventDefault(); toggleVoz();}} />
 
                       <p style={{fontSize: '0.75rem', color: t.textoSutil.color, textAlign: 'center', marginBottom: '10px'}}>
-                        Presiona <strong>Espacio</strong>, <strong>Enter</strong> o di <strong>"Siguiente"</strong> por el micrófono.
+                        Presiona <strong>Espacio</strong>, <strong>Enter</strong> o di <strong>"Siguiente"</strong> por el micrófono para fijar el valor.
                       </p>
 
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '10px' }}>
@@ -650,7 +627,6 @@ export default function AppDiagnostico() {
                                }} 
                                value={currentDockInputs[campo]} 
                                onChange={(e) => handleDockChangeManual(campo, e.target.value)} 
-                               readOnly 
                              />
                            </div>
                         ))}
@@ -679,17 +655,24 @@ export default function AppDiagnostico() {
                     {!formEsFinal && (<div style={estilos.opcionesContainer}><h4 style={{ ...t.textoPrincipal, marginBottom: '10px' }}>Botones de Respuesta (Rutas):</h4>{formOpciones.map((op, index) => (<div key={index} style={estilos.opcionRow}><div style={{ flex: 1 }}><input style={{ ...estilos.inputFormPequeño, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} type="text" placeholder="Texto del botón (Ej: Sí, cargar a 1.2A)" value={op.texto} onChange={(e) => handleCambioOpcion(index, 'texto', e.target.value)} /><input style={{ ...estilos.inputFormPequeño, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma, marginTop: '4px' }} type="text" placeholder="ID del siguiente paso (Ej: revisar_ic_carga)" value={op.siguientePaso} onChange={(e) => handleCambioOpcion(index, 'siguientePaso', e.target.value.replace(/\s+/g, '_').toLowerCase())} /></div><button onClick={(e) => {e.preventDefault(); handleQuitarOpcion(index)}} style={estilos.btnBorrarOp}><Trash2 size={20} color="#ef4444" /></button></div>))}<button onClick={(e) => {e.preventDefault(); handleAgregarOpcion()}} style={estilos.btnAgregarOp}><Plus size={18} /> Agregar otra ruta</button></div>)}
                     {mensajeAdmin && <p style={{ color: mensajeAdmin.includes('❌') ? '#ef4444' : '#22c55e', fontWeight: 'bold', textAlign: 'center', padding: '10px', background: 'rgba(0,0,0,0.05)', borderRadius: '8px' }}>{mensajeAdmin}</p>}
 
+                    {/* --- RENDERIZADO DEL FPC EN PANTALLA --- */}
                     <div style={{ ...estilos.opcionesContainer, backgroundColor: 'rgba(139, 92, 246, 0.05)', border: '2px solid rgba(139, 92, 246, 0.3)', marginTop: '20px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
                         <h4 style={{ margin: 0, color: '#8b5cf6', display: 'flex', alignItems: 'center', gap: '8px' }}>
                            <Map size={20} /> Mapeo de FPC (Modo ZXW)
                         </h4>
-                        <div style={{display:'flex', gap:'5px', backgroundColor: 'rgba(0,0,0,0.1)', padding:'4px', borderRadius:'8px'}}>
-                          <button onClick={(e) => {e.preventDefault(); setModoFpc('crear')}} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: modoFpc === 'crear' ? '#8b5cf6' : 'transparent', color: modoFpc === 'crear' ? 'white' : 'gray', fontWeight: 'bold' }}>Grabar Sano</button>
-                          <button onClick={(e) => {e.preventDefault(); setModoFpc('diagnostico')}} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: modoFpc === 'diagnostico' ? '#ef4444' : 'transparent', color: modoFpc === 'diagnostico' ? 'white' : 'gray', fontWeight: 'bold' }}>Diagnóstico</button>
+                        <div style={{display:'flex', gap:'5px'}}>
+                          <div style={{display:'flex', gap:'5px', backgroundColor: 'rgba(0,0,0,0.1)', padding:'4px', borderRadius:'8px'}}>
+                            <button onClick={(e) => {e.preventDefault(); setEscalaFpc('diodo')}} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: escalaFpc === 'diodo' ? '#8b5cf6' : 'transparent', color: escalaFpc === 'diodo' ? 'white' : 'gray', fontWeight: 'bold' }}>Diodo</button>
+                            <button onClick={(e) => {e.preventDefault(); setEscalaFpc('ua')}} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: escalaFpc === 'ua' ? '#10b981' : 'transparent', color: escalaFpc === 'ua' ? 'white' : 'gray', fontWeight: 'bold' }}>uA</button>
+                          </div>
+                          <div style={{display:'flex', gap:'5px', backgroundColor: 'rgba(0,0,0,0.1)', padding:'4px', borderRadius:'8px'}}>
+                            <button onClick={(e) => {e.preventDefault(); setModoFpc('crear')}} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: modoFpc === 'crear' ? '#8b5cf6' : 'transparent', color: modoFpc === 'crear' ? 'white' : 'gray', fontWeight: 'bold' }}>Grabar Sano</button>
+                            <button onClick={(e) => {e.preventDefault(); setModoFpc('diagnostico')}} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: modoFpc === 'diagnostico' ? '#ef4444' : 'transparent', color: modoFpc === 'diagnostico' ? 'white' : 'gray', fontWeight: 'bold' }}>Diagnóstico</button>
+                          </div>
                         </div>
                       </div>
-                      <FPCInteligente pines={fpcPines} setPines={setFpcPines} pinActivo={pinActivoFpc} setPinActivo={setPinActivoFpc} modo={modoFpc} />
+                      <FPCInteligente pines={fpcPines} setPines={setFpcPines} pinActivo={pinActivoFpc} setPinActivo={setPinActivoFpc} modo={modoFpc} escala={escalaFpc} lecturaEnVivo={lecturaUsb.valor} />
                     </div>
 
                   </div>
