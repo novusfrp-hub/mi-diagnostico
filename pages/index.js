@@ -37,8 +37,10 @@ const FPCInteligente = ({ pines, setPines, pinActivo, setPinActivo, modo = 'diag
     return '#eab308'; 
   };
   const formNum = (val) => { if (!val || val === '---') return ''; if (val === 'OL') return 'OL'; return val.startsWith('0.') ? val.substring(1) : val; };
-  const renderPin = (pin, esArr) => (
-    <div key={pin.id} onClick={() => setPinActivo(pin.id)} style={{ width: '45px', display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer' }}>
+  
+  // Modificado: Agregado parámetro 'isExtremo' para ensanchar los bordes
+  const renderPin = (pin, esArr, isExtremo) => (
+    <div key={pin.id} onClick={() => setPinActivo(pin.id)} style={{ width: isExtremo ? '70px' : '45px', display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer' }}>
       {esArr && <span style={{ fontSize: '0.55rem', color: 'gray', marginBottom: '2px' }}>{pin.id}</span>}
       <div style={{ width: '100%', height: '30px', backgroundColor: obtenerColorPin(pin), border: pinActivo === pin.id ? '2px solid #fff' : '1px solid #222', borderRadius: '4px', transition: 'all 0.2s', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
          <span style={{ fontSize: '0.6rem', fontWeight: 'bold', color: '#fff', textShadow: '1px 1px 2px #000' }}>{modo === 'crear' ? formNum(pin.valorSano) : formNum(pin.valorActual)}</span>
@@ -46,14 +48,18 @@ const FPCInteligente = ({ pines, setPines, pinActivo, setPinActivo, modo = 'diag
       {!esArr && <span style={{ fontSize: '0.55rem', color: 'gray', marginTop: '2px' }}>{pin.id}</span>}
     </div>
   );
+
   return (
     <div style={{ backgroundColor: '#111827', padding: '15px', borderRadius: '15px', border: '2px solid #374151', width: '100%', overflowX: 'auto' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', backgroundColor: '#000', padding: '10px', borderRadius: '10px', minWidth: 'max-content' }}>
-        <div style={{ display: 'flex', gap: '3px' }}>{filaSup.map(pin => renderPin(pin, true))}</div><div style={{ height: '8px', backgroundColor: '#1a1a1a', borderRadius: '2px', width: '100%' }} /><div style={{ display: 'flex', gap: '3px' }}>{filaInf.map(pin => renderPin(pin, false))}</div>
+        {/* Pasamos isExtremo (true si es el índice 0 o el último) */}
+        <div style={{ display: 'flex', gap: '3px' }}>{filaSup.map((pin, i) => renderPin(pin, true, i === 0 || i === filaSup.length - 1))}</div>
+        <div style={{ height: '8px', backgroundColor: '#1a1a1a', borderRadius: '2px', width: '100%' }} />
+        <div style={{ display: 'flex', gap: '3px' }}>{filaInf.map((pin, i) => renderPin(pin, false, i === 0 || i === filaInf.length - 1))}</div>
       </div>
       <div style={{ marginTop: '15px', padding: '10px', backgroundColor: '#1a1a1a', borderRadius: '10px', borderLeft: `4px solid ${obtenerColorPin(pines.find(p => p.id === pinActivo) || {})}` }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div><span style={{ color: '#00ffff', fontWeight: 'bold', fontSize: '1.1rem' }}>PIN {pinActivo}</span>{modo === 'crear' ? ( <input value={pines.find(p => p.id === pinActivo)?.nombre || ''} onChange={(e) => setPines(prev => prev.map(p => p.id === pinActivo ? { ...p, nombre: e.target.value } : p))} placeholder="Nombre de línea..." style={{ display: 'block', marginTop: '5px', background: '#000', color: 'white', border: '1px solid #333', padding: '5px', borderRadius: '5px', width: '200px', outline:'none', fontSize:'0.8rem' }} /> ) : ( <span style={{ display: 'block', color: '#fff', fontSize: '0.85rem', marginTop: '5px' }}>{pines.find(p => p.id === pinActivo)?.nombre || 'Línea sin nombre'}</span> )}</div>
+          <div><span style={{ color: '#00ffff', fontWeight: 'bold', fontSize: '1.1rem' }}>PIN {pinActivo}</span>{modo === 'crear' ? ( <input value={pines.find(p => p.id === pinActivo)?.nombre || ''} onChange={(e) => setPines(prev => prev.map(p => p.id === pinActivo ? { ...p, nombre: e.target.value.replace(/\s+/g, '_') } : p))} placeholder="Nombre_de_linea" style={{ display: 'block', marginTop: '5px', background: '#000', color: 'white', border: '1px solid #333', padding: '5px', borderRadius: '5px', width: '200px', outline:'none', fontSize:'0.8rem' }} /> ) : ( <span style={{ display: 'block', color: '#fff', fontSize: '0.85rem', marginTop: '5px' }}>{pines.find(p => p.id === pinActivo)?.nombre || 'Línea sin nombre'}</span> )}</div>
           <div style={{ textAlign: 'right' }}><span style={{ color: 'gray', fontSize: '0.75rem', display: 'block' }}>Valor Sano: <strong style={{color:'#fff'}}>{pines.find(p => p.id === pinActivo)?.valorSano || '---'} {escala==='diodo'?'V':'uA'}</strong></span><span style={{ color: 'gray', fontSize: '0.75rem', display: 'block', marginTop: '4px' }}>Actual: <strong style={{color: '#fff', fontSize: '1.3rem'}}>{(pinActivo === pines.find(p => p.id === pinActivo)?.id && lecturaEnVivo !== '----') ? lecturaEnVivo : (pines.find(p => p.id === pinActivo)?.valorActual || '---')} {escala==='diodo'?'V':'uA'}</strong></span></div>
         </div>
       </div>
@@ -88,7 +94,7 @@ export default function AppDiagnostico() {
   const [formNuevoFpc, setFormNuevoFpc] = useState({ nombre: '', pines: 40 });
   const [seccionLibreria, setSeccionLibreria] = useState('fpc'); 
 
-  // --- ESTADOS MULTÍMETRO Y DOCKTEST (Globales para Admin y Librería) ---
+  // --- ESTADOS MULTÍMETRO Y DOCKTEST ---
   const [usbConectado, setUsbConectado] = useState(false);
   const [lecturaUsb, setLecturaUsb] = useState({ valor: '----', unidad: '---' });
   const [dispositivoUsb, setDispositivoUsb] = useState(null);
@@ -103,7 +109,7 @@ export default function AppDiagnostico() {
   // --- ADMIN ESTADOS ---
   const [formId, setFormId] = useState(''); const [formPregunta, setFormPregunta] = useState(''); const [formTabsNota, setFormTabsNota] = useState([{ titulo: 'General', contenido: '' }]); const [formEsFinal, setFormEsFinal] = useState(false); const [formOpciones, setFormOpciones] = useState([{ texto: '', siguientePaso: '' }]); const [formTabla, setFormTabla] = useState([]); const [formSimV, setFormSimV] = useState(''); const [formSimA, setFormSimA] = useState(''); const [dockAdminTab, setDockAdminTab] = useState('diodo'); const [formDockDiodo, setFormDockDiodo] = useState({ vbus: '---', dp: '---', dm: '---', cc1: '---', cc2: '---' }); const [formDockUa, setFormDockUa] = useState({ vbus: '---', dp: '---', dm: '---', cc1: '---', cc2: '---' }); const [formImgUrl, setFormImgUrl] = useState(''); const [formImgTipo, setFormImgTipo] = useState('microscopio'); const [formVideoUrl, setFormVideoUrl] = useState(''); const [formEsFallaSerie, setFormEsFallaSerie] = useState(false); const [formTituloSerie, setFormTituloSerie] = useState(''); const [formDescSerie, setFormDescSerie] = useState(''); const [mensajeAdmin, setMensajeAdmin] = useState('');
 
-  // --- REFERENCIAS INMUTABLES (Solución al Closure Trap en TODO el sistema) ---
+  // --- REFERENCIAS INMUTABLES ---
   const lecturaUsbRef = useRef(lecturaUsb); useEffect(() => { lecturaUsbRef.current = lecturaUsb; }, [lecturaUsb]);
   const libreriaVisibleRef = useRef(libreriaVisible); useEffect(() => { libreriaVisibleRef.current = libreriaVisible; }, [libreriaVisible]);
   const mostrarAdminRef = useRef(mostrarAdmin); useEffect(() => { mostrarAdminRef.current = mostrarAdmin; }, [mostrarAdmin]);
@@ -121,7 +127,7 @@ export default function AppDiagnostico() {
 
   const reproducirBip = () => { try { const audioCtx = new (window.AudioContext || window.webkitAudioContext)(); const oscillator = audioCtx.createOscillator(); oscillator.type = 'sine'; oscillator.frequency.setValueAtTime(1200, audioCtx.currentTime); oscillator.connect(audioCtx.destination); oscillator.start(); oscillator.stop(audioCtx.currentTime + 0.1); } catch(e) {} };
 
-  // --- MOTOR DE GUARDADO UNIVERSAL (Funciona en Admin y Librería sin sobreescribir) ---
+  // --- MOTOR DE GUARDADO UNIVERSAL ---
   const avanzarPinMagico = (valorForzado = null) => {
     const valVivo = valorForzado || lecturaUsbRef.current.valor;
     const campoActual = campoActivoRef.current;
@@ -129,7 +135,6 @@ export default function AppDiagnostico() {
     const pinAct = pinActivoFpcRef.current;
 
     if (libreriaVisibleRef.current) {
-        // --- GUARDADO EN LIBRERÍA DE MODELOS ---
         const modAct = modeloActivoRef.current;
         if (!modAct) return;
         let modeloActualizado = { ...modAct };
@@ -139,7 +144,7 @@ export default function AppDiagnostico() {
             const escala = escalaFpcRef.current;
             const key = escala === 'diodo' ? 'docktestDiodo' : 'docktestUa';
             if(!modeloActualizado[key]) modeloActualizado[key] = { vbus: '---', dp: '---', dm: '---', cc1: '---', cc2: '---' };
-            modeloActualizado[key][campoActual] = valVivo; // Escribe exacto donde debe
+            modeloActualizado[key][campoActual] = valVivo; 
             setModeloActivo(modeloActualizado);
             setCampoActivoDock(prev => { const idx = ordenCamposDock.indexOf(prev); return (idx >= 0 && idx < ordenCamposDock.length - 1) ? ordenCamposDock[idx + 1] : prev; });
         } else if (seccion === 'fpc' && fpcActivoRef.current) {
@@ -161,7 +166,6 @@ export default function AppDiagnostico() {
             setPinActivoFpc(prev => prev < fpcAct.pines.length ? prev + 1 : prev);
         }
     } else if (mostrarAdminRef.current) {
-        // --- GUARDADO EN CREADOR DE PASOS (ADMIN) ---
         setFormDockDiodo(prev => { if (dockAdminTabRef.current === 'diodo') return { ...prev, [campoActual]: valVivo }; return prev; });
         setFormDockUa(prev => { if (dockAdminTabRef.current === 'ua') return { ...prev, [campoActual]: valVivo }; return prev; });
         setCampoActivoDock(prev => { const idx = ordenCamposDock.indexOf(prev); return (idx >= 0 && idx < ordenCamposDock.length - 1) ? ordenCamposDock[idx + 1] : prev; });
@@ -231,7 +235,19 @@ export default function AppDiagnostico() {
   const cargarLibreriaDB = async () => { try { const qs = await getDocs(collection(db, "hardware_db")); const arr = []; qs.forEach(doc => arr.push({ id: doc.id, ...doc.data() })); setModelosLibreria(arr); } catch (error) { console.error("Error Libreria:", error); } };
   const crearNuevoModeloDB = async (e) => { e.preventDefault(); if(!formNuevoModelo.marca || !formNuevoModelo.nombre) return; const idUnico = `${formNuevoModelo.marca}_${formNuevoModelo.nombre}`.toLowerCase().replace(/\s+/g, '_'); const nuevoObj = { marca: formNuevoModelo.marca, nombre: formNuevoModelo.nombre, fpcs: [], docktestDiodo: {vbus:'---',dp:'---',dm:'---',cc1:'---',cc2:'---'}, docktestUa: {vbus:'---',dp:'---',dm:'---',cc1:'---',cc2:'---'} }; await setDoc(doc(db, "hardware_db", idUnico), nuevoObj); setFormNuevoModelo({ marca: '', nombre: '' }); cargarLibreriaDB(); setModeloActivo({...nuevoObj, id: idUnico}); };
   const guardarModeloActualDB = async () => { if(!modeloActivo) return; await setDoc(doc(db, "hardware_db", modeloActivo.id), modeloActivo); alert("¡Placa guardada en la nube de Marshall Cell!"); cargarLibreriaDB(); };
-  const crearNuevoFpcEnModelo = () => { if(!formNuevoFpc.nombre || formNuevoFpc.pines <= 0) return; const pinesArray = Array.from({ length: parseInt(formNuevoFpc.pines) }, (_, i) => ({ id: i + 1, nombre: `Línea ${i + 1}`, valorSano: '---', valorActual: '---' })); const nuevoFpc = { id: Date.now().toString(), nombre: formNuevoFpc.nombre, pines: pinesArray }; const modActualizado = {...modeloActivo, fpcs: [...modeloActivo.fpcs, nuevoFpc]}; setModeloActivo(modActualizado); setFpcActivo(nuevoFpc); setFormNuevoFpc({ nombre: '', pines: 40 }); setPinActivoFpc(1); };
+  
+  const crearNuevoFpcEnModelo = () => { if(!formNuevoFpc.nombre || formNuevoFpc.pines <= 0) return; const pinesArray = Array.from({ length: parseInt(formNuevoFpc.pines) }, (_, i) => ({ id: i + 1, nombre: `Linea_${i + 1}`, valorSano: '---', valorActual: '---' })); const nuevoFpc = { id: Date.now().toString(), nombre: formNuevoFpc.nombre.replace(/\s+/g, '_'), pines: pinesArray }; const modActualizado = {...modeloActivo, fpcs: [...modeloActivo.fpcs, nuevoFpc]}; setModeloActivo(modActualizado); setFpcActivo(nuevoFpc); setFormNuevoFpc({ nombre: '', pines: 40 }); setPinActivoFpc(1); };
+  const eliminarFpcActivo = () => { if(!fpcActivo || !window.confirm(`¿Seguro de eliminar el FPC ${fpcActivo.nombre}?`)) return; const modActualizado = {...modeloActivo, fpcs: modeloActivo.fpcs.filter(f => f.id !== fpcActivo.id)}; setModeloActivo(modActualizado); setFpcActivo(null); setPinActivoFpc(1); };
+  const editarPinesFpcActivo = () => {
+    if(!fpcActivo) return;
+    const newCount = window.prompt("Ingresa el nuevo número total de pines:", fpcActivo.pines.length);
+    if(!newCount || isNaN(newCount) || parseInt(newCount) <= 0) return;
+    const count = parseInt(newCount);
+    let nuevosPines = [...fpcActivo.pines];
+    if(count > nuevosPines.length) { for(let i = nuevosPines.length + 1; i <= count; i++) { nuevosPines.push({ id: i, nombre: `Linea_${i}`, valorSano: '---', valorActual: '---' }); } } 
+    else if(count < nuevosPines.length) { if(!window.confirm(`Se eliminarán ${nuevosPines.length - count} pines del final. ¿Continuar?`)) return; nuevosPines = nuevosPines.slice(0, count); }
+    const fpcMod = {...fpcActivo, pines: nuevosPines}; setFpcActivo(fpcMod); setModeloActivo(prev => ({...prev, fpcs: prev.fpcs.map(f => f.id === fpcMod.id ? fpcMod : f)})); if(pinActivoFpc > count) setPinActivoFpc(1);
+  };
   const abrirLibreria = () => { setLibreriaVisible(true); cargarLibreriaDB(); };
 
   // --- CARGA DIAGNÓSTICO BÁSICO (Antiguo) ---
@@ -371,7 +387,7 @@ export default function AppDiagnostico() {
                                         ))}
                                     </div>
                                     <div style={{ display:'flex', gap:'5px', background:'#1a1a1a', padding:'5px', borderRadius:'10px', border:'1px solid #333' }}>
-                                        <input placeholder="Nombre FPC..." value={formNuevoFpc.nombre} onChange={e=>setFormNuevoFpc({...formNuevoFpc, nombre: e.target.value})} style={{...estilos.inputDark, width:'120px', padding:'5px'}} />
+                                        <input placeholder="Nombre FPC..." value={formNuevoFpc.nombre} onChange={e=>setFormNuevoFpc({...formNuevoFpc, nombre: e.target.value.replace(/\s+/g, '_')})} style={{...estilos.inputDark, width:'120px', padding:'5px'}} />
                                         <input type="number" placeholder="Pines" value={formNuevoFpc.pines} onChange={e=>setFormNuevoFpc({...formNuevoFpc, pines: e.target.value})} style={{...estilos.inputDark, width:'60px', padding:'5px', textAlign:'center'}} />
                                         <button onClick={crearNuevoFpcEnModelo} style={{ background:'#10b981', border:'none', borderRadius:'6px', color:'white', fontWeight:'bold', padding:'0 10px', cursor:'pointer' }}>+ FPC</button>
                                     </div>
@@ -379,6 +395,12 @@ export default function AppDiagnostico() {
                                 {fpcActivo ? (
                                     <>
                                         <div style={{display:'flex', justifyContent:'flex-end', gap:'10px', marginBottom:'15px'}}>
+                                            {/* HERRAMIENTAS NUEVAS: Editar Pines / Eliminar FPC */}
+                                            <div style={{display:'flex', gap:'5px', backgroundColor: '#1a1a1a', padding:'4px', borderRadius:'8px', marginRight:'auto'}}>
+                                                <button onClick={editarPinesFpcActivo} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: 'transparent', color: '#eab308', fontWeight: 'bold', cursor:'pointer' }}>✏️ Pines</button>
+                                                <button onClick={eliminarFpcActivo} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: 'transparent', color: '#ef4444', fontWeight: 'bold', cursor:'pointer' }}>🗑️ FPC</button>
+                                            </div>
+
                                             <div style={{display:'flex', gap:'5px', backgroundColor: '#1a1a1a', padding:'4px', borderRadius:'8px'}}>
                                                 <button onClick={()=>setEscalaFpc('diodo')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: escalaFpc === 'diodo' ? '#8b5cf6' : 'transparent', color: escalaFpc === 'diodo' ? 'white' : 'gray', fontWeight: 'bold', cursor:'pointer' }}>Diodo</button>
                                                 <button onClick={()=>setEscalaFpc('ua')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: escalaFpc === 'ua' ? '#10b981' : 'transparent', color: escalaFpc === 'ua' ? 'white' : 'gray', fontWeight: 'bold', cursor:'pointer' }}>uA</button>
@@ -417,7 +439,6 @@ export default function AppDiagnostico() {
                   <label style={estilos.labelForm}>ID Único</label><input style={estilos.inputLigero} value={formId} onChange={(e) => setFormId(e.target.value.toLowerCase().replace(/\s+/g, '_'))} readOnly={formId === 'inicio'} />
                   <label style={estilos.labelForm}>Pregunta Principal</label><textarea style={{...estilos.inputLigero, minHeight:'60px'}} value={formPregunta} onChange={(e) => setFormPregunta(e.target.value)} />
                   
-                  {/* DOCKTEST RÁPIDO EN ADMIN (AHORA CON AUTOHOLD ARREGLADO) */}
                   <div style={{ ...estilos.opcionesContainer, backgroundColor: 'rgba(59, 130, 246, 0.05)', border: '2px solid rgba(59, 130, 246, 0.3)', marginTop: '20px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
                         <h4 style={{ ...t.textoPrincipal, margin: 0, color: '#3b82f6', display: 'flex', alignItems: 'center', gap: '8px' }}><Usb size={20} /> Captura de Docktest Rápido</h4>
