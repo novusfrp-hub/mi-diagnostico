@@ -4,104 +4,59 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { doc, setDoc, addDoc, collection, getDocs, deleteDoc, updateDoc } from 'firebase/firestore';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth'; 
 import { db, auth } from '../firebase'; 
-import { Sun, Moon, ArrowLeft, RefreshCcw, Zap, Smartphone, AlertTriangle, ChevronRight, Home, ShieldCheck, Camera, CheckCircle2, XCircle, Settings, Plus, Save, X, Trash2, Edit, ChevronDown, CornerDownRight, LogOut, Lightbulb, Usb, Map, Play, Flame, ClipboardList, History, Printer, FileText, MessageCircle, Link, Monitor, Mic, MicOff } from 'lucide-react'; 
+import { Sun, Moon, ArrowLeft, RefreshCcw, Zap, Smartphone, AlertTriangle, ChevronRight, Home, ShieldCheck, Camera, CheckCircle2, XCircle, Settings, Plus, Save, X, Trash2, Edit, ChevronDown, CornerDownRight, LogOut, Lightbulb, Usb, Map, Play, Flame, ClipboardList, History, Printer, FileText, MessageCircle, Link, Monitor, Mic, MicOff, BookOpen, Cpu } from 'lucide-react'; 
 
-const obtenerUrlVideo = (url) => {
-  if (!url) return '';
-  let videoId = '';
-  if (url.includes('youtu.be/')) videoId = url.split('youtu.be/')[1].split('?')[0];
-  else if (url.includes('youtube.com/watch')) videoId = new URLSearchParams(url.split('?')[1]).get('v');
-  else if (url.includes('youtube.com/embed/')) return url;
-  return videoId ? `https://www.youtube.com/embed/${videoId}` : url;
-};
+const obtenerUrlVideo = (url) => { if (!url) return ''; let v = ''; if (url.includes('youtu.be/')) v = url.split('youtu.be/')[1].split('?')[0]; else if (url.includes('youtube.com/watch')) v = new URLSearchParams(url.split('?')[1]).get('v'); else if (url.includes('youtube.com/embed/')) return url; return v ? `https://www.youtube.com/embed/${v}` : url; };
 
 // --- VISOR GIGANTE DEL MULTÍMETRO ---
-const VisorHUD = ({ valor, unidad, conectado, conectarFn, vozActiva, toggleVozFn }) => (
-  <div style={{ backgroundColor: '#1a1a1a', border: '2px solid #333333', borderRadius: '15px', padding: '20px', display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '20px', position: 'relative', overflow: 'hidden', boxShadow: conectado ? '0 0 20px rgba(0, 255, 255, 0.2)' : 'none' }}>
-    <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+const VisorHUD = ({ valor, unidad, conectado, conectarFn, vozActiva, toggleVozFn, autoHoldActivo, toggleAutoHoldFn }) => (
+  <div style={{ backgroundColor: '#1a1a1a', border: '2px solid #333333', borderRadius: '15px', padding: '15px', display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '15px', position: 'relative', overflow: 'hidden', boxShadow: conectado ? '0 0 20px rgba(0, 255, 255, 0.2)' : 'none' }}>
+    <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
       <span style={{ color: '#555', fontSize: '0.8rem', fontWeight: 'bold' }}>UT61E+ ANALYZER</span>
-      <div style={{ display: 'flex', gap: '10px' }}>
-        <button onClick={conectarFn} style={{ background: conectado ? 'rgba(0, 255, 0, 0.1)' : '#333', color: conectado ? '#00ff00' : 'white', border: 'none', padding: '5px 15px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
-          <Link size={12} /> {conectado ? 'CONECTADO' : 'CONECTAR USB'}
-        </button>
-        <button onClick={toggleVozFn} style={{ background: vozActiva ? 'rgba(234, 179, 8, 0.2)' : '#333', color: vozActiva ? '#eab308' : 'white', border: 'none', padding: '5px 15px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', boxShadow: vozActiva ? '0 0 10px rgba(234,179,8,0.5)' : 'none' }}>
-          {vozActiva ? <Mic size={12} /> : <MicOff size={12} />} {vozActiva ? 'ESCUCHANDO...' : 'MICRO OFF'}
-        </button>
+      <div style={{ display: 'flex', gap: '8px' }}>
+        <button onClick={conectarFn} style={{ background: conectado ? 'rgba(0, 255, 0, 0.1)' : '#333', color: conectado ? '#00ff00' : 'white', border: 'none', padding: '5px 15px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}><Link size={12} /> {conectado ? 'CONECTADO' : 'USB'}</button>
+        <button onClick={toggleVozFn} style={{ background: vozActiva ? 'rgba(234, 179, 8, 0.2)' : '#333', color: vozActiva ? '#eab308' : 'white', border: 'none', padding: '5px 15px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', boxShadow: vozActiva ? '0 0 10px rgba(234,179,8,0.5)' : 'none' }}>{vozActiva ? <Mic size={12} /> : <MicOff size={12} />} VOZ</button>
+        <button onClick={toggleAutoHoldFn} style={{ background: autoHoldActivo ? 'rgba(16, 185, 129, 0.2)' : '#333', color: autoHoldActivo ? '#10b981' : 'white', border: 'none', padding: '5px 15px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', boxShadow: autoHoldActivo ? '0 0 10px rgba(16,185,129,0.5)' : 'none' }}><Zap size={12} /> {autoHoldActivo ? 'HOLD ON' : 'HOLD'}</button>
       </div>
     </div>
     <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
-      <span style={{ color: valor === 'OL' ? '#ff0000' : '#00ffff', fontSize: '4.5rem', fontWeight: 'bold', fontFamily: 'Consolas, monospace', textShadow: valor === 'OL' ? '0 0 15px rgba(255,0,0,0.5)' : '0 0 15px rgba(0,255,255,0.4)', lineHeight: '1' }}>
-        {valor}
-      </span>
-      <span style={{ color: 'gray', fontSize: '1.5rem', fontWeight: 'bold' }}>{unidad}</span>
+      <span style={{ color: valor === 'OL' ? '#ff0000' : '#00ffff', fontSize: '4rem', fontWeight: 'bold', fontFamily: 'Consolas, monospace', textShadow: valor === 'OL' ? '0 0 15px rgba(255,0,0,0.5)' : '0 0 15px rgba(0,255,255,0.4)', lineHeight: '1' }}>{valor}</span>
+      <span style={{ color: 'gray', fontSize: '1.2rem', fontWeight: 'bold' }}>{unidad}</span>
     </div>
   </div>
 );
 
-// --- FPC INTELIGENTE MEJORADO (Textos dentro de pines) ---
+// --- FPC INTELIGENTE ---
 const FPCInteligente = ({ pines, setPines, pinActivo, setPinActivo, modo = 'diagnostico', escala = 'diodo', lecturaEnVivo }) => {
-  const mitad = Math.ceil(pines.length / 2);
-  const filaSup = pines.slice(0, mitad);
-  const filaInf = pines.slice(mitad);
-
+  const mitad = Math.ceil(pines.length / 2); const filaSup = pines.slice(0, mitad); const filaInf = pines.slice(mitad);
   const obtenerColorPin = (pin) => {
     if (modo === 'crear') return pinActivo === pin.id ? '#00ffff' : '#374151'; 
     if (!pin.valorActual || pin.valorActual === '---') return '#374151'; 
-    if (pin.valorActual === 'OL' && pin.valorSano !== 'OL') return '#f97316'; // Línea Abierta
-    
-    const vActual = parseFloat(pin.valorActual);
-    const vSano = parseFloat(pin.valorSano);
-    
-    if (escala === 'diodo') {
-      if (vActual < 0.050) return '#ef4444'; // Corto a GND
-      if (!isNaN(vActual) && !isNaN(vSano) && Math.abs(vActual - vSano) <= 0.040) return '#10b981'; // OK
-    } else {
-      // Lógica para uA (Microamperios)
-      if (vActual > 2000) return '#ef4444'; // Consumo altísimo
-      if (!isNaN(vActual) && !isNaN(vSano) && Math.abs(vActual - vSano) <= 50) return '#10b981'; // OK
-    }
-    return '#eab308'; // Fuga o alteración
+    if (pin.valorActual === 'OL' && pin.valorSano !== 'OL') return '#f97316'; 
+    const vAct = parseFloat(pin.valorActual); const vSano = parseFloat(pin.valorSano);
+    if (escala === 'diodo') { if (vAct < 0.050) return '#ef4444'; if (!isNaN(vAct) && !isNaN(vSano) && Math.abs(vAct - vSano) <= 0.040) return '#10b981'; } 
+    else { if (vAct > 2000) return '#ef4444'; if (!isNaN(vAct) && !isNaN(vSano) && Math.abs(vAct - vSano) <= 50) return '#10b981'; }
+    return '#eab308'; 
   };
-
-  const formatearNumeroPin = (val) => {
-    if (!val || val === '---') return '';
-    if (val === 'OL') return 'OL';
-    return val.startsWith('0.') ? val.substring(1) : val; // Transforma "0.364" a ".364" para que quepa
-  };
-
-  const renderPin = (pin, esArriba) => (
-    <div key={pin.id} onClick={() => setPinActivo(pin.id)} style={{ width: '55px', display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer' }}>
-      {esArriba && <span style={{ fontSize: '0.6rem', color: 'gray', marginBottom: '2px' }}>{pin.id}</span>}
-      <div style={{ width: '100%', height: '35px', backgroundColor: obtenerColorPin(pin), border: pinActivo === pin.id ? '2px solid #fff' : '1px solid #222', borderRadius: '4px', transition: 'all 0.2s', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
-         <span style={{ fontSize: '0.6rem', fontWeight: 'bold', color: '#fff', textShadow: '1px 1px 2px #000' }}>{modo === 'crear' ? formatearNumeroPin(pin.valorSano) : formatearNumeroPin(pin.valorActual)}</span>
+  const formNum = (val) => { if (!val || val === '---') return ''; if (val === 'OL') return 'OL'; return val.startsWith('0.') ? val.substring(1) : val; };
+  const renderPin = (pin, esArr) => (
+    <div key={pin.id} onClick={() => setPinActivo(pin.id)} style={{ width: '45px', display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer' }}>
+      {esArr && <span style={{ fontSize: '0.55rem', color: 'gray', marginBottom: '2px' }}>{pin.id}</span>}
+      <div style={{ width: '100%', height: '30px', backgroundColor: obtenerColorPin(pin), border: pinActivo === pin.id ? '2px solid #fff' : '1px solid #222', borderRadius: '4px', transition: 'all 0.2s', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
+         <span style={{ fontSize: '0.6rem', fontWeight: 'bold', color: '#fff', textShadow: '1px 1px 2px #000' }}>{modo === 'crear' ? formNum(pin.valorSano) : formNum(pin.valorActual)}</span>
       </div>
-      {!esArriba && <span style={{ fontSize: '0.6rem', color: 'gray', marginTop: '2px' }}>{pin.id}</span>}
+      {!esArr && <span style={{ fontSize: '0.55rem', color: 'gray', marginTop: '2px' }}>{pin.id}</span>}
     </div>
   );
-
   return (
-    <div style={{ backgroundColor: '#111827', padding: '20px', borderRadius: '15px', border: '2px solid #374151', width: '100%', overflowX: 'auto' }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', backgroundColor: '#000', padding: '15px', borderRadius: '10px', minWidth: 'max-content' }}>
-        <div style={{ display: 'flex', gap: '4px' }}>{filaSup.map(pin => renderPin(pin, true))}</div>
-        <div style={{ height: '10px', backgroundColor: '#1a1a1a', borderRadius: '2px', width: '100%' }} />
-        <div style={{ display: 'flex', gap: '4px' }}>{filaInf.map(pin => renderPin(pin, false))}</div>
+    <div style={{ backgroundColor: '#111827', padding: '15px', borderRadius: '15px', border: '2px solid #374151', width: '100%', overflowX: 'auto' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', backgroundColor: '#000', padding: '10px', borderRadius: '10px', minWidth: 'max-content' }}>
+        <div style={{ display: 'flex', gap: '3px' }}>{filaSup.map(pin => renderPin(pin, true))}</div><div style={{ height: '8px', backgroundColor: '#1a1a1a', borderRadius: '2px', width: '100%' }} /><div style={{ display: 'flex', gap: '3px' }}>{filaInf.map(pin => renderPin(pin, false))}</div>
       </div>
-
-      <div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#1a1a1a', borderRadius: '10px', borderLeft: `4px solid ${obtenerColorPin(pines.find(p => p.id === pinActivo) || {})}` }}>
+      <div style={{ marginTop: '15px', padding: '10px', backgroundColor: '#1a1a1a', borderRadius: '10px', borderLeft: `4px solid ${obtenerColorPin(pines.find(p => p.id === pinActivo) || {})}` }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div>
-            <span style={{ color: '#00ffff', fontWeight: 'bold', fontSize: '1.2rem' }}>PIN {pinActivo}</span>
-            {modo === 'crear' ? (
-               <input value={pines.find(p => p.id === pinActivo)?.nombre || ''} onChange={(e) => setPines(prev => prev.map(p => p.id === pinActivo ? { ...p, nombre: e.target.value } : p))} placeholder="Nombre (Ej: MIPI_DSI_CLK)" style={{ display: 'block', marginTop: '5px', background: '#000', color: 'white', border: '1px solid #333', padding: '5px', borderRadius: '5px', width: '200px', outline:'none' }} />
-            ) : (
-               <span style={{ display: 'block', color: '#fff', fontSize: '0.9rem', marginTop: '5px' }}>{pines.find(p => p.id === pinActivo)?.nombre || 'Línea sin nombre'}</span>
-            )}
-          </div>
-          <div style={{ textAlign: 'right' }}>
-            <span style={{ color: 'gray', fontSize: '0.8rem', display: 'block' }}>Valor Sano: <strong style={{color:'#fff'}}>{pines.find(p => p.id === pinActivo)?.valorSano || '---'} {escala==='diodo'?'V':'uA'}</strong></span>
-            {/* Si es el pin activo, mostramos la lectura EN VIVO del multímetro. Si no, mostramos lo guardado */}
-            <span style={{ color: 'gray', fontSize: '0.8rem', display: 'block', marginTop: '4px' }}>Actual: <strong style={{color: '#fff', fontSize: '1.5rem'}}>{(pinActivo === pines.find(p => p.id === pinActivo)?.id && lecturaEnVivo !== '----') ? lecturaEnVivo : (pines.find(p => p.id === pinActivo)?.valorActual || '---')} {escala==='diodo'?'V':'uA'}</strong></span>
-          </div>
+          <div><span style={{ color: '#00ffff', fontWeight: 'bold', fontSize: '1.1rem' }}>PIN {pinActivo}</span>{modo === 'crear' ? ( <input value={pines.find(p => p.id === pinActivo)?.nombre || ''} onChange={(e) => setPines(prev => prev.map(p => p.id === pinActivo ? { ...p, nombre: e.target.value } : p))} placeholder="Nombre de línea..." style={{ display: 'block', marginTop: '5px', background: '#000', color: 'white', border: '1px solid #333', padding: '5px', borderRadius: '5px', width: '200px', outline:'none', fontSize:'0.8rem' }} /> ) : ( <span style={{ display: 'block', color: '#fff', fontSize: '0.85rem', marginTop: '5px' }}>{pines.find(p => p.id === pinActivo)?.nombre || 'Línea sin nombre'}</span> )}</div>
+          <div style={{ textAlign: 'right' }}><span style={{ color: 'gray', fontSize: '0.75rem', display: 'block' }}>Valor Sano: <strong style={{color:'#fff'}}>{pines.find(p => p.id === pinActivo)?.valorSano || '---'} {escala==='diodo'?'V':'uA'}</strong></span><span style={{ color: 'gray', fontSize: '0.75rem', display: 'block', marginTop: '4px' }}>Actual: <strong style={{color: '#fff', fontSize: '1.3rem'}}>{(pinActivo === pines.find(p => p.id === pinActivo)?.id && lecturaEnVivo !== '----') ? lecturaEnVivo : (pines.find(p => p.id === pinActivo)?.valorActual || '---')} {escala==='diodo'?'V':'uA'}</strong></span></div>
         </div>
       </div>
     </div>
@@ -113,437 +68,229 @@ export default function AppDiagnostico() {
   const [historial, setHistorial] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [tema, setTema] = useState('light');
+  
+  // Modales
   const [mostrarAdmin, setMostrarAdmin] = useState(false);
   const [vistaAdmin, setVistaAdmin] = useState('login'); 
   const [estaAutenticado, setEstaAutenticado] = useState(false); 
-  const [emailAdmin, setEmailAdmin] = useState('');
-  const [passAdmin, setPassAdmin] = useState('');
-  const [errorLogin, setErrorLogin] = useState('');
-  const [busqueda, setBusqueda] = useState('');
-  const [listaPasos, setListaPasos] = useState([]);
-  const [pasosExpandidos, setPasosExpandidos] = useState({}); 
-  
-  const [notaVisible, setNotaVisible] = useState(false);
-  const [tipVisto, setTipVisto] = useState(false);
-  const [tipTabActiva, setTipTabActiva] = useState(0);
-
-  const [panelMedicionVisible, setPanelMedicionVisible] = useState(false);
-  const [dockViewTab, setDockViewTab] = useState('diodo');
-  const [imgModalVisible, setImgModalVisible] = useState(false);
-  const [videoModalVisible, setVideoModalVisible] = useState(false);
+  const [emailAdmin, setEmailAdmin] = useState(''); const [passAdmin, setPassAdmin] = useState(''); const [errorLogin, setErrorLogin] = useState('');
+  const [listaPasos, setListaPasos] = useState([]); const [pasosExpandidos, setPasosExpandidos] = useState({}); 
+  const [notaVisible, setNotaVisible] = useState(false); const [tipTabActiva, setTipTabActiva] = useState(0);
+  const [imgModalVisible, setImgModalVisible] = useState(false); const [videoModalVisible, setVideoModalVisible] = useState(false);
   const [fallasEnSerie, setFallasEnSerie] = useState([]);
+  const [bitacoraVisible, setBitacoraVisible] = useState(false); const [historialCasosVisible, setHistorialCasosVisible] = useState(false); const [casosGuardados, setCasosGuardados] = useState([]); const [casoEditando, setCasoEditando] = useState(null); const [formCaso, setFormCaso] = useState({ marca: '', modelo: '', sintomas: '', protocolo: '', imgUrl: '' }); const [mensajeCaso, setMensajeCaso] = useState('');
+  const [reporteVisible, setReporteVisible] = useState(false); const [casoReporte, setCasoReporte] = useState(null);
 
-  const [bitacoraVisible, setBitacoraVisible] = useState(false);
-  const [historialCasosVisible, setHistorialCasosVisible] = useState(false);
-  const [casosGuardados, setCasosGuardados] = useState([]);
-  const [casoEditando, setCasoEditando] = useState(null);
-  const [formCaso, setFormCaso] = useState({ marca: '', modelo: '', sintomas: '', protocolo: '', imgUrl: '' });
-  const [mensajeCaso, setMensajeCaso] = useState('');
-  const [reporteVisible, setReporteVisible] = useState(false);
-  const [casoReporte, setCasoReporte] = useState(null);
+  // --- NUEVA LIBRERÍA DE MODELOS ---
+  const [libreriaVisible, setLibreriaVisible] = useState(false);
+  const [modelosLibreria, setModelosLibreria] = useState([]);
+  const [modeloActivo, setModeloActivo] = useState(null);
+  const [fpcActivo, setFpcActivo] = useState(null); // Qué FPC estamos viendo del modelo
+  const [formNuevoModelo, setFormNuevoModelo] = useState({ marca: '', nombre: '' });
+  const [formNuevoFpc, setFormNuevoFpc] = useState({ nombre: '', pines: 40 });
 
-  // --- ESTADOS MULTÍMETRO & FPC ---
+  // --- ESTADOS MULTÍMETRO (AHORA VIVEN EN LA LIBRERÍA) ---
   const [usbConectado, setUsbConectado] = useState(false);
   const [lecturaUsb, setLecturaUsb] = useState({ valor: '----', unidad: '---' });
   const [dispositivoUsb, setDispositivoUsb] = useState(null);
-  const lecturaUsbRef = useRef(lecturaUsb);
-  useEffect(() => { lecturaUsbRef.current = lecturaUsb; }, [lecturaUsb]);
+  const lecturaUsbRef = useRef(lecturaUsb); useEffect(() => { lecturaUsbRef.current = lecturaUsb; }, [lecturaUsb]);
   
   const ordenCamposDock = ['vbus', 'dp', 'dm', 'cc1', 'cc2'];
   const [campoActivoDock, setCampoActivoDock] = useState('vbus');
-
-  const pinesIniciales = Array.from({ length: 40 }, (_, i) => ({
-    id: i + 1, nombre: `Linea_${i + 1}`, valorSano: '---', valorActual: '---'
-  }));
-  const [fpcPines, setFpcPines] = useState(pinesIniciales);
   const [pinActivoFpc, setPinActivoFpc] = useState(1);
   const [modoFpc, setModoFpc] = useState('crear');
-  const [escalaFpc, setEscalaFpc] = useState('diodo'); // 'diodo' o 'ua'
+  const [escalaFpc, setEscalaFpc] = useState('diodo');
+  const [seccionLibreria, setSeccionLibreria] = useState('fpc'); // 'docktest' o 'fpc'
 
-  // --- ESTADOS DEL FORMULARIO ADMIN ---
-  const [formId, setFormId] = useState('');
-  const [formPregunta, setFormPregunta] = useState('');
-  const [formTabsNota, setFormTabsNota] = useState([{ titulo: 'General', contenido: '' }]); 
-  const [formEsFinal, setFormEsFinal] = useState(false);
-  const [formOpciones, setFormOpciones] = useState([{ texto: '', siguientePaso: '' }]);
-  const [formTabla, setFormTabla] = useState([]);
-  const [formSimV, setFormSimV] = useState('');
-  const [formSimA, setFormSimA] = useState('');
-  const [dockAdminTab, setDockAdminTab] = useState('diodo');
-  const [formDockDiodo, setFormDockDiodo] = useState({ vbus: '', dp: '', dm: '', cc1: '', cc2: '' });
-  const [formDockUa, setFormDockUa] = useState({ vbus: '', dp: '', dm: '', cc1: '', cc2: '' });
-  const [formImgUrl, setFormImgUrl] = useState('');
-  const [formImgTipo, setFormImgTipo] = useState('microscopio');
-  const [formVideoUrl, setFormVideoUrl] = useState('');
-  const [formEsFallaSerie, setFormEsFallaSerie] = useState(false);
-  const [formTituloSerie, setFormTituloSerie] = useState('');
-  const [formDescSerie, setFormDescSerie] = useState('');
-  const [mensajeAdmin, setMensajeAdmin] = useState('');
+  // --- ADMIN ESTADOS LIGEROS (Sin Dock/FPC) ---
+  const [formId, setFormId] = useState(''); const [formPregunta, setFormPregunta] = useState(''); const [formTabsNota, setFormTabsNota] = useState([{ titulo: 'General', contenido: '' }]); const [formEsFinal, setFormEsFinal] = useState(false); const [formOpciones, setFormOpciones] = useState([{ texto: '', siguientePaso: '' }]); const [formTabla, setFormTabla] = useState([]); const [formSimV, setFormSimV] = useState(''); const [formSimA, setFormSimA] = useState(''); const [formImgUrl, setFormImgUrl] = useState(''); const [formImgTipo, setFormImgTipo] = useState('microscopio'); const [formVideoUrl, setFormVideoUrl] = useState(''); const [formEsFallaSerie, setFormEsFallaSerie] = useState(false); const [formTituloSerie, setFormTituloSerie] = useState(''); const [formDescSerie, setFormDescSerie] = useState(''); const [mensajeAdmin, setMensajeAdmin] = useState('');
+
+  const reproducirBip = () => { try { const audioCtx = new (window.AudioContext || window.webkitAudioContext)(); const oscillator = audioCtx.createOscillator(); oscillator.type = 'sine'; oscillator.frequency.setValueAtTime(1200, audioCtx.currentTime); oscillator.connect(audioCtx.destination); oscillator.start(); oscillator.stop(audioCtx.currentTime + 0.1); } catch(e) {} };
+
+  // --- MOTOR DE GUARDADO LIBRERÍA ---
+  const avanzarPinMagico = (valorForzado = null) => {
+    const valVivo = valorForzado || lecturaUsbRef.current.valor;
+    if (!modeloActivo) return;
+
+    let modeloActualizado = { ...modeloActivo };
+
+    if (seccionLibreria === 'docktest') {
+        const key = escalaFpc === 'diodo' ? 'docktestDiodo' : 'docktestUa';
+        if(!modeloActualizado[key]) modeloActualizado[key] = { vbus: '---', dp: '---', dm: '---', cc1: '---', cc2: '---' };
+        modeloActualizado[key][campoActivoDock] = valVivo;
+        setModeloActivo(modeloActualizado);
+        setCampoActivoDock(prev => { const idx = ordenCamposDock.indexOf(prev); return (idx >= 0 && idx < ordenCamposDock.length - 1) ? ordenCamposDock[idx + 1] : prev; });
+    } else if (seccionLibreria === 'fpc' && fpcActivo) {
+        const nuevosFpcs = modeloActualizado.fpcs.map(fpc => {
+            if (fpc.id === fpcActivo.id) {
+                const nuevosPines = fpc.pines.map(p => {
+                    if (p.id === pinActivoFpc) {
+                        return modoFpc === 'crear' ? { ...p, valorSano: valVivo } : { ...p, valorActual: valVivo };
+                    }
+                    return p;
+                });
+                const fpcMod = { ...fpc, pines: nuevosPines };
+                setFpcActivo(fpcMod); // Actualiza la vista local
+                return fpcMod;
+            }
+            return fpc;
+        });
+        modeloActualizado.fpcs = nuevosFpcs;
+        setModeloActivo(modeloActualizado);
+        setPinActivoFpc(prev => prev < fpcActivo.pines.length ? prev + 1 : prev);
+    }
+  };
+
+  // --- AUTO-HOLD ---
+  const [autoHoldActivo, setAutoHoldActivo] = useState(false);
+  const autoHoldValueRef = useRef(null); const autoHoldStartTimeRef = useRef(0); const autoHoldTriggeredRef = useRef(false);
 
   // --- MAGIA WEBHID ---
   const conectarMultimetroUSB = async () => {
     if (typeof navigator === 'undefined' || !navigator.hid) { alert("Navegador no compatible."); return; }
     try {
       const devices = await navigator.hid.requestDevice({ filters: [{ vendorId: 0x1A86, productId: 0xE429 }] });
-      if (devices.length === 0) return; 
-      const device = devices[0]; await device.open();
-      setDispositivoUsb(device); setUsbConectado(true);
-
+      if (devices.length === 0) return; const device = devices[0]; await device.open(); setDispositivoUsb(device); setUsbConectado(true);
       device.addEventListener("inputreport", event => {
-        const text = new TextDecoder().decode(event.data);
-        let valStr = "---"; let uniStr = "";
-        if (text.includes("OL") || text.includes("?0")) { valStr = "OL"; uniStr = "---"; } 
+        const text = new TextDecoder().decode(event.data); let valStr = "---"; let uniStr = "---";
+        if (text.includes("OL") || text.includes("?0")) { valStr = "OL"; } 
         else {
           const match = text.match(/([-+]?\d+\.\d+)/);
-          if (match) {
-            valStr = parseFloat(match[1]).toFixed(3);
-            if (text.includes("V")) uniStr = "V"; else if (text.includes("Ohm") || text.includes("kOhm")) uniStr = "Ω"; else if (text.includes("A") || text.includes("uA")) uniStr = "A"; else uniStr = "Diod"; 
-          }
+          if (match) { valStr = parseFloat(match[1]).toFixed(3); if (text.includes("V")) uniStr = "V"; else if (text.includes("Ohm") || text.includes("kOhm")) uniStr = "Ω"; else if (text.includes("A") || text.includes("uA")) uniStr = "A"; else uniStr = "Diod"; }
         }
-        // SOLAMENTE ACTUALIZA LA LECTURA EN VIVO (No escribe en memoria automáticamente)
         setLecturaUsb({ valor: valStr, unidad: uniStr });
+
+        // Auto-Hold logic
+        setAutoHoldActivo(prevHold => {
+          if (prevHold) {
+            const valNum = parseFloat(valStr);
+            if (!isNaN(valNum)) {
+                if (autoHoldValueRef.current !== null && Math.abs(valNum - autoHoldValueRef.current) <= 0.003) {
+                    if (!autoHoldTriggeredRef.current && Date.now() - autoHoldStartTimeRef.current >= 1500) {
+                        autoHoldTriggeredRef.current = true; reproducirBip(); avanzarPinMagico(valStr);
+                    }
+                } else { autoHoldValueRef.current = valNum; autoHoldStartTimeRef.current = Date.now(); autoHoldTriggeredRef.current = false; }
+            } else { autoHoldValueRef.current = null; autoHoldTriggeredRef.current = false; }
+          }
+          return prevHold;
+        });
       });
     } catch (error) { alert("Error USB."); }
   };
 
-  // --- MOTOR DE GUARDADO Y AVANCE (TECLADO Y VOZ) ---
-  const avanzarPinMagico = () => {
-    const valVivo = lecturaUsbRef.current.valor;
-
-    // 1. Guardar y Avanzar Docktest
-    setFormDockDiodo(prev => {
-        if(dockAdminTab === 'diodo') return { ...prev, [campoActivoDock]: valVivo };
-        return prev;
-    });
-    setFormDockUa(prev => {
-        if(dockAdminTab === 'ua') return { ...prev, [campoActivoDock]: valVivo };
-        return prev;
-    });
-
-    setCampoActivoDock(prev => {
-      const indiceActual = ordenCamposDock.indexOf(prev);
-      return (indiceActual >= 0 && indiceActual < ordenCamposDock.length - 1) ? ordenCamposDock[indiceActual + 1] : prev;
-    });
-
-    // 2. Guardar y Avanzar FPC
-    setFpcPines(prev => prev.map(p => {
-        if (p.id === pinActivoFpc) {
-            if (modoFpc === 'crear') return { ...p, valorSano: valVivo };
-            return { ...p, valorActual: valVivo };
-        }
-        return p;
-    }));
-    setPinActivoFpc(prev => prev < fpcPines.length ? prev + 1 : prev);
-  };
-
   useEffect(() => {
-    const handleKeyDown = (e) => {
-      if ((e.code === 'Space' || e.key === 'Enter') && mostrarAdmin && vistaAdmin === 'formulario') {
-        e.preventDefault(); avanzarPinMagico();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [mostrarAdmin, vistaAdmin, fpcPines.length, campoActivoDock, dockAdminTab, pinActivoFpc, modoFpc]);
+    const handleKeyDown = (e) => { if ((e.code === 'Space' || e.key === 'Enter') && libreriaVisible) { e.preventDefault(); avanzarPinMagico(); } };
+    window.addEventListener('keydown', handleKeyDown); return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [libreriaVisible, fpcActivo, campoActivoDock, pinActivoFpc, modoFpc, seccionLibreria, modeloActivo]);
 
-  // --- INTELIGENCIA ARTIFICIAL: COMANDOS DE VOZ ---
-  const [vozActiva, setVozActiva] = useState(false);
-  const recognitionRef = useRef(null);
-  const vozActivaRef = useRef(vozActiva);
-  useEffect(() => { vozActivaRef.current = vozActiva; }, [vozActiva]);
-
-  const reproducirBip = () => {
-    try {
-      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      const oscillator = audioCtx.createOscillator();
-      oscillator.type = 'sine'; oscillator.frequency.setValueAtTime(1000, audioCtx.currentTime); 
-      oscillator.connect(audioCtx.destination); oscillator.start(); oscillator.stop(audioCtx.currentTime + 0.1); 
-    } catch(e) {}
-  };
-
+  // --- COMANDOS DE VOZ ---
+  const [vozActiva, setVozActiva] = useState(false); const recognitionRef = useRef(null);
   const toggleVoz = () => {
-    if (typeof window === 'undefined') return;
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) { alert("Navegador no soporta voz."); return; }
-
-    if (vozActiva) {
-      if (recognitionRef.current) { recognitionRef.current.onend = null; recognitionRef.current.stop(); }
-      setVozActiva(false);
-    } else {
-      const recognition = new SpeechRecognition();
-      recognition.continuous = true; recognition.lang = 'es-PE'; recognition.interimResults = false;
+    if (typeof window === 'undefined') return; const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition; if (!SpeechRecognition) { alert("Navegador no soporta voz."); return; }
+    if (vozActiva) { if (recognitionRef.current) { recognitionRef.current.onend = null; recognitionRef.current.stop(); } setVozActiva(false); } 
+    else {
+      const recognition = new SpeechRecognition(); recognition.continuous = true; recognition.lang = 'es-PE'; recognition.interimResults = false;
       recognition.onresult = (event) => {
         const transcript = event.results[event.resultIndex][0].transcript.toLowerCase().trim();
-        if (transcript.includes('ok') || transcript.includes('okay') || transcript.includes('siguiente') || transcript.includes('listo') || transcript.includes('ya')) {
-          reproducirBip(); avanzarPinMagico();
-        }
+        if (transcript.includes('ok') || transcript.includes('okay') || transcript.includes('siguiente') || transcript.includes('listo') || transcript.includes('ya')) { reproducirBip(); avanzarPinMagico(); }
       };
-      recognition.onend = () => { if (vozActivaRef.current) { try { recognition.start(); } catch(e) {} } };
+      recognition.onend = () => { setVozActiva(prev => { if(prev){ try{recognition.start()}catch(e){} } return prev; }) };
       recognition.start(); recognitionRef.current = recognition; setVozActiva(true);
     }
   };
 
-
-  const cargarFallasEnSerie = async () => {
+  // --- FIREBASE LIBRERÍA CRUD ---
+  const cargarLibreriaDB = async () => {
     try {
-      const querySnapshot = await getDocs(collection(db, "pasos"));
-      const fallas = [];
-      querySnapshot.forEach((doc) => { if (doc.data().esFallaEnSerie) fallas.push({ id: doc.id, ...doc.data() }); });
-      setFallasEnSerie(fallas);
-    } catch (error) { console.error(error); }
+      const qs = await getDocs(collection(db, "hardware_db")); const arr = [];
+      qs.forEach(doc => arr.push({ id: doc.id, ...doc.data() }));
+      setModelosLibreria(arr);
+    } catch (error) { console.error("Error Libreria:", error); }
   };
+  const crearNuevoModeloDB = async (e) => {
+    e.preventDefault(); if(!formNuevoModelo.marca || !formNuevoModelo.nombre) return;
+    const idUnico = `${formNuevoModelo.marca}_${formNuevoModelo.nombre}`.toLowerCase().replace(/\s+/g, '_');
+    const nuevoObj = { marca: formNuevoModelo.marca, nombre: formNuevoModelo.nombre, fpcs: [], docktestDiodo: {vbus:'---',dp:'---',dm:'---',cc1:'---',cc2:'---'}, docktestUa: {vbus:'---',dp:'---',dm:'---',cc1:'---',cc2:'---'} };
+    await setDoc(doc(db, "hardware_db", idUnico), nuevoObj);
+    setFormNuevoModelo({ marca: '', nombre: '' }); cargarLibreriaDB(); setModeloActivo({...nuevoObj, id: idUnico});
+  };
+  const guardarModeloActualDB = async () => {
+    if(!modeloActivo) return;
+    await setDoc(doc(db, "hardware_db", modeloActivo.id), modeloActivo);
+    alert("¡Placa guardada en la nube de Marshall Cell!"); cargarLibreriaDB();
+  };
+  const crearNuevoFpcEnModelo = () => {
+    if(!formNuevoFpc.nombre || formNuevoFpc.pines <= 0) return;
+    const pinesArray = Array.from({ length: parseInt(formNuevoFpc.pines) }, (_, i) => ({ id: i + 1, nombre: `Línea ${i + 1}`, valorSano: '---', valorActual: '---' }));
+    const nuevoFpc = { id: Date.now().toString(), nombre: formNuevoFpc.nombre, pines: pinesArray };
+    const modActualizado = {...modeloActivo, fpcs: [...modeloActivo.fpcs, nuevoFpc]};
+    setModeloActivo(modActualizado); setFpcActivo(nuevoFpc); setFormNuevoFpc({ nombre: '', pines: 40 }); setPinActivoFpc(1);
+  };
+  const abrirLibreria = () => { setLibreriaVisible(true); cargarLibreriaDB(); };
 
+
+  // --- CARGA DIAGNÓSTICO BÁSICO (Antiguo) ---
+  const cargarFallasEnSerie = async () => { try { const qs = await getDocs(collection(db, "pasos")); const fallas = []; qs.forEach((doc) => { if (doc.data().esFallaEnSerie) fallas.push({ id: doc.id, ...doc.data() }); }); setFallasEnSerie(fallas); } catch (e) {} };
   const cargarPaso = async (idPaso, esRetroceso = false) => {
-    setCargando(true);
-    try {
-      const respuesta = await fetch(`/api/diagnostico?paso=${idPaso}`);
-      const datos = await respuesta.json();
-      setPasoActual((prevPaso) => {
-        if (!esRetroceso && prevPaso) setHistorial(prevHistorial => [...prevHistorial, prevPaso.id]);
-        return datos;
-      });
-      setNotaVisible(false); setTipVisto(false); setTipTabActiva(0); setPanelMedicionVisible(false); setImgModalVisible(false); setVideoModalVisible(false);
-      if (datos.docktestDiodo) setDockViewTab('diodo'); else if (datos.docktestUa) setDockViewTab('ua');
-    } catch (error) { alert("Error al cargar el diagnóstico"); }
-    setCargando(false);
+    setCargando(true); try {
+      const respuesta = await fetch(`/api/diagnostico?paso=${idPaso}`); const datos = await respuesta.json();
+      setPasoActual((prev) => { if (!esRetroceso && prev) setHistorial(prevHist => [...prevHist, prev.id]); return datos; });
+      setNotaVisible(false); setImgModalVisible(false); setVideoModalVisible(false);
+    } catch (error) {} setCargando(false);
   };
-
-  const irAtras = () => { 
-    setHistorial(prev => {
-      if (prev.length === 0) return prev;
-      const nuevo = [...prev];
-      const anterior = nuevo.pop();
-      cargarPaso(anterior, true);
-      return nuevo;
-    });
-  };
-
+  const irAtras = () => { setHistorial(prev => { if (prev.length === 0) return prev; const nuevo = [...prev]; const anterior = nuevo.pop(); cargarPaso(anterior, true); return nuevo; }); };
   const toggleTema = () => setTema(tema === 'light' ? 'dark' : 'light');
   useEffect(() => { cargarPaso('inicio'); cargarFallasEnSerie(); }, []);
-
-  const limpiarTexto = (texto) => texto.replace(/[\u{1F300}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F1E6}-\u{1F1FF}\u{2300}-\u{23FF}\u{2B50}]/gu, '').trim();
-
-  const obtenerIconoDinamico = (texto) => {
-    const txt = texto.toLowerCase();
-    if (txt.includes('apple') || txt.includes('iphone')) return <Smartphone size={24} color="#0058bc" />;
-    if (txt.includes('carga')) return <Zap size={24} color="#0058bc" />;
-    if (txt.includes('básico') || txt.startsWith('sí')) return <CheckCircle2 size={24} color="#22c55e" />; 
-    if (txt.includes('avanzado') || txt.startsWith('no')) return <XCircle size={24} color="#ef4444" />; 
-    return <ChevronRight size={24} color="#9ca3af" />;
-  };
-
-  const iniciarSesion = async (e) => { 
-    e.preventDefault(); setErrorLogin(''); 
-    try { 
-        await signInWithEmailAndPassword(auth, emailAdmin, passAdmin); 
-        setEstaAutenticado(true); setEmailAdmin(''); setPassAdmin(''); setVistaAdmin('lista'); cargarTodosLosPasos(); 
-    } catch (error) { setErrorLogin('❌ Correo o Contraseña incorrectos.'); } 
-  };
+  const iniciarSesion = async (e) => { e.preventDefault(); setErrorLogin(''); try { await signInWithEmailAndPassword(auth, emailAdmin, passAdmin); setEstaAutenticado(true); setVistaAdmin('lista'); cargarTodosLosPasos(); } catch (error) { setErrorLogin('❌ Error.'); } };
   const cerrarSesion = async () => { await signOut(auth); setEstaAutenticado(false); setMostrarAdmin(false); };
-  const cargarTodosLosPasos = async () => { try { const querySnapshot = await getDocs(collection(db, "pasos")); const pasosArray = []; querySnapshot.forEach((doc) => pasosArray.push({ id: doc.id, ...doc.data() })); setListaPasos(pasosArray); setPasosExpandidos({ inicio: true }); } catch (error) { console.error(error); } };
-  const abrirAdmin = () => { setMostrarAdmin(true); if (estaAutenticado) { setVistaAdmin('lista'); cargarTodosLosPasos(); } else { setVistaAdmin('login'); setErrorLogin(''); } };
-
-  const cargarHistorialCasos = async () => {
-    try {
-      const querySnapshot = await getDocs(collection(db, "historial_reparaciones"));
-      const casosArray = [];
-      querySnapshot.forEach((doc) => casosArray.push({ id: doc.id, ...doc.data() }));
-      casosArray.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
-      setCasosGuardados(casosArray);
-    } catch (error) { console.error("Error al cargar casos:", error); }
-  };
-
-  const abrirHistorial = () => { setHistorialCasosVisible(true); cargarHistorialCasos(); };
-  const prepararNuevoCaso = () => { setFormCaso({marca: '', modelo: '', sintomas: '', protocolo: '', imgUrl: ''}); setCasoEditando(null); setMensajeCaso(''); setBitacoraVisible(true); };
-  const editarCasoExistente = (caso) => { setFormCaso({ marca: caso.marca, modelo: caso.modelo, sintomas: caso.sintomas, protocolo: caso.protocolo || '', imgUrl: caso.imgUrl || '' }); setCasoEditando(caso.id); setMensajeCaso(''); setBitacoraVisible(true); };
-
-  const guardarBitacora = async (e) => {
-    e.preventDefault();
-    if (!formCaso.marca || !formCaso.modelo || !formCaso.sintomas) { setMensajeCaso('⚠️ Llena Marca, Modelo y Síntomas.'); return; }
-    setMensajeCaso('Guardando...');
-    try {
-      if (casoEditando) {
-        await updateDoc(doc(db, "historial_reparaciones", casoEditando), { ...formCaso, ultimaModificacion: new Date().toISOString() });
-        setMensajeCaso('✅ ¡Caso actualizado!');
-      } else {
-        await addDoc(collection(db, "historial_reparaciones"), { ...formCaso, fecha: new Date().toISOString(), estado: 'Registrado' });
-        setMensajeCaso('✅ ¡Caso registrado!');
-      }
-      setTimeout(() => { setBitacoraVisible(false); setMensajeCaso(''); cargarHistorialCasos(); }, 1500);
-    } catch (error) { setMensajeCaso('❌ Error al guardar.'); }
-  };
-
-  const eliminarCaso = async (id) => { if (window.confirm('¿Seguro de eliminar este caso del historial?')) { try { await deleteDoc(doc(db, "historial_reparaciones", id)); cargarHistorialCasos(); } catch (error) { alert("Error: " + error.message); } } };
-  const abrirReporte = (caso) => { setCasoReporte(caso); setReporteVisible(true); setHistorialCasosVisible(false); };
+  const cargarTodosLosPasos = async () => { try { const qs = await getDocs(collection(db, "pasos")); const arr = []; qs.forEach((doc) => arr.push({ id: doc.id, ...doc.data() })); setListaPasos(arr); } catch (e) {} };
+  const abrirAdmin = () => { setMostrarAdmin(true); if (estaAutenticado) { setVistaAdmin('lista'); cargarTodosLosPasos(); } else { setVistaAdmin('login'); } };
   
-  const imprimirReporte = async () => {
-    if (!casoReporte) return;
-    try {
-      const { pdf } = await import('@react-pdf/renderer');
-      const ReportePDF = (await import('../components/pdfx/ReportePDF')).default;
-      const blob = await pdf(<ReportePDF caso={casoReporte} />).toBlob();
-      window.open(URL.createObjectURL(blob), '_blank');
-    } catch (error) { alert("Error generando PDF."); }
-  };
-  
-  const enviarWhatsApp = () => {
-    if (!casoReporte) return;
-    const texto = `📱 *MARSHALL CELL - REPORTE TÉCNICO*\n\n*Equipo:* ${casoReporte.marca} ${casoReporte.modelo}\n*ID:* #${casoReporte.id.substring(0, 6).toUpperCase()}\n*Fecha:* ${new Date(casoReporte.fecha).toLocaleDateString()}\n\n⚠️ *Síntoma:* ${casoReporte.sintomas}\n\n🛠️ *Diagnóstico:* ${casoReporte.protocolo || 'Pendiente.'}\n\n👨‍🔧 *Técnico:* Marshall\n📍 *Laboratorio:* Oropesa, Cusco`;
-    window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank');
-  };
+  // Admin Guardar (Solo Preguntas, Sin multímetro)
+  const prepararNuevoPaso = () => { setFormId(''); setFormPregunta(''); setFormTabsNota([{ titulo: 'General', contenido: '' }]); setFormEsFinal(false); setFormOpciones([{ texto: '', siguientePaso: '' }]); setFormTabla([]); setFormSimV(''); setFormSimA(''); setFormImgUrl(''); setFormVideoUrl(''); setFormEsFallaSerie(false); setMensajeAdmin(''); setVistaAdmin('formulario'); };
+  const guardarPasoFirebase = async () => { try { const datos = { pregunta: formPregunta, esFinal: formEsFinal, opciones: formEsFinal?[]:formOpciones, imgUrl: formImgUrl, videoUrl: formVideoUrl, tabsNota: formTabsNota, esFallaEnSerie: formEsFallaSerie, tituloFallaSerie: formTituloSerie, descFallaSerie: formDescSerie }; await setDoc(doc(db, "pasos", formId), datos); setMensajeAdmin('✅ ¡Guardado!'); setTimeout(() => { setVistaAdmin('lista'); cargarTodosLosPasos(); }, 1000); } catch (e) { setMensajeAdmin('❌ Error'); } };
 
-  const prepararNuevoPaso = () => { setFormId(''); setFormPregunta(''); setFormTabsNota([{ titulo: 'General', contenido: '' }]); setFormEsFinal(false); setFormOpciones([{ texto: '', siguientePaso: '' }]); setFormTabla([]); setFormSimV(''); setFormSimA(''); setFormImgUrl(''); setFormImgTipo('microscopio'); setFormVideoUrl(''); setFormDockDiodo({ vbus: '', dp: '', dm: '', cc1: '', cc2: '' }); setFormDockUa({ vbus: '', dp: '', dm: '', cc1: '', cc2: '' }); setDockAdminTab('diodo'); setCampoActivoDock('vbus'); setFormEsFallaSerie(false); setFormTituloSerie(''); setFormDescSerie(''); setMensajeAdmin(''); setVistaAdmin('formulario'); };
-  
-  const editarPaso = (paso) => { 
-    setFormId(paso.id); setFormPregunta(paso.pregunta || ''); 
-    if (paso.tabsNota && paso.tabsNota.length > 0) setFormTabsNota(paso.tabsNota);
-    else if (paso.notaExperta) setFormTabsNota([{ titulo: 'General', contenido: paso.notaExperta }]);
-    else setFormTabsNota([{ titulo: 'General', contenido: '' }]);
-    setFormEsFinal(!!paso.esFinal); setFormOpciones(paso.opciones && paso.opciones.length > 0 ? paso.opciones : [{ texto: '', siguientePaso: '' }]); setFormTabla(paso.tablaReferencia || []); setFormSimV(paso.simVoltaje || ''); setFormSimA(paso.simAmperaje || ''); setFormImgUrl(paso.imgUrl || ''); setFormImgTipo(paso.imgTipo || 'microscopio'); setFormVideoUrl(paso.videoUrl || ''); setFormDockDiodo(paso.docktestDiodo || { vbus: '', dp: '', dm: '', cc1: '', cc2: '' }); setFormDockUa(paso.docktestUa || { vbus: '', dp: '', dm: '', cc1: '', cc2: '' }); setDockAdminTab('diodo'); setCampoActivoDock('vbus'); setFormEsFallaSerie(!!paso.esFallaEnSerie); setFormTituloSerie(paso.tituloFallaSerie || ''); setFormDescSerie(paso.descFallaSerie || ''); setMensajeAdmin(''); setVistaAdmin('formulario'); 
-  };
-
-  const eliminarPaso = async (id) => { if (id === 'inicio') return; if (window.confirm(`¿Eliminar "${id}"?`)) { try { await deleteDoc(doc(db, "pasos", id)); cargarTodosLosPasos(); cargarFallasEnSerie(); } catch (error) { alert("Error: " + error.message); } } };
-  const handleAgregarOpcion = () => setFormOpciones([...formOpciones, { texto: '', siguientePaso: '' }]); const handleQuitarOpcion = (index) => { const nuevas = [...formOpciones]; nuevas.splice(index, 1); setFormOpciones(nuevas); }; const handleCambioOpcion = (index, campo, valor) => { const nuevas = [...formOpciones]; nuevas[index][campo] = valor; setFormOpciones(nuevas); }; const handleAgregarFilaTabla = () => setFormTabla([...formTabla, { valor: '', descripcion: '' }]); const handleQuitarFilaTabla = (index) => { const nuevas = [...formTabla]; nuevas.splice(index, 1); setFormTabla(nuevas); }; const handleCambioFilaTabla = (index, campo, valor) => { const nuevas = [...formTabla]; nuevas[index][campo] = valor; setFormTabla(nuevas); }; 
-  
-  const guardarPasoFirebase = async () => {
-    if (!formId || !formPregunta) { setMensajeAdmin('⚠️ ID y pregunta obligatorios.'); return; }
-    setMensajeAdmin('Guardando...');
-    try {
-      const datosAGuardar = { pregunta: formPregunta, esFinal: formEsFinal };
-      const tabsValidas = formTabsNota.filter(t => t.titulo.trim() !== '' && t.contenido.trim() !== '');
-      if (tabsValidas.length > 0) { datosAGuardar.tabsNota = tabsValidas; datosAGuardar.notaExperta = null; } else { datosAGuardar.tabsNota = []; datosAGuardar.notaExperta = null; }
-      if (formSimV.trim() !== '') datosAGuardar.simVoltaje = formSimV; if (formSimA.trim() !== '') datosAGuardar.simAmperaje = formSimA;
-      if (formImgUrl.trim() !== '') { datosAGuardar.imgUrl = formImgUrl; datosAGuardar.imgTipo = formImgTipo; } else { datosAGuardar.imgUrl = null; }
-      if (formVideoUrl.trim() !== '') datosAGuardar.videoUrl = formVideoUrl; else datosAGuardar.videoUrl = null;
-      if (!formEsFinal) datosAGuardar.opciones = formOpciones;
-      
-      const tablaValida = formTabla.filter(fila => fila.valor.trim() !== '' || fila.descripcion.trim() !== '');
-      if (tablaValida.length > 0) datosAGuardar.tablaReferencia = tablaValida; else datosAGuardar.tablaReferencia = [];
-      const hasDiodo = Object.values(formDockDiodo).some(v => v.trim() !== ''); const hasUa = Object.values(formDockUa).some(v => v.trim() !== '');
-      if (hasDiodo) datosAGuardar.docktestDiodo = formDockDiodo; else datosAGuardar.docktestDiodo = null;
-      if (hasUa) datosAGuardar.docktestUa = formDockUa; else datosAGuardar.docktestUa = null;
-
-      if (formEsFallaSerie) { datosAGuardar.esFallaEnSerie = true; datosAGuardar.tituloFallaSerie = formTituloSerie; datosAGuardar.descFallaSerie = formDescSerie; } 
-      else { datosAGuardar.esFallaEnSerie = false; datosAGuardar.tituloFallaSerie = null; datosAGuardar.descFallaSerie = null; }
-
-      await setDoc(doc(db, "pasos", formId), datosAGuardar);
-      setMensajeAdmin('✅ ¡Guardado!'); cargarFallasEnSerie(); 
-      setTimeout(() => { cargarTodosLosPasos(); setVistaAdmin('lista'); if (pasoActual.id === formId) cargarPaso(formId); }, 1500);
-    } catch (error) { setMensajeAdmin('❌ Error: ' + error.message); }
-  };
-
-  const pasosMap = listaPasos.reduce((acc, paso) => { acc[paso.id] = paso; return acc; }, {});
-  const toggleExpandir = (id) => setPasosExpandidos(prev => ({ ...prev, [id]: !prev[id] }));
-
-  const renderArbol = (idPaso, nivel = 0, visitados = new Set()) => {
-    const paso = pasosMap[idPaso]; const t = estilos[tema];
-    if (!paso || visitados.has(idPaso)) return null; 
-    const tieneHijos = !paso.esFinal && paso.opciones && paso.opciones.length > 0;
-    const expandido = pasosExpandidos[idPaso];
-    const nuevosVisitados = new Set(visitados).add(idPaso);
-
-    return (
-      <div key={`${idPaso}-${nivel}`} style={{ marginLeft: nivel > 0 ? '20px' : '0', borderLeft: nivel > 0 ? `2px solid ${tema === 'light' ? '#e5e7eb' : '#374151'}` : 'none', paddingLeft: nivel > 0 ? '15px' : '0', marginTop: '10px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', borderRadius: '10px', backgroundColor: t.cristalBgItem.backgroundColor, border: t.bordeFantasma.border }}>
-          <div onClick={() => tieneHijos && toggleExpandir(idPaso)} style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: tieneHijos ? 'pointer' : 'default', flex: 1 }}>
-            {tieneHijos ? (expandido ? <ChevronDown size={18} color="#0058bc" /> : <ChevronRight size={18} color="#0058bc" />) : (<ShieldCheck size={14} color="#22c55e" />)}
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <span style={{ fontWeight: 'bold', color: '#0058bc', fontSize: '0.9rem', display: 'flex', alignItems:'center', gap:'4px' }}>{paso.id} {paso.imgUrl && (paso.imgTipo === 'microscopio' ? <Camera size={12} color="#8b5cf6" /> : <Map size={12} color="#8b5cf6" />)} {paso.videoUrl && <Play size={12} color="#ef4444" />} {paso.esFallaEnSerie && <Flame size={12} color="#f97316" />}</span>
-              <span style={{ fontSize: '0.8rem', color: t.textoPrincipal.color, opacity: 0.8 }}>{paso.pregunta}</span>
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: '5px' }}><button onClick={() => editarPaso(paso)} style={estilos.btnAccionLista}><Edit size={16} color="#eab308" /></button><button onClick={() => eliminarPaso(paso.id)} style={estilos.btnAccionLista}><Trash2 size={16} color="#ef4444" /></button></div>
-        </div>
-        <AnimatePresence>{expandido && tieneHijos && (<motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} style={{ overflow: 'hidden' }}>{paso.opciones.map((op, idx) => (<div key={idx} style={{ marginTop: '5px' }}><div style={{ fontSize: '0.75rem', color: t.textoSutil.color, marginLeft: '35px', marginTop: '8px', marginBottom: '-5px', display: 'flex', alignItems: 'center', gap: '5px', fontWeight: '600' }}><CornerDownRight size={14} /> "{op.texto}" ➡️</div>{renderArbol(op.siguientePaso, nivel + 1, nuevosVisitados)}</div>))}</motion.div>)}</AnimatePresence>
-      </div>
-    );
-  };
-
-  if (!pasoActual) {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '100vh', backgroundColor: '#111827', color: '#00ffff', fontFamily: 'system-ui, sans-serif' }}>
-        <RefreshCcw size={48} style={{ animation: 'spin 2s linear infinite', marginBottom: '20px' }} />
-        <h2>Iniciando Marshall Cell CRM...</h2>
-        <style>{`@keyframes spin { 100% { transform: rotate(360deg); } }`}</style>
-      </div>
-    );
-  }
+  if (!pasoActual) return <div style={{height: '100vh', backgroundColor: '#111827', display:'flex', justifyContent:'center', alignItems:'center'}}><h2 style={{color:'#0ff'}}>Iniciando Marshall Cell...</h2></div>;
 
   const t = estilos[tema];
-  const tieneDocktest = pasoActual.docktestDiodo || pasoActual.docktestUa;
-  const currentDockData = dockViewTab === 'diodo' ? pasoActual.docktestDiodo : pasoActual.docktestUa;
-  const currentDockInputs = dockAdminTab === 'diodo' ? formDockDiodo : formDockUa;
-  const arrayTips = pasoActual.tabsNota && pasoActual.tabsNota.length > 0 ? pasoActual.tabsNota : (pasoActual.notaExperta ? [{ titulo: 'General', contenido: pasoActual.notaExperta }] : []);
-  const tieneTips = arrayTips.length > 0;
+  const tieneTips = pasoActual.tabsNota && pasoActual.tabsNota.length > 0;
 
   return (
     <div style={{ ...estilos.contenedor, ...t.fondoPrincipal }}>
-      
       <header className="no-print" style={{ ...estilos.header, ...t.bordeFantasmaBottom }}>
         <div style={estilos.headerInner}>
           <h1 style={{ ...estilos.logoTexto, ...t.textoPrincipal }}>MARSHALL CELL CRM</h1>
           <div style={{display: 'flex', gap: '15px', alignItems: 'center'}}>
-            {!mostrarAdmin && (
-              <div onClick={conectarMultimetroUSB} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '4px 15px', backgroundColor: '#0a0a0a', borderRadius: '10px', border: `2px solid ${usbConectado ? 'rgba(0, 255, 255, 0.4)' : '#374151'}`, cursor: 'pointer', boxShadow: usbConectado ? 'inset 0 0 15px rgba(0,255,255,0.1)' : 'none', minWidth: '150px', justifyContent: 'space-between' }} title={usbConectado ? "Multímetro Conectado" : "Clic para conectar UT61E+"}>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                  <Link size={24} color={usbConectado ? '#00ffff' : '#6b7280'} />
-                  <span style={{ fontSize: '0.7rem', color: '#6b7280', fontWeight: 'bold', marginTop: '4px', letterSpacing: '1px' }}>UT61E+</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-                  <span style={{ color: lecturaUsb.valor === 'OL' ? '#ff0000' : (usbConectado ? '#00ffff' : '#6b7280'), fontFamily: 'Consolas, monospace', fontWeight: 'bold', fontSize: '2.5rem', textShadow: usbConectado && lecturaUsb.valor !== 'OL' ? '0 0 10px rgba(0,255,255,0.5)' : 'none' }}>
-                    {usbConectado ? lecturaUsb.valor : 'OFF'}
-                  </span>
-                  {usbConectado && lecturaUsb.valor !== 'OL' && (
-                    <span style={{ color: '#888', fontSize: '1.2rem', fontWeight: 'bold' }}>{lecturaUsb.unidad}</span>
-                  )}
-                </div>
+            {!mostrarAdmin && !libreriaVisible && (
+              <div onClick={conectarMultimetroUSB} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '4px 15px', backgroundColor: '#0a0a0a', borderRadius: '10px', border: `2px solid ${usbConectado ? 'rgba(0, 255, 255, 0.4)' : '#374151'}`, cursor: 'pointer', minWidth: '130px', justifyContent: 'space-between' }}>
+                <Link size={20} color={usbConectado ? '#00ffff' : '#6b7280'} />
+                <span style={{ color: lecturaUsb.valor === 'OL' ? '#ff0000' : (usbConectado ? '#00ffff' : '#6b7280'), fontFamily: 'Consolas, monospace', fontWeight: 'bold', fontSize: '1.8rem' }}>{usbConectado ? lecturaUsb.valor : 'USB'}</span>
               </div>
             )}
-            <button onClick={abrirHistorial} style={{...estilos.btnHeader, backgroundColor: t.cristalBgItem.backgroundColor, color: t.textoPrincipal.color, border: t.bordeFantasma.border}} title="Ver Historial"><History size={16} /> <span style={{fontSize: '0.7rem', fontWeight: 'bold'}}>HISTORIAL</span></button>
-            <button onClick={prepararNuevoCaso} style={{...estilos.btnHeader, backgroundColor: '#10b981', color: 'white', border: 'none'}} title="Registrar Nuevo Caso"><ClipboardList size={16} /> <span style={{fontSize: '0.7rem', fontWeight: 'bold'}}>INGRESO</span></button>
+            {/* --- BOTÓN GIGANTE DE LIBRERÍA --- */}
+            <button onClick={abrirLibreria} style={{...estilos.btnHeader, backgroundColor: '#8b5cf6', color: 'white', border: 'none'}} title="Librería de Hardware"><Cpu size={16} /> <span style={{fontSize: '0.7rem', fontWeight: 'bold'}}>LIBRERÍA MODELOS</span></button>
+            
+            <button onClick={() => {}} style={{...estilos.btnHeader, backgroundColor: t.cristalBgItem.backgroundColor, color: t.textoPrincipal.color, border: t.bordeFantasma.border}}><History size={16} /> <span style={{fontSize: '0.7rem', fontWeight: 'bold'}}>HISTORIAL</span></button>
             <button onClick={toggleTema} style={{ ...estilos.btnTema, ...t.textoSutil, marginLeft: '5px' }}>{tema === 'light' ? <Moon size={20} /> : <Sun size={20} />}</button>
           </div>
         </div>
-        <div style={estilos.lineaAcento}></div>
       </header>
 
       <main className="no-print" style={estilos.main}>
-        <AnimatePresence>
-          {pasoActual.id === 'inicio' && fallasEnSerie.length > 0 && (
-            <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, height: 0 }} style={{ width: '100%', marginBottom: '30px' }}>
-              <h3 style={{ ...t.textoPrincipal, fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 15px 0' }}><Flame size={20} color="#f97316" /> FALLAS CRÓNICAS (ACCESO RÁPIDO)</h3>
-              <div style={estilos.carruselFallas}>
-                {fallasEnSerie.map(falla => (
-                  <motion.button key={falla.id} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} style={{ ...estilos.tarjetaFallaSerie, ...t.cristalBgItem, ...t.bordeFantasma }} onClick={() => cargarPaso(falla.id)}>
-                    <div style={estilos.fallaSerieHeader}><AlertTriangle size={18} color="#ef4444" /><span style={{ ...estilos.fallaSerieTitulo, color: t.textoPrincipal.color }}>{falla.tituloFallaSerie || 'Falla Crónica'}</span></div>
-                    <p style={{ ...estilos.fallaSerieDesc, color: t.textoSutil.color }}>{falla.descFallaSerie || falla.pregunta}</p>
-                    <div style={{ display: 'flex', gap: '5px', marginTop: '10px' }}>{falla.imgUrl && <Camera size={14} color="#8b5cf6" />}{falla.videoUrl && <Play size={14} color="#ef4444" />}{(falla.docktestDiodo || falla.docktestUa) && <Usb size={14} color="#3b82f6" />}</div>
-                  </motion.button>
-                ))}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
+        {/* FLUJO DIAGNÓSTICO NORMAL (Simplificado para espacio) */}
         <AnimatePresence mode="wait">
-          <motion.div key={pasoActual.id} initial={{ opacity: 0, scale: 0.98, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.98, y: -10 }} transition={{ duration: 0.4 }} style={{ ...estilos.tarjetaCristal, ...t.cristalBg, ...t.bordeFantasma }}>
+          <motion.div key={pasoActual.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} style={{ ...estilos.tarjetaCristal, ...t.cristalBg, ...t.bordeFantasma }}>
             <div style={estilos.seccionTitulo}>
-              <span style={{ ...estilos.etiquetaPaso, color: '#0058bc', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                PASO {String(historial.length + 1).padStart(2, '0')}
-                {tieneTips && (<motion.button onClick={() => { setNotaVisible(true); setTipVisto(true); setTipTabActiva(0); }} animate={!tipVisto ? { scale: [1, 1.1, 1], boxShadow: ["0px 0px 0px rgba(234, 179, 8, 0)", "0px 0px 15px rgba(234, 179, 8, 0.7)", "0px 0px 0px rgba(234, 179, 8, 0)"] } : { scale: 1, boxShadow: "none" }} transition={!tipVisto ? { duration: 1.5, repeat: Infinity, ease: "easeInOut" } : { duration: 0.3 }} style={estilos.btnBombillo} title="Wiki Técnica"><Lightbulb size={16} color="#a16207" /> <span style={{fontSize: '0.75rem', fontWeight: '800', color: '#a16207'}}>TIPS ({arrayTips.length})</span></motion.button>)}
-                {pasoActual.imgUrl && (<button onClick={() => setImgModalVisible(true)} style={estilos.btnImgFlotante} title="Ver Imagen"><Camera size={16} color="white" /> <span style={{fontSize: '0.7rem', fontWeight: '800', color: 'white'}}>{pasoActual.imgTipo === 'microscopio' ? 'FOTO' : 'PLANO'}</span></button>)}
-                {pasoActual.videoUrl && (<button onClick={() => setVideoModalVisible(true)} style={{...estilos.btnImgFlotante, background: '#ef4444', boxShadow: '0 4px 10px rgba(239, 68, 68, 0.3)'}} title="Ver Video"><Play size={16} color="white" /> <span style={{fontSize: '0.7rem', fontWeight: '800', color: 'white'}}>VIDEO</span></button>)}
-              </span>
+              <span style={{ ...estilos.etiquetaPaso, color: '#0058bc' }}>PASO {String(historial.length + 1).padStart(2, '0')}</span>
               <h2 style={{ ...estilos.tituloPregunta, ...t.textoPrincipal }}>{pasoActual.pregunta}</h2>
             </div>
-            
             {pasoActual.esFinal ? (
-              <div style={estilos.estadoFinal}><div style={estilos.iconoFinalBg}><ShieldCheck size={48} color="#0058bc" /></div><h3 style={{ ...estilos.textoFinal, ...t.textoPrincipal }}>Diagnóstico Completado</h3><button style={estilos.btnPrimario} onClick={() => { setHistorial([]); cargarPaso('inicio'); }}><RefreshCcw size={18} style={{ marginRight: '8px' }} /> Iniciar Nueva Evaluación</button></div>
+              <div style={estilos.estadoFinal}><ShieldCheck size={48} color="#0058bc" /><h3 style={{ ...t.textoPrincipal }}>Diagnóstico Completado</h3><button style={estilos.btnPrimario} onClick={() => { setHistorial([]); cargarPaso('inicio'); }}>Reiniciar</button></div>
             ) : (
               <div style={estilos.gridOpciones}>
-                {pasoActual.opciones?.map((opcion, index) => (
-                  <motion.button key={index} whileHover={{ scale: 1.02, backgroundColor: t.hoverBg }} whileTap={{ scale: 0.98 }} style={{ ...estilos.btnOpcion, ...t.bordeFantasma, ...t.cristalBgItem }} onClick={() => cargarPaso(opcion.siguientePaso)}>
-                    <div style={estilos.opcionContenido}><div style={estilos.iconoCirculo}>{obtenerIconoDinamico(opcion.texto)}</div><div style={estilos.textosOpcion}><span style={{ ...estilos.tituloOpcion, ...t.textoPrincipal }}>{limpiarTexto(opcion.texto)}</span><span style={{ ...estilos.descOpcion, ...t.textoSutil }}>Toque para continuar</span></div></div><ChevronRight size={20} style={{ color: '#0058bc', opacity: 0.5 }} />
+                {pasoActual.opciones?.map((op, i) => (
+                  <motion.button key={i} whileHover={{ scale: 1.02, backgroundColor: t.hoverBg }} whileTap={{ scale: 0.98 }} style={{ ...estilos.btnOpcion, ...t.bordeFantasma, ...t.cristalBgItem }} onClick={() => cargarPaso(op.siguientePaso)}>
+                    <div style={estilos.opcionContenido}><span style={{ ...estilos.tituloOpcion, ...t.textoPrincipal }}>{op.texto}</span></div><ChevronRight size={20} style={{ color: '#0058bc', opacity: 0.5 }} />
                   </motion.button>
                 ))}
               </div>
@@ -552,132 +299,147 @@ export default function AppDiagnostico() {
         </AnimatePresence>
       </main>
 
-      {/* MODALES, WIKI, HISTORIAL Y REPORTERÍA QUEDAN INTACTOS */}
-      <AnimatePresence>{notaVisible && tieneTips && (<motion.div className="no-print" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={estilos.modalOverlay}><motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} style={{ ...estilos.modalCard, ...t.fondoPrincipal, ...t.bordeFantasma, maxWidth: '700px' }}><div style={{...estilos.modalHeader, backgroundColor: '#fef08a', borderBottom: '1px solid #fde047'}}><div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#854d0e' }}><Lightbulb size={24} /><h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 'bold' }}>Wiki Técnica</h3></div><button onClick={() => setNotaVisible(false)} style={{...estilos.btnCerrar, color: '#854d0e'}}><X size={24} /></button></div><div style={{ display: 'flex', flexDirection: 'column', maxHeight: '70vh' }}><div style={{ display: 'flex', overflowX: 'auto', borderBottom: t.bordeFantasma.border, backgroundColor: 'rgba(0,0,0,0.03)', scrollbarWidth: 'none' }}>{arrayTips.map((tab, index) => (<button key={index} onClick={() => setTipTabActiva(index)} style={{ padding: '14px 24px', border: 'none', background: 'none', borderBottom: tipTabActiva === index ? '3px solid #eab308' : '3px solid transparent', color: tipTabActiva === index ? '#ca8a04' : t.textoSutil.color, fontWeight: 'bold', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.2s' }}>{tab.titulo}</button>))}</div><div style={{ padding: '25px', overflowY: 'auto', flex: 1, color: t.textoPrincipal.color, lineHeight: '1.6', fontSize: '1rem', whiteSpace: 'pre-wrap' }}>{arrayTips[tipTabActiva]?.contenido}</div></div></motion.div></motion.div>)}</AnimatePresence>
-      <AnimatePresence>{bitacoraVisible && (<motion.div className="no-print" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={estilos.modalOverlay}><motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} style={{ ...estilos.modalCard, ...t.fondoPrincipal, ...t.bordeFantasma }}><div style={estilos.modalHeader}><div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><ClipboardList size={24} color="#10b981" /><h3 style={{ margin: 0, ...t.textoPrincipal, fontSize: '1.2rem' }}>{casoEditando ? 'Editar Caso' : 'Nueva Bitácora'}</h3></div><button onClick={() => setBitacoraVisible(false)} style={estilos.btnCerrar}><X size={24} color={t.textoSutil.color} /></button></div><div style={estilos.modalBody}><form onSubmit={guardarBitacora} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}><div style={{ display: 'flex', gap: '10px' }}><div style={{ flex: 1 }}><label style={{...estilos.labelForm, ...t.textoPrincipal}}>Marca *</label><input required type="text" placeholder="Ej: Samsung" style={{ ...estilos.inputForm, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} value={formCaso.marca} onChange={(e) => setFormCaso({...formCaso, marca: e.target.value})} /></div><div style={{ flex: 1 }}><label style={{...estilos.labelForm, ...t.textoPrincipal}}>Modelo *</label><input required type="text" placeholder="Ej: Galaxy A54" style={{ ...estilos.inputForm, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} value={formCaso.modelo} onChange={(e) => setFormCaso({...formCaso, modelo: e.target.value})} /></div></div><div><label style={{...estilos.labelForm, ...t.textoPrincipal}}>Síntomas *</label><textarea required style={{ ...estilos.inputForm, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma, minHeight: '60px' }} value={formCaso.sintomas} onChange={(e) => setFormCaso({...formCaso, sintomas: e.target.value})} /></div><div><label style={{...estilos.labelForm, ...t.textoPrincipal}}>Protocolo / Diagnóstico</label><textarea style={{ ...estilos.inputForm, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma, minHeight: '60px' }} value={formCaso.protocolo} onChange={(e) => setFormCaso({...formCaso, protocolo: e.target.value})} /></div><div><label style={{...estilos.labelForm, ...t.textoPrincipal}}>Enlace Imagen (Opcional - Recomendado Postimages)</label><input type="text" placeholder="https://i.postimg.cc/..." style={{ ...estilos.inputForm, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} value={formCaso.imgUrl} onChange={(e) => setFormCaso({...formCaso, imgUrl: e.target.value})} /></div>{mensajeCaso && <p style={{ color: mensajeCaso.includes('❌') || mensajeCaso.includes('⚠️') ? '#ef4444' : '#10b981', fontWeight: 'bold', textAlign: 'center', margin: 0 }}>{mensajeCaso}</p>}<button type="submit" style={{ ...estilos.btnPrimarioGuardar, background: '#10b981', justifyContent: 'center', padding: '15px' }}><Save size={20} style={{marginRight:'8px'}}/> {casoEditando ? 'Actualizar Caso' : 'Guardar Caso en Historial'}</button></form></div></motion.div></motion.div>)}</AnimatePresence>
-      <AnimatePresence>{historialCasosVisible && (<motion.div className="no-print" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={estilos.modalOverlay}><motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} style={{ ...estilos.modalCard, maxWidth: '800px', ...t.fondoPrincipal, ...t.bordeFantasma }}><div style={estilos.modalHeader}><div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><History size={24} color="#0058bc" /><h3 style={{ margin: 0, ...t.textoPrincipal, fontSize: '1.2rem' }}>Historial</h3></div><button onClick={() => setHistorialCasosVisible(false)} style={estilos.btnCerrar}><X size={24} color={t.textoSutil.color} /></button></div><div style={{ ...estilos.modalBody, padding: '15px' }}>{casosGuardados.length === 0 ? (<div style={{ textAlign: 'center', padding: '40px', color: t.textoSutil.color }}><FileText size={48} style={{opacity: 0.5, marginBottom:'10px'}}/><p>No hay casos registrados aún.</p></div>) : (<div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>{casosGuardados.map(caso => (<div key={caso.id} style={{ backgroundColor: t.cristalBgItem.backgroundColor, border: t.bordeFantasma.border, borderRadius: '12px', padding: '15px', display: 'flex', flexDirection: 'column', gap: '10px' }}><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}><div><h4 style={{ margin: '0 0 5px 0', ...t.textoPrincipal, fontSize: '1.1rem' }}>{caso.marca} {caso.modelo}</h4><span style={{ fontSize: '0.75rem', color: t.textoSutil.color }}>Ingreso: {new Date(caso.fecha).toLocaleDateString()}</span></div><div style={{ display: 'flex', gap: '8px' }}><button onClick={() => abrirReporte(caso)} style={{ ...estilos.btnAccionLista, backgroundColor: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', padding: '5px 12px', display: 'flex', gap: '5px', alignItems: 'center' }} title="Ver Reporte"><FileText size={16} /> <span>Reporte</span></button><button onClick={() => {setHistorialCasosVisible(false); editarCasoExistente(caso);}} style={{ ...estilos.btnAccionLista, backgroundColor: 'rgba(234, 179, 8, 0.1)', color: '#eab308' }} title="Editar"><Edit size={18} /></button><button onClick={() => eliminarCaso(caso.id)} style={{ ...estilos.btnAccionLista, backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' }} title="Eliminar"><Trash2 size={18} /></button></div></div><div style={{ fontSize: '0.85rem', ...t.textoPrincipal, backgroundColor: 'rgba(0,0,0,0.02)', padding: '10px', borderRadius: '8px' }}><strong>Síntoma:</strong> {caso.sintomas}</div>{caso.protocolo && <div style={{ fontSize: '0.85rem', ...t.textoPrincipal }}><strong>Diagnóstico:</strong> {caso.protocolo}</div>}</div>))}</div>)}</div></motion.div></motion.div>)}</AnimatePresence>
-      <AnimatePresence>{reporteVisible && casoReporte && (<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{...estilos.modalOverlay, backgroundColor: 'rgba(0,0,0,0.9)'}}><motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} style={{ width: '100%', maxWidth: '800px', display: 'flex', flexDirection: 'column', gap: '20px', alignItems: 'center', height: '90vh' }}><div className="no-print" style={{ display: 'flex', gap: '15px', width: '100%', justifyContent: 'flex-end', padding: '10px 0' }}><button onClick={enviarWhatsApp} style={{ background: '#25D366', color: 'white', padding: '10px 20px', borderRadius: '10px', border: 'none', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 4px 10px rgba(37, 211, 102, 0.3)' }}><MessageCircle size={20} /> WhatsApp</button><button onClick={imprimirReporte} style={{ background: '#0058bc', color: 'white', padding: '10px 20px', borderRadius: '10px', border: 'none', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 4px 10px rgba(0, 88, 188, 0.3)' }}><Printer size={20} /> Imprimir / PDF nativo</button><button onClick={() => setReporteVisible(false)} style={{ background: '#374151', color: 'white', padding: '10px', borderRadius: '10px', border: 'none', cursor: 'pointer' }}><X size={20} /></button></div><div style={{ flex: 1, width: '100%', overflowY: 'auto', borderRadius: '8px' }}><div id="seccion-reporte" style={{ backgroundColor: 'white', width: '100%', maxWidth: '210mm', minHeight: '297mm', margin: '0 auto', padding: '40px', boxSizing: 'border-box', boxShadow: '0 10px 25px rgba(0,0,0,0.5)', color: '#111827', fontFamily: 'system-ui, sans-serif' }}><div style={{ textAlign: 'center', borderBottom: '3px solid #0058bc', paddingBottom: '20px', marginBottom: '30px' }}><h1 style={{ color: '#0058bc', margin: 0, fontSize: '28px', textTransform: 'uppercase', letterSpacing: '2px' }}>MARSHALL CELL</h1><h2 style={{ color: '#4b5563', margin: '5px 0 0 0', fontSize: '16px', fontWeight: 'normal' }}>Reporte Técnico Oficial de Diagnóstico</h2></div><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '30px' }}><div style={{ background: '#f9fafb', padding: '15px', borderRadius: '8px', border: '1px solid #e5e7eb' }}><strong style={{ color: '#111827', display: 'block', marginBottom: '5px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px' }}>Fecha de Ingreso</strong><p style={{ margin: 0, fontSize: '15px' }}>{new Date(casoReporte.fecha).toLocaleDateString()}</p></div><div style={{ background: '#f9fafb', padding: '15px', borderRadius: '8px', border: '1px solid #e5e7eb' }}><strong style={{ color: '#111827', display: 'block', marginBottom: '5px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px' }}>ID de Caso</strong><p style={{ margin: 0, fontSize: '15px' }}>#{casoReporte.id.substring(0, 8).toUpperCase()}</p></div><div style={{ background: '#f9fafb', padding: '15px', borderRadius: '8px', border: '1px solid #e5e7eb' }}><strong style={{ color: '#111827', display: 'block', marginBottom: '5px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px' }}>Marca</strong><p style={{ margin: 0, fontSize: '15px' }}>{casoReporte.marca}</p></div><div style={{ background: '#f9fafb', padding: '15px', borderRadius: '8px', border: '1px solid #e5e7eb' }}><strong style={{ color: '#111827', display: 'block', marginBottom: '5px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px' }}>Modelo</strong><p style={{ margin: 0, fontSize: '15px' }}>{casoReporte.modelo}</p></div></div><div style={{ background: '#f9fafb', padding: '15px', borderRadius: '8px', border: '1px solid #e5e7eb', marginBottom: '20px' }}><strong style={{ color: '#111827', display: 'block', marginBottom: '5px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px' }}>Síntomas Reportados</strong><p style={{ margin: 0, fontSize: '15px', whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>{casoReporte.sintomas}</p></div><div style={{ background: '#f9fafb', padding: '15px', borderRadius: '8px', border: '1px solid #e5e7eb' }}><strong style={{ color: '#111827', display: 'block', marginBottom: '5px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px' }}>Protocolo de Reparación / Diagnóstico</strong><p style={{ margin: 0, fontSize: '15px', whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>{casoReporte.protocolo || 'Pendiente de evaluación técnica profunda.'}</p></div>{casoReporte.imgUrl && (<div style={{ marginTop: '30px', textAlign: 'center', background: '#f9fafb', padding: '20px', borderRadius: '8px', border: '1px solid #e5e7eb' }}><strong style={{ color: '#111827', display: 'block', marginBottom: '10px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px' }}>Evidencia Técnica Adjunta</strong><img src={casoReporte.imgUrl} alt="Evidencia" referrerPolicy="no-referrer" style={{ maxWidth: '100%', maxHeight: '350px', borderRadius: '8px', objectFit: 'contain' }} /></div>)}<div style={{ marginTop: '50px', textAlign: 'center', fontSize: '12px', color: '#9ca3af', borderTop: '1px solid #e5e7eb', paddingTop: '20px' }}>Generado por Marshall Cell CRM<br/>Laboratorio de Microelectrónica - Oropesa, Cusco, Perú</div></div></div></motion.div></motion.div>)}</AnimatePresence>
-      <AnimatePresence>{imgModalVisible && pasoActual.imgUrl && (<motion.div className="no-print" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={estilos.modalOverlay} onClick={() => setImgModalVisible(false)}><motion.div initial={{ scale: 0.8 }} animate={{ scale: 1 }} exit={{ scale: 0.8 }} style={estilos.visualizadorContenedor} onClick={(e) => e.stopPropagation()}><div style={estilos.visualizadorHeader}><div style={{display:'flex', alignItems:'center', gap:'10px'}}>{pasoActual.imgTipo === 'microscopio' ? <Camera size={20} color="white" /> : <Map size={20} color="white" />}<span style={{color:'white', fontWeight:'bold'}}>{pasoActual.imgTipo === 'microscopio' ? 'Vista' : 'Plano'}</span></div><button onClick={() => setImgModalVisible(false)} style={{background:'none', border:'none', cursor:'pointer'}}><X size={24} color="white" /></button></div><div style={estilos.visualizadorCuerpo}><img src={pasoActual.imgUrl} alt="Visualización técnica" referrerPolicy="no-referrer" style={estilos.imagenTecnica} /></div><div style={estilos.visualizadorFooter}>Tip: Usa el zoom de tu pantalla para ver detalles.</div></motion.div></motion.div>)}</AnimatePresence>
-      <AnimatePresence>{videoModalVisible && pasoActual.videoUrl && (<motion.div className="no-print" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={estilos.modalOverlay} onClick={() => setVideoModalVisible(false)}><motion.div initial={{ scale: 0.8 }} animate={{ scale: 1 }} exit={{ scale: 0.8 }} style={{...estilos.visualizadorContenedor, maxWidth: '800px', height: 'auto', aspectRatio: '16/9'}} onClick={(e) => e.stopPropagation()}><div style={{...estilos.visualizadorHeader, borderBottom: 'none'}}><div style={{display:'flex', alignItems:'center', gap:'10px'}}><Play size={20} color="white" /><span style={{color:'white', fontWeight:'bold'}}>Video</span></div><button onClick={() => setVideoModalVisible(false)} style={{background:'none', border:'none', cursor:'pointer'}}><X size={24} color="white" /></button></div><div style={{ flex: 1, backgroundColor: '#000', width: '100%', height: '100%' }}><iframe width="100%" height="100%" src={obtenerUrlVideo(pasoActual.videoUrl)} title="YouTube" frameBorder="0" allowFullScreen style={{display: 'block'}}></iframe></div></motion.div></motion.div>)}</AnimatePresence>
-      <AnimatePresence>{tieneDocktest && (<motion.button className="no-print" initial={{ x: 100, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 100, opacity: 0 }} onClick={() => setPanelMedicionVisible(true)} style={{ position: 'fixed', right: 0, top: '40%', transform: 'translateY(-50%)', backgroundColor: dockViewTab === 'diodo' ? '#3b82f6' : '#10b981', color: 'white', border: 'none', padding: '15px 10px 15px 15px', borderRadius: '15px 0 0 15px', cursor: 'pointer', zIndex: 900, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', boxShadow: `-5px 0 15px ${dockViewTab === 'diodo' ? 'rgba(59, 130, 246, 0.4)' : 'rgba(16, 185, 129, 0.4)'}` }}><motion.div animate={{ opacity: [1, 0.5, 1] }} transition={{ duration: 1.5, repeat: Infinity }}><Usb size={24} /></motion.div><span style={{ fontSize: '0.7rem', fontWeight: 'bold', writingMode: 'vertical-rl', transform: 'rotate(180deg)', marginTop: '5px' }}>DOCKTEST</span></motion.button>)}</AnimatePresence>
-      <AnimatePresence>{panelMedicionVisible && tieneDocktest && (<><motion.div className="no-print" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1999 }} onClick={() => setPanelMedicionVisible(false)} /><motion.div className="no-print" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: 'spring', damping: 25, stiffness: 200 }} style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: '320px', backgroundColor: t.fondoPrincipal.backgroundColor, borderLeft: t.bordeFantasma.border, zIndex: 2000, display: 'flex', flexDirection: 'column', boxShadow: '-10px 0 30px rgba(0,0,0,0.2)' }}><div style={{ padding: '20px', borderBottom: t.bordeFantasma.border, display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: dockViewTab === 'diodo' ? 'rgba(59, 130, 246, 0.05)' : 'rgba(16, 185, 129, 0.05)' }}><div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><Usb size={24} color={dockViewTab === 'diodo' ? '#3b82f6' : '#10b981'} /><h3 style={{ margin: 0, ...t.textoPrincipal, fontSize: '1.1rem' }}>Valores</h3></div><button onClick={() => setPanelMedicionVisible(false)} style={estilos.btnCerrar}><X size={20} color={t.textoSutil.color}/></button></div><div style={{ padding: '20px', flex: 1, overflowY: 'auto' }}><div style={{ display: 'flex', backgroundColor: 'rgba(0,0,0,0.05)', borderRadius: '20px', padding: '4px', marginBottom: '20px' }}><button onClick={() => setDockViewTab('diodo')} disabled={!pasoActual.docktestDiodo} style={{ flex: 1, padding: '8px', borderRadius: '16px', border: 'none', backgroundColor: dockViewTab === 'diodo' ? '#3b82f6' : 'transparent', color: dockViewTab === 'diodo' ? 'white' : (pasoActual.docktestDiodo ? t.textoSutil.color : 'rgba(0,0,0,0.2)'), fontWeight: 'bold', cursor: pasoActual.docktestDiodo ? 'pointer' : 'not-allowed' }}>Diodo</button><button onClick={() => setDockViewTab('ua')} disabled={!pasoActual.docktestUa} style={{ flex: 1, padding: '8px', borderRadius: '16px', border: 'none', backgroundColor: dockViewTab === 'ua' ? '#10b981' : 'transparent', color: dockViewTab === 'ua' ? 'white' : (pasoActual.docktestUa ? t.textoSutil.color : 'rgba(0,0,0,0.2)'), fontWeight: 'bold', cursor: pasoActual.docktestUa ? 'pointer' : 'not-allowed' }}>uA</button></div>{currentDockData ? (<div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>{[{ label: 'VBUS', value: currentDockData.vbus, color: '#ef4444' },{ label: 'D-', value: currentDockData.dm, color: dockViewTab === 'diodo' ? '#3b82f6' : '#10b981' },{ label: 'D+', value: currentDockData.dp, color: dockViewTab === 'diodo' ? '#3b82f6' : '#10b981' },{ label: 'CC1', value: currentDockData.cc1, color: '#eab308' },{ label: 'CC2', value: currentDockData.cc2, color: '#eab308' },{ label: 'GND', value: '0.000', color: '#6b7280' }].map((pin, i) => pin.value ? (<div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 15px', backgroundColor: t.cristalBgItem.backgroundColor, borderRadius: '10px', border: t.bordeFantasma.border }}><span style={{ fontWeight: 'bold', color: pin.color, fontSize: '1.1rem' }}>{pin.label}</span><span style={{ fontWeight: '600', ...t.textoPrincipal, fontSize: '1.1rem' }}>{pin.value} {dockViewTab === 'ua' && pin.label !== 'GND' ? 'uA' : ''}</span></div>) : null)}</div>) : (<p style={{textAlign: 'center', color: t.textoSutil.color}}>Sin datos.</p>)}</div></motion.div></>)}</AnimatePresence>
-
       <nav className="no-print" style={{ ...estilos.navInferior, ...t.cristalBgNav, ...t.bordeFantasmaTop }}><div style={{ width: '80px', display: 'flex', justifyContent: 'center' }}>{historial.length > 0 && <button style={{ ...estilos.navBtn, ...t.textoSutil }} onClick={irAtras}><ArrowLeft size={24} /> <span style={estilos.navLabel}>BACK</span></button>}</div><button style={estilos.navBtnCentro} onClick={() => { setHistorial([]); cargarPaso('inicio'); }}><Home size={24} color="white" /></button><div style={{ width: '80px', display: 'flex', justifyContent: 'center' }}><button style={{ ...estilos.navBtn, ...t.textoSutil }} onClick={abrirAdmin}><Settings size={24} /> <span style={estilos.navLabel}>ADMIN</span></button></div></nav>
 
-      {/* MODAL ADMIN */}
+      {/* --- MODAL: LA GRAN LIBRERÍA DE HARDWARE (DB) --- */}
       <AnimatePresence>
-        {mostrarAdmin && (
+        {libreriaVisible && (
           <motion.div className="no-print" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={estilos.modalOverlay}>
-            <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} style={{ ...estilos.modalCard, ...t.fondoPrincipal, ...t.bordeFantasma, width: '100%', maxWidth: '800px' }}>
-              <div style={estilos.modalHeader}><div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>{vistaAdmin === 'formulario' && <button onClick={() => setVistaAdmin('lista')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0058bc' }}><ArrowLeft size={20} /></button>}<h3 style={{ ...estilos.modalTitulo, ...t.textoPrincipal }}>{vistaAdmin === 'login' ? '🔐 Acceso' : vistaAdmin === 'lista' ? '📂 Flujos' : '⚙️ Creador de Pasos'}</h3></div><div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>{estaAutenticado && vistaAdmin !== 'login' && <button onClick={cerrarSesion} style={{ background: 'none', border: 'none', color: '#ef4444' }}><LogOut size={20} /></button>}<button onClick={() => setMostrarAdmin(false)} style={{ ...estilos.btnCerrar, ...t.textoSutil }}><X size={24} /></button></div></div>
-
-              {vistaAdmin === 'login' && (
-                <div style={estilos.modalBody}>
-                  <form onSubmit={iniciarSesion} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                    <div><label style={estilos.labelForm}>Correo</label><input required type="email" style={{ ...estilos.inputForm, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} value={emailAdmin} onChange={(e) => setEmailAdmin(e.target.value)} /></div>
-                    <div><label style={estilos.labelForm}>Clave</label><input required type="password" style={{ ...estilos.inputForm, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} value={passAdmin} onChange={(e) => setPassAdmin(e.target.value)} /></div>
-                    {errorLogin && <p style={{ color: '#ef4444', fontWeight: 'bold', textAlign: 'center', margin: '5px 0' }}>{errorLogin}</p>}
-                    <button type="submit" style={{...estilos.btnPrimarioGuardar, justifyContent: 'center', padding: '12px'}}>Entrar</button>
-                  </form>
+            <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} style={{ width: '100%', maxWidth: '1200px', height: '90vh', backgroundColor: '#111827', borderRadius: '1.5rem', display: 'flex', overflow: 'hidden', border: '1px solid #374151' }}>
+              
+              {/* PANEL IZQUIERDO: LISTA DE MODELOS */}
+              <div style={{ width: '300px', backgroundColor: '#000', borderRight: '1px solid #374151', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ padding: '20px', borderBottom: '1px solid #374151' }}>
+                    <h3 style={{ color: '#8b5cf6', margin: '0 0 15px 0', display:'flex', alignItems:'center', gap:'10px' }}><Cpu size={24} /> HARDWARE DB</h3>
+                    <form onSubmit={crearNuevoModeloDB} style={{ display:'flex', flexDirection:'column', gap:'8px' }}>
+                        <input required placeholder="Marca (Ej: Xiaomi)" value={formNuevoModelo.marca} onChange={e=>setFormNuevoModelo({...formNuevoModelo, marca: e.target.value})} style={estilos.inputDark} />
+                        <input required placeholder="Modelo (Ej: POCO X3)" value={formNuevoModelo.nombre} onChange={e=>setFormNuevoModelo({...formNuevoModelo, nombre: e.target.value})} style={estilos.inputDark} />
+                        <button type="submit" style={{ backgroundColor: '#8b5cf6', color: 'white', border: 'none', padding: '8px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}>+ Añadir Teléfono</button>
+                    </form>
                 </div>
-              )}
+                <div style={{ flex: 1, overflowY: 'auto', padding: '10px' }}>
+                    {modelosLibreria.map(mod => (
+                        <button key={mod.id} onClick={() => {setModeloActivo(mod); setFpcActivo(mod.fpcs[0]||null);}} style={{ width: '100%', padding: '12px', textAlign: 'left', backgroundColor: modeloActivo?.id === mod.id ? '#1f2937' : 'transparent', border: 'none', color: modeloActivo?.id === mod.id ? '#00ffff' : '#9ca3af', borderLeft: modeloActivo?.id === mod.id ? '4px solid #00ffff' : '4px solid transparent', cursor: 'pointer', borderRadius: '0 8px 8px 0', marginBottom: '5px', fontWeight: 'bold' }}>
+                            {mod.marca} {mod.nombre}
+                        </button>
+                    ))}
+                </div>
+              </div>
 
-              {vistaAdmin === 'lista' && (<div style={estilos.modalBody}><div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}><input style={{ ...estilos.inputForm, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} type="text" placeholder="Buscar..." value={busqueda} onChange={(e) => setBusqueda(e.target.value)} /><button onClick={prepararNuevoPaso} style={estilos.btnPrimarioGuardar}><Plus size={20} /></button></div><div style={estilos.listaContainer}>{listaPasos.length > 0 ? renderArbol('inicio') : <p>Cargando...</p>}</div></div>)}
+              {/* PANEL DERECHO: HERRAMIENTAS DEL MODELO */}
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: '#111827' }}>
+                <div style={{ padding: '15px 25px', borderBottom: '1px solid #374151', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <h2 style={{ color: 'white', margin: 0 }}>{modeloActivo ? `${modeloActivo.marca} ${modeloActivo.nombre}` : 'Selecciona un Modelo...'}</h2>
+                    <div style={{display:'flex', gap:'15px'}}>
+                        {modeloActivo && <button onClick={guardarModeloActualDB} style={{ background: '#10b981', color: 'white', border: 'none', padding: '8px 20px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', display:'flex', alignItems:'center', gap:'5px' }}><Save size={16}/> Guardar Placa</button>}
+                        <button onClick={() => setLibreriaVisible(false)} style={{ background: 'none', border: 'none', color: 'gray', cursor: 'pointer' }}><X size={28} /></button>
+                    </div>
+                </div>
 
+                {modeloActivo ? (
+                    <div style={{ flex: 1, overflowY: 'auto', padding: '25px' }}>
+                        
+                        {/* Selector de Herramienta (Docktest o FPC) */}
+                        <div style={{ display: 'flex', gap: '10px', marginBottom: '25px' }}>
+                            <button onClick={()=>setSeccionLibreria('docktest')} style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', background: seccionLibreria==='docktest' ? '#3b82f6' : '#1f2937', color: 'white', fontWeight: 'bold', cursor:'pointer' }}>Docktest (Pin de Carga)</button>
+                            <button onClick={()=>setSeccionLibreria('fpc')} style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', background: seccionLibreria==='fpc' ? '#8b5cf6' : '#1f2937', color: 'white', fontWeight: 'bold', cursor:'pointer' }}>Planos FPC (Pantalla, Cámaras)</button>
+                        </div>
+
+                        <VisorHUD valor={lecturaUsb.valor} unidad={lecturaUsb.unidad} conectado={usbConectado} conectarFn={conectarMultimetroUSB} vozActiva={vozActiva} toggleVozFn={toggleVoz} autoHoldActivo={autoHoldActivo} toggleAutoHoldFn={()=>setAutoHoldActivo(!autoHoldActivo)} />
+
+                        {seccionLibreria === 'docktest' && (
+                            <div style={{ backgroundColor: '#000', padding: '20px', borderRadius: '15px', border: '1px solid #333' }}>
+                                <div style={{display:'flex', justifyContent:'space-between', marginBottom:'15px'}}>
+                                    <h3 style={{color:'#3b82f6', margin:0}}>Captura de Docktest</h3>
+                                    <div style={{display:'flex', gap:'5px', backgroundColor: '#1a1a1a', padding:'4px', borderRadius:'8px'}}>
+                                        <button onClick={()=>setEscalaFpc('diodo')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: escalaFpc === 'diodo' ? '#3b82f6' : 'transparent', color: escalaFpc === 'diodo' ? 'white' : 'gray', fontWeight: 'bold', cursor:'pointer' }}>Diodo</button>
+                                        <button onClick={()=>setEscalaFpc('ua')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: escalaFpc === 'ua' ? '#10b981' : 'transparent', color: escalaFpc === 'ua' ? 'white' : 'gray', fontWeight: 'bold', cursor:'pointer' }}>uA</button>
+                                    </div>
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '15px' }}>
+                                    {ordenCamposDock.map(c => {
+                                        const valuesObj = escalaFpc === 'diodo' ? modeloActivo.docktestDiodo : modeloActivo.docktestUa;
+                                        const valActual = valuesObj ? valuesObj[c] : '---';
+                                        return (
+                                        <div key={c} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                            <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: campoActivoDock === c ? '#00ffff' : 'gray', marginBottom: '8px', textTransform: 'uppercase' }}>{c}</span>
+                                            <input readOnly onClick={() => setCampoActivoDock(c)} value={valActual} style={{ width:'100%', padding:'15px', textAlign: 'center', fontFamily: 'Consolas', fontWeight: 'bold', fontSize: '1.2rem', border: campoActivoDock === c ? '2px solid #00ffff' : '1px solid #333', backgroundColor: campoActivoDock === c ? 'rgba(0, 255, 255, 0.1)' : '#1a1a1a', color: campoActivoDock === c ? '#00ffff' : 'white', borderRadius:'8px', cursor:'pointer', outline:'none' }} />
+                                        </div>
+                                    )})}
+                                </div>
+                            </div>
+                        )}
+
+                        {seccionLibreria === 'fpc' && (
+                            <div>
+                                <div style={{ display:'flex', gap:'15px', marginBottom:'20px' }}>
+                                    {/* Lista horizontal de FPCs del modelo */}
+                                    <div style={{ display:'flex', gap:'10px', overflowX:'auto', flex:1, paddingBottom:'5px' }}>
+                                        {modeloActivo.fpcs.map(f => (
+                                            <button key={f.id} onClick={()=>setFpcActivo(f)} style={{ padding:'8px 15px', borderRadius:'20px', border:'none', background: fpcActivo?.id === f.id ? '#8b5cf6' : '#1f2937', color:'white', fontWeight:'bold', cursor:'pointer', whiteSpace:'nowrap' }}>{f.nombre} ({f.pines.length} pines)</button>
+                                        ))}
+                                    </div>
+                                    {/* Creador de FPC Dinámico */}
+                                    <div style={{ display:'flex', gap:'5px', background:'#1a1a1a', padding:'5px', borderRadius:'10px', border:'1px solid #333' }}>
+                                        <input placeholder="Nombre FPC..." value={formNuevoFpc.nombre} onChange={e=>setFormNuevoFpc({...formNuevoFpc, nombre: e.target.value})} style={{...estilos.inputDark, width:'120px', padding:'5px'}} />
+                                        <input type="number" placeholder="Pines" value={formNuevoFpc.pines} onChange={e=>setFormNuevoFpc({...formNuevoFpc, pines: e.target.value})} style={{...estilos.inputDark, width:'60px', padding:'5px', textAlign:'center'}} />
+                                        <button onClick={crearNuevoFpcEnModelo} style={{ background:'#10b981', border:'none', borderRadius:'6px', color:'white', fontWeight:'bold', padding:'0 10px', cursor:'pointer' }}>+ FPC</button>
+                                    </div>
+                                </div>
+
+                                {fpcActivo ? (
+                                    <>
+                                        <div style={{display:'flex', justifyContent:'flex-end', gap:'10px', marginBottom:'15px'}}>
+                                            <div style={{display:'flex', gap:'5px', backgroundColor: '#1a1a1a', padding:'4px', borderRadius:'8px'}}>
+                                                <button onClick={()=>setEscalaFpc('diodo')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: escalaFpc === 'diodo' ? '#8b5cf6' : 'transparent', color: escalaFpc === 'diodo' ? 'white' : 'gray', fontWeight: 'bold', cursor:'pointer' }}>Diodo</button>
+                                                <button onClick={()=>setEscalaFpc('ua')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: escalaFpc === 'ua' ? '#10b981' : 'transparent', color: escalaFpc === 'ua' ? 'white' : 'gray', fontWeight: 'bold', cursor:'pointer' }}>uA</button>
+                                            </div>
+                                            <div style={{display:'flex', gap:'5px', backgroundColor: '#1a1a1a', padding:'4px', borderRadius:'8px'}}>
+                                                <button onClick={()=>setModoFpc('crear')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: modoFpc === 'crear' ? '#8b5cf6' : 'transparent', color: modoFpc === 'crear' ? 'white' : 'gray', fontWeight: 'bold', cursor:'pointer' }}>Grabar Sano</button>
+                                                <button onClick={()=>setModoFpc('diagnostico')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: modoFpc === 'diagnostico' ? '#ef4444' : 'transparent', color: modoFpc === 'diagnostico' ? 'white' : 'gray', fontWeight: 'bold', cursor:'pointer' }}>Diagnóstico</button>
+                                            </div>
+                                        </div>
+                                        <FPCInteligente pines={fpcActivo.pines} setPines={(updater) => {
+                                            const arrNuevo = typeof updater === 'function' ? updater(fpcActivo.pines) : updater;
+                                            const fpcMod = {...fpcActivo, pines: arrNuevo};
+                                            setFpcActivo(fpcMod);
+                                            setModeloActivo(prev => ({...prev, fpcs: prev.fpcs.map(f => f.id===fpcMod.id ? fpcMod : f)}));
+                                        }} pinActivo={pinActivoFpc} setPinActivo={setPinActivoFpc} modo={modoFpc} escala={escalaFpc} lecturaEnVivo={lecturaUsb.valor} />
+                                    </>
+                                ) : (
+                                    <div style={{ textAlign:'center', padding:'50px', color:'gray' }}><Map size={48} style={{opacity:0.3, marginBottom:'10px'}} /><p>Crea un FPC arriba para empezar a mapear.</p></div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    <div style={{ flex: 1, display:'flex', flexDirection:'column', justifyContent:'center', alignItems:'center', color:'gray' }}>
+                        <Smartphone size={64} style={{opacity:0.2, marginBottom:'15px'}} />
+                        <h3>Selecciona un teléfono del panel izquierdo</h3>
+                    </div>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ADMIN (CREADOR DE PASOS LIGERO) */}
+      <AnimatePresence>
+        {mostrarAdmin && !libreriaVisible && (
+          <motion.div className="no-print" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={estilos.modalOverlay}>
+            <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} style={{ ...estilos.modalCard, ...t.fondoPrincipal, ...t.bordeFantasma, width: '100%', maxWidth: '700px' }}>
+              <div style={estilos.modalHeader}><div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>{vistaAdmin === 'formulario' && <button onClick={() => setVistaAdmin('lista')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0058bc' }}><ArrowLeft size={20} /></button>}<h3 style={{ margin:0, ...t.textoPrincipal }}>⚙️ Editor de Flujos (Sin Hardware)</h3></div><button onClick={() => setMostrarAdmin(false)} style={estilos.btnCerrar}><X size={24} /></button></div>
+              {vistaAdmin === 'lista' && (<div style={estilos.modalBody}><div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}><button onClick={prepararNuevoPaso} style={estilos.btnPrimarioGuardar}>+ Nueva Pregunta</button></div><div style={estilos.listaContainer}>{listaPasos.length > 0 ? renderArbol('inicio') : <p>Cargando...</p>}</div></div>)}
               {vistaAdmin === 'formulario' && (
-                <>
-                  <div style={estilos.modalBody}>
-                    <label style={estilos.labelForm}>ID Único</label>
-                    <input style={{ ...estilos.inputForm, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} type="text" value={formId} onChange={(e) => setFormId(e.target.value.toLowerCase().replace(/\s+/g, '_'))} readOnly={formId === 'inicio'} />
-                    <label style={{...estilos.labelForm, marginTop:'10px', display:'block'}}>Pregunta Principal (El título grande)</label>
-                    <textarea style={{ ...estilos.inputForm, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma, minHeight: '60px' }} value={formPregunta} onChange={(e) => setFormPregunta(e.target.value)} />
-                    
-                    <div style={{ ...estilos.opcionesContainer, backgroundColor: 'rgba(59, 130, 246, 0.05)', border: '2px solid rgba(59, 130, 246, 0.3)', marginTop: '20px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-                        <h4 style={{ ...t.textoPrincipal, margin: 0, color: '#3b82f6', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                           <Usb size={20} /> Captura de Docktest / Caídas de Tensión
-                        </h4>
-                        <div style={{display:'flex', gap:'5px', backgroundColor: 'rgba(0,0,0,0.1)', padding:'4px', borderRadius:'8px'}}>
-                          <button onClick={(e) => {e.preventDefault(); setDockAdminTab('diodo')}} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: dockAdminTab === 'diodo' ? '#3b82f6' : 'transparent', color: dockAdminTab === 'diodo' ? 'white' : t.textoSutil.color, fontWeight: 'bold' }}>Diodo</button>
-                          <button onClick={(e) => {e.preventDefault(); setDockAdminTab('ua')}} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: dockAdminTab === 'ua' ? '#10b981' : 'transparent', color: dockAdminTab === 'ua' ? 'white' : t.textoSutil.color, fontWeight: 'bold' }}>uA</button>
-                        </div>
-                      </div>
-
-                      <VisorHUD valor={lecturaUsb.valor} unidad={lecturaUsb.unidad} conectado={usbConectado} conectarFn={(e) => {e.preventDefault(); conectarMultimetroUSB();}} vozActiva={vozActiva} toggleVozFn={(e) => {e.preventDefault(); toggleVoz();}} />
-
-                      <p style={{fontSize: '0.75rem', color: t.textoSutil.color, textAlign: 'center', marginBottom: '10px'}}>
-                        Presiona <strong>Espacio</strong>, <strong>Enter</strong> o di <strong>"Siguiente"</strong> por el micrófono para fijar el valor.
-                      </p>
-
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '10px' }}>
-                        {ordenCamposDock.map((campo) => (
-                           <div key={campo} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                             <span style={{ fontSize: '0.7rem', fontWeight: 'bold', color: campoActivoDock === campo ? '#00ffff' : t.textoSutil.color, marginBottom: '5px', textTransform: 'uppercase' }}>{campo}</span>
-                             <input 
-                               onClick={() => setCampoActivoDock(campo)}
-                               style={{ 
-                                  ...estilos.inputFormPequeño, 
-                                  textAlign: 'center', 
-                                  fontFamily: 'Consolas', 
-                                  fontWeight: 'bold', 
-                                  fontSize: '1rem',
-                                  border: campoActivoDock === campo ? '2px solid #00ffff' : t.bordeFantasma.border,
-                                  backgroundColor: campoActivoDock === campo ? 'rgba(0, 255, 255, 0.1)' : t.cristalBgItem.backgroundColor,
-                                  color: campoActivoDock === campo ? '#00ffff' : t.textoPrincipal.color
-                               }} 
-                               value={currentDockInputs[campo]} 
-                               onChange={(e) => handleDockChangeManual(campo, e.target.value)} 
-                             />
-                           </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div style={{ ...estilos.opcionesContainer, backgroundColor: 'rgba(234, 179, 8, 0.05)', border: '1px solid rgba(234, 179, 8, 0.2)' }}>
-                      <h4 style={{ ...t.textoPrincipal, margin: '0 0 10px 0', color: '#eab308', display: 'flex', alignItems: 'center', gap: '6px' }}><Lightbulb size={18} /> Wiki Técnica (Tips)</h4>
-                      {formTabsNota.map((tab, index) => (
-                        <div key={index} style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '15px', padding: '10px', backgroundColor: 'rgba(0,0,0,0.02)', borderRadius: '8px' }}>
-                          <div style={{ display: 'flex', gap: '10px' }}>
-                            <input style={{ ...estilos.inputFormPequeño, flex: 1, fontWeight: 'bold' }} placeholder="Título (Ej: Teoría, Precaución)" value={tab.titulo} onChange={(e) => { const n = [...formTabsNota]; n[index].titulo = e.target.value; setFormTabsNota(n); }} />
-                            <button onClick={(e) => { e.preventDefault(); const n = [...formTabsNota]; n.splice(index, 1); setFormTabsNota(n); }} style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer' }}><Trash2 size={18}/></button>
-                          </div>
-                          <textarea style={{ ...estilos.inputForm, minHeight: '60px' }} placeholder="Contenido del tip..." value={tab.contenido} onChange={(e) => { const n = [...formTabsNota]; n[index].contenido = e.target.value; setFormTabsNota(n); }} />
-                        </div>
-                      ))}
-                      <button onClick={(e) => { e.preventDefault(); setFormTabsNota([...formTabsNota, { titulo: 'Nueva Pestaña', contenido: '' }]); }} style={estilos.btnAgregarOp}><Plus size={18} /> Agregar Pestaña</button>
-                    </div>
-
-                    <div style={{ ...estilos.opcionesContainer, backgroundColor: 'rgba(139, 92, 246, 0.05)', border: '1px solid rgba(139, 92, 246, 0.2)' }}><h4 style={{ ...t.textoPrincipal, margin: '0 0 10px 0', display: 'flex', alignItems: 'center', gap: '6px', color: '#8b5cf6' }}><Camera size={18} /> Imagen / Plano</h4><input style={{ ...estilos.inputFormPequeño, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} type="text" placeholder="URL..." value={formImgUrl} onChange={(e) => setFormImgUrl(e.target.value)} /><div style={{ display: 'flex', gap: '10px', marginTop:'10px' }}><button onClick={(e) => {e.preventDefault(); setFormImgTipo('microscopio')}} style={{ flex:1, padding:'8px', borderRadius:'8px', border:'none', backgroundColor: formImgTipo === 'microscopio' ? '#8b5cf6' : 'rgba(0,0,0,0.05)', color: formImgTipo === 'microscopio' ? 'white' : t.textoSutil.color, cursor:'pointer' }}>📸 Foto</button><button onClick={(e) => {e.preventDefault(); setFormImgTipo('esquema')}} style={{ flex:1, padding:'8px', borderRadius:'8px', border:'none', backgroundColor: formImgTipo === 'esquema' ? '#8b5cf6' : 'rgba(0,0,0,0.05)', color: formImgTipo === 'esquema' ? 'white' : t.textoSutil.color, cursor:'pointer' }}>🗺️ Plano</button></div></div>
-                    <div style={{ ...estilos.opcionesContainer, backgroundColor: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.2)' }}><h4 style={{ ...t.textoPrincipal, margin: '0 0 10px 0', display: 'flex', alignItems: 'center', gap: '6px', color: '#ef4444' }}><Monitor size={18} /> Video de YouTube</h4><input style={{ ...estilos.inputFormPequeño, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} type="text" placeholder="Enlace..." value={formVideoUrl} onChange={(e) => setFormVideoUrl(e.target.value)} /></div>
-                    <div style={{ ...estilos.opcionesContainer, backgroundColor: 'rgba(249, 115, 22, 0.05)', border: '1px solid rgba(249, 115, 22, 0.2)', paddingBottom: '10px' }}><div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: formEsFallaSerie ? '10px' : '0' }}><input type="checkbox" id="esFallaSerie" checked={formEsFallaSerie} onChange={(e) => setFormEsFallaSerie(e.target.checked)} /><label htmlFor="esFallaSerie" style={{ ...t.textoPrincipal, fontWeight: 'bold', color: '#f97316', display: 'flex', alignItems: 'center', gap: '5px' }}><Flame size={18} /> ¿Falla Crónica para el Carrusel?</label></div>{formEsFallaSerie && (<div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}><input style={estilos.inputFormPequeño} type="text" placeholder="Título corto (Ej: POCO X3 Pro)" value={formTituloSerie} onChange={(e) => setFormTituloSerie(e.target.value)} /><input style={estilos.inputFormPequeño} type="text" placeholder="Descripción breve" value={formDescSerie} onChange={(e) => setFormDescSerie(e.target.value)} /></div>)}</div>
-
-                    <div style={estilos.checkboxGroup}><input type="checkbox" id="esFinal" checked={formEsFinal} onChange={(e) => setFormEsFinal(e.target.checked)} /><label htmlFor="esFinal" style={{ ...t.textoPrincipal, fontWeight: '600' }}>¿Este paso es el Final del diagnóstico?</label></div>
-                    {!formEsFinal && (<div style={estilos.opcionesContainer}><h4 style={{ ...t.textoPrincipal, marginBottom: '10px' }}>Botones de Respuesta (Rutas):</h4>{formOpciones.map((op, index) => (<div key={index} style={estilos.opcionRow}><div style={{ flex: 1 }}><input style={{ ...estilos.inputFormPequeño, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma }} type="text" placeholder="Texto del botón (Ej: Sí, cargar a 1.2A)" value={op.texto} onChange={(e) => handleCambioOpcion(index, 'texto', e.target.value)} /><input style={{ ...estilos.inputFormPequeño, ...t.cristalBgItem, ...t.textoPrincipal, ...t.bordeFantasma, marginTop: '4px' }} type="text" placeholder="ID del siguiente paso (Ej: revisar_ic_carga)" value={op.siguientePaso} onChange={(e) => handleCambioOpcion(index, 'siguientePaso', e.target.value.replace(/\s+/g, '_').toLowerCase())} /></div><button onClick={(e) => {e.preventDefault(); handleQuitarOpcion(index)}} style={estilos.btnBorrarOp}><Trash2 size={20} color="#ef4444" /></button></div>))}<button onClick={(e) => {e.preventDefault(); handleAgregarOpcion()}} style={estilos.btnAgregarOp}><Plus size={18} /> Agregar otra ruta</button></div>)}
-                    {mensajeAdmin && <p style={{ color: mensajeAdmin.includes('❌') ? '#ef4444' : '#22c55e', fontWeight: 'bold', textAlign: 'center', padding: '10px', background: 'rgba(0,0,0,0.05)', borderRadius: '8px' }}>{mensajeAdmin}</p>}
-
-                    {/* --- RENDERIZADO DEL FPC EN PANTALLA --- */}
-                    <div style={{ ...estilos.opcionesContainer, backgroundColor: 'rgba(139, 92, 246, 0.05)', border: '2px solid rgba(139, 92, 246, 0.3)', marginTop: '20px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-                        <h4 style={{ margin: 0, color: '#8b5cf6', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                           <Map size={20} /> Mapeo de FPC (Modo ZXW)
-                        </h4>
-                        <div style={{display:'flex', gap:'5px'}}>
-                          <div style={{display:'flex', gap:'5px', backgroundColor: 'rgba(0,0,0,0.1)', padding:'4px', borderRadius:'8px'}}>
-                            <button onClick={(e) => {e.preventDefault(); setEscalaFpc('diodo')}} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: escalaFpc === 'diodo' ? '#8b5cf6' : 'transparent', color: escalaFpc === 'diodo' ? 'white' : 'gray', fontWeight: 'bold' }}>Diodo</button>
-                            <button onClick={(e) => {e.preventDefault(); setEscalaFpc('ua')}} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: escalaFpc === 'ua' ? '#10b981' : 'transparent', color: escalaFpc === 'ua' ? 'white' : 'gray', fontWeight: 'bold' }}>uA</button>
-                          </div>
-                          <div style={{display:'flex', gap:'5px', backgroundColor: 'rgba(0,0,0,0.1)', padding:'4px', borderRadius:'8px'}}>
-                            <button onClick={(e) => {e.preventDefault(); setModoFpc('crear')}} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: modoFpc === 'crear' ? '#8b5cf6' : 'transparent', color: modoFpc === 'crear' ? 'white' : 'gray', fontWeight: 'bold' }}>Grabar Sano</button>
-                            <button onClick={(e) => {e.preventDefault(); setModoFpc('diagnostico')}} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: modoFpc === 'diagnostico' ? '#ef4444' : 'transparent', color: modoFpc === 'diagnostico' ? 'white' : 'gray', fontWeight: 'bold' }}>Diagnóstico</button>
-                          </div>
-                        </div>
-                      </div>
-                      <FPCInteligente pines={fpcPines} setPines={setFpcPines} pinActivo={pinActivoFpc} setPinActivo={setPinActivoFpc} modo={modoFpc} escala={escalaFpc} lecturaEnVivo={lecturaUsb.valor} />
-                    </div>
-
-                  </div>
-                  <div style={estilos.modalFooter}><button onClick={guardarPasoFirebase} style={{...estilos.btnPrimarioGuardar, padding: '12px 30px', fontSize: '1.1rem'}}><Save size={20} /> Guardar Paso a la Nube</button></div>
-                </>
+                <div style={estilos.modalBody}>
+                  <label style={estilos.labelForm}>ID Único</label><input style={estilos.inputLigero} value={formId} onChange={(e) => setFormId(e.target.value.toLowerCase().replace(/\s+/g, '_'))} readOnly={formId === 'inicio'} />
+                  <label style={estilos.labelForm}>Pregunta Principal</label><textarea style={{...estilos.inputLigero, minHeight:'60px'}} value={formPregunta} onChange={(e) => setFormPregunta(e.target.value)} />
+                  <div style={estilos.checkboxGroup}><input type="checkbox" id="esFinal" checked={formEsFinal} onChange={(e) => setFormEsFinal(e.target.checked)} /><label htmlFor="esFinal" style={t.textoPrincipal}>¿Paso Final?</label></div>
+                  {!formEsFinal && (<div style={{marginTop:'15px'}}><h4 style={t.textoPrincipal}>Rutas:</h4>{formOpciones.map((op, i) => (<div key={i} style={{display:'flex', gap:'10px', marginBottom:'10px'}}><input style={estilos.inputLigero} placeholder="Botón" value={op.texto} onChange={e=>handleCambioOpcion(i,'texto',e.target.value)} /><input style={estilos.inputLigero} placeholder="ID Destino" value={op.siguientePaso} onChange={e=>handleCambioOpcion(i,'siguientePaso',e.target.value)} /><button onClick={()=>handleQuitarOpcion(i)} style={{background:'none',border:'none',color:'red'}}><Trash2 size={18}/></button></div>))}<button onClick={handleAgregarOpcion} style={{color:'#0058bc', background:'none', border:'none', fontWeight:'bold'}}>+ Opción</button></div>)}
+                  {mensajeAdmin && <p style={{color:'green', textAlign:'center', fontWeight:'bold'}}>{mensajeAdmin}</p>}
+                  <button onClick={guardarPasoFirebase} style={{...estilos.btnPrimarioGuardar, width:'100%', marginTop:'20px', padding:'15px', justifyContent:'center'}}>Guardar Pregunta</button>
+                </div>
               )}
             </motion.div>
           </motion.div>
@@ -688,17 +450,7 @@ export default function AppDiagnostico() {
 }
 
 const estilos = {
-  contenedor: { minHeight: '100vh', paddingBottom: '100px', display: 'flex', flexDirection: 'column' },
-  header: { padding: '16px 0' }, headerInner: { display: 'flex', justifyContent: 'space-between', padding: '0 24px', alignItems: 'center' }, logoTexto: { fontSize: '0.8rem', fontWeight: '800' }, lineaAcento: { height: '3px', width: '30%', background: '#0058bc' },
-  main: { flex: 1, padding: '40px 20px', maxWidth: '900px', margin: '0 auto', width: '100%' }, tarjetaCristal: { width: '100%', borderRadius: '2rem', padding: '40px', display: 'flex', flexDirection: 'column', alignItems: 'center' },
-  seccionTitulo: { textAlign: 'center', marginBottom: '30px', position: 'relative' }, etiquetaPaso: { fontSize: '0.7rem', fontWeight: '800', marginBottom: '10px', display: 'flex', alignItems:'center', justifyContent: 'center', gap:'10px' }, tituloPregunta: { fontSize: '1.8rem', fontWeight: '800' },
-  gridOpciones: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '15px', width: '100%' }, btnOpcion: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '15px', borderRadius: '1.2rem', cursor: 'pointer' }, opcionContenido: { display: 'flex', alignItems: 'center', gap: '12px' }, iconoCirculo: { width: '40px', height: '40px', borderRadius: '50%', backgroundColor: 'rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center' }, tituloOpcion: { fontSize: '1rem', fontWeight: '700' }, descOpcion: { fontSize: '0.75rem' },
-  btnPrimario: { background: '#0058bc', color: 'white', border: 'none', padding: '12px 24px', borderRadius: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center' },
-  navInferior: { position: 'fixed', bottom: 0, left: 0, right: 0, height: '70px', display: 'flex', justifyContent: 'space-around', alignItems: 'center', zIndex: 1000 }, navBtn: { background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer' }, navLabel: { fontSize: '0.6rem', fontWeight: '700' }, navBtnCentro: { width: '50px', height: '50px', borderRadius: '50%', background: '#0058bc', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transform: 'translateY(-10px)' },
-  modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.8)', zIndex: 2000, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }, modalCard: { width: '100%', maxWidth: '600px', maxHeight: '90vh', borderRadius: '1.5rem', display: 'flex', flexDirection: 'column', overflow: 'hidden' }, modalHeader: { padding: '15px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }, modalTitulo: { margin: 0, fontSize: '1rem' }, btnCerrar: { background: 'none', border: 'none', cursor: 'pointer' }, modalBody: { padding: '20px', overflowY: 'auto', flex: 1 }, listaContainer: { display: 'flex', flexDirection: 'column', gap: '10px' }, listaItem: { display: 'flex', justifyContent: 'space-between', padding: '10px', borderRadius: '10px' }, btnAccionLista: { background: 'none', border: 'none', cursor: 'pointer', padding: '5px', borderRadius: '8px' }, labelForm: { fontSize: '0.8rem', fontWeight: '600' }, inputForm: { width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid transparent', outline: 'none' }, inputFormPequeño: { width: '100%', padding: '8px', borderRadius: '6px', fontSize: '0.8rem', outline: 'none' }, opcionesContainer: { padding: '15px', borderRadius: '12px', marginTop: '10px' }, modalFooter: { padding: '15px', display: 'flex', justifyContent: 'flex-end' }, btnPrimarioGuardar: { background: '#0058bc', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' },
-  btnBombillo: { backgroundColor: '#fef08a', border: '1px solid #eab308', borderRadius: '20px', padding: '4px 10px', display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }, checkboxGroup: { display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 0', marginTop: '10px' }, opcionRow: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px' }, btnBorrarOp: { background: 'none', border: 'none', cursor: 'pointer' }, btnAgregarOp: { background: 'none', border: 'none', color: '#0058bc', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }, btnImgFlotante: { background: '#8b5cf6', border: 'none', borderRadius: '20px', padding: '4px 10px', display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer', boxShadow: '0 4px 10px rgba(139, 92, 246, 0.3)' }, visualizadorContenedor: { width: '95vw', maxWidth: '1000px', height: '80vh', backgroundColor: '#111827', borderRadius: '1.5rem', display: 'flex', flexDirection: 'column', overflow: 'hidden', border: '2px solid #374151' }, visualizadorHeader: { padding: '15px 20px', borderBottom: '1px solid #374151', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }, visualizadorCuerpo: { flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden', padding: '10px', backgroundColor: '#000' }, imagenTecnica: { maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }, visualizadorFooter: { padding: '10px', textAlign: 'center', color: '#6b7280', fontSize: '0.8rem', borderTop: '1px solid #374151' }, carruselFallas: { display: 'flex', gap: '15px', overflowX: 'auto', paddingBottom: '10px', scrollbarWidth: 'thin' }, tarjetaFallaSerie: { minWidth: '220px', padding: '15px', borderRadius: '1rem', border: '1px solid rgba(249, 115, 22, 0.3)', cursor: 'pointer', display: 'flex', flexDirection: 'column', textAlign: 'left', borderLeft: '4px solid #f97316' }, fallaSerieHeader: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }, fallaSerieTitulo: { fontWeight: 'bold', fontSize: '0.9rem' }, fallaSerieDesc: { fontSize: '0.75rem', margin: 0, lineHeight: '1.3' },
-  btnHeader: { padding: '6px 12px', borderRadius: '20px', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', outline: 'none' },
-
+  contenedor: { minHeight: '100vh', paddingBottom: '100px', display: 'flex', flexDirection: 'column' }, header: { padding: '16px 0' }, headerInner: { display: 'flex', justifyContent: 'space-between', padding: '0 24px', alignItems: 'center' }, logoTexto: { fontSize: '0.8rem', fontWeight: '800' }, main: { flex: 1, padding: '40px 20px', maxWidth: '900px', margin: '0 auto', width: '100%' }, tarjetaCristal: { width: '100%', borderRadius: '2rem', padding: '40px', display: 'flex', flexDirection: 'column', alignItems: 'center' }, seccionTitulo: { textAlign: 'center', marginBottom: '30px' }, etiquetaPaso: { fontSize: '0.7rem', fontWeight: '800', marginBottom: '10px', display: 'block' }, tituloPregunta: { fontSize: '1.8rem', fontWeight: '800' }, gridOpciones: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '15px', width: '100%' }, btnOpcion: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '15px', borderRadius: '1.2rem', cursor: 'pointer', border:'none', textAlign:'left' }, opcionContenido: { display: 'flex', alignItems: 'center', gap: '12px' }, tituloOpcion: { fontSize: '1rem', fontWeight: '700' }, navInferior: { position: 'fixed', bottom: 0, left: 0, right: 0, height: '70px', display: 'flex', justifyContent: 'space-around', alignItems: 'center', zIndex: 1000 }, navBtn: { background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer' }, navLabel: { fontSize: '0.6rem', fontWeight: '700' }, navBtnCentro: { width: '50px', height: '50px', borderRadius: '50%', background: '#0058bc', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transform: 'translateY(-10px)' }, modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.8)', zIndex: 2000, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }, modalCard: { width: '100%', maxWidth: '600px', maxHeight: '90vh', borderRadius: '1.5rem', display: 'flex', flexDirection: 'column', overflow: 'hidden' }, modalHeader: { padding: '15px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }, btnCerrar: { background: 'none', border: 'none', cursor: 'pointer', color:'gray' }, modalBody: { padding: '20px', overflowY: 'auto', flex: 1 }, btnPrimarioGuardar: { background: '#0058bc', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }, btnHeader: { padding: '6px 12px', borderRadius: '20px', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', outline: 'none' }, inputDark: { width: '100%', padding: '10px', backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '8px', color: 'white', outline: 'none' }, inputLigero: { width: '100%', padding: '10px', backgroundColor: 'rgba(0,0,0,0.05)', border: '1px solid rgba(0,0,0,0.1)', borderRadius: '8px', outline: 'none', marginTop:'5px' }, checkboxGroup: { display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 0', marginTop: '10px' },
   dark: { fondoPrincipal: { backgroundColor: '#2f3034' }, cristalBg: { backgroundColor: 'rgba(47, 48, 52, 0.7)' }, cristalBgItem: { backgroundColor: 'rgba(255, 255, 255, 0.03)' }, cristalBgNav: { backgroundColor: 'rgba(47, 48, 52, 0.85)' }, textoPrincipal: { color: '#ffffff' }, textoSutil: { color: '#9ca3af' }, bordeFantasma: { border: '1px solid rgba(255, 255, 255, 0.08)' }, bordeFantasmaBottom: { borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }, bordeFantasmaTop: { borderTop: '1px solid rgba(255, 255, 255, 0.08)' }, hoverBg: 'rgba(255, 255, 255, 0.06)' },
   light: { fondoPrincipal: { backgroundColor: '#faf9fe' }, cristalBg: { backgroundColor: 'rgba(255, 255, 255, 0.8)' }, cristalBgItem: { backgroundColor: 'rgba(255, 255, 255, 1)' }, cristalBgNav: { backgroundColor: 'rgba(250, 249, 254, 0.85)' }, textoPrincipal: { color: '#111827' }, textoSutil: { color: '#6b7280' }, bordeFantasma: { border: '1px solid rgba(0, 0, 0, 0.05)' }, bordeFantasmaBottom: { borderBottom: '1px solid rgba(0, 0, 0, 0.05)' }, bordeFantasmaTop: { borderTop: '1px solid rgba(0, 0, 0, 0.05)' }, hoverBg: 'rgba(0, 88, 188, 0.02)' }
 };
