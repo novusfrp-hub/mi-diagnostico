@@ -64,12 +64,12 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
       onClick={() => setPinActivo(pin.id)}
       style={{
         width: isExtremo ? '70px' : '45px',
-        minWidth: isExtremo ? '70px' : '45px', // FORZAR ancho mínimo
+        minWidth: isExtremo ? '70px' : '45px',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         cursor: 'pointer',
-        flexShrink: 0 // EVITA que se encoja
+        flexShrink: 0 
       }}
     >
       {esArriba && <span style={{ fontSize: '0.55rem', color: 'gray', marginBottom: '2px' }}>{pin.id}</span>}
@@ -110,62 +110,46 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
         borderRadius: '15px',
         border: '2px solid #374151',
         width: '100%',
-        maxWidth: '100%',
-        overflow: 'hidden'
+        maxWidth: '100%'
       }}
     >
-      {/* CONTENEDOR DE SCROLL - VERSIÓN CORREGIDA */}
+      {/* CONTENEDOR DE SCROLL REPARADO */}
       <div
         style={{
           width: '100%',
           overflowX: 'auto',
-          overflowY: 'visible',
-          WebkitOverflowScrolling: 'touch', // Scroll suave en iOS/Android
-          scrollbarWidth: 'thin',
-          position: 'relative'
+          paddingBottom: '10px', // Da espacio para la barra de scroll
+          WebkitOverflowScrolling: 'touch', // Habilita deslizamiento suave en celulares
         }}
       >
-        {/* FONDO NEGRO QUE SE AJUSTA AL CONTENIDO */}
+        {/* LA CAJA NEGRA AHORA ES INLINE-FLEX (Se estira infinitamente con los pines) */}
         <div
           style={{
-            display: 'flex',
+            display: 'inline-flex',
             flexDirection: 'column',
             gap: '6px',
             backgroundColor: '#000',
             padding: '10px',
             borderRadius: '10px',
-            width: 'max-content', // CRUCIAL: se ajusta al contenido
-            minWidth: '100%' // Opcional: cubre todo el ancho mínimo
+            minWidth: '100%'
           }}
         >
           {/* FILA SUPERIOR */}
-          <div 
-            style={{ 
-              display: 'flex', 
-              gap: '3px',
-              flexWrap: 'nowrap' // EVITA que se envuelvan a otra línea
-            }}
-          >
+          <div style={{ display: 'flex', gap: '3px' }}>
             {filaSup.map((pin, i) => renderPin(pin, true, i === 0 || i === filaSup.length - 1))}
           </div>
           
           {/* SEPARADOR */}
-          <div style={{ height: '8px', backgroundColor: '#1a1a1a', borderRadius: '2px' }} />
+          <div style={{ height: '8px', backgroundColor: '#1a1a1a', borderRadius: '2px', width: '100%' }} />
           
           {/* FILA INFERIOR */}
-          <div 
-            style={{ 
-              display: 'flex', 
-              gap: '3px',
-              flexWrap: 'nowrap' // EVITA que se envuelvan
-            }}
-          >
+          <div style={{ display: 'flex', gap: '3px' }}>
             {filaInf.map((pin, i) => renderPin(pin, false, i === 0 || i === filaInf.length - 1))}
           </div>
         </div>
       </div>
 
-      {/* Panel de detalles del pin activo (sin cambios) */}
+      {/* PANEL INFERIOR DE DETALLES DEL PIN */}
       <div
         style={{
           marginTop: '15px',
