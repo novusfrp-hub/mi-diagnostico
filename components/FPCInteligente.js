@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 
 export default function FPCInteligente({ pines, setPines, pinActivo, setPinActivo, modo = 'diagnostico', escala = 'diodo', lecturaEnVivo, tiposDisponibles: tiposProp = ['DATA', 'VCC', 'GND', 'NC'], setTiposDisponibles }) {
-  // Si el padre no maneja los tipos, usamos estado local
+  // Manejo de la lista de tipos en el menú desplegable
   const [tiposInternos, setTiposInternos] = useState(tiposProp);
   const tipos = setTiposDisponibles ? tiposProp : tiposInternos;
   const setTipos = setTiposDisponibles || setTiposInternos;
@@ -11,13 +11,13 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
   const filaInf = pines.slice(mitad);
 
   const manejarAgregarTipo = () => {
-    const nuevoTipo = window.prompt('Ingrese el nombre del nuevo tipo de línea:', '');
+    const nuevoTipo = window.prompt('Ingrese el nombre del nuevo tipo de línea (Ej: I2C, SPI):', '');
     if (nuevoTipo && nuevoTipo.trim() !== '') {
       const tipoLimpio = nuevoTipo.trim().toUpperCase().replace(/\s+/g, '_');
       if (!tipos.includes(tipoLimpio)) {
         setTipos([...tipos, tipoLimpio]);
       } else {
-        alert('Este tipo ya existe.');
+        alert('Este tipo ya existe en la lista.');
       }
     }
   };
@@ -69,7 +69,7 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
         flexDirection: 'column',
         alignItems: 'center',
         cursor: 'pointer',
-        flexShrink: 0 
+        flexShrink: 0
       }}
     >
       {esArriba && <span style={{ fontSize: '0.55rem', color: 'gray', marginBottom: '2px' }}>{pin.id}</span>}
@@ -110,40 +110,46 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
         borderRadius: '15px',
         border: '2px solid #374151',
         width: '100%',
-        maxWidth: '100%',
-        overflow: 'hidden'
+        maxWidth: '100%'
       }}
     >
-      {/* CONTENEDOR DE SCROLL REPARADO */}
-      <div
-        style={{
-          width: '100%',
-          overflowX: 'auto',
-          paddingBottom: '10px', // Da espacio para la barra de scroll
-          WebkitOverflowScrolling: 'touch', // Habilita deslizamiento suave en celulares
+      {/* INYECTAMOS CSS PARA LA BARRA DE DESPLAZAMIENTO (SCROLL) */}
+      <style>{`
+        .fpc-scroll-container::-webkit-scrollbar { height: 10px; }
+        .fpc-scroll-container::-webkit-scrollbar-track { background: #1a1a1a; border-radius: 5px; }
+        .fpc-scroll-container::-webkit-scrollbar-thumb { background: #3b82f6; border-radius: 5px; cursor: pointer; }
+        .fpc-scroll-container::-webkit-scrollbar-thumb:hover { background: #2563eb; }
+      `}</style>
+
+      {/* CONTENEDOR PADRE CON LÍMITE Y SCROLL ACTIVO */}
+      <div 
+        className="fpc-scroll-container"
+        style={{ 
+          width: '100%', 
+          overflowX: 'auto', 
+          paddingBottom: '12px',
+          WebkitOverflowScrolling: 'touch' // Para que deslice suave en Android
         }}
       >
-        {/* LA CAJA NEGRA AHORA ES INLINE-FLEX (Se estira infinitamente con los pines) */}
+        {/* LA CAJA NEGRA (inline-flex es la clave para que abrace exacto a los pines) */}
         <div
           style={{
-            display: 'flex',
+            display: 'inline-flex',
             flexDirection: 'column',
             gap: '6px',
             backgroundColor: '#000',
-            padding: '10px',
-            borderRadius: '10px',
-            minWidth: '100%',
-            width: 'max-content'
+            padding: '12px',
+            borderRadius: '10px'
           }}
         >
           {/* FILA SUPERIOR */}
-          <div style={{ display: 'flex', gap: '3px', width: 'max-content' }}>
+          <div style={{ display: 'flex', gap: '3px' }}>
             {filaSup.map((pin, i) => renderPin(pin, true, i === 0 || i === filaSup.length - 1))}
           </div>
-          
-          {/* SEPARADOR */}
+
+          {/* SEPARADOR DEL MEDIO */}
           <div style={{ height: '8px', backgroundColor: '#1a1a1a', borderRadius: '2px', width: '100%' }} />
-          
+
           {/* FILA INFERIOR */}
           <div style={{ display: 'flex', gap: '3px' }}>
             {filaInf.map((pin, i) => renderPin(pin, false, i === 0 || i === filaInf.length - 1))}
@@ -151,7 +157,7 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
         </div>
       </div>
 
-      {/* PANEL INFERIOR DE DETALLES DEL PIN */}
+      {/* PANEL INFERIOR DE DETALLES Y COMBO BOX */}
       <div
         style={{
           marginTop: '15px',
@@ -198,6 +204,7 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
                   }}
                 />
 
+                {/* EL COMBO BOX CORRECTO */}
                 <select
                   value={pines.find(p => p.id === pinActivo)?.tipo || 'DATA'}
                   onChange={(e) => {
@@ -251,9 +258,10 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
                 <button
                   onClick={() => {
                     if (pines.length <= 1) return alert('No puedes eliminar el último pin.');
-                    if (!window.confirm('¿Seguro de eliminar esta línea?')) return;
+                    if (!window.confirm('¿Seguro de eliminar este pin específico?')) return;
                     setPines(prev => {
                       const nuevosPines = prev.filter(p => p.id !== pinActivo);
+                      // Re-asignamos los IDs para que sigan en orden 1, 2, 3...
                       return nuevosPines.map((p, i) => ({ ...p, id: i + 1 }));
                     });
                     setPinActivo(1);
@@ -269,7 +277,7 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
                     fontWeight: 'bold'
                   }}
                 >
-                  - Quitar
+                  - Quitar Pin
                 </button>
               </div>
             ) : (
