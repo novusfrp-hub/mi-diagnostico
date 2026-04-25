@@ -110,14 +110,15 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
         borderRadius: '15px',
         border: '2px solid #374151',
         width: '100%',
-        maxWidth: '100%'
+        maxWidth: '100%',
+        overflow: 'hidden' // <-- EL CANDADO MAGICO QUE FALTABA
       }}
     >
-      {/* INYECTAMOS CSS PARA LA BARRA DE DESPLAZAMIENTO (SCROLL) */}
+      {/* INYECTAMOS CSS PARA NAVEGADORES WEBKIT (Chrome/Brave) */}
       <style>{`
-        .fpc-scroll-container::-webkit-scrollbar { height: 10px; }
-        .fpc-scroll-container::-webkit-scrollbar-track { background: #1a1a1a; border-radius: 5px; }
-        .fpc-scroll-container::-webkit-scrollbar-thumb { background: #3b82f6; border-radius: 5px; cursor: pointer; }
+        .fpc-scroll-container::-webkit-scrollbar { height: 8px; }
+        .fpc-scroll-container::-webkit-scrollbar-track { background: #1a1a1a; border-radius: 4px; }
+        .fpc-scroll-container::-webkit-scrollbar-thumb { background: #3b82f6; border-radius: 4px; }
         .fpc-scroll-container::-webkit-scrollbar-thumb:hover { background: #2563eb; }
       `}</style>
 
@@ -128,10 +129,11 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
           width: '100%', 
           overflowX: 'auto', 
           paddingBottom: '12px',
-          WebkitOverflowScrolling: 'touch' // Para que deslice suave en Android
+          WebkitOverflowScrolling: 'touch', // Deslizamiento en celular
+          scrollbarWidth: 'auto', // Forzamos scrollbar en Firefox/Android
+          scrollbarColor: '#3b82f6 #1a1a1a' // Color de la barra
         }}
       >
-        {/* LA CAJA NEGRA (inline-flex es la clave para que abrace exacto a los pines) */}
         <div
           style={{
             display: 'inline-flex',
@@ -204,7 +206,6 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
                   }}
                 />
 
-                {/* EL COMBO BOX CORRECTO */}
                 <select
                   value={pines.find(p => p.id === pinActivo)?.tipo || 'DATA'}
                   onChange={(e) => {
@@ -261,7 +262,6 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
                     if (!window.confirm('¿Seguro de eliminar este pin específico?')) return;
                     setPines(prev => {
                       const nuevosPines = prev.filter(p => p.id !== pinActivo);
-                      // Re-asignamos los IDs para que sigan en orden 1, 2, 3...
                       return nuevosPines.map((p, i) => ({ ...p, id: i + 1 }));
                     });
                     setPinActivo(1);
