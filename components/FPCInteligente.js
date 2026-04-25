@@ -135,12 +135,14 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
           scrollbarColor: '#3b82f6 #1a1a1a'
         }}
       >
-        <div style={{ display: 'flex', gap: '3px', backgroundColor: '#000', padding: '12px 12px 6px 12px', borderRadius: '10px 10px 0 0' }}>
-          {filaSup.map((pin, i) => renderPin(pin, true, i === 0 || i === filaSup.length - 1))}
-        </div>
-        <div style={{ height: '8px', backgroundColor: '#1a1a1a', marginLeft: '0', marginRight: '0' }} />
-        <div style={{ display: 'flex', gap: '3px', backgroundColor: '#000', padding: '6px 12px 12px 12px', borderRadius: '0 0 10px 10px' }}>
-          {filaInf.map((pin, i) => renderPin(pin, false, i === 0 || i === filaInf.length - 1))}
+        <div style={{ display: 'inline-block', backgroundColor: '#000', padding: '12px', borderRadius: '10px', minWidth: '100%' }}>
+          <div style={{ display: 'flex', gap: '3px' }}>
+            {filaSup.map((pin, i) => renderPin(pin, true, i === 0 || i === filaSup.length - 1))}
+          </div>
+          <div style={{ height: '8px', backgroundColor: '#1a1a1a', borderRadius: '2px', margin: '6px 0' }} />
+          <div style={{ display: 'flex', gap: '3px' }}>
+            {filaInf.map((pin, i) => renderPin(pin, false, i === 0 || i === filaInf.length - 1))}
+          </div>
         </div>
       </div>
 

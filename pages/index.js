@@ -345,13 +345,8 @@ export default function AppDiagnostico() {
                           </div>
                         </div>
                         {fpcActivo ? (
-                          <div style={{ textAlign: 'center', padding: '40px', backgroundColor: '#0d1117', borderRadius: '15px', border: '1px solid #21262d' }}>
-                            <Cpu size={48} style={{ opacity: 0.4, marginBottom: '15px', color: '#8b5cf6' }} />
-                            <p style={{ color: '#9ca3af', marginBottom: '5px', fontSize: '0.85rem' }}>FPC seleccionado:</p>
-                            <h3 style={{ color: '#8b5cf6', margin: '0 0 5px 0' }}>{fpcActivo.nombre}</h3>
-                            <span style={{ color: '#6b7280', fontSize: '0.8rem' }}>{fpcActivo.pines.length} pines</span>
-                            <br />
-                            <button onClick={() => setModalFpcAbierto(true)} style={{ marginTop: '20px', background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)', color: 'white', border: 'none', padding: '12px 30px', borderRadius: '12px', fontWeight: 'bold', fontSize: '1rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '10px', boxShadow: '0 4px 15px rgba(139, 92, 246, 0.4)' }}><Map size={20} /> Abrir Visor de Pines</button>
+                          <div style={{ textAlign: 'center', padding: '20px', color: '#6b7280', fontSize: '0.85rem' }}>
+                            <span style={{ color: '#8b5cf6', fontWeight: 'bold' }}>{fpcActivo.nombre}</span> seleccionado — haz click en el nombre arriba para abrir el visor.
                           </div>
                         ) : (<div style={{ textAlign: 'center', padding: '50px', color: 'gray' }}><Map size={48} style={{ opacity: 0.3, marginBottom: '10px' }} /><p>Crea un FPC arriba para empezar a mapear.</p></div>)}
                       </div>
@@ -371,6 +366,7 @@ export default function AppDiagnostico() {
             {/* HEADER */}
             <div style={{ padding: '10px 20px', borderBottom: '1px solid #374151', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#111827', flexShrink: 0, flexWrap: 'wrap', gap: '8px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <button onClick={() => setModalFpcAbierto(false)} style={{ background: 'none', border: 'none', color: '#8b5cf6', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px' }}><ArrowLeft size={22} /></button>
                 <Cpu size={20} color="#8b5cf6" />
                 <span style={{ color: 'white', fontWeight: 'bold', fontSize: '1.1rem' }}>{fpcActivo.nombre}</span>
                 <span style={{ fontSize: '0.7rem', padding: '3px 8px', borderRadius: '12px', background: '#1f2937', color: '#9ca3af', fontWeight: 'bold' }}>{fpcActivo.pines.length} PINES</span>
