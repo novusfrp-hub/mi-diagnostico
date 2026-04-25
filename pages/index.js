@@ -138,6 +138,20 @@ export default function AppDiagnostico() {
     }
   };
 
+  // PWA INSTALL
+  const [deferredPrompt, setDeferredPrompt] = useState(null); const [showInstallPrompt, setShowInstallPrompt] = useState(false);
+  useEffect(() => {
+    const handleBip = (e) => { e.preventDefault(); setDeferredPrompt(e); setShowInstallPrompt(true); };
+    window.addEventListener('beforeinstallprompt', handleBip);
+    return () => window.removeEventListener('beforeinstallprompt', handleBip);
+  }, []);
+  const handleInstallClick = () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then(() => { setDeferredPrompt(null); setShowInstallPrompt(false); });
+    }
+  };
+
   // LIBRERÍA CRUD
   const cargarLibreriaDB = async () => { try { const qs = await getDocs(collection(db, "hardware_db")); const arr = []; qs.forEach(doc => arr.push({ id: doc.id, ...doc.data() })); setModelosLibreria(arr); } catch (error) {} };
   const crearNuevoModeloDB = async (e) => { e.preventDefault(); if(!formNuevoModelo.marca || !formNuevoModelo.nombre) return; const idUnico = `${formNuevoModelo.marca}_${formNuevoModelo.nombre}`.toLowerCase().replace(/\s+/g, '_'); const nuevoObj = { marca: formNuevoModelo.marca, nombre: formNuevoModelo.nombre, fpcs: [], docktestDiodo: {vbus:'---',dp:'---',dm:'---',cc1:'---',cc2:'---'}, docktestUa: {vbus:'---',dp:'---',dm:'---',cc1:'---',cc2:'---'} }; await setDoc(doc(db, "hardware_db", idUnico), nuevoObj); setFormNuevoModelo({ marca: '', nombre: '' }); cargarLibreriaDB(); setModeloActivo({...nuevoObj, id: idUnico}); };
@@ -184,13 +198,17 @@ export default function AppDiagnostico() {
     <div style={{ ...estilos.contenedor, ...t.fondoPrincipal }}>
       <style>{`
         .modal-lib { flex-direction: row; } .modal-lib-side { width: 300px; border-right: 1px solid #374151; } .fpc-tools { display: flex; gap: 10px; margin-bottom: 15px; justify-content: flex-end; }
-        @media (max-width: 850px) { .modal-lib { flex-direction: column !important; } .modal-lib-side { width: 100% !important; border-right: none !important; border-bottom: 1px solid #374151; max-height: 250px; } .fpc-tools { flex-wrap: wrap; justify-content: center !important; } .hide-on-mobile { display: none !important; } .hud-valor-text { font-size: 3rem !important; } .grid-dock { grid-template-columns: repeat(3, 1fr) !important; } }
+        ::-webkit-scrollbar { height: 8px; width: 8px; } ::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); border-radius: 4px; } ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; } ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.4); }
+        @media (max-width: 850px) { .modal-lib { flex-direction: column !important; border-radius: 0 !important; width: 100vw !important; height: 100vh !important; } .modal-lib-side { width: 100% !important; border-right: none !important; border-bottom: 1px solid #374151; max-height: 250px; } .fpc-tools { flex-wrap: wrap; justify-content: center !important; } .hide-on-mobile { display: none !important; } .hud-valor-text { font-size: 3rem !important; } .grid-dock { grid-template-columns: repeat(3, 1fr) !important; } }
       `}</style>
 
       <header className="no-print" style={{ ...estilos.header, ...t.bordeFantasmaBottom }}>
         <div style={estilos.headerInner}>
           <h1 style={{ ...estilos.logoTexto, ...t.textoPrincipal }} className="hide-on-mobile">MARSHALL CELL</h1>
           <div style={{display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', justifyContent:'center', width: '100%'}}>
+            {showInstallPrompt && (
+              <button onClick={handleInstallClick} style={{...estilos.btnHeader, backgroundColor: '#f97316', color: 'white', border: 'none', boxShadow: '0 0 10px rgba(249, 115, 22, 0.4)'}}><Smartphone size={16} /> <span style={{fontSize: '0.7rem', fontWeight: 'bold'}} className="hide-on-mobile">INSTALAR APP</span></button>
+            )}
             {!mostrarAdmin && !libreriaVisible && (
               <div onClick={usbConectado ? desconectarMultimetroUSB : conectarMultimetroUSB} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 10px', backgroundColor: '#0a0a0a', borderRadius: '10px', border: `2px solid ${usbConectado ? 'rgba(239, 68, 68, 0.4)' : '#374151'}`, cursor: 'pointer' }}>
                 <Link size={16} color={usbConectado ? '#ef4444' : '#6b7280'} />
@@ -254,7 +272,7 @@ export default function AppDiagnostico() {
       <AnimatePresence>
         {libreriaVisible && (
           <motion.div className="no-print" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={estilos.modalOverlay}>
-            <motion.div className="modal-lib" initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} style={{ width: '100%', maxWidth: '1200px', height: '90vh', backgroundColor: '#111827', borderRadius: '1.5rem', display: 'flex', overflow: 'hidden', border: '1px solid #374151' }}>
+            <motion.div className="modal-lib" initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} style={{ width: '95vw', maxWidth: '1600px', height: '95vh', backgroundColor: '#111827', borderRadius: '1.5rem', display: 'flex', overflow: 'hidden', border: '1px solid #374151' }}>
               <div className="modal-lib-side" style={{ backgroundColor: '#000', display: 'flex', flexDirection: 'column' }}>
                 <div style={{ padding: '20px', borderBottom: '1px solid #374151' }}>
                     <h3 style={{ color: '#8b5cf6', margin: '0 0 15px 0', display:'flex', alignItems:'center', gap:'10px' }}><Cpu size={24} /> HARDWARE DB</h3>

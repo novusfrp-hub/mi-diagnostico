@@ -73,7 +73,8 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
                     }} style={{ background: '#1f2937', color: 'white', border: '1px solid #333', padding: '6px 10px', borderRadius: '5px', outline:'none', fontSize:'0.85rem', cursor:'pointer' }}>
                         <option value="DATA">DATA</option><option value="VCC">VCC</option><option value="GND">GND</option><option value="NC">NC</option>
                     </select>
-                    <div style={{ display: 'flex', gap: '5px' }}>
+                    <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+                        <span style={{color: 'gray', fontSize: '0.7rem', display: 'flex', alignItems: 'center', marginRight: '5px'}}>Insertar:</span>
                         <button onClick={() => {
                             setPines(prev => {
                                 const idx = prev.findIndex(p => p.id === pinActivo);
@@ -82,7 +83,35 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
                                 nuevosPines.splice(idx + 1, 0, nuevoPin);
                                 return nuevosPines.map((p, i) => ({ ...p, id: i + 1 }));
                             });
-                        }} style={{ background: '#10b981', color: 'white', border: 'none', padding: '6px 10px', borderRadius: '5px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}>+ Línea</button>
+                        }} style={{ background: '#3b82f6', color: 'white', border: 'none', padding: '6px 10px', borderRadius: '5px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}>+ DATA</button>
+                        <button onClick={() => {
+                            setPines(prev => {
+                                const idx = prev.findIndex(p => p.id === pinActivo);
+                                const nuevoPin = { id: Date.now(), nombre: `GND`, valorSano: '---', valorActual: '---', tipo: 'GND' };
+                                const nuevosPines = [...prev];
+                                nuevosPines.splice(idx + 1, 0, nuevoPin);
+                                return nuevosPines.map((p, i) => ({ ...p, id: i + 1 }));
+                            });
+                        }} style={{ background: '#4b5563', color: 'white', border: 'none', padding: '6px 10px', borderRadius: '5px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}>+ GND</button>
+                        <button onClick={() => {
+                            setPines(prev => {
+                                const idx = prev.findIndex(p => p.id === pinActivo);
+                                const nuevoPin = { id: Date.now(), nombre: `VCC`, valorSano: '---', valorActual: '---', tipo: 'VCC' };
+                                const nuevosPines = [...prev];
+                                nuevosPines.splice(idx + 1, 0, nuevoPin);
+                                return nuevosPines.map((p, i) => ({ ...p, id: i + 1 }));
+                            });
+                        }} style={{ background: '#7f1d1d', color: 'white', border: 'none', padding: '6px 10px', borderRadius: '5px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}>+ VCC</button>
+                        <button onClick={() => {
+                            setPines(prev => {
+                                const idx = prev.findIndex(p => p.id === pinActivo);
+                                const nuevoPin = { id: Date.now(), nombre: `NC`, valorSano: '---', valorActual: '---', tipo: 'NC' };
+                                const nuevosPines = [...prev];
+                                nuevosPines.splice(idx + 1, 0, nuevoPin);
+                                return nuevosPines.map((p, i) => ({ ...p, id: i + 1 }));
+                            });
+                        }} style={{ background: '#1e3a8a', color: 'white', border: 'none', padding: '6px 10px', borderRadius: '5px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}>+ NC</button>
+                        
                         <button onClick={() => {
                             if (pines.length <= 1) return alert("No puedes eliminar el último pin.");
                             if (!window.confirm("¿Seguro de eliminar esta línea?")) return;
@@ -91,7 +120,7 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
                                 return nuevosPines.map((p, i) => ({ ...p, id: i + 1 }));
                             });
                             setPinActivo(1);
-                        }} style={{ background: '#ef4444', color: 'white', border: 'none', padding: '6px 10px', borderRadius: '5px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}>- Quitar</button>
+                        }} style={{ background: '#ef4444', color: 'white', border: 'none', padding: '6px 10px', borderRadius: '5px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold', marginLeft: '5px' }}>- Quitar</button>
                     </div>
                 </div>
               ) : ( 
