@@ -52,22 +52,47 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
   );
 
   return (
-    <div style={{ backgroundColor: '#111827', padding: '15px', borderRadius: '15px', border: '2px solid #374151', width: '100%' }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', backgroundColor: '#000', padding: '10px', borderRadius: '10px', overflowX: 'auto', scrollbarWidth: 'thin' }}>
-        <div style={{ display: 'flex', gap: '3px', minWidth: 'max-content' }}>{filaSup.map((pin, i) => renderPin(pin, true, i === 0 || i === filaSup.length - 1))}</div>
-        <div style={{ height: '8px', backgroundColor: '#1a1a1a', borderRadius: '2px', width: '100%', minWidth: 'max-content' }} />
-        <div style={{ display: 'flex', gap: '3px', minWidth: 'max-content' }}>{filaInf.map((pin, i) => renderPin(pin, false, i === 0 || i === filaInf.length - 1))}</div>
+    <div style={{ backgroundColor: '#111827', padding: '15px', borderRadius: '15px', border: '2px solid #374151', width: '100%', maxWidth: '100%', overflow: 'hidden' }}>
+      <div style={{ width: '100%', overflowX: 'auto', paddingBottom: '10px', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'thin' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', backgroundColor: '#000', padding: '10px', borderRadius: '10px', minWidth: 'max-content' }}>
+          <div style={{ display: 'flex', gap: '3px', minWidth: 'max-content' }}>{filaSup.map((pin, i) => renderPin(pin, true, i === 0 || i === filaSup.length - 1))}</div>
+          <div style={{ height: '8px', backgroundColor: '#1a1a1a', borderRadius: '2px', width: '100%', minWidth: 'max-content' }} />
+          <div style={{ display: 'flex', gap: '3px', minWidth: 'max-content' }}>{filaInf.map((pin, i) => renderPin(pin, false, i === 0 || i === filaInf.length - 1))}</div>
+        </div>
       </div>
       <div style={{ marginTop: '15px', padding: '10px', backgroundColor: '#1a1a1a', borderRadius: '10px', borderLeft: `4px solid ${obtenerColorPin(pines.find(p => p.id === pinActivo) || {})}` }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px' }}>
-          <div>
+          <div style={{ flex: '1 1 auto' }}>
               <span style={{ color: '#00ffff', fontWeight: 'bold', fontSize: '1.1rem' }}>PIN {pinActivo}</span>
               {modo === 'crear' ? ( 
-                <div style={{display:'flex', gap:'5px', marginTop:'5px', flexWrap:'wrap'}}>
-                    <input value={pines.find(p => p.id === pinActivo)?.nombre || ''} onChange={(e) => setPines(prev => prev.map(p => p.id === pinActivo ? { ...p, nombre: e.target.value.replace(/ /g, '_') } : p))} placeholder="Nombre_de_linea" style={{ background: '#000', color: 'white', border: '1px solid #333', padding: '5px', borderRadius: '5px', width: '140px', outline:'none', fontSize:'0.8rem' }} />
-                    <select value={pines.find(p => p.id === pinActivo)?.tipo || 'DATA'} onChange={(e) => setPines(prev => prev.map(p => p.id === pinActivo ? { ...p, tipo: e.target.value } : p))} style={{ background: '#1f2937', color: 'white', border: '1px solid #333', padding: '5px', borderRadius: '5px', outline:'none', fontSize:'0.8rem', cursor:'pointer' }}>
+                <div style={{display:'flex', gap:'8px', marginTop:'8px', flexWrap:'wrap', alignItems: 'center'}}>
+                    <input value={pines.find(p => p.id === pinActivo)?.nombre || ''} onChange={(e) => setPines(prev => prev.map(p => p.id === pinActivo ? { ...p, nombre: e.target.value.replace(/ /g, '_') } : p))} placeholder="Nombre_de_linea" style={{ background: '#000', color: 'white', border: '1px solid #333', padding: '6px 10px', borderRadius: '5px', width: '140px', outline:'none', fontSize:'0.85rem' }} />
+                    <select value={pines.find(p => p.id === pinActivo)?.tipo || 'DATA'} onChange={(e) => {
+                        const val = e.target.value;
+                        setPines(prev => prev.map(p => p.id === pinActivo ? { ...p, tipo: val, ...(val === 'GND' ? {nombre: 'GND'} : val === 'NC' ? {nombre: 'NC'} : {}) } : p));
+                    }} style={{ background: '#1f2937', color: 'white', border: '1px solid #333', padding: '6px 10px', borderRadius: '5px', outline:'none', fontSize:'0.85rem', cursor:'pointer' }}>
                         <option value="DATA">DATA</option><option value="VCC">VCC</option><option value="GND">GND</option><option value="NC">NC</option>
                     </select>
+                    <div style={{ display: 'flex', gap: '5px' }}>
+                        <button onClick={() => {
+                            setPines(prev => {
+                                const idx = prev.findIndex(p => p.id === pinActivo);
+                                const nuevoPin = { id: Date.now(), nombre: `Linea_${prev.length + 1}`, valorSano: '---', valorActual: '---', tipo: 'DATA' };
+                                const nuevosPines = [...prev];
+                                nuevosPines.splice(idx + 1, 0, nuevoPin);
+                                return nuevosPines.map((p, i) => ({ ...p, id: i + 1 }));
+                            });
+                        }} style={{ background: '#10b981', color: 'white', border: 'none', padding: '6px 10px', borderRadius: '5px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}>+ Línea</button>
+                        <button onClick={() => {
+                            if (pines.length <= 1) return alert("No puedes eliminar el último pin.");
+                            if (!window.confirm("¿Seguro de eliminar esta línea?")) return;
+                            setPines(prev => {
+                                const nuevosPines = prev.filter(p => p.id !== pinActivo);
+                                return nuevosPines.map((p, i) => ({ ...p, id: i + 1 }));
+                            });
+                            setPinActivo(1);
+                        }} style={{ background: '#ef4444', color: 'white', border: 'none', padding: '6px 10px', borderRadius: '5px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}>- Quitar</button>
+                    </div>
                 </div>
               ) : ( 
                   <div style={{marginTop:'5px'}}>
@@ -76,7 +101,7 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
                   </div>
               )}
           </div>
-          <div style={{ textAlign: 'right' }}>
+          <div style={{ textAlign: 'right', flex: '0 1 auto' }}>
               <span style={{ color: 'gray', fontSize: '0.75rem', display: 'block' }}>Valor Sano: <strong style={{color:'#fff'}}>{pines.find(p => p.id === pinActivo)?.valorSano || '---'} {escala==='diodo'?'V':'uA'}</strong></span>
               <span style={{ color: 'gray', fontSize: '0.75rem', display: 'block', marginTop: '4px' }}>Actual: <strong style={{color: '#fff', fontSize: '1.3rem'}}>{(pinActivo === pines.find(p => p.id === pinActivo)?.id && lecturaEnVivo !== '----') ? lecturaEnVivo : (pines.find(p => p.id === pinActivo)?.valorActual || '---')} {escala==='diodo'?'V':'uA'}</strong></span>
           </div>
