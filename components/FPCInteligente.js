@@ -110,7 +110,8 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
         borderRadius: '15px',
         border: '2px solid #374151',
         width: '100%',
-        maxWidth: '100%'
+        maxWidth: '100%',
+        overflow: 'hidden'
       }}
     >
       {/* CONTENEDOR DE SCROLL REPARADO */}
@@ -125,17 +126,18 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
         {/* LA CAJA NEGRA AHORA ES INLINE-FLEX (Se estira infinitamente con los pines) */}
         <div
           style={{
-            display: 'inline-flex',
+            display: 'flex',
             flexDirection: 'column',
             gap: '6px',
             backgroundColor: '#000',
             padding: '10px',
             borderRadius: '10px',
-            minWidth: '100%'
+            minWidth: '100%',
+            width: 'max-content'
           }}
         >
           {/* FILA SUPERIOR */}
-          <div style={{ display: 'flex', gap: '3px' }}>
+          <div style={{ display: 'flex', gap: '3px', width: 'max-content' }}>
             {filaSup.map((pin, i) => renderPin(pin, true, i === 0 || i === filaSup.length - 1))}
           </div>
           
