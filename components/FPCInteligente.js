@@ -64,11 +64,12 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
       onClick={() => setPinActivo(pin.id)}
       style={{
         width: isExtremo ? '70px' : '45px',
+        minWidth: isExtremo ? '70px' : '45px', // FORZAR ancho mínimo
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         cursor: 'pointer',
-        flexShrink: 0
+        flexShrink: 0 // EVITA que se encoja
       }}
     >
       {esArriba && <span style={{ fontSize: '0.55rem', color: 'gray', marginBottom: '2px' }}>{pin.id}</span>}
@@ -113,17 +114,18 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
         overflow: 'hidden'
       }}
     >
-      {/* Contenedor con scroll horizontal */}
+      {/* CONTENEDOR DE SCROLL - VERSIÓN CORREGIDA */}
       <div
         style={{
           width: '100%',
           overflowX: 'auto',
           overflowY: 'visible',
-          WebkitOverflowScrolling: 'touch',
-          scrollbarWidth: 'thin'
+          WebkitOverflowScrolling: 'touch', // Scroll suave en iOS/Android
+          scrollbarWidth: 'thin',
+          position: 'relative'
         }}
       >
-        {/* Fondo negro que se ajusta al contenido */}
+        {/* FONDO NEGRO QUE SE AJUSTA AL CONTENIDO */}
         <div
           style={{
             display: 'flex',
@@ -132,21 +134,38 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
             backgroundColor: '#000',
             padding: '10px',
             borderRadius: '10px',
-            width: 'max-content',
-            minWidth: '100%'
+            width: 'max-content', // CRUCIAL: se ajusta al contenido
+            minWidth: '100%' // Opcional: cubre todo el ancho mínimo
           }}
         >
-          <div style={{ display: 'flex', gap: '3px' }}>
+          {/* FILA SUPERIOR */}
+          <div 
+            style={{ 
+              display: 'flex', 
+              gap: '3px',
+              flexWrap: 'nowrap' // EVITA que se envuelvan a otra línea
+            }}
+          >
             {filaSup.map((pin, i) => renderPin(pin, true, i === 0 || i === filaSup.length - 1))}
           </div>
+          
+          {/* SEPARADOR */}
           <div style={{ height: '8px', backgroundColor: '#1a1a1a', borderRadius: '2px' }} />
-          <div style={{ display: 'flex', gap: '3px' }}>
+          
+          {/* FILA INFERIOR */}
+          <div 
+            style={{ 
+              display: 'flex', 
+              gap: '3px',
+              flexWrap: 'nowrap' // EVITA que se envuelvan
+            }}
+          >
             {filaInf.map((pin, i) => renderPin(pin, false, i === 0 || i === filaInf.length - 1))}
           </div>
         </div>
       </div>
 
-      {/* Panel de detalles del pin activo */}
+      {/* Panel de detalles del pin activo (sin cambios) */}
       <div
         style={{
           marginTop: '15px',
@@ -193,7 +212,6 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
                   }}
                 />
 
-                {/* Select dinámico */}
                 <select
                   value={pines.find(p => p.id === pinActivo)?.tipo || 'DATA'}
                   onChange={(e) => {
@@ -228,7 +246,6 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
                   ))}
                 </select>
 
-                {/* Botón para añadir nuevo tipo */}
                 <button
                   onClick={manejarAgregarTipo}
                   style={{
@@ -245,7 +262,6 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
                   + Añadir Tipo
                 </button>
 
-                {/* Botón eliminar pin */}
                 <button
                   onClick={() => {
                     if (pines.length <= 1) return alert('No puedes eliminar el último pin.');
