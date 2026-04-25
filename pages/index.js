@@ -43,7 +43,7 @@ export default function AppDiagnostico() {
   const [reporteVisible, setReporteVisible] = useState(false); const [casoReporte, setCasoReporte] = useState(null);
 
   // ESTADOS LIBRERÍA
-  const [libreriaVisible, setLibreriaVisible] = useState(false); const [modelosLibreria, setModelosLibreria] = useState([]); const [modeloActivo, setModeloActivo] = useState(null); const [fpcActivo, setFpcActivo] = useState(null); const [formNuevoModelo, setFormNuevoModelo] = useState({ marca: '', nombre: '' }); const [formNuevoFpc, setFormNuevoFpc] = useState({ nombre: '', pines: 40 }); const [seccionLibreria, setSeccionLibreria] = useState('fpc'); const [imagenFpcVisible, setImagenFpcVisible] = useState(false);
+  const [libreriaVisible, setLibreriaVisible] = useState(false); const [modelosLibreria, setModelosLibreria] = useState([]); const [modeloActivo, setModeloActivo] = useState(null); const [fpcActivo, setFpcActivo] = useState(null); const [formNuevoModelo, setFormNuevoModelo] = useState({ marca: '', nombre: '' }); const [formNuevoFpc, setFormNuevoFpc] = useState({ nombre: '', pines: 40 }); const [seccionLibreria, setSeccionLibreria] = useState('fpc'); const [imagenFpcVisible, setImagenFpcVisible] = useState(false); const [modalFpcAbierto, setModalFpcAbierto] = useState(false);
 
   // ESTADOS MULTÍMETRO
   const [usbConectado, setUsbConectado] = useState(false); const [lecturaUsb, setLecturaUsb] = useState({ valor: '----', unidad: '---' }); const [dispositivoUsb, setDispositivoUsb] = useState(null); const ordenCamposDock = ['vbus', 'dp', 'dm', 'cc1', 'cc2']; const [campoActivoDock, setCampoActivoDock] = useState('vbus'); const [pinActivoFpc, setPinActivoFpc] = useState(1); const [modoFpc, setModoFpc] = useState('crear'); const [escalaFpc, setEscalaFpc] = useState('diodo');
@@ -335,7 +335,7 @@ export default function AppDiagnostico() {
                         <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
                           <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', flex: 1, paddingBottom: '5px', scrollbarWidth: 'thin' }}>
                             {modeloActivo.fpcs.map(f => (
-                              <button key={f.id} onClick={() => { setFpcActivo(f); setPinActivoFpc(1); }} style={{ padding: '8px 15px', borderRadius: '20px', border: 'none', background: fpcActivo?.id === f.id ? '#8b5cf6' : '#1f2937', color: 'white', fontWeight: 'bold', cursor: 'pointer', whiteSpace: 'nowrap' }}>{f.nombre} ({f.pines.length})</button>
+                              <button key={f.id} onClick={() => { setFpcActivo(f); setPinActivoFpc(1); setModalFpcAbierto(true); }} style={{ padding: '8px 15px', borderRadius: '20px', border: 'none', background: fpcActivo?.id === f.id ? '#8b5cf6' : '#1f2937', color: 'white', fontWeight: 'bold', cursor: 'pointer', whiteSpace: 'nowrap' }}>{f.nombre} ({f.pines.length})</button>
                             ))}
                           </div>
                           <div style={{ display: 'flex', gap: '5px', background: '#1a1a1a', padding: '5px', borderRadius: '10px', border: '1px solid #333' }}>
@@ -345,32 +345,14 @@ export default function AppDiagnostico() {
                           </div>
                         </div>
                         {fpcActivo ? (
-                          <>
-                            <div className="fpc-tools">
-                              <div style={{ display: 'flex', gap: '5px', backgroundColor: '#1a1a1a', padding: '4px', borderRadius: '8px', marginRight: 'auto' }}>
-                                {fpcActivo.imgUrl ? (
-                                  <button onClick={() => setImagenFpcVisible(true)} style={{ padding: '6px 10px', borderRadius: '6px', border: 'none', background: '#3b82f6', color: 'white', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}><ImageIcon size={14} /> Placa</button>
-                                ) : (
-                                  <button onClick={editarUbicacionFpc} style={{ padding: '6px 10px', borderRadius: '6px', border: '1px dashed #4b5563', background: 'transparent', color: '#9ca3af', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.7rem' }}>+ Añadir Foto</button>
-                                )}
-                                <button onClick={editarPinesFpcActivo} style={{ padding: '6px 10px', borderRadius: '6px', border: 'none', background: 'transparent', color: '#eab308', fontWeight: 'bold', cursor: 'pointer' }}>✏️ Pines</button>
-                                <button onClick={eliminarFpcActivo} style={{ padding: '6px 10px', borderRadius: '6px', border: 'none', background: 'transparent', color: '#ef4444', fontWeight: 'bold', cursor: 'pointer' }}>🗑️</button>
-                              </div>
-                              <div style={{ display: 'flex', gap: '5px', backgroundColor: '#1a1a1a', padding: '4px', borderRadius: '8px' }}>
-                                <button onClick={() => setEscalaFpc('diodo')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: escalaFpc === 'diodo' ? '#8b5cf6' : 'transparent', color: escalaFpc === 'diodo' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}>Diodo</button>
-                                <button onClick={() => setEscalaFpc('ua')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: escalaFpc === 'ua' ? '#10b981' : 'transparent', color: escalaFpc === 'ua' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}>uA</button>
-                              </div>
-                              <div style={{ display: 'flex', gap: '5px', backgroundColor: '#1a1a1a', padding: '4px', borderRadius: '8px' }}>
-                                <button onClick={() => setModoFpc('crear')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: modoFpc === 'crear' ? '#8b5cf6' : 'transparent', color: modoFpc === 'crear' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}>Grabar</button>
-                                <button onClick={() => setModoFpc('diagnostico')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: modoFpc === 'diagnostico' ? '#ef4444' : 'transparent', color: modoFpc === 'diagnostico' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}>Diagnóstico</button>
-                              </div>
-                            </div>
-                            <FPCInteligente pines={fpcActivo.pines} setPines={(updater) => {
-                              const arrNuevo = typeof updater === 'function' ? updater(fpcActivo.pines) : updater;
-                              const fpcMod = { ...fpcActivo, pines: arrNuevo }; setFpcActivo(fpcMod);
-                              setModeloActivo(prev => ({ ...prev, fpcs: prev.fpcs.map(f => f.id === fpcMod.id ? fpcMod : f) }));
-                            }} pinActivo={pinActivoFpc} setPinActivo={setPinActivoFpc} modo={modoFpc} escala={escalaFpc} lecturaEnVivo={lecturaUsb.valor} />
-                          </>
+                          <div style={{ textAlign: 'center', padding: '40px', backgroundColor: '#0d1117', borderRadius: '15px', border: '1px solid #21262d' }}>
+                            <Cpu size={48} style={{ opacity: 0.4, marginBottom: '15px', color: '#8b5cf6' }} />
+                            <p style={{ color: '#9ca3af', marginBottom: '5px', fontSize: '0.85rem' }}>FPC seleccionado:</p>
+                            <h3 style={{ color: '#8b5cf6', margin: '0 0 5px 0' }}>{fpcActivo.nombre}</h3>
+                            <span style={{ color: '#6b7280', fontSize: '0.8rem' }}>{fpcActivo.pines.length} pines</span>
+                            <br />
+                            <button onClick={() => setModalFpcAbierto(true)} style={{ marginTop: '20px', background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)', color: 'white', border: 'none', padding: '12px 30px', borderRadius: '12px', fontWeight: 'bold', fontSize: '1rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '10px', boxShadow: '0 4px 15px rgba(139, 92, 246, 0.4)' }}><Map size={20} /> Abrir Visor de Pines</button>
+                          </div>
                         ) : (<div style={{ textAlign: 'center', padding: '50px', color: 'gray' }}><Map size={48} style={{ opacity: 0.3, marginBottom: '10px' }} /><p>Crea un FPC arriba para empezar a mapear.</p></div>)}
                       </div>
                     )}
@@ -378,6 +360,54 @@ export default function AppDiagnostico() {
                 ) : (<div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', color: 'gray' }}><Smartphone size={64} style={{ opacity: 0.2, marginBottom: '15px' }} /><h3>Selecciona un teléfono</h3></div>)}
               </div>
             </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* --- MODAL FULLSCREEN: VISOR DE PINES FPC --- */}
+      <AnimatePresence>
+        {modalFpcAbierto && fpcActivo && modeloActivo && (
+          <motion.div className="no-print" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#0a0b0f', zIndex: 2500, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            {/* HEADER */}
+            <div style={{ padding: '10px 20px', borderBottom: '1px solid #374151', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#111827', flexShrink: 0, flexWrap: 'wrap', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <Cpu size={20} color="#8b5cf6" />
+                <span style={{ color: 'white', fontWeight: 'bold', fontSize: '1.1rem' }}>{fpcActivo.nombre}</span>
+                <span style={{ fontSize: '0.7rem', padding: '3px 8px', borderRadius: '12px', background: '#1f2937', color: '#9ca3af', fontWeight: 'bold' }}>{fpcActivo.pines.length} PINES</span>
+              </div>
+              <div className="fpc-tools" style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: '5px', backgroundColor: '#1a1a1a', padding: '4px', borderRadius: '8px' }}>
+                  {fpcActivo.imgUrl ? (
+                    <button onClick={() => setImagenFpcVisible(true)} style={{ padding: '6px 10px', borderRadius: '6px', border: 'none', background: '#3b82f6', color: 'white', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}><ImageIcon size={14} /> Placa</button>
+                  ) : (
+                    <button onClick={editarUbicacionFpc} style={{ padding: '6px 10px', borderRadius: '6px', border: '1px dashed #4b5563', background: 'transparent', color: '#9ca3af', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.7rem' }}>+ Foto</button>
+                  )}
+                  <button onClick={editarPinesFpcActivo} style={{ padding: '6px 10px', borderRadius: '6px', border: 'none', background: 'transparent', color: '#eab308', fontWeight: 'bold', cursor: 'pointer' }}>✏️ Pines</button>
+                  <button onClick={() => { eliminarFpcActivo(); setModalFpcAbierto(false); }} style={{ padding: '6px 10px', borderRadius: '6px', border: 'none', background: 'transparent', color: '#ef4444', fontWeight: 'bold', cursor: 'pointer' }}>🗑️</button>
+                </div>
+                <div style={{ display: 'flex', gap: '5px', backgroundColor: '#1a1a1a', padding: '4px', borderRadius: '8px' }}>
+                  <button onClick={() => setEscalaFpc('diodo')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: escalaFpc === 'diodo' ? '#8b5cf6' : 'transparent', color: escalaFpc === 'diodo' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}>Diodo</button>
+                  <button onClick={() => setEscalaFpc('ua')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: escalaFpc === 'ua' ? '#10b981' : 'transparent', color: escalaFpc === 'ua' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}>uA</button>
+                </div>
+                <div style={{ display: 'flex', gap: '5px', backgroundColor: '#1a1a1a', padding: '4px', borderRadius: '8px' }}>
+                  <button onClick={() => setModoFpc('crear')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: modoFpc === 'crear' ? '#8b5cf6' : 'transparent', color: modoFpc === 'crear' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}>Grabar</button>
+                  <button onClick={() => setModoFpc('diagnostico')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: modoFpc === 'diagnostico' ? '#ef4444' : 'transparent', color: modoFpc === 'diagnostico' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}>Diagnóstico</button>
+                </div>
+                <button onClick={() => setModalFpcAbierto(false)} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', cursor: 'pointer', padding: '8px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}><X size={20} /></button>
+              </div>
+            </div>
+            {/* VISOR HUD */}
+            <div style={{ padding: '10px 20px', flexShrink: 0 }}>
+              <VisorHUD valor={lecturaUsb.valor} unidad={lecturaUsb.unidad} conectado={usbConectado} conectarFn={conectarMultimetroUSB} desconectarFn={desconectarMultimetroUSB} vozActiva={vozActiva} toggleVozFn={toggleVoz} autoHoldActivo={autoHoldActivo} toggleAutoHoldFn={() => setAutoHoldActivo(!autoHoldActivo)} />
+            </div>
+            {/* FPC COMPONENT */}
+            <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '0 20px 20px 20px' }}>
+              <FPCInteligente pines={fpcActivo.pines} setPines={(updater) => {
+                const arrNuevo = typeof updater === 'function' ? updater(fpcActivo.pines) : updater;
+                const fpcMod = { ...fpcActivo, pines: arrNuevo }; setFpcActivo(fpcMod);
+                setModeloActivo(prev => ({ ...prev, fpcs: prev.fpcs.map(f => f.id === fpcMod.id ? fpcMod : f) }));
+              }} pinActivo={pinActivoFpc} setPinActivo={setPinActivoFpc} modo={modoFpc} escala={escalaFpc} lecturaEnVivo={lecturaUsb.valor} />
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

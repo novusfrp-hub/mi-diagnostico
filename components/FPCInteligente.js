@@ -122,53 +122,27 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
         .fpc-scroll-container::-webkit-scrollbar-thumb:hover { background: #2563eb; }
       `}</style>
 
-      {/* CONTENEDOR PADRE CON LÍMITE Y SCROLL ACTIVO */}
-      {(() => {
-        // Calculamos el ancho EXACTO que necesitan los pines para forzar el scroll
-        const n = filaSup.length;
-        const anchoContenido = n <= 1
-          ? 70 + 24
-          : (n === 2 ? 140 + 3 + 24 : 140 + (n - 2) * 45 + (n - 1) * 3 + 24);
-        return (
-          <div 
-            className="fpc-scroll-container"
-            style={{ 
-              width: '100%', 
-              overflowX: 'auto', 
-              overflowY: 'hidden',
-              paddingBottom: '12px',
-              WebkitOverflowScrolling: 'touch',
-              scrollbarWidth: 'auto',
-              scrollbarColor: '#3b82f6 #1a1a1a'
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '6px',
-                backgroundColor: '#000',
-                padding: '12px',
-                borderRadius: '10px',
-                minWidth: anchoContenido + 'px'
-              }}
-            >
-              {/* FILA SUPERIOR */}
-              <div style={{ display: 'flex', gap: '3px' }}>
-                {filaSup.map((pin, i) => renderPin(pin, true, i === 0 || i === filaSup.length - 1))}
-              </div>
-
-              {/* SEPARADOR DEL MEDIO */}
-              <div style={{ height: '8px', backgroundColor: '#1a1a1a', borderRadius: '2px' }} />
-
-              {/* FILA INFERIOR */}
-              <div style={{ display: 'flex', gap: '3px' }}>
-                {filaInf.map((pin, i) => renderPin(pin, false, i === 0 || i === filaInf.length - 1))}
-              </div>
-            </div>
-          </div>
-        );
-      })()}
+      {/* CONTENEDOR CON SCROLL HORIZONTAL */}
+      <div 
+        className="fpc-scroll-container"
+        style={{ 
+          width: '100%', 
+          overflowX: 'auto', 
+          overflowY: 'hidden',
+          paddingBottom: '12px',
+          WebkitOverflowScrolling: 'touch',
+          scrollbarWidth: 'auto',
+          scrollbarColor: '#3b82f6 #1a1a1a'
+        }}
+      >
+        <div style={{ display: 'flex', gap: '3px', backgroundColor: '#000', padding: '12px 12px 6px 12px', borderRadius: '10px 10px 0 0' }}>
+          {filaSup.map((pin, i) => renderPin(pin, true, i === 0 || i === filaSup.length - 1))}
+        </div>
+        <div style={{ height: '8px', backgroundColor: '#1a1a1a', marginLeft: '0', marginRight: '0' }} />
+        <div style={{ display: 'flex', gap: '3px', backgroundColor: '#000', padding: '6px 12px 12px 12px', borderRadius: '0 0 10px 10px' }}>
+          {filaInf.map((pin, i) => renderPin(pin, false, i === 0 || i === filaInf.length - 1))}
+        </div>
+      </div>
 
       {/* PANEL INFERIOR DE DETALLES Y COMBO BOX */}
       <div
