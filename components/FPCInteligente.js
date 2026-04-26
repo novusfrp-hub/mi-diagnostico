@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
+import { Save } from 'lucide-react';
 
-export default function FPCInteligente({ pines, setPines, pinActivo, setPinActivo, modo = 'diagnostico', escala = 'diodo', lecturaEnVivo, tiposDisponibles: tiposProp = ['DATA', 'VCC', 'GND', 'NC'], setTiposDisponibles }) {
+export default function FPCInteligente({ pines, setPines, pinActivo, setPinActivo, modo = 'diagnostico', escala = 'diodo', lecturaEnVivo, tiposDisponibles: tiposProp = ['DATA', 'VCC', 'GND', 'NC'], setTiposDisponibles, onGuardar }) {
   const [tiposInternos, setTiposInternos] = useState(tiposProp);
   const tipos = setTiposDisponibles ? tiposProp : tiposInternos;
   const setTipos = setTiposDisponibles || setTiposInternos;
@@ -129,6 +130,35 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
         .fpc-scroll-container::-webkit-scrollbar-thumb:hover { background: #2563eb; }
       `}</style>
 
+      {/* BARRA SUPERIOR CON BOTÓN GUARDAR */}
+      {onGuardar && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '10px' }}>
+          <button
+            onClick={onGuardar}
+            style={{
+              background: '#10b981',
+              color: 'white',
+              border: 'none',
+              padding: '8px 16px',
+              borderRadius: '8px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontSize: '0.8rem',
+              boxShadow: '0 0 10px rgba(16, 185, 129, 0.3)',
+              transition: 'all 0.2s'
+            }}
+            onMouseEnter={(e) => { e.target.style.background = '#059669'; e.target.style.boxShadow = '0 0 15px rgba(16, 185, 129, 0.5)'; }}
+            onMouseLeave={(e) => { e.target.style.background = '#10b981'; e.target.style.boxShadow = '0 0 10px rgba(16, 185, 129, 0.3)'; }}
+          >
+            <Save size={16} />
+            GUARDAR {modo === 'crear' ? 'VALORES SANOS' : 'MEDICIONES'}
+          </button>
+        </div>
+      )}
+
       <div 
         className="fpc-scroll-container"
         style={{ 
@@ -176,7 +206,7 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
             {modo === 'crear' ? (
               <div style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
                 
-                {/* LA NUEVA CAJA DE MUESTRAS DE COLOR */}
+                {/* CAJA DE MUESTRAS DE COLOR */}
                 <input 
                   type="color"
                   value={pines.find(p => p.id === pinActivo)?.colorCustom || '#d4af37'}
@@ -203,7 +233,7 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
                         p.id === pinActivo ? {
                           ...p,
                           tipo: val,
-                          nombre: val // <-- AHORA CUALQUIER TIPO CAMBIA EL NOMBRE AUTOMÁTICAMENTE
+                          nombre: val
                         } : p
                       )
                     );
