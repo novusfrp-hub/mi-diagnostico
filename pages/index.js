@@ -448,7 +448,7 @@ export default function AppDiagnostico() {
                 const arrNuevo = typeof updater === 'function' ? updater(fpcActivo.pines) : updater;
                 const fpcMod = { ...fpcActivo, pines: arrNuevo }; setFpcActivo(fpcMod);
                 setModeloActivo(prev => ({ ...prev, fpcs: prev.fpcs.map(f => f.id === fpcMod.id ? fpcMod : f) }));
-              }} pinActivo={pinActivoFpc} setPinActivo={setPinActivoFpc} modo={modoFpc} escala={escalaFpc} lecturaEnVivo={lecturaUsb.valor} />
+              }} pinActivo={pinActivoFpc} setPinActivo={setPinActivoFpc} modo={modoFpc} escala={escalaFpc} lecturaEnVivo={lecturaUsb.valor}  onGuardar={guardarModeloActualDB} />
             </div>
           </motion.div>
         )}
