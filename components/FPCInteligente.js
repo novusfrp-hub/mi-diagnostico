@@ -249,7 +249,7 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
                   onClick={manejarAgregarTipo}
                   style={{ background: '#0ea5e9', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '5px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}
                 >
-                  + Añadir Tipo
+                  + Añadir Línea
                 </button>
 
                 <button
