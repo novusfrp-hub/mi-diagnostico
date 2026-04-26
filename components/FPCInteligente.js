@@ -1,24 +1,25 @@
-import React, { useState } from 'react';
+import React from 'react';
 
-export default function FPCInteligente({ pines, setPines, pinActivo, setPinActivo, modo = 'diagnostico', escala = 'diodo', lecturaEnVivo, tiposDisponibles: tiposProp = ['DATA', 'VCC', 'GND', 'NC'], setTiposDisponibles }) {
-  // Manejo de la lista de tipos en el menú desplegable
-  const [tiposInternos, setTiposInternos] = useState(tiposProp);
-  const tipos = setTiposDisponibles ? tiposProp : tiposInternos;
-  const setTipos = setTiposDisponibles || setTiposInternos;
+export default function FPCInteligente({ pines, setPines, pinActivo, setPinActivo, modo = 'diagnostico', escala = 'diodo', lecturaEnVivo }) {
+  
+  // 🧠 TRUCO MAGICO: Extraemos los tipos dinámicamente de los pines que ya existen.
+  // Así no necesitas guardar la lista en la base de datos entera.
+  const tiposBase = ['DATA', 'VCC', 'GND', 'NC'];
+  const tiposCustom = pines.map(p => p.tipo).filter(t => t && !tiposBase.includes(t));
+  const tipos = [...new Set([...tiposBase, ...tiposCustom])];
 
   const mitad = Math.ceil(pines.length / 2);
   const filaSup = pines.slice(0, mitad);
   const filaInf = pines.slice(mitad);
 
+  // Al añadir un tipo, se le aplica directamente al pin activo
   const manejarAgregarTipo = () => {
-    const nuevoTipo = window.prompt('Ingrese el nombre del nuevo tipo de línea (Ej: I2C, SPI):', '');
+    const nuevoTipo = window.prompt('Ingrese el nombre del nuevo tipo (Ej: OL, I2C, SPI):', '');
     if (nuevoTipo && nuevoTipo.trim() !== '') {
       const tipoLimpio = nuevoTipo.trim().toUpperCase().replace(/\s+/g, '_');
-      if (!tipos.includes(tipoLimpio)) {
-        setTipos([...tipos, tipoLimpio]);
-      } else {
-        alert('Este tipo ya existe en la lista.');
-      }
+      setPines(prev => prev.map(p => 
+        p.id === pinActivo ? { ...p, tipo: tipoLimpio, nombre: tipoLimpio } : p
+      ));
     }
   };
 
@@ -111,42 +112,50 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
         border: '2px solid #374151',
         width: '100%',
         maxWidth: '100%',
-        overflow: 'hidden' // <-- EL CANDADO MAGICO QUE FALTABA
+        overflow: 'hidden' // Evita que se salga del marco gris
       }}
     >
-      {/* INYECTAMOS CSS PARA NAVEGADORES WEBKIT (Chrome/Brave) */}
       <style>{`
-        .fpc-scroll-container::-webkit-scrollbar { height: 8px; }
-        .fpc-scroll-container::-webkit-scrollbar-track { background: #1a1a1a; border-radius: 4px; }
-        .fpc-scroll-container::-webkit-scrollbar-thumb { background: #3b82f6; border-radius: 4px; }
+        .fpc-scroll-container::-webkit-scrollbar { height: 10px; }
+        .fpc-scroll-container::-webkit-scrollbar-track { background: #1a1a1a; border-radius: 5px; }
+        .fpc-scroll-container::-webkit-scrollbar-thumb { background: #3b82f6; border-radius: 5px; cursor: pointer; }
         .fpc-scroll-container::-webkit-scrollbar-thumb:hover { background: #2563eb; }
       `}</style>
 
-      {/* CONTENEDOR CON SCROLL HORIZONTAL */}
+      {/* EL CONTENEDOR DE SCROLL REPARADO */}
       <div 
         className="fpc-scroll-container"
         style={{ 
           width: '100%', 
           overflowX: 'auto', 
-          overflowY: 'hidden',
           paddingBottom: '12px',
-          WebkitOverflowScrolling: 'touch',
-          scrollbarWidth: 'auto',
-          scrollbarColor: '#3b82f6 #1a1a1a'
+          WebkitOverflowScrolling: 'touch'
         }}
       >
-        <div style={{ display: 'inline-block', backgroundColor: '#000', padding: '12px', borderRadius: '10px', minWidth: '100%' }}>
+        {/* LA CAJA NEGRA (width: max-content obliga a que se adapte exactamente a los pines) */}
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '6px',
+            backgroundColor: '#000',
+            padding: '12px',
+            borderRadius: '10px',
+            width: 'max-content'
+          }}
+        >
           <div style={{ display: 'flex', gap: '3px' }}>
             {filaSup.map((pin, i) => renderPin(pin, true, i === 0 || i === filaSup.length - 1))}
           </div>
-          <div style={{ height: '8px', backgroundColor: '#1a1a1a', borderRadius: '2px', margin: '6px 0' }} />
+          
+          <div style={{ height: '8px', backgroundColor: '#1a1a1a', borderRadius: '2px', width: '100%' }} />
+          
           <div style={{ display: 'flex', gap: '3px' }}>
             {filaInf.map((pin, i) => renderPin(pin, false, i === 0 || i === filaInf.length - 1))}
           </div>
         </div>
       </div>
 
-      {/* PANEL INFERIOR DE DETALLES Y COMBO BOX */}
       <div
         style={{
           marginTop: '15px',
@@ -156,15 +165,7 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
           borderLeft: `4px solid ${obtenerColorPin(pines.find(p => p.id === pinActivo) || {})}`
         }}
       >
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'flex-start',
-            flexWrap: 'wrap',
-            gap: '10px'
-          }}
-        >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px' }}>
           <div style={{ flex: '1 1 auto' }}>
             <span style={{ color: '#00ffff', fontWeight: 'bold', fontSize: '1.1rem' }}>
               PIN {pinActivo}
@@ -174,23 +175,10 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
                 <input
                   value={pines.find(p => p.id === pinActivo)?.nombre || ''}
                   onChange={(e) =>
-                    setPines(prev =>
-                      prev.map(p =>
-                        p.id === pinActivo ? { ...p, nombre: e.target.value.replace(/ /g, '_') } : p
-                      )
-                    )
+                    setPines(prev => prev.map(p => p.id === pinActivo ? { ...p, nombre: e.target.value.replace(/ /g, '_') } : p))
                   }
                   placeholder="Nombre_de_linea"
-                  style={{
-                    background: '#000',
-                    color: 'white',
-                    border: '1px solid #333',
-                    padding: '6px 10px',
-                    borderRadius: '5px',
-                    width: '140px',
-                    outline: 'none',
-                    fontSize: '0.85rem'
-                  }}
+                  style={{ background: '#000', color: 'white', border: '1px solid #333', padding: '6px 10px', borderRadius: '5px', width: '140px', outline: 'none', fontSize: '0.85rem' }}
                 />
 
                 <select
@@ -199,46 +187,25 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
                     const val = e.target.value;
                     setPines(prev =>
                       prev.map(p =>
-                        p.id === pinActivo
-                          ? {
-                              ...p,
-                              tipo: val,
-                              ...(val === 'GND' ? { nombre: 'GND' } : val === 'NC' ? { nombre: 'NC' } : {})
-                            }
-                          : p
+                        p.id === pinActivo ? {
+                          ...p,
+                          tipo: val,
+                          // Si selecciona algo que no sea DATA ni VCC, se le asigna el nombre automáticamente
+                          ...(val !== 'DATA' && val !== 'VCC' ? { nombre: val } : {})
+                        } : p
                       )
                     );
                   }}
-                  style={{
-                    background: '#1f2937',
-                    color: 'white',
-                    border: '1px solid #333',
-                    padding: '6px 10px',
-                    borderRadius: '5px',
-                    outline: 'none',
-                    fontSize: '0.85rem',
-                    cursor: 'pointer'
-                  }}
+                  style={{ background: '#1f2937', color: 'white', border: '1px solid #333', padding: '6px 10px', borderRadius: '5px', outline: 'none', fontSize: '0.85rem', cursor: 'pointer' }}
                 >
                   {tipos.map(tipo => (
-                    <option key={tipo} value={tipo}>
-                      {tipo}
-                    </option>
+                    <option key={tipo} value={tipo}>{tipo}</option>
                   ))}
                 </select>
 
                 <button
                   onClick={manejarAgregarTipo}
-                  style={{
-                    background: '#0ea5e9',
-                    color: 'white',
-                    border: 'none',
-                    padding: '6px 12px',
-                    borderRadius: '5px',
-                    cursor: 'pointer',
-                    fontSize: '0.75rem',
-                    fontWeight: 'bold'
-                  }}
+                  style={{ background: '#0ea5e9', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '5px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}
                 >
                   + Añadir Tipo
                 </button>
@@ -253,16 +220,7 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
                     });
                     setPinActivo(1);
                   }}
-                  style={{
-                    background: '#ef4444',
-                    color: 'white',
-                    border: 'none',
-                    padding: '6px 10px',
-                    borderRadius: '5px',
-                    cursor: 'pointer',
-                    fontSize: '0.75rem',
-                    fontWeight: 'bold'
-                  }}
+                  style={{ background: '#ef4444', color: 'white', border: 'none', padding: '6px 10px', borderRadius: '5px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}
                 >
                   - Quitar Pin
                 </button>
@@ -272,17 +230,7 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
                 <span style={{ display: 'inline-block', color: '#fff', fontSize: '0.85rem' }}>
                   {pines.find(p => p.id === pinActivo)?.nombre || 'Línea sin nombre'}
                 </span>
-                <span
-                  style={{
-                    marginLeft: '8px',
-                    fontSize: '0.7rem',
-                    padding: '2px 6px',
-                    borderRadius: '4px',
-                    background: '#374151',
-                    color: 'white',
-                    fontWeight: 'bold'
-                  }}
-                >
+                <span style={{ marginLeft: '8px', fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', background: '#374151', color: 'white', fontWeight: 'bold' }}>
                   {pines.find(p => p.id === pinActivo)?.tipo || 'DATA'}
                 </span>
               </div>
