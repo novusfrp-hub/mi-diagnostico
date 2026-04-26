@@ -1,41 +1,48 @@
-import React from 'react';
+import React, { useState } from 'react';
 
-export default function FPCInteligente({ pines, setPines, pinActivo, setPinActivo, modo = 'diagnostico', escala = 'diodo', lecturaEnVivo }) {
-  
-  // 🧠 TRUCO MAGICO: Extraemos los tipos dinámicamente de los pines que ya existen.
-  // Así no necesitas guardar la lista en la base de datos entera.
-  const tiposBase = ['DATA', 'VCC', 'GND', 'NC'];
-  const tiposCustom = pines.map(p => p.tipo).filter(t => t && !tiposBase.includes(t));
-  const tipos = [...new Set([...tiposBase, ...tiposCustom])];
+export default function FPCInteligente({ pines, setPines, pinActivo, setPinActivo, modo = 'diagnostico', escala = 'diodo', lecturaEnVivo, tiposDisponibles: tiposProp = ['DATA', 'VCC', 'GND', 'NC'], setTiposDisponibles }) {
+  const [tiposInternos, setTiposInternos] = useState(tiposProp);
+  const tipos = setTiposDisponibles ? tiposProp : tiposInternos;
+  const setTipos = setTiposDisponibles || setTiposInternos;
 
   const mitad = Math.ceil(pines.length / 2);
   const filaSup = pines.slice(0, mitad);
   const filaInf = pines.slice(mitad);
 
-  // Al añadir un tipo, se le aplica directamente al pin activo
   const manejarAgregarTipo = () => {
-    const nuevoTipo = window.prompt('Ingrese el nombre del nuevo tipo (Ej: OL, I2C, SPI):', '');
+    const nuevoTipo = window.prompt('Ingrese el nombre del nuevo tipo de línea (Ej: I2C, SPI):', '');
     if (nuevoTipo && nuevoTipo.trim() !== '') {
       const tipoLimpio = nuevoTipo.trim().toUpperCase().replace(/\s+/g, '_');
-      setPines(prev => prev.map(p => 
-        p.id === pinActivo ? { ...p, tipo: tipoLimpio, nombre: tipoLimpio } : p
-      ));
+      if (!tipos.includes(tipoLimpio)) {
+        setTipos([...tipos, tipoLimpio]);
+        // Asignamos el nuevo tipo y nombre automáticamente al pin activo
+        setPines(prev => prev.map(p => 
+          p.id === pinActivo ? { ...p, tipo: tipoLimpio, nombre: tipoLimpio } : p
+        ));
+      } else {
+        alert('Este tipo ya existe en la lista.');
+      }
     }
   };
 
   const obtenerColorPin = (pin) => {
-    if (pin.tipo === 'GND') return '#4b5563';
-    if (pin.tipo === 'NC') return '#1e3a8a';
+    // Si el usuario le asignó un color personalizado, lo usamos. Si no, usamos el dorado por defecto.
+    const colorBase = pin.colorCustom || '#d4af37'; 
 
-    const doradoPcb = '#d4af37';
-
+    // MODO CREAR
     if (modo === 'crear') {
-      if (pinActivo === pin.id) return '#00ffff';
+      if (pinActivo === pin.id) return '#00ffff'; // El pin seleccionado siempre se ve Cian
+      if (pin.tipo === 'GND') return '#4b5563';
+      if (pin.tipo === 'NC') return '#1e3a8a';
       if (pin.tipo === 'VCC') return '#7f1d1d';
-      return doradoPcb;
+      return colorBase;
     }
 
-    if (!pin.valorActual || pin.valorActual === '---') return doradoPcb;
+    // MODO DIAGNÓSTICO
+    if (pin.tipo === 'GND') return '#4b5563';
+    if (pin.tipo === 'NC') return '#1e3a8a';
+    
+    if (!pin.valorActual || pin.valorActual === '---') return colorBase; // Muestra el color base si no se ha medido
     if (pin.valorActual === 'OL' && pin.valorSano !== 'OL') return '#f97316';
 
     const vAct = parseFloat(pin.valorActual);
@@ -112,7 +119,7 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
         border: '2px solid #374151',
         width: '100%',
         maxWidth: '100%',
-        overflow: 'hidden' // Evita que se salga del marco gris
+        overflow: 'hidden'
       }}
     >
       <style>{`
@@ -122,7 +129,6 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
         .fpc-scroll-container::-webkit-scrollbar-thumb:hover { background: #2563eb; }
       `}</style>
 
-      {/* EL CONTENEDOR DE SCROLL REPARADO */}
       <div 
         className="fpc-scroll-container"
         style={{ 
@@ -132,7 +138,6 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
           WebkitOverflowScrolling: 'touch'
         }}
       >
-        {/* LA CAJA NEGRA (width: max-content obliga a que se adapte exactamente a los pines) */}
         <div
           style={{
             display: 'flex',
@@ -147,9 +152,7 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
           <div style={{ display: 'flex', gap: '3px' }}>
             {filaSup.map((pin, i) => renderPin(pin, true, i === 0 || i === filaSup.length - 1))}
           </div>
-          
           <div style={{ height: '8px', backgroundColor: '#1a1a1a', borderRadius: '2px', width: '100%' }} />
-          
           <div style={{ display: 'flex', gap: '3px' }}>
             {filaInf.map((pin, i) => renderPin(pin, false, i === 0 || i === filaInf.length - 1))}
           </div>
@@ -172,6 +175,16 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
             </span>
             {modo === 'crear' ? (
               <div style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                
+                {/* LA NUEVA CAJA DE MUESTRAS DE COLOR */}
+                <input 
+                  type="color"
+                  value={pines.find(p => p.id === pinActivo)?.colorCustom || '#d4af37'}
+                  onChange={(e) => setPines(prev => prev.map(p => p.id === pinActivo ? { ...p, colorCustom: e.target.value } : p))}
+                  style={{ padding: '0', border: 'none', borderRadius: '5px', width: '28px', height: '28px', cursor: 'pointer', background: 'transparent' }}
+                  title="Color personalizado de la línea"
+                />
+
                 <input
                   value={pines.find(p => p.id === pinActivo)?.nombre || ''}
                   onChange={(e) =>
@@ -190,8 +203,7 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
                         p.id === pinActivo ? {
                           ...p,
                           tipo: val,
-                          // Si selecciona algo que no sea DATA ni VCC, se le asigna el nombre automáticamente
-                          ...(val !== 'DATA' && val !== 'VCC' ? { nombre: val } : {})
+                          nombre: val // <-- AHORA CUALQUIER TIPO CAMBIA EL NOMBRE AUTOMÁTICAMENTE
                         } : p
                       )
                     );
@@ -226,7 +238,8 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
                 </button>
               </div>
             ) : (
-              <div style={{ marginTop: '5px' }}>
+              <div style={{ marginTop: '5px', display:'flex', alignItems:'center' }}>
+                <span style={{ display: 'inline-block', width:'12px', height:'12px', borderRadius:'50%', backgroundColor: pines.find(p => p.id === pinActivo)?.colorCustom || '#d4af37', marginRight: '8px' }}></span>
                 <span style={{ display: 'inline-block', color: '#fff', fontSize: '0.85rem' }}>
                   {pines.find(p => p.id === pinActivo)?.nombre || 'Línea sin nombre'}
                 </span>
