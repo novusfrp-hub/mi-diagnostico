@@ -68,7 +68,17 @@ export default function AppDiagnostico() {
   );
   // ESTADOS ADMIN
   const [formId, setFormId] = useState(''); const [formPregunta, setFormPregunta] = useState(''); const [formTabsNota, setFormTabsNota] = useState([{ titulo: 'General', contenido: '' }]); const [formEsFinal, setFormEsFinal] = useState(false); const [formOpciones, setFormOpciones] = useState([{ texto: '', siguientePaso: '' }]); const [formImgUrl, setFormImgUrl] = useState(''); const [formImgTipo, setFormImgTipo] = useState('microscopio'); const [formVideoUrl, setFormVideoUrl] = useState(''); const [formEsFallaSerie, setFormEsFallaSerie] = useState(false); const [formTituloSerie, setFormTituloSerie] = useState(''); const [formDescSerie, setFormDescSerie] = useState(''); const [mensajeAdmin, setMensajeAdmin] = useState('');
-
+  // AUTO-SAVE HÍBRIDO
+  const {
+    cambiosPendientes: cambiosPendientesFpc,
+    guardando: guardandoFpc,
+    ultimaSincronizacion: ultimaSincFpc,
+    sincronizarAhora: sincronizarFpcAhora
+  } = useAutoSave(
+    fpcActivo ? `fpc_borrador_${modeloActivo?.id}_${fpcActivo.id}` : null,
+    fpcActivo,
+    guardarModeloActualDB
+  );
   // REFERENCIAS INMUTABLES
   const lecturaUsbRef = useRef(lecturaUsb); useEffect(() => { lecturaUsbRef.current = lecturaUsb; }, [lecturaUsb]);
   const libreriaVisibleRef = useRef(libreriaVisible); useEffect(() => { libreriaVisibleRef.current = libreriaVisible; }, [libreriaVisible]);
