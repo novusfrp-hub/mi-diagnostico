@@ -1,4 +1,5 @@
 /* eslint-disable */
+import useAutoSave from '../hooks/useAutoSave';
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { doc, setDoc, addDoc, collection, getDocs, deleteDoc, updateDoc } from 'firebase/firestore';
@@ -48,7 +49,23 @@ export default function AppDiagnostico() {
 
   // ESTADOS MULTÍMETRO
   const [usbConectado, setUsbConectado] = useState(false); const [lecturaUsb, setLecturaUsb] = useState({ valor: '----', unidad: '---' }); const [dispositivoUsb, setDispositivoUsb] = useState(null); const ordenCamposDock = ['vbus', 'dp', 'dm', 'cc1', 'cc2']; const [campoActivoDock, setCampoActivoDock] = useState('vbus'); const [pinActivoFpc, setPinActivoFpc] = useState(1); const [modoFpc, setModoFpc] = useState('crear'); const [escalaFpc, setEscalaFpc] = useState('diodo');
+export default function AppDiagnostico() {
+  const [pasoActual, setPasoActual] = useState(null);
+  // ... todos tus otros useState ...
 
+  // ==========================================
+  // AUTO-SAVE HÍBRIDO (localStorage + Firebase)
+  // ==========================================
+  const {
+    cambiosPendientes: cambiosPendientesFpc,
+    guardando: guardandoFpc,
+    ultimaSincronizacion: ultimaSincFpc,
+    sincronizarAhora: sincronizarFpcAhora
+  } = useAutoSave(
+    fpcActivo ? `fpc_borrador_${modeloActivo?.id}_${fpcActivo.id}` : null,
+    fpcActivo,
+    guardarModeloActualDB
+  );
   // ESTADOS ADMIN
   const [formId, setFormId] = useState(''); const [formPregunta, setFormPregunta] = useState(''); const [formTabsNota, setFormTabsNota] = useState([{ titulo: 'General', contenido: '' }]); const [formEsFinal, setFormEsFinal] = useState(false); const [formOpciones, setFormOpciones] = useState([{ texto: '', siguientePaso: '' }]); const [formImgUrl, setFormImgUrl] = useState(''); const [formImgTipo, setFormImgTipo] = useState('microscopio'); const [formVideoUrl, setFormVideoUrl] = useState(''); const [formEsFallaSerie, setFormEsFallaSerie] = useState(false); const [formTituloSerie, setFormTituloSerie] = useState(''); const [formDescSerie, setFormDescSerie] = useState(''); const [mensajeAdmin, setMensajeAdmin] = useState('');
 

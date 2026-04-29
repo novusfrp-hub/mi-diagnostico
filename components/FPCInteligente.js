@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { Save } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Save, Cloud, CloudOff, Check, AlertCircle } from 'lucide-react';
 
-export default function FPCInteligente({ pines, setPines, pinActivo, setPinActivo, modo = 'diagnostico', escala = 'diodo', lecturaEnVivo, tiposDisponibles: tiposProp = ['DATA', 'VCC', 'GND', 'NC'], setTiposDisponibles, onGuardar }) {
+export default function FPCInteligente({ pines, setPines, pinActivo, setPinActivo, modo = 'diagnostico', escala = 'diodo', lecturaEnVivo, tiposDisponibles: tiposProp = ['DATA', 'VCC', 'GND', 'NC'], setTiposDisponibles, onGuardar, cambiosPendientes = false, guardando = false, ultimaSincronizacion = null }) {
   const [tiposInternos, setTiposInternos] = useState(tiposProp);
   const tipos = setTiposDisponibles ? tiposProp : tiposInternos;
   const setTipos = setTiposDisponibles || setTiposInternos;
@@ -16,8 +16,7 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
       const tipoLimpio = nuevoTipo.trim().toUpperCase().replace(/\s+/g, '_');
       if (!tipos.includes(tipoLimpio)) {
         setTipos([...tipos, tipoLimpio]);
-        // Asignamos el nuevo tipo y nombre automáticamente al pin activo
-        setPines(prev => prev.map(p => 
+        setPines(prev => prev.map(p =>
           p.id === pinActivo ? { ...p, tipo: tipoLimpio, nombre: tipoLimpio } : p
         ));
       } else {
@@ -27,23 +26,20 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
   };
 
   const obtenerColorPin = (pin) => {
-    // Si el usuario le asignó un color personalizado, lo usamos. Si no, usamos el dorado por defecto.
-    const colorBase = pin.colorCustom || '#d4af37'; 
+    const colorBase = pin.colorCustom || '#d4af37';
 
-    // MODO CREAR
     if (modo === 'crear') {
-      if (pinActivo === pin.id) return '#00ffff'; // El pin seleccionado siempre se ve Cian
+      if (pinActivo === pin.id) return '#00ffff';
       if (pin.tipo === 'GND') return '#4b5563';
       if (pin.tipo === 'NC') return '#1e3a8a';
       if (pin.tipo === 'VCC') return '#7f1d1d';
       return colorBase;
     }
 
-    // MODO DIAGNÓSTICO
     if (pin.tipo === 'GND') return '#4b5563';
     if (pin.tipo === 'NC') return '#1e3a8a';
-    
-    if (!pin.valorActual || pin.valorActual === '---') return colorBase; // Muestra el color base si no se ha medido
+
+    if (!pin.valorActual || pin.valorActual === '---') return colorBase;
     if (pin.valorActual === 'OL' && pin.valorSano !== 'OL') return '#f97316';
 
     const vAct = parseFloat(pin.valorActual);
@@ -111,16 +107,26 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
     </div>
   );
 
+  // Formatear tiempo relativo
+  const tiempoRelativo = (fecha) => {
+    if (!fecha) return '';
+    const segundos = Math.floor((Date.now() - fecha.getTime()) / 1000);
+    if (segundos < 60) return `hace ${segundos}s`;
+    if (segundos < 3600) return `hace ${Math.floor(segundos / 60)}min`;
+    return `hace ${Math.floor(segundos / 3600)}h`;
+  };
+
   return (
     <div
       style={{
         backgroundColor: '#111827',
         padding: '15px',
         borderRadius: '15px',
-        border: '2px solid #374151',
+        border: cambiosPendientes ? '2px solid #f59e0b' : '2px solid #374151',
         width: '100%',
         maxWidth: '100%',
-        overflow: 'hidden'
+        overflow: 'hidden',
+        transition: 'border-color 0.3s'
       }}
     >
       <style>{`
@@ -130,40 +136,96 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
         .fpc-scroll-container::-webkit-scrollbar-thumb:hover { background: #2563eb; }
       `}</style>
 
-      {/* BARRA SUPERIOR CON BOTÓN GUARDAR */}
-      {onGuardar && (
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '10px' }}>
+      {/* BARRA SUPERIOR CON INDICADOR DE ESTADO Y BOTÓN GUARDAR */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
+
+        {/* Indicador de estado de sincronización */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {cambiosPendientes ? (
+            <span style={{
+              display: 'flex', alignItems: 'center', gap: '4px',
+              fontSize: '0.7rem', color: '#f59e0b',
+              backgroundColor: 'rgba(245, 158, 11, 0.1)',
+              padding: '4px 10px', borderRadius: '12px',
+              fontWeight: 'bold'
+            }}>
+              <AlertCircle size={14} />
+              Cambios locales sin guardar
+            </span>
+          ) : ultimaSincronizacion ? (
+            <span style={{
+              display: 'flex', alignItems: 'center', gap: '4px',
+              fontSize: '0.7rem', color: '#10b981',
+              backgroundColor: 'rgba(16, 185, 129, 0.1)',
+              padding: '4px 10px', borderRadius: '12px'
+            }}>
+              <Check size={14} />
+              Sincronizado {tiempoRelativo(ultimaSincronizacion)}
+            </span>
+          ) : (
+            <span style={{
+              display: 'flex', alignItems: 'center', gap: '4px',
+              fontSize: '0.7rem', color: '#6b7280',
+              padding: '4px 10px'
+            }}>
+              <Cloud size={14} />
+              Borrador local
+            </span>
+          )}
+        </div>
+
+        {/* Botón Guardar */}
+        {onGuardar && (
           <button
             onClick={onGuardar}
+            disabled={guardando}
             style={{
-              background: '#10b981',
+              background: cambiosPendientes ? '#f59e0b' : '#10b981',
               color: 'white',
               border: 'none',
               padding: '8px 16px',
               borderRadius: '8px',
               fontWeight: 'bold',
-              cursor: 'pointer',
+              cursor: guardando ? 'not-allowed' : 'pointer',
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
               fontSize: '0.8rem',
-              boxShadow: '0 0 10px rgba(16, 185, 129, 0.3)',
-              transition: 'all 0.2s'
+              boxShadow: cambiosPendientes
+                ? '0 0 15px rgba(245, 158, 11, 0.4)'
+                : '0 0 10px rgba(16, 185, 129, 0.3)',
+              transition: 'all 0.3s',
+              opacity: guardando ? 0.7 : 1,
+              animation: cambiosPendientes ? 'pulse 2s infinite' : 'none'
             }}
-            onMouseEnter={(e) => { e.target.style.background = '#059669'; e.target.style.boxShadow = '0 0 15px rgba(16, 185, 129, 0.5)'; }}
-            onMouseLeave={(e) => { e.target.style.background = '#10b981'; e.target.style.boxShadow = '0 0 10px rgba(16, 185, 129, 0.3)'; }}
+            title={cambiosPendientes ? 'Hay cambios sin guardar en la nube' : 'Todo está sincronizado'}
           >
-            <Save size={16} />
-            GUARDAR {modo === 'crear' ? 'VALORES SANOS' : 'MEDICIONES'}
+            {guardando ? (
+              <>
+                <span style={{
+                  width: '14px', height: '14px',
+                  border: '2px solid white',
+                  borderTopColor: 'transparent',
+                  borderRadius: '50%',
+                  animation: 'spin 0.8s linear infinite'
+                }} />
+                GUARDANDO...
+              </>
+            ) : (
+              <>
+                {cambiosPendientes ? <CloudOff size={16} /> : <Cloud size={16} />}
+                {cambiosPendientes ? 'SINCRONIZAR AHORA' : 'GUARDADO EN NUBE'}
+              </>
+            )}
           </button>
-        </div>
-      )}
+        )}
+      </div>
 
-      <div 
+      <div
         className="fpc-scroll-container"
-        style={{ 
-          width: '100%', 
-          overflowX: 'auto', 
+        style={{
+          width: '100%',
+          overflowX: 'auto',
           paddingBottom: '12px',
           WebkitOverflowScrolling: 'touch'
         }}
@@ -205,9 +267,8 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
             </span>
             {modo === 'crear' ? (
               <div style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-                
-                {/* CAJA DE MUESTRAS DE COLOR */}
-                <input 
+
+                <input
                   type="color"
                   value={pines.find(p => p.id === pinActivo)?.colorCustom || '#d4af37'}
                   onChange={(e) => setPines(prev => prev.map(p => p.id === pinActivo ? { ...p, colorCustom: e.target.value } : p))}
@@ -249,7 +310,7 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
                   onClick={manejarAgregarTipo}
                   style={{ background: '#0ea5e9', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '5px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}
                 >
-                  + Añadir Línea
+                  + Añadir Tipo
                 </button>
 
                 <button
@@ -268,8 +329,8 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
                 </button>
               </div>
             ) : (
-              <div style={{ marginTop: '5px', display:'flex', alignItems:'center' }}>
-                <span style={{ display: 'inline-block', width:'12px', height:'12px', borderRadius:'50%', backgroundColor: pines.find(p => p.id === pinActivo)?.colorCustom || '#d4af37', marginRight: '8px' }}></span>
+              <div style={{ marginTop: '5px', display: 'flex', alignItems: 'center' }}>
+                <span style={{ display: 'inline-block', width: '12px', height: '12px', borderRadius: '50%', backgroundColor: pines.find(p => p.id === pinActivo)?.colorCustom || '#d4af37', marginRight: '8px' }}></span>
                 <span style={{ display: 'inline-block', color: '#fff', fontSize: '0.85rem' }}>
                   {pines.find(p => p.id === pinActivo)?.nombre || 'Línea sin nombre'}
                 </span>
@@ -298,6 +359,18 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
           </div>
         </div>
       </div>
+
+      {/* Animaciones CSS */}
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { box-shadow: 0 0 15px rgba(245, 158, 11, 0.4); }
+          50% { box-shadow: 0 0 25px rgba(245, 158, 11, 0.7); }
+        }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 }
