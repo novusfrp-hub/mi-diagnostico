@@ -1,5 +1,4 @@
 /* eslint-disable */
-import useAutoSave from '../hooks/useAutoSave';
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { doc, setDoc, addDoc, collection, getDocs, deleteDoc, updateDoc } from 'firebase/firestore';
@@ -8,6 +7,7 @@ import { db, auth } from '../firebase';
 import { Sun, Moon, ArrowLeft, RefreshCcw, Zap, Smartphone, AlertTriangle, ChevronRight, Home, ShieldCheck, Camera, CheckCircle2, XCircle, Settings, Plus, Save, X, Trash2, Edit, ChevronDown, CornerDownRight, LogOut, Lightbulb, Usb, Map, Play, Flame, ClipboardList, History, Printer, FileText, MessageCircle, Link, Monitor, Mic, MicOff, Cpu, Image as ImageIcon } from 'lucide-react';
 
 import FPCInteligente from '../components/FPCInteligente.js';
+import useAutoSave from '../hooks/useAutoSave';
 
 const obtenerUrlVideo = (url) => { if (!url) return ''; let v = ''; if (url.includes('youtu.be/')) v = url.split('youtu.be/')[1].split('?')[0]; else if (url.includes('youtube.com/watch')) v = new URLSearchParams(url.split('?')[1]).get('v'); else if (url.includes('youtube.com/embed/')) return url; return v ? `https://www.youtube.com/embed/${v}` : url; };
 
@@ -49,26 +49,11 @@ export default function AppDiagnostico() {
 
   // ESTADOS MULTÍMETRO
   const [usbConectado, setUsbConectado] = useState(false); const [lecturaUsb, setLecturaUsb] = useState({ valor: '----', unidad: '---' }); const [dispositivoUsb, setDispositivoUsb] = useState(null); const ordenCamposDock = ['vbus', 'dp', 'dm', 'cc1', 'cc2']; const [campoActivoDock, setCampoActivoDock] = useState('vbus'); const [pinActivoFpc, setPinActivoFpc] = useState(1); const [modoFpc, setModoFpc] = useState('crear'); const [escalaFpc, setEscalaFpc] = useState('diodo');
-export default function AppDiagnostico() {
-  const [pasoActual, setPasoActual] = useState(null);
-  // ... todos tus otros useState ...
 
-  // ==========================================
-  // AUTO-SAVE HÍBRIDO (localStorage + Firebase)
-  // ==========================================
-  const {
-    cambiosPendientes: cambiosPendientesFpc,
-    guardando: guardandoFpc,
-    ultimaSincronizacion: ultimaSincFpc,
-    sincronizarAhora: sincronizarFpcAhora
-  } = useAutoSave(
-    fpcActivo ? `fpc_borrador_${modeloActivo?.id}_${fpcActivo.id}` : null,
-    fpcActivo,
-    guardarModeloActualDB
-  );
   // ESTADOS ADMIN
   const [formId, setFormId] = useState(''); const [formPregunta, setFormPregunta] = useState(''); const [formTabsNota, setFormTabsNota] = useState([{ titulo: 'General', contenido: '' }]); const [formEsFinal, setFormEsFinal] = useState(false); const [formOpciones, setFormOpciones] = useState([{ texto: '', siguientePaso: '' }]); const [formImgUrl, setFormImgUrl] = useState(''); const [formImgTipo, setFormImgTipo] = useState('microscopio'); const [formVideoUrl, setFormVideoUrl] = useState(''); const [formEsFallaSerie, setFormEsFallaSerie] = useState(false); const [formTituloSerie, setFormTituloSerie] = useState(''); const [formDescSerie, setFormDescSerie] = useState(''); const [mensajeAdmin, setMensajeAdmin] = useState('');
-  // AUTO-SAVE HÍBRIDO
+
+  // AUTO-SAVE HÍBRIDO (localStorage + Firebase)
   const {
     cambiosPendientes: cambiosPendientesFpc,
     guardando: guardandoFpc,
@@ -79,6 +64,7 @@ export default function AppDiagnostico() {
     fpcActivo,
     guardarModeloActualDB
   );
+
   // REFERENCIAS INMUTABLES
   const lecturaUsbRef = useRef(lecturaUsb); useEffect(() => { lecturaUsbRef.current = lecturaUsb; }, [lecturaUsb]);
   const libreriaVisibleRef = useRef(libreriaVisible); useEffect(() => { libreriaVisibleRef.current = libreriaVisible; }, [libreriaVisible]);
@@ -366,7 +352,7 @@ export default function AppDiagnostico() {
                 <div style={{ padding: '15px 20px', borderBottom: '1px solid #374151', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
                   <h2 style={{ color: 'white', margin: 0, fontSize: '1.2rem' }}>{modeloActivo ? `${modeloActivo.marca} ${modeloActivo.nombre}` : 'Selecciona Modelo'}</h2>
                   <div style={{ display: 'flex', gap: '10px' }}>
-                    {modeloActivo && <button onClick={guardarModeloActualDB} style={{ background: '#10b981', color: 'white', border: 'none', padding: '8px 15px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}><Save size={16} /> Guardar</button>}
+                    {modeloActivo && <button onClick={sincronizarFpcAhora} style={{ background: '#10b981', color: 'white', border: 'none', padding: '8px 15px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}><Save size={16} /> Guardar</button>}
                     <button onClick={() => setLibreriaVisible(false)} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', cursor: 'pointer', padding: '8px', borderRadius: '8px' }}><X size={16} /></button>
                   </div>
                 </div>
@@ -451,7 +437,6 @@ export default function AppDiagnostico() {
                 {/* Botones de imagen Placa/Esquema + herramientas */}
                 <div style={{ display: 'flex', gap: '5px', backgroundColor: '#1a1a1a', padding: '4px', borderRadius: '8px', alignItems: 'center' }}>
                   <BotonesImagenFPC />
-                  
                   <button onClick={editarPinesFpcActivo} style={{ padding: '6px 10px', borderRadius: '6px', border: 'none', background: 'transparent', color: '#eab308', fontWeight: 'bold', cursor: 'pointer', marginLeft: '5px' }}>✏️ Pines</button>
                   <button onClick={() => { eliminarFpcActivo(); setModalFpcAbierto(false); }} style={{ padding: '6px 10px', borderRadius: '6px', border: 'none', background: 'transparent', color: '#ef4444', fontWeight: 'bold', cursor: 'pointer' }}>🗑️</button>
                 </div>
@@ -471,11 +456,23 @@ export default function AppDiagnostico() {
               <VisorHUD valor={lecturaUsb.valor} unidad={lecturaUsb.unidad} conectado={usbConectado} conectarFn={conectarMultimetroUSB} desconectarFn={desconectarMultimetroUSB} vozActiva={vozActiva} toggleVozFn={toggleVoz} autoHoldActivo={autoHoldActivo} toggleAutoHoldFn={() => setAutoHoldActivo(!autoHoldActivo)} />
             </div>
             <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '0 20px 20px 20px' }}>
-              <FPCInteligente pines={fpcActivo.pines} setPines={(updater) => {
-                const arrNuevo = typeof updater === 'function' ? updater(fpcActivo.pines) : updater;
-                const fpcMod = { ...fpcActivo, pines: arrNuevo }; setFpcActivo(fpcMod);
-                setModeloActivo(prev => ({ ...prev, fpcs: prev.fpcs.map(f => f.id === fpcMod.id ? fpcMod : f) }));
-              }} pinActivo={pinActivoFpc} setPinActivo={setPinActivoFpc} modo={modoFpc} escala={escalaFpc} lecturaEnVivo={lecturaUsb.valor}  onGuardar={guardarModeloActualDB} />
+              <FPCInteligente 
+                pines={fpcActivo.pines} 
+                setPines={(updater) => {
+                  const arrNuevo = typeof updater === 'function' ? updater(fpcActivo.pines) : updater;
+                  const fpcMod = { ...fpcActivo, pines: arrNuevo }; setFpcActivo(fpcMod);
+                  setModeloActivo(prev => ({ ...prev, fpcs: prev.fpcs.map(f => f.id === fpcMod.id ? fpcMod : f) }));
+                }} 
+                pinActivo={pinActivoFpc} 
+                setPinActivo={setPinActivoFpc} 
+                modo={modoFpc} 
+                escala={escalaFpc} 
+                lecturaEnVivo={lecturaUsb.valor}
+                onGuardar={sincronizarFpcAhora}
+                cambiosPendientes={cambiosPendientesFpc}
+                guardando={guardandoFpc}
+                ultimaSincronizacion={ultimaSincFpc}
+              />
             </div>
           </motion.div>
         )}
@@ -492,7 +489,6 @@ export default function AppDiagnostico() {
                   <span style={{ color: 'white', fontWeight: 'bold' }}>Vista: {tipoImagenViendo === 'placa' ? 'Placa Base' : 'Esquemático'} ({fpcActivo.nombre})</span>
                 </div>
                 <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
-                  {/* Toggle entre Placa y Esquema si ambas existen */}
                   {fpcActivo.imgPlaca && fpcActivo.imgEsquema && (
                     <div style={{ display: 'flex', gap: '5px', backgroundColor: '#1a1a1a', padding: '4px', borderRadius: '8px' }}>
                       <button onClick={() => setTipoImagenViendo('placa')} style={{ padding: '6px 10px', borderRadius: '6px', border: 'none', background: tipoImagenViendo === 'placa' ? '#3b82f6' : 'transparent', color: tipoImagenViendo === 'placa' ? 'white' : '#9ca3af', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}><ImageIcon size={14} /> Placa</button>
@@ -510,9 +506,6 @@ export default function AppDiagnostico() {
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* --- MODALES DE DIAGNÓSTICO EXISTENTES (Tips, Imagen, Video, Bitácora, Historial, Reporte) --- */}
-      {/* ... (mantener los modales existentes sin cambios) ... */}
 
       <AnimatePresence>
         {mostrarAdmin && !libreriaVisible && (
