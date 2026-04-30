@@ -53,18 +53,6 @@ export default function AppDiagnostico() {
   // ESTADOS ADMIN
   const [formId, setFormId] = useState(''); const [formPregunta, setFormPregunta] = useState(''); const [formTabsNota, setFormTabsNota] = useState([{ titulo: 'General', contenido: '' }]); const [formEsFinal, setFormEsFinal] = useState(false); const [formOpciones, setFormOpciones] = useState([{ texto: '', siguientePaso: '' }]); const [formImgUrl, setFormImgUrl] = useState(''); const [formImgTipo, setFormImgTipo] = useState('microscopio'); const [formVideoUrl, setFormVideoUrl] = useState(''); const [formEsFallaSerie, setFormEsFallaSerie] = useState(false); const [formTituloSerie, setFormTituloSerie] = useState(''); const [formDescSerie, setFormDescSerie] = useState(''); const [mensajeAdmin, setMensajeAdmin] = useState('');
 
-  // AUTO-SAVE HÍBRIDO (localStorage + Firebase)
-  const {
-    cambiosPendientes: cambiosPendientesFpc,
-    guardando: guardandoFpc,
-    ultimaSincronizacion: ultimaSincFpc,
-    sincronizarAhora: sincronizarFpcAhora
-  } = useAutoSave(
-    fpcActivo ? `fpc_borrador_${modeloActivo?.id}_${fpcActivo.id}` : null,
-    fpcActivo,
-    guardarModeloActualDB
-  );
-
   // REFERENCIAS INMUTABLES
   const lecturaUsbRef = useRef(lecturaUsb); useEffect(() => { lecturaUsbRef.current = lecturaUsb; }, [lecturaUsb]);
   const libreriaVisibleRef = useRef(libreriaVisible); useEffect(() => { libreriaVisibleRef.current = libreriaVisible; }, [libreriaVisible]);
@@ -187,6 +175,18 @@ export default function AppDiagnostico() {
     } 
   };
 
+  // AUTO-SAVE HÍBRIDO (localStorage + Firebase) - AHORA DESPUÉS DE guardarModeloActualDB
+  const {
+    cambiosPendientes: cambiosPendientesFpc,
+    guardando: guardandoFpc,
+    ultimaSincronizacion: ultimaSincFpc,
+    sincronizarAhora: sincronizarFpcAhora
+  } = useAutoSave(
+    fpcActivo ? `fpc_borrador_${modeloActivo?.id}_${fpcActivo.id}` : null,
+    fpcActivo,
+    guardarModeloActualDB
+  );
+
   const abrirLibreria = () => { setLibreriaVisible(true); cargarLibreriaDB(); };
 
   // DIAGNÓSTICO BÁSICO (Flujos)
@@ -221,7 +221,7 @@ export default function AppDiagnostico() {
   if (!pasoActual) return <div style={{ height: '100vh', backgroundColor: '#111827', display: 'flex', justifyContent: 'center', alignItems: 'center' }}><h2 style={{ color: '#0ff' }}>Iniciando Marshall Cell...</h2></div>;
   const t = estilos[tema]; const tieneTips = pasoActual.tabsNota && pasoActual.tabsNota.length > 0;
 
-  // Componente renderizador de botones de imagen para FPC (reutilizable)
+  // Componente renderizador de botones de imagen para FPC
   const BotonesImagenFPC = ({ compacto = false }) => {
     if (!fpcActivo) return null;
     return (
@@ -433,14 +433,11 @@ export default function AppDiagnostico() {
                 <span style={{ fontSize: '0.7rem', padding: '3px 8px', borderRadius: '12px', background: '#1f2937', color: '#9ca3af', fontWeight: 'bold' }}>{fpcActivo.pines.length} PINES</span>
               </div>
               <div className="fpc-tools" style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                
-                {/* Botones de imagen Placa/Esquema + herramientas */}
                 <div style={{ display: 'flex', gap: '5px', backgroundColor: '#1a1a1a', padding: '4px', borderRadius: '8px', alignItems: 'center' }}>
                   <BotonesImagenFPC />
                   <button onClick={editarPinesFpcActivo} style={{ padding: '6px 10px', borderRadius: '6px', border: 'none', background: 'transparent', color: '#eab308', fontWeight: 'bold', cursor: 'pointer', marginLeft: '5px' }}>✏️ Pines</button>
                   <button onClick={() => { eliminarFpcActivo(); setModalFpcAbierto(false); }} style={{ padding: '6px 10px', borderRadius: '6px', border: 'none', background: 'transparent', color: '#ef4444', fontWeight: 'bold', cursor: 'pointer' }}>🗑️</button>
                 </div>
-
                 <div style={{ display: 'flex', gap: '5px', backgroundColor: '#1a1a1a', padding: '4px', borderRadius: '8px' }}>
                   <button onClick={() => setEscalaFpc('diodo')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: escalaFpc === 'diodo' ? '#8b5cf6' : 'transparent', color: escalaFpc === 'diodo' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}>Diodo</button>
                   <button onClick={() => setEscalaFpc('ua')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: escalaFpc === 'ua' ? '#10b981' : 'transparent', color: escalaFpc === 'ua' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}>uA</button>
