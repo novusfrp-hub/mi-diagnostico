@@ -7,6 +7,7 @@ import { db, auth } from '../firebase';
 import { Sun, Moon, ArrowLeft, RefreshCcw, Zap, Smartphone, AlertTriangle, ChevronRight, Home, ShieldCheck, Camera, CheckCircle2, XCircle, Settings, Plus, Save, X, Trash2, Edit, ChevronDown, CornerDownRight, LogOut, Lightbulb, Usb, Map, Play, Flame, ClipboardList, History, Printer, FileText, MessageCircle, Link, Monitor, Mic, MicOff, Cpu, Image as ImageIcon } from 'lucide-react';
 
 import FPCInteligente from '../components/FPCInteligente.js';
+import EscanerRFFE from '../components/EscanerRFFE.js';
 import useAutoSave from '../hooks/useAutoSave';
 
 const obtenerUrlVideo = (url) => { if (!url) return ''; let v = ''; if (url.includes('youtu.be/')) v = url.split('youtu.be/')[1].split('?')[0]; else if (url.includes('youtube.com/watch')) v = new URLSearchParams(url.split('?')[1]).get('v'); else if (url.includes('youtube.com/embed/')) return url; return v ? `https://www.youtube.com/embed/${v}` : url; };
@@ -50,6 +51,9 @@ export default function AppDiagnostico() {
   // ESTADOS MULTÍMETRO
   const [usbConectado, setUsbConectado] = useState(false); const [lecturaUsb, setLecturaUsb] = useState({ valor: '----', unidad: '---' }); const [dispositivoUsb, setDispositivoUsb] = useState(null); const ordenCamposDock = ['vbus', 'dp', 'dm', 'cc1', 'cc2']; const [campoActivoDock, setCampoActivoDock] = useState('vbus'); const [pinActivoFpc, setPinActivoFpc] = useState(1); const [modoFpc, setModoFpc] = useState('crear'); const [escalaFpc, setEscalaFpc] = useState('diodo');
 
+  // ESTADOS RFFE
+  const [lecturaRffe, setLecturaRffe] = useState('0x00'); const [dispositivoSerial, setDispositivoSerial] = useState(null);
+
   // ESTADOS ADMIN
   const [formId, setFormId] = useState(''); const [formPregunta, setFormPregunta] = useState(''); const [formTabsNota, setFormTabsNota] = useState([{ titulo: 'General', contenido: '' }]); const [formEsFinal, setFormEsFinal] = useState(false); const [formOpciones, setFormOpciones] = useState([{ texto: '', siguientePaso: '' }]); const [formImgUrl, setFormImgUrl] = useState(''); const [formImgTipo, setFormImgTipo] = useState('microscopio'); const [formVideoUrl, setFormVideoUrl] = useState(''); const [formEsFallaSerie, setFormEsFallaSerie] = useState(false); const [formTituloSerie, setFormTituloSerie] = useState(''); const [formDescSerie, setFormDescSerie] = useState(''); const [mensajeAdmin, setMensajeAdmin] = useState('');
 
@@ -64,6 +68,7 @@ export default function AppDiagnostico() {
   const pinActivoFpcRef = useRef(pinActivoFpc); useEffect(() => { pinActivoFpcRef.current = pinActivoFpc; }, [pinActivoFpc]);
   const modoFpcRef = useRef(modoFpc); useEffect(() => { modoFpcRef.current = modoFpc; }, [modoFpc]);
   const [autoHoldActivo, setAutoHoldActivo] = useState(false); const autoHoldActivoRef = useRef(autoHoldActivo); useEffect(() => { autoHoldActivoRef.current = autoHoldActivo; }, [autoHoldActivo]);
+  const lecturaRffeRef = useRef(lecturaRffe); useEffect(() => { lecturaRffeRef.current = lecturaRffe; }, [lecturaRffe]);
   const autoHoldValueRef = useRef(null); const autoHoldStartTimeRef = useRef(0); const autoHoldTriggeredRef = useRef(false);
 
   const reproducirBip = () => { try { const audioCtx = new (window.AudioContext || window.webkitAudioContext)(); const oscillator = audioCtx.createOscillator(); oscillator.type = 'sine'; oscillator.frequency.setValueAtTime(1200, audioCtx.currentTime); oscillator.connect(audioCtx.destination); oscillator.start(); oscillator.stop(audioCtx.currentTime + 0.1); } catch (e) { } };
@@ -126,6 +131,35 @@ export default function AppDiagnostico() {
   };
   const desconectarMultimetroUSB = async () => { if (dispositivoUsb) { try { await dispositivoUsb.close(); } catch (e) { } setDispositivoUsb(null); } setUsbConectado(false); setLecturaUsb({ valor: '----', unidad: '---' }); };
 
+  // WEBSERIAL RFFE (RP2040)
+  const conectarEscanerRFFE = async () => {
+    if (typeof navigator === 'undefined' || !navigator.serial) { alert("Navegador no soporta Serial."); return; }
+    try {
+      const port = await navigator.serial.requestPort(); await port.open({ baudRate: 115200 }); setDispositivoSerial(port);
+      const reader = port.readable.getReader();
+      while (true) {
+        const { value, done } = await reader.read(); if (done) break;
+        const text = new TextDecoder().decode(value).trim();
+        if (text.startsWith('0x')) setLecturaRffe(text);
+      }
+    } catch (e) { alert("Error Serial."); }
+  };
+
+  useEffect(() => {
+    if (!lecturaRffe || lecturaRffe === '0x00') return;
+    const timeout = setTimeout(() => {
+      reproducirBip();
+      setModeloActivo(prev => {
+        if (!prev || !prev.rffe_ics) return prev;
+        const nuevosIcs = prev.rffe_ics.map(ic => {
+          return { ...ic, mfgIdActual: lecturaRffe };
+        });
+        return { ...prev, rffe_ics: nuevosIcs };
+      });
+    }, 1000);
+    return () => clearTimeout(timeout);
+  }, [lecturaRffe]);
+
   useEffect(() => { const handleKeyDown = (e) => { if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return; if ((e.code === 'Space' || e.key === 'Enter') && libreriaVisible) { e.preventDefault(); avanzarPinMagico(); } }; window.addEventListener('keydown', handleKeyDown); return () => window.removeEventListener('keydown', handleKeyDown); }, [libreriaVisible]);
 
   // VOZ
@@ -156,7 +190,7 @@ export default function AppDiagnostico() {
 
   // LIBRERÍA CRUD
   const cargarLibreriaDB = async () => { try { const qs = await getDocs(collection(db, "hardware_db")); const arr = []; qs.forEach(doc => arr.push({ id: doc.id, ...doc.data() })); setModelosLibreria(arr); } catch (error) { } };
-  const crearNuevoModeloDB = async (e) => { e.preventDefault(); if (!formNuevoModelo.marca || !formNuevoModelo.nombre) return; const idUnico = `${formNuevoModelo.marca}_${formNuevoModelo.nombre}`.toLowerCase().replace(/\s+/g, '_'); const nuevoObj = { marca: formNuevoModelo.marca, nombre: formNuevoModelo.nombre, fpcs: [], docktestDiodo: { vbus: '---', dp: '---', dm: '---', cc1: '---', cc2: '---' }, docktestUa: { vbus: '---', dp: '---', dm: '---', cc1: '---', cc2: '---' } }; await setDoc(doc(db, "hardware_db", idUnico), nuevoObj); setFormNuevoModelo({ marca: '', nombre: '' }); cargarLibreriaDB(); setModeloActivo({ ...nuevoObj, id: idUnico }); };
+  const crearNuevoModeloDB = async (e) => { e.preventDefault(); if (!formNuevoModelo.marca || !formNuevoModelo.nombre) return; const idUnico = `${formNuevoModelo.marca}_${formNuevoModelo.nombre}`.toLowerCase().replace(/\s+/g, '_'); const nuevoObj = { marca: formNuevoModelo.marca, nombre: formNuevoModelo.nombre, fpcs: [], rffe_ics: [], docktestDiodo: { vbus: '---', dp: '---', dm: '---', cc1: '---', cc2: '---' }, docktestUa: { vbus: '---', dp: '---', dm: '---', cc1: '---', cc2: '---' } }; await setDoc(doc(db, "hardware_db", idUnico), nuevoObj); setFormNuevoModelo({ marca: '', nombre: '' }); cargarLibreriaDB(); setModeloActivo({ ...nuevoObj, id: idUnico }); };
   const guardarModeloActualDB = async () => { if (!modeloActivo) return; await setDoc(doc(db, "hardware_db", modeloActivo.id), modeloActivo); alert("¡Placa guardada en la nube de Marshall Cell!"); cargarLibreriaDB(); };
   
   const crearNuevoFpcEnModelo = () => { if (!formNuevoFpc.nombre || formNuevoFpc.pines <= 0) return; const pinesArray = Array.from({ length: parseInt(formNuevoFpc.pines) }, (_, i) => ({ id: i + 1, nombre: `Linea_${i + 1}`, valorSano: '---', valorActual: '---', tipo: 'DATA' })); const nuevoFpc = { id: Date.now().toString(), nombre: formNuevoFpc.nombre.replace(/ /g, '_'), pines: pinesArray, imgPlaca: '', imgEsquema: '' }; const modActualizado = { ...modeloActivo, fpcs: [...modeloActivo.fpcs, nuevoFpc] }; setModeloActivo(modActualizado); setFpcActivo(nuevoFpc); setFormNuevoFpc({ nombre: '', pines: 40 }); setPinActivoFpc(1); };
@@ -361,6 +395,7 @@ export default function AppDiagnostico() {
                     <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
                       <button onClick={() => setSeccionLibreria('docktest')} style={{ padding: '10px 15px', borderRadius: '8px', border: 'none', background: seccionLibreria === 'docktest' ? '#3b82f6' : '#1f2937', color: 'white', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>Docktest</button>
                       <button onClick={() => setSeccionLibreria('fpc')} style={{ padding: '10px 15px', borderRadius: '8px', border: 'none', background: seccionLibreria === 'fpc' ? '#8b5cf6' : '#1f2937', color: 'white', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>Planos FPC</button>
+                      <button onClick={() => setSeccionLibreria('rffe')} style={{ padding: '10px 15px', borderRadius: '8px', border: 'none', background: seccionLibreria === 'rffe' ? '#10b981' : '#1f2937', color: 'white', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>Módulo RFFE</button>
                     </div>
                     <VisorHUD valor={lecturaUsb.valor} unidad={lecturaUsb.unidad} conectado={usbConectado} conectarFn={conectarMultimetroUSB} desconectarFn={desconectarMultimetroUSB} vozActiva={vozActiva} toggleVozFn={toggleVoz} autoHoldActivo={autoHoldActivo} toggleAutoHoldFn={() => setAutoHoldActivo(!autoHoldActivo)} />
 
@@ -411,6 +446,22 @@ export default function AppDiagnostico() {
                             </div>
                           </div>
                         ) : (<div style={{ textAlign: 'center', padding: '50px', color: 'gray' }}><Map size={48} style={{ opacity: 0.3, marginBottom: '10px' }} /><p>Crea un FPC arriba para empezar a mapear.</p></div>)}
+                      </div>
+                    )}
+
+                    {seccionLibreria === 'rffe' && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                        <div style={{ backgroundColor: '#000', padding: '15px', borderRadius: '12px', border: '1px solid #333', display: 'flex', justifyContent: 'center' }}>
+                           <button onClick={conectarEscanerRFFE} style={{ background: dispositivoSerial ? 'rgba(16, 185, 129, 0.2)' : '#333', color: dispositivoSerial ? '#10b981' : 'white', border: 'none', padding: '10px 20px', borderRadius: '25px', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                             <Wifi size={18} /> {dispositivoSerial ? 'ESCÁNER RFFE CONECTADO' : 'CONECTAR ESCÁNER RP2040'}
+                           </button>
+                        </div>
+                        <EscanerRFFE
+                          modeloActivo={modeloActivo}
+                          setModeloActivo={setModeloActivo}
+                          modo={estaAutenticado ? 'crear' : 'diagnostico'}
+                          lecturaRffe={lecturaRffe}
+                        />
                       </div>
                     )}
                   </div>
