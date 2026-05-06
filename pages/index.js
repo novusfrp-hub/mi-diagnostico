@@ -459,7 +459,7 @@ export default function AppDiagnostico() {
                         <EscanerRFFE
                           modeloActivo={modeloActivo}
                           setModeloActivo={setModeloActivo}
-                          modo={estaAutenticado ? 'crear' : 'diagnostico'}
+                          modo={'crear'}
                           lecturaRffe={lecturaRffe}
                         />
                       </div>
