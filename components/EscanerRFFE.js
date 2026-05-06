@@ -482,7 +482,7 @@ const EscanerRFFE = ({ modeloActivo, setModeloActivo, modo = 'diagnostico', lect
                   {/* Imágenes de Placa / Esquemático */}
                   <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
                     {ic.imgPlaca ? (
-                      <button onClick={() => setImagenModal({ visible: true, url: ic.imgPlaca, titulo: \`Placa: \${ic.nombre}\` })} style={{ flex: 1, padding: '8px', borderRadius: '6px', border: 'none', backgroundColor: '#3b82f6', color: 'white', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '0.75rem' }}>
+                      <button onClick={() => setImagenModal({ visible: true, url: ic.imgPlaca, titulo: `Placa: ${ic.nombre}` })} style={{ flex: 1, padding: '8px', borderRadius: '6px', border: 'none', backgroundColor: '#3b82f6', color: 'white', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '0.75rem' }}>
                         <ImageIcon size={14} /> Ver Placa
                       </button>
                     ) : modo === 'crear' ? (
@@ -492,7 +492,7 @@ const EscanerRFFE = ({ modeloActivo, setModeloActivo, modo = 'diagnostico', lect
                     ) : null}
 
                     {ic.imgEsquema ? (
-                      <button onClick={() => setImagenModal({ visible: true, url: ic.imgEsquema, titulo: \`Esquema: \${ic.nombre}\` })} style={{ flex: 1, padding: '8px', borderRadius: '6px', border: 'none', backgroundColor: '#8b5cf6', color: 'white', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '0.75rem' }}>
+                      <button onClick={() => setImagenModal({ visible: true, url: ic.imgEsquema, titulo: `Esquema: ${ic.nombre}` })} style={{ flex: 1, padding: '8px', borderRadius: '6px', border: 'none', backgroundColor: '#8b5cf6', color: 'white', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '0.75rem' }}>
                         <Map size={14} /> Ver Esquema
                       </button>
                     ) : modo === 'crear' ? (
