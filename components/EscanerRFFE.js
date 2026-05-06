@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Cpu, Wifi, Database, Plus, CheckCircle2, XCircle, Trash2, Save, ChevronRight } from 'lucide-react';
+import { Cpu, Database, Plus, CheckCircle2, XCircle, Trash2, Save, ChevronRight } from 'lucide-react';
 
 const EscanerRFFE = ({ modeloActivo, setModeloActivo, modo = 'diagnostico', lecturaRffe = '0x00' }) => {
   const [icSeleccionado, setIcSeleccionado] = useState(null);

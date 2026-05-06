@@ -453,7 +453,7 @@ export default function AppDiagnostico() {
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                         <div style={{ backgroundColor: '#000', padding: '15px', borderRadius: '12px', border: '1px solid #333', display: 'flex', justifyContent: 'center' }}>
                            <button onClick={conectarEscanerRFFE} style={{ background: dispositivoSerial ? 'rgba(16, 185, 129, 0.2)' : '#333', color: dispositivoSerial ? '#10b981' : 'white', border: 'none', padding: '10px 20px', borderRadius: '25px', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                             <Wifi size={18} /> {dispositivoSerial ? 'ESCÁNER RFFE CONECTADO' : 'CONECTAR ESCÁNER RP2040'}
+                             <Link size={18} /> {dispositivoSerial ? 'ESCÁNER RFFE CONECTADO' : 'CONECTAR ESCÁNER RP2040'}
                            </button>
                         </div>
                         <EscanerRFFE
