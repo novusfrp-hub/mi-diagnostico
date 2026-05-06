@@ -11,6 +11,8 @@ const lineaVacia = () => ({
   nombre: 'SDA',
   color: '#00ffff',
   pullUp: false,
+  resistenciaNombre: '',
+  aliasBus: '',
   nota: ''
 });
 
@@ -259,16 +261,20 @@ const EscanerRFFE = ({ modeloActivo, setModeloActivo, modo = 'diagnostico', lect
                 {/* Controles de líneas (Izquierda) */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginRight: '0' }}>
                   {builderData.lineas.map(linea => (
-                    <div key={linea.id} style={{ display: 'flex', alignItems: 'center', height: '36px', gap: '8px' }}>
+                    <div key={linea.id} style={{ display: 'flex', alignItems: 'center', minHeight: '36px', gap: '8px', flexWrap: 'wrap' }}>
                       <button onClick={() => eliminarLinea(linea.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px' }}>
                         <Trash2 size={14} />
                       </button>
                       <input type="color" value={linea.color} onChange={e => actualizarLinea(linea.id, 'color', e.target.value)} style={{ width: '24px', height: '24px', border: 'none', borderRadius: '4px', cursor: 'pointer', backgroundColor: 'transparent', padding: 0 }} />
                       <input type="text" placeholder="Pin" value={linea.nombre} onChange={e => actualizarLinea(linea.id, 'nombre', e.target.value)} style={{ ...inputStyle, width: '70px', padding: '4px 8px' }} />
+                      <input type="text" placeholder="TP / Alias Bus" value={linea.aliasBus || ''} onChange={e => actualizarLinea(linea.id, 'aliasBus', e.target.value)} style={{ ...inputStyle, width: '100px', padding: '4px 8px', color: '#9ca3af' }} />
                       <input type="text" placeholder="Nota" value={linea.nota} onChange={e => actualizarLinea(linea.id, 'nota', e.target.value)} style={{ ...inputStyle, width: '100px', padding: '4px 8px' }} />
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#fbbf24', fontSize: '0.7rem', cursor: 'pointer', fontWeight: 'bold', marginLeft: '4px', marginRight: '8px' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#fbbf24', fontSize: '0.7rem', cursor: 'pointer', fontWeight: 'bold', marginLeft: '4px' }}>
                         <input type="checkbox" checked={linea.pullUp} onChange={e => actualizarLinea(linea.id, 'pullUp', e.target.checked)} /> R-Pull
                       </label>
+                      {linea.pullUp && (
+                        <input type="text" placeholder="Nombre R (R200)" value={linea.resistenciaNombre || ''} onChange={e => actualizarLinea(linea.id, 'resistenciaNombre', e.target.value)} style={{ ...inputStyle, width: '90px', padding: '4px 8px', color: '#fbbf24', borderColor: '#fbbf2466' }} />
+                      )}
                       {/* Trazo CSS */}
                       <div style={{ width: '60px', height: '2px', backgroundColor: linea.color, boxShadow: `0 0 4px ${linea.color}` }}></div>
                     </div>
@@ -422,12 +428,19 @@ const EscanerRFFE = ({ modeloActivo, setModeloActivo, modo = 'diagnostico', lect
                                 {linea.nota}
                               </span>
                             )}
-                            <span style={{ color: linea.color, fontSize: '0.75rem', fontWeight: 'bold', width: '40px', textAlign: 'right', marginRight: '8px' }}>
-                              {linea.nombre}
-                            </span>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', marginRight: '8px', minWidth: '50px' }}>
+                              <span style={{ color: linea.color, fontSize: '0.75rem', fontWeight: 'bold', lineHeight: 1 }}>
+                                {linea.nombre}
+                              </span>
+                              {linea.aliasBus && (
+                                <span style={{ color: '#9ca3af', fontSize: '0.55rem', lineHeight: 1, marginTop: '1px' }}>
+                                  {linea.aliasBus}
+                                </span>
+                              )}
+                            </div>
                             {linea.pullUp && (
-                              <span style={{ fontSize: '0.6rem', color: '#fbbf24', marginRight: '6px', padding: '1px 4px', border: '1px solid #fbbf24', borderRadius: '3px', fontWeight: 'bold' }}>
-                                R↑
+                              <span style={{ fontSize: '0.6rem', color: '#fbbf24', marginRight: '6px', padding: '1px 4px', border: '1px solid #fbbf24', borderRadius: '3px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
+                                R↑ {linea.resistenciaNombre || ''}
                               </span>
                             )}
                             <div style={{ width: '50px', height: '2px', backgroundColor: linea.color, boxShadow: `0 0 4px ${linea.color}` }}></div>
