@@ -4,6 +4,7 @@ import { Cpu, Database, Plus, CheckCircle2, XCircle, Trash2, Save, ChevronRight 
 const EscanerRFFE = ({ modeloActivo, setModeloActivo, modo = 'diagnostico', lecturaRffe = '0x00' }) => {
   const [icSeleccionado, setIcSeleccionado] = useState(null);
   const [nuevoIc, setNuevoIc] = useState({ nombre: '', nomenclatura: '', mfgIdSano: '', prodIdSano: '' });
+  const [mostrarFormNuevo, setMostrarFormNuevo] = useState(false);
 
   const rffeIcs = modeloActivo?.rffe_ics || [];
 
@@ -22,6 +23,7 @@ const EscanerRFFE = ({ modeloActivo, setModeloActivo, modo = 'diagnostico', lect
     };
     setModeloActivo(nuevoModelo);
     setNuevoIc({ nombre: '', nomenclatura: '', mfgIdSano: '', prodIdSano: '' });
+    setMostrarFormNuevo(false);
   };
 
   const eliminarIC = (id) => {
@@ -49,32 +51,39 @@ const EscanerRFFE = ({ modeloActivo, setModeloActivo, modo = 'diagnostico', lect
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: modo === 'crear' ? '1fr 1fr' : '1fr', gap: '20px' }}>
-        {/* Lado Izquierdo: Formulario (Solo modo crear) */}
-        {modo === 'crear' && (
-          <div style={{ backgroundColor: '#1a1a1a', padding: '15px', borderRadius: '10px', border: '1px solid #333' }}>
-            <h3 style={{ fontSize: '0.9rem', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '8px', color: '#3b82f6' }}>
-              <Plus size={18} /> REGISTRAR NUEVO IC
-            </h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <input type="text" placeholder="Nombre (ej. Transceptor)" value={nuevoIc.nombre} onChange={e => setNuevoIc({...nuevoIc, nombre: e.target.value})} style={{ backgroundColor: '#111827', border: '1px solid #374151', color: 'white', padding: '8px', borderRadius: '6px', fontSize: '0.8rem' }} />
-              <input type="text" placeholder="Nomenclatura (ej. U3001)" value={nuevoIc.nomenclatura} onChange={e => setNuevoIc({...nuevoIc, nomenclatura: e.target.value})} style={{ backgroundColor: '#111827', border: '1px solid #374151', color: 'white', padding: '8px', borderRadius: '6px', fontSize: '0.8rem' }} />
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                <input type="text" placeholder="mfgId Sano (0x00)" value={nuevoIc.mfgIdSano} onChange={e => setNuevoIc({...nuevoIc, mfgIdSano: e.target.value})} style={{ backgroundColor: '#111827', border: '1px solid #374151', color: 'white', padding: '8px', borderRadius: '6px', fontSize: '0.8rem' }} />
-                <input type="text" placeholder="prodId Sano (0x00)" value={nuevoIc.prodIdSano} onChange={e => setNuevoIc({...nuevoIc, prodIdSano: e.target.value})} style={{ backgroundColor: '#111827', border: '1px solid #374151', color: 'white', padding: '8px', borderRadius: '6px', fontSize: '0.8rem' }} />
-              </div>
-              <button onClick={handleAgregarIC} style={{ backgroundColor: '#3b82f6', color: 'white', border: 'none', padding: '10px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', marginTop: '5px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                <Save size={16} /> GUARDAR EN MODELO
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Lado Derecho/Principal: Lista de ICs */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        {/* Principal: Lista de ICs y Formulario */}
         <div>
-          <h3 style={{ fontSize: '0.9rem', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '8px', color: '#9ca3af' }}>
-            <Database size={18} /> MAPA RFFE DEL DISPOSITIVO
-          </h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+            <h3 style={{ fontSize: '0.9rem', margin: 0, display: 'flex', alignItems: 'center', gap: '8px', color: '#9ca3af' }}>
+              <Database size={18} /> MAPA RFFE DEL DISPOSITIVO
+            </h3>
+            {modo === 'crear' && (
+              <button 
+                onClick={() => setMostrarFormNuevo(!mostrarFormNuevo)} 
+                style={{ backgroundColor: mostrarFormNuevo ? '#ef4444' : '#3b82f6', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.75rem' }}
+              >
+                {mostrarFormNuevo ? <XCircle size={14} /> : <Plus size={14} />} {mostrarFormNuevo ? 'Cancelar' : 'Añadir IC RFFE'}
+              </button>
+            )}
+          </div>
+
+          {modo === 'crear' && mostrarFormNuevo && (
+            <div style={{ backgroundColor: '#1a1a1a', padding: '15px', borderRadius: '10px', border: '1px dashed #3b82f6', marginBottom: '20px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '10px', marginBottom: '10px' }}>
+                <input type="text" placeholder="Nombre (ej. Transceptor)" value={nuevoIc.nombre} onChange={e => setNuevoIc({...nuevoIc, nombre: e.target.value})} style={{ backgroundColor: '#111827', border: '1px solid #374151', color: 'white', padding: '8px', borderRadius: '6px', fontSize: '0.8rem' }} />
+                <input type="text" placeholder="Nomenclatura (ej. U3001)" value={nuevoIc.nomenclatura} onChange={e => setNuevoIc({...nuevoIc, nomenclatura: e.target.value})} style={{ backgroundColor: '#111827', border: '1px solid #374151', color: 'white', padding: '8px', borderRadius: '6px', fontSize: '0.8rem' }} />
+                <input type="text" placeholder="Mfg ID (ej. 0x20)" value={nuevoIc.mfgIdSano} onChange={e => setNuevoIc({...nuevoIc, mfgIdSano: e.target.value})} style={{ backgroundColor: '#111827', border: '1px solid #374151', color: 'white', padding: '8px', borderRadius: '6px', fontSize: '0.8rem' }} />
+                <input type="text" placeholder="Prod ID (ej. 0x1B)" value={nuevoIc.prodIdSano} onChange={e => setNuevoIc({...nuevoIc, prodIdSano: e.target.value})} style={{ backgroundColor: '#111827', border: '1px solid #374151', color: 'white', padding: '8px', borderRadius: '6px', fontSize: '0.8rem' }} />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <button onClick={handleAgregarIC} style={{ backgroundColor: '#10b981', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem' }}>
+                  <Save size={16} /> Guardar IC
+                </button>
+              </div>
+            </div>
+          )}
+
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '12px' }}>
             {rffeIcs.map(ic => {
               const coincide = ic.mfgIdActual === ic.mfgIdSano && ic.mfgIdActual !== '---';
