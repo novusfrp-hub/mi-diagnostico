@@ -214,7 +214,8 @@ export default function AppDiagnostico() {
     cambiosPendientes: cambiosPendientesFpc,
     guardando: guardandoFpc,
     ultimaSincronizacion: ultimaSincFpc,
-    sincronizarAhora: sincronizarFpcAhora
+    sincronizarAhora: sincronizarFpcAhora,
+    descartarCambios: descartarCambiosFpc
   } = useAutoSave(
     fpcActivo ? `fpc_borrador_${modeloActivo?.id}_${fpcActivo.id}` : null,
     fpcActivo,
@@ -487,6 +488,9 @@ export default function AppDiagnostico() {
                 <div style={{ display: 'flex', gap: '5px', backgroundColor: '#1a1a1a', padding: '4px', borderRadius: '8px', alignItems: 'center' }}>
                   <BotonesImagenFPC />
                   <button onClick={editarPinesFpcActivo} style={{ padding: '6px 10px', borderRadius: '6px', border: 'none', background: 'transparent', color: '#eab308', fontWeight: 'bold', cursor: 'pointer', marginLeft: '5px' }}>✏️ Pines</button>
+                  {cambiosPendientesFpc && (
+                    <button onClick={() => { descartarCambiosFpc(); setFpcActivo(prev => prev ? {...prev} : null); }} style={{ padding: '6px 10px', borderRadius: '6px', border: '1px dashed #6b7280', background: 'transparent', color: '#9ca3af', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.65rem' }}>↩ Descartar</button>
+                  )}
                   <button onClick={() => { eliminarFpcActivo(); setModalFpcAbierto(false); }} style={{ padding: '6px 10px', borderRadius: '6px', border: 'none', background: 'transparent', color: '#ef4444', fontWeight: 'bold', cursor: 'pointer' }}>🗑️</button>
                 </div>
                 <div style={{ display: 'flex', gap: '5px', backgroundColor: '#1a1a1a', padding: '4px', borderRadius: '8px' }}>
@@ -675,6 +679,185 @@ export default function AppDiagnostico() {
                   <button onClick={guardarPasoFirebase} style={{ ...estilos.btnPrimarioGuardar, width: '100%', marginTop: '20px', padding: '15px', justifyContent: 'center' }}>Guardar Paso en la Nube</button>
                 </div>
               )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* --- MODAL 7: TIPS / WIKI TÉCNICA --- */}
+      <AnimatePresence>
+        {notaVisible && pasoActual?.tabsNota?.length > 0 && (
+          <motion.div className="no-print" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={estilos.modalOverlay} onClick={() => setNotaVisible(false)}>
+            <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} style={{ ...estilos.modalCard, ...t.fondoPrincipal, ...t.bordeFantasma, width: '100%', maxWidth: '700px' }} onClick={(e) => e.stopPropagation()}>
+              <div style={estilos.modalHeader}>
+                <h3 style={{ margin: 0, ...t.textoPrincipal, display: 'flex', alignItems: 'center', gap: '8px' }}><Lightbulb size={20} color="#eab308" /> Wiki Técnica</h3>
+                <button onClick={() => setNotaVisible(false)} style={estilos.btnCerrar}><X size={24} /></button>
+              </div>
+              <div style={{ padding: '15px 20px', borderBottom: '1px solid rgba(0,0,0,0.1)', display: 'flex', gap: '8px', overflowX: 'auto' }}>
+                {pasoActual.tabsNota.map((tab, i) => (
+                  <button key={i} onClick={() => setTipTabActiva(i)} style={{ padding: '8px 14px', borderRadius: '20px', border: 'none', background: tipTabActiva === i ? '#eab308' : 'rgba(0,0,0,0.05)', color: tipTabActiva === i ? 'white' : t.textoSutil.color, fontWeight: 'bold', cursor: 'pointer', whiteSpace: 'nowrap', fontSize: '0.75rem' }}>
+                    {tab.titulo}
+                  </button>
+                ))}
+              </div>
+              <div style={{ ...estilos.modalBody, maxHeight: '50vh' }}>
+                {pasoActual.tabsNota[tipTabActiva] && (
+                  <div style={{ whiteSpace: 'pre-wrap', lineHeight: '1.6', fontSize: '0.9rem', ...t.textoPrincipal }}>
+                    {pasoActual.tabsNota[tipTabActiva].contenido}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* --- MODAL 8: VISOR DE IMAGEN (FOTO / PLANO) --- */}
+      <AnimatePresence>
+        {imgModalVisible && pasoActual?.imgUrl && (
+          <motion.div className="no-print" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.95)', zIndex: 3000, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }} onClick={() => setImgModalVisible(false)}>
+            <motion.div initial={{ scale: 0.8 }} animate={{ scale: 1 }} exit={{ scale: 0.8 }} style={{ width: '95vw', maxWidth: '1000px', height: '80vh', backgroundColor: '#111827', borderRadius: '1.5rem', display: 'flex', flexDirection: 'column', overflow: 'hidden', border: '2px solid #8b5cf6' }} onClick={(e) => e.stopPropagation()}>
+              <div style={{ padding: '15px 20px', borderBottom: '1px solid #374151', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: 'white', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {pasoActual.imgTipo === 'microscopio' ? <Camera size={18} color="#8b5cf6" /> : <Map size={18} color="#8b5cf6" />}
+                  {pasoActual.imgTipo === 'microscopio' ? 'Foto de Microscopio' : 'Plano / Esquemático'}
+                </span>
+                <button onClick={() => setImgModalVisible(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'white' }}><X size={24} /></button>
+              </div>
+              <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden', padding: '10px', backgroundColor: '#000' }}>
+                <img src={pasoActual.imgUrl} alt="Imagen de referencia" referrerPolicy="no-referrer" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* --- MODAL 9: VISOR DE VIDEO --- */}
+      <AnimatePresence>
+        {videoModalVisible && pasoActual?.videoUrl && (
+          <motion.div className="no-print" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.95)', zIndex: 3000, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }} onClick={() => setVideoModalVisible(false)}>
+            <motion.div initial={{ scale: 0.8 }} animate={{ scale: 1 }} exit={{ scale: 0.8 }} style={{ width: '90vw', maxWidth: '960px', height: '80vh', backgroundColor: '#000', borderRadius: '1.5rem', display: 'flex', flexDirection: 'column', overflow: 'hidden', border: '2px solid #ef4444' }} onClick={(e) => e.stopPropagation()}>
+              <div style={{ padding: '15px 20px', borderBottom: '1px solid #374151', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#111827' }}>
+                <span style={{ color: 'white', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Play size={18} color="#ef4444" /> Video Tutorial
+                </span>
+                <button onClick={() => setVideoModalVisible(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'white' }}><X size={24} /></button>
+              </div>
+              <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' }}>
+                <iframe src={obtenerUrlVideo(pasoActual.videoUrl)} title="Video tutorial" style={{ width: '100%', height: '100%', border: 'none' }} allowFullScreen />
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* --- MODAL 10: BITÁCORA (INGRESO DE CASO) --- */}
+      <AnimatePresence>
+        {bitacoraVisible && (
+          <motion.div className="no-print" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={estilos.modalOverlay} onClick={() => setBitacoraVisible(false)}>
+            <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} style={{ ...estilos.modalCard, ...t.fondoPrincipal, ...t.bordeFantasma, width: '100%', maxWidth: '700px' }} onClick={(e) => e.stopPropagation()}>
+              <div style={estilos.modalHeader}>
+                <h3 style={{ margin: 0, ...t.textoPrincipal, display: 'flex', alignItems: 'center', gap: '8px' }}><ClipboardList size={20} color="#10b981" /> {casoEditando ? 'Editar Caso' : 'Nuevo Ingreso'}</h3>
+                <button onClick={() => setBitacoraVisible(false)} style={estilos.btnCerrar}><X size={24} /></button>
+              </div>
+              <div style={estilos.modalBody}>
+                <form onSubmit={guardarBitacora} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div><label style={estilos.labelForm}>Marca</label><input required type="text" style={estilos.inputLigero} value={formCaso.marca} onChange={(e) => setFormCaso({ ...formCaso, marca: e.target.value })} placeholder="Ej: Xiaomi" /></div>
+                    <div><label style={estilos.labelForm}>Modelo</label><input required type="text" style={estilos.inputLigero} value={formCaso.modelo} onChange={(e) => setFormCaso({ ...formCaso, modelo: e.target.value })} placeholder="Ej: POCO X3 Pro" /></div>
+                  </div>
+                  <div><label style={estilos.labelForm}>Síntomas</label><textarea required style={{ ...estilos.inputLigero, minHeight: '60px' }} value={formCaso.sintomas} onChange={(e) => setFormCaso({ ...formCaso, sintomas: e.target.value })} placeholder="Describe el problema reportado por el cliente..." /></div>
+                  <div><label style={estilos.labelForm}>Protocolo / Diagnóstico</label><textarea style={{ ...estilos.inputLigero, minHeight: '80px' }} value={formCaso.protocolo} onChange={(e) => setFormCaso({ ...formCaso, protocolo: e.target.value })} placeholder="Pasos realizados, mediciones, diagnóstico..." /></div>
+                  <div><label style={estilos.labelForm}>URL de Imagen (opcional)</label><input type="text" style={estilos.inputLigero} value={formCaso.imgUrl} onChange={(e) => setFormCaso({ ...formCaso, imgUrl: e.target.value })} placeholder="https://..." /></div>
+                  {mensajeCaso && <p style={{ color: mensajeCaso.includes('❌') ? '#ef4444' : '#10b981', textAlign: 'center', fontWeight: 'bold' }}>{mensajeCaso}</p>}
+                  <button type="submit" style={{ ...estilos.btnPrimarioGuardar, width: '100%', padding: '15px', justifyContent: 'center', marginTop: '10px' }}><Save size={18} /> {casoEditando ? 'Actualizar Caso' : 'Guardar en Bitácora'}</button>
+                </form>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* --- MODAL 11: HISTORIAL DE CASOS --- */}
+      <AnimatePresence>
+        {historialCasosVisible && (
+          <motion.div className="no-print" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={estilos.modalOverlay} onClick={() => setHistorialCasosVisible(false)}>
+            <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} style={{ ...estilos.modalCard, ...t.fondoPrincipal, ...t.bordeFantasma, width: '100%', maxWidth: '800px' }} onClick={(e) => e.stopPropagation()}>
+              <div style={estilos.modalHeader}>
+                <h3 style={{ margin: 0, ...t.textoPrincipal, display: 'flex', alignItems: 'center', gap: '8px' }}><History size={20} color="#0058bc" /> Historial de Reparaciones</h3>
+                <button onClick={() => setHistorialCasosVisible(false)} style={estilos.btnCerrar}><X size={24} /></button>
+              </div>
+              <div style={estilos.modalBody}>
+                {casosGuardados.length === 0 ? (
+                  <p style={{ textAlign: 'center', color: t.textoSutil.color, padding: '40px' }}>Aún no hay casos registrados. Usa el botón <strong>INGRESO</strong> para añadir el primero.</p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {casosGuardados.map(caso => (
+                      <div key={caso.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', borderRadius: '10px', border: t.bordeFantasma.border, ...t.cristalBgItem }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                            <span style={{ fontWeight: 'bold', fontSize: '0.9rem', ...t.textoPrincipal }}>{caso.marca} {caso.modelo}</span>
+                            <span style={{ fontSize: '0.65rem', color: '#6b7280', backgroundColor: '#1f2937', padding: '2px 8px', borderRadius: '10px' }}>#{caso.id.substring(0, 6).toUpperCase()}</span>
+                            <span style={{ fontSize: '0.7rem', color: t.textoSutil.color }}>{new Date(caso.fecha).toLocaleDateString()}</span>
+                          </div>
+                          <p style={{ fontSize: '0.75rem', color: t.textoSutil.color, margin: '4px 0 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{caso.sintomas}</p>
+                        </div>
+                        <div style={{ display: 'flex', gap: '6px', flexShrink: 0, marginLeft: '10px' }}>
+                          <button onClick={() => { setFormCaso({ marca: caso.marca, modelo: caso.modelo, sintomas: caso.sintomas, protocolo: caso.protocolo || '', imgUrl: caso.imgUrl || '' }); setCasoEditando(caso.id); setHistorialCasosVisible(false); setBitacoraVisible(true); }} style={{ background: 'rgba(234, 179, 8, 0.1)', border: '1px solid rgba(234, 179, 8, 0.3)', color: '#eab308', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.7rem' }}><Edit size={14} /></button>
+                          <button onClick={() => abrirReporte(caso)} style={{ background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.3)', color: '#3b82f6', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.7rem' }}><FileText size={14} /></button>
+                          <button onClick={() => eliminarCaso(caso.id)} style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#ef4444', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.7rem' }}><Trash2 size={14} /></button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* --- MODAL 12: REPORTE DE CASO (PDF + WHATSAPP) --- */}
+      <AnimatePresence>
+        {reporteVisible && casoReporte && (
+          <motion.div className="no-print" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={estilos.modalOverlay} onClick={() => setReporteVisible(false)}>
+            <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} style={{ ...estilos.modalCard, ...t.fondoPrincipal, ...t.bordeFantasma, width: '100%', maxWidth: '700px' }} onClick={(e) => e.stopPropagation()}>
+              <div style={estilos.modalHeader}>
+                <h3 style={{ margin: 0, ...t.textoPrincipal, display: 'flex', alignItems: 'center', gap: '8px' }}><FileText size={20} color="#0058bc" /> Reporte Técnico</h3>
+                <button onClick={() => setReporteVisible(false)} style={estilos.btnCerrar}><X size={24} /></button>
+              </div>
+              <div style={estilos.modalBody}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '15px' }}>
+                  <div style={{ backgroundColor: 'rgba(0,0,0,0.03)', padding: '10px', borderRadius: '8px' }}><span style={{ fontSize: '0.7rem', fontWeight: 'bold', color: '#6b7280', display: 'block' }}>MARCA</span><span style={{ fontWeight: 'bold', ...t.textoPrincipal }}>{casoReporte.marca}</span></div>
+                  <div style={{ backgroundColor: 'rgba(0,0,0,0.03)', padding: '10px', borderRadius: '8px' }}><span style={{ fontSize: '0.7rem', fontWeight: 'bold', color: '#6b7280', display: 'block' }}>MODELO</span><span style={{ fontWeight: 'bold', ...t.textoPrincipal }}>{casoReporte.modelo}</span></div>
+                  <div style={{ backgroundColor: 'rgba(0,0,0,0.03)', padding: '10px', borderRadius: '8px' }}><span style={{ fontSize: '0.7rem', fontWeight: 'bold', color: '#6b7280', display: 'block' }}>ID CASO</span><span style={{ fontWeight: 'bold', ...t.textoPrincipal }}>#{casoReporte.id.substring(0, 8).toUpperCase()}</span></div>
+                  <div style={{ backgroundColor: 'rgba(0,0,0,0.03)', padding: '10px', borderRadius: '8px' }}><span style={{ fontSize: '0.7rem', fontWeight: 'bold', color: '#6b7280', display: 'block' }}>FECHA</span><span style={{ fontWeight: 'bold', ...t.textoPrincipal }}>{new Date(casoReporte.fecha).toLocaleDateString()}</span></div>
+                </div>
+                <div style={{ marginBottom: '15px' }}>
+                  <span style={{ fontSize: '0.7rem', fontWeight: 'bold', color: '#ef4444', display: 'block', marginBottom: '4px' }}>⚠️ SÍNTOMAS</span>
+                  <p style={{ fontSize: '0.85rem', margin: 0, lineHeight: '1.5', ...t.textoPrincipal }}>{casoReporte.sintomas}</p>
+                </div>
+                <div style={{ marginBottom: '20px' }}>
+                  <span style={{ fontSize: '0.7rem', fontWeight: 'bold', color: '#0058bc', display: 'block', marginBottom: '4px' }}>🛠️ PROTOCOLO / DIAGNÓSTICO</span>
+                  <p style={{ fontSize: '0.85rem', margin: 0, lineHeight: '1.5', ...t.textoPrincipal, whiteSpace: 'pre-wrap' }}>{casoReporte.protocolo || 'Pendiente de evaluación técnica profunda.'}</p>
+                </div>
+                {casoReporte.imgUrl && (
+                  <div style={{ marginBottom: '20px', backgroundColor: '#000', borderRadius: '10px', padding: '10px', display: 'flex', justifyContent: 'center' }}>
+                    <img src={casoReporte.imgUrl} alt="Evidencia" referrerPolicy="no-referrer" style={{ maxWidth: '100%', maxHeight: '200px', objectFit: 'contain', borderRadius: '6px' }} />
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button onClick={imprimirReporte} style={{ flex: 1, backgroundColor: '#0058bc', color: 'white', border: 'none', padding: '12px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '0.85rem' }}>
+                    <Printer size={18} /> Imprimir PDF
+                  </button>
+                  <button onClick={enviarWhatsApp} style={{ flex: 1, backgroundColor: '#25D366', color: 'white', border: 'none', padding: '12px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '0.85rem' }}>
+                    <MessageCircle size={18} /> WhatsApp
+                  </button>
+                </div>
+                <p style={{ textAlign: 'center', fontSize: '0.65rem', color: '#9ca3af', marginTop: '15px' }}>
+                  Marshall Cell — Laboratorio de Microelectrónica, Oropesa, Cusco
+                </p>
+              </div>
             </motion.div>
           </motion.div>
         )}
