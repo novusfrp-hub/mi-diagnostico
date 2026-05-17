@@ -8,6 +8,7 @@ import { Sun, Moon, ArrowLeft, RefreshCcw, Zap, Smartphone, AlertTriangle, Chevr
 
 import FPCInteligente from '../components/FPCInteligente.js';
 import EscanerRFFE from '../components/EscanerRFFE.js';
+import FormularioIngresoAvanzado from '../components/FormularioIngresoAvanzado.js';
 import useAutoSave from '../hooks/useAutoSave';
 
 const obtenerUrlVideo = (url) => { if (!url) return ''; let v = ''; if (url.includes('youtu.be/')) v = url.split('youtu.be/')[1].split('?')[0]; else if (url.includes('youtube.com/watch')) v = new URLSearchParams(url.split('?')[1]).get('v'); else if (url.includes('youtube.com/embed/')) return url; return v ? `https://www.youtube.com/embed/${v}` : url; };
@@ -39,7 +40,7 @@ export default function AppDiagnostico() {
   const [notaVisible, setNotaVisible] = useState(false); const [tipTabActiva, setTipTabActiva] = useState(0);
   const [imgModalVisible, setImgModalVisible] = useState(false); const [videoModalVisible, setVideoModalVisible] = useState(false);
   const [fallasEnSerie, setFallasEnSerie] = useState([]);
-  const [bitacoraVisible, setBitacoraVisible] = useState(false); const [historialCasosVisible, setHistorialCasosVisible] = useState(false); const [casosGuardados, setCasosGuardados] = useState([]); const [casoEditando, setCasoEditando] = useState(null); const [formCaso, setFormCaso] = useState({ marca: '', modelo: '', sintomas: '', protocolo: '', imgUrl: '' }); const [mensajeCaso, setMensajeCaso] = useState('');
+  const [bitacoraVisible, setBitacoraVisible] = useState(false); const [historialCasosVisible, setHistorialCasosVisible] = useState(false); const [casosGuardados, setCasosGuardados] = useState([]); const [casoEditando, setCasoEditando] = useState(null); const [formCaso, setFormCaso] = useState({ marca: '', modelo: '', sintomas: '', protocolo: '', imgUrl: '', consumoUsb: { voltaje: '', corriente: '', comportamiento: '', conBateria: '', sinBateria: '' }, consumoFuente: { inicial: '', postPower: '', comportamiento: '' }, lineasAfectadas: [] }); const [mensajeCaso, setMensajeCaso] = useState('');
   const [reporteVisible, setReporteVisible] = useState(false); const [casoReporte, setCasoReporte] = useState(null);
 
   // ESTADOS LIBRERÍA
@@ -246,7 +247,7 @@ export default function AppDiagnostico() {
   // HISTORIAL Y BITÁCORA
   const cargarHistorialCasos = async () => { try { const qs = await getDocs(collection(db, "historial_reparaciones")); const arr = []; qs.forEach((doc) => arr.push({ id: doc.id, ...doc.data() })); arr.sort((a, b) => new Date(b.fecha) - new Date(a.fecha)); setCasosGuardados(arr); } catch (e) { } };
   const abrirHistorial = () => { setHistorialCasosVisible(true); cargarHistorialCasos(); };
-  const prepararNuevoCaso = () => { setFormCaso({ marca: '', modelo: '', sintomas: '', protocolo: '', imgUrl: '' }); setCasoEditando(null); setMensajeCaso(''); setBitacoraVisible(true); };
+  const prepararNuevoCaso = () => { setFormCaso({ marca: '', modelo: '', sintomas: '', protocolo: '', imgUrl: '', consumoUsb: { voltaje: '', corriente: '', comportamiento: '', conBateria: '', sinBateria: '' }, consumoFuente: { inicial: '', postPower: '', comportamiento: '' }, lineasAfectadas: [] }); setCasoEditando(null); setMensajeCaso(''); setBitacoraVisible(true); };
   const guardarBitacora = async (e) => { e.preventDefault(); setMensajeCaso('Guardando...'); try { if (casoEditando) { await updateDoc(doc(db, "historial_reparaciones", casoEditando), { ...formCaso }); } else { await addDoc(collection(db, "historial_reparaciones"), { ...formCaso, fecha: new Date().toISOString() }); } setMensajeCaso('✅ ¡Registrado!'); setTimeout(() => { setBitacoraVisible(false); cargarHistorialCasos(); }, 1000); } catch (e) { setMensajeCaso('❌ Error.'); } };
   const eliminarCaso = async (id) => { if (window.confirm('¿Seguro de eliminar este caso?')) { try { await deleteDoc(doc(db, "historial_reparaciones", id)); cargarHistorialCasos(); } catch (error) { } } };
   const abrirReporte = (caso) => { setCasoReporte(caso); setReporteVisible(true); setHistorialCasosVisible(false); };
@@ -751,27 +752,14 @@ export default function AppDiagnostico() {
         )}
       </AnimatePresence>
 
-      {/* --- MODAL 10: BITÁCORA (INGRESO DE CASO) --- */}
+      {/* --- MODAL 10: BITÁCORA (INGRESO DE CASO AVANZADO) --- */}
       <AnimatePresence>
         {bitacoraVisible && (
           <motion.div className="no-print" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={estilos.modalOverlay} onClick={() => setBitacoraVisible(false)}>
-            <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} style={{ ...estilos.modalCard, ...t.fondoPrincipal, ...t.bordeFantasma, width: '100%', maxWidth: '700px' }} onClick={(e) => e.stopPropagation()}>
-              <div style={estilos.modalHeader}>
-                <h3 style={{ margin: 0, ...t.textoPrincipal, display: 'flex', alignItems: 'center', gap: '8px' }}><ClipboardList size={20} color="#10b981" /> {casoEditando ? 'Editar Caso' : 'Nuevo Ingreso'}</h3>
-                <button onClick={() => setBitacoraVisible(false)} style={estilos.btnCerrar}><X size={24} /></button>
-              </div>
-              <div style={estilos.modalBody}>
-                <form onSubmit={guardarBitacora} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    <div><label style={estilos.labelForm}>Marca</label><input required type="text" style={estilos.inputLigero} value={formCaso.marca} onChange={(e) => setFormCaso({ ...formCaso, marca: e.target.value })} placeholder="Ej: Xiaomi" /></div>
-                    <div><label style={estilos.labelForm}>Modelo</label><input required type="text" style={estilos.inputLigero} value={formCaso.modelo} onChange={(e) => setFormCaso({ ...formCaso, modelo: e.target.value })} placeholder="Ej: POCO X3 Pro" /></div>
-                  </div>
-                  <div><label style={estilos.labelForm}>Síntomas</label><textarea required style={{ ...estilos.inputLigero, minHeight: '60px' }} value={formCaso.sintomas} onChange={(e) => setFormCaso({ ...formCaso, sintomas: e.target.value })} placeholder="Describe el problema reportado por el cliente..." /></div>
-                  <div><label style={estilos.labelForm}>Protocolo / Diagnóstico</label><textarea style={{ ...estilos.inputLigero, minHeight: '80px' }} value={formCaso.protocolo} onChange={(e) => setFormCaso({ ...formCaso, protocolo: e.target.value })} placeholder="Pasos realizados, mediciones, diagnóstico..." /></div>
-                  <div><label style={estilos.labelForm}>URL de Imagen (opcional)</label><input type="text" style={estilos.inputLigero} value={formCaso.imgUrl} onChange={(e) => setFormCaso({ ...formCaso, imgUrl: e.target.value })} placeholder="https://..." /></div>
-                  {mensajeCaso && <p style={{ color: mensajeCaso.includes('❌') ? '#ef4444' : '#10b981', textAlign: 'center', fontWeight: 'bold' }}>{mensajeCaso}</p>}
-                  <button type="submit" style={{ ...estilos.btnPrimarioGuardar, width: '100%', padding: '15px', justifyContent: 'center', marginTop: '10px' }}><Save size={18} /> {casoEditando ? 'Actualizar Caso' : 'Guardar en Bitácora'}</button>
-                </form>
+            <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} style={{ ...estilos.modalCard, ...t.fondoPrincipal, ...t.bordeFantasma, width: '100%', maxWidth: '800px', padding: 0, border: 'none', backgroundColor: '#111827' }} onClick={(e) => e.stopPropagation()}>
+              <div style={{ position: 'relative' }}>
+                <button onClick={() => setBitacoraVisible(false)} style={{ position: 'absolute', top: '16px', right: '20px', zIndex: 1, background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '8px', cursor: 'pointer', color: 'white', display: 'flex', alignItems: 'center', padding: '6px 8px' }}><X size={20} /></button>
+                <FormularioIngresoAvanzado formCaso={formCaso} setFormCaso={setFormCaso} guardarBitacora={guardarBitacora} casoEditando={casoEditando} mensajeCaso={mensajeCaso} casosGuardados={casosGuardados} />
               </div>
             </motion.div>
           </motion.div>
@@ -803,7 +791,7 @@ export default function AppDiagnostico() {
                           <p style={{ fontSize: '0.75rem', color: t.textoSutil.color, margin: '4px 0 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{caso.sintomas}</p>
                         </div>
                         <div style={{ display: 'flex', gap: '6px', flexShrink: 0, marginLeft: '10px' }}>
-                          <button onClick={() => { setFormCaso({ marca: caso.marca, modelo: caso.modelo, sintomas: caso.sintomas, protocolo: caso.protocolo || '', imgUrl: caso.imgUrl || '' }); setCasoEditando(caso.id); setHistorialCasosVisible(false); setBitacoraVisible(true); }} style={{ background: 'rgba(234, 179, 8, 0.1)', border: '1px solid rgba(234, 179, 8, 0.3)', color: '#eab308', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.7rem' }}><Edit size={14} /></button>
+                          <button onClick={() => { setFormCaso({ marca: caso.marca, modelo: caso.modelo, sintomas: caso.sintomas, protocolo: caso.protocolo || '', imgUrl: caso.imgUrl || '', consumoUsb: caso.consumoUsb || { voltaje: '', corriente: '', comportamiento: '', conBateria: '', sinBateria: '' }, consumoFuente: caso.consumoFuente || { inicial: '', postPower: '', comportamiento: '' }, lineasAfectadas: caso.lineasAfectadas || [] }); setCasoEditando(caso.id); setHistorialCasosVisible(false); setBitacoraVisible(true); }} style={{ background: 'rgba(234, 179, 8, 0.1)', border: '1px solid rgba(234, 179, 8, 0.3)', color: '#eab308', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.7rem' }}><Edit size={14} /></button>
                           <button onClick={() => abrirReporte(caso)} style={{ background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.3)', color: '#3b82f6', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.7rem' }}><FileText size={14} /></button>
                           <button onClick={() => eliminarCaso(caso.id)} style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#ef4444', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.7rem' }}><Trash2 size={14} /></button>
                         </div>
