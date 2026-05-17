@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { ClipboardList, Save, Plus, Trash2, Zap, Usb, ChevronDown } from 'lucide-react';
+import { ClipboardList, Save, Plus, Trash2, Zap, Usb, ChevronDown, Image, Eye } from 'lucide-react';
 
 const ESTADOS_COMPORTAMIENTO = ['Estático', 'Cíclico', 'Corto total', 'Fuga inicial', 'Congelado', 'Sube y cae'];
 
@@ -82,7 +82,7 @@ export default function FormularioIngresoAvanzado({
       ...prev,
       lineasAfectadas: [
         ...prev.lineasAfectadas,
-        { id: generarId(), nombre: '', componentes: [] }
+        { id: generarId(), nombre: '', componentes: [], imagenes: [] }
       ]
     }));
   }, [setFormCaso]);
@@ -141,6 +141,51 @@ export default function FormularioIngresoAvanzado({
               ...l,
               componentes: l.componentes.map(c =>
                 c.id === idComponente ? { ...c, [campo]: valor } : c
+              )
+            }
+          : l
+      )
+    }));
+  }, [setFormCaso]);
+
+  // CRUD Imágenes dentro de una línea
+  const agregarImagen = useCallback((idLinea) => {
+    setFormCaso(prev => ({
+      ...prev,
+      lineasAfectadas: prev.lineasAfectadas.map(l =>
+        l.id === idLinea
+          ? {
+              ...l,
+              imagenes: [
+                ...(l.imagenes || []),
+                { id: generarId(), url: '', tipo: 'placa' }
+              ]
+            }
+          : l
+      )
+    }));
+  }, [setFormCaso]);
+
+  const eliminarImagen = useCallback((idLinea, idImagen) => {
+    setFormCaso(prev => ({
+      ...prev,
+      lineasAfectadas: prev.lineasAfectadas.map(l =>
+        l.id === idLinea
+          ? { ...l, imagenes: (l.imagenes || []).filter(img => img.id !== idImagen) }
+          : l
+      )
+    }));
+  }, [setFormCaso]);
+
+  const actualizarImagen = useCallback((idLinea, idImagen, campo, valor) => {
+    setFormCaso(prev => ({
+      ...prev,
+      lineasAfectadas: prev.lineasAfectadas.map(l =>
+        l.id === idLinea
+          ? {
+              ...l,
+              imagenes: (l.imagenes || []).map(img =>
+                img.id === idImagen ? { ...img, [campo]: valor } : img
               )
             }
           : l
@@ -519,6 +564,112 @@ export default function FormularioIngresoAvanzado({
                   }}
                 >
                   <Plus size={14} /> Añadir Componente
+                </button>
+              </div>
+            </div>
+
+            {/* Imágenes de la línea (PostImage URLs) */}
+            <div style={{
+              backgroundColor: '#0d0d0d',
+              border: '1px solid #374151',
+              borderRadius: '8px',
+              padding: '10px',
+              marginTop: '10px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                <Image size={14} color="#8b5cf6" />
+                <span style={{ color: '#9ca3af', fontSize: '0.75rem', fontWeight: 'bold' }}>IMÁGENES DE REFERENCIA</span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {(linea.imagenes || []).length > 0 ? (
+                  (linea.imagenes || []).map((img) => (
+                    <div
+                      key={img.id}
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'auto 1fr auto',
+                        gap: '8px',
+                        alignItems: 'center'
+                      }}
+                    >
+                      <select
+                        style={{ ...selectDark, width: '110px' }}
+                        value={img.tipo}
+                        onChange={(e) => actualizarImagen(linea.id, img.id, 'tipo', e.target.value)}
+                      >
+                        <option value="placa">📸 Placa</option>
+                        <option value="esquema">🗺️ Esquema</option>
+                        <option value="solucion">✅ Solución</option>
+                      </select>
+                      <input
+                        type="text"
+                        style={inputDark}
+                        value={img.url}
+                        onChange={(e) => actualizarImagen(linea.id, img.id, 'url', e.target.value)}
+                        placeholder="URL de PostImage..."
+                      />
+                      {img.url && (
+                        <a
+                          href={img.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            background: 'rgba(139, 92, 246, 0.1)',
+                            border: '1px solid rgba(139, 92, 246, 0.3)',
+                            color: '#8b5cf6',
+                            borderRadius: '6px',
+                            padding: '6px 8px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            textDecoration: 'none'
+                          }}
+                          title="Ver imagen"
+                        >
+                          <Eye size={14} />
+                        </a>
+                      )}
+                      {!img.url && <div style={{ width: '30px' }} />}
+                      <button
+                        type="button"
+                        onClick={() => eliminarImagen(linea.id, img.id)}
+                        style={{
+                          background: 'rgba(239, 68, 68, 0.1)',
+                          border: '1px solid rgba(239, 68, 68, 0.3)',
+                          color: '#ef4444',
+                          borderRadius: '6px',
+                          padding: '6px 8px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center'
+                        }}
+                        title="Eliminar imagen"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  ))
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => agregarImagen(linea.id)}
+                  style={{
+                    background: 'transparent',
+                    border: '1px dashed #4b5563',
+                    color: '#9ca3af',
+                    borderRadius: '6px',
+                    padding: '6px 12px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    fontSize: '0.75rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    justifyContent: 'center',
+                    marginTop: '4px'
+                  }}
+                >
+                  <Image size={14} /> Añadir Imagen (PostImage)
                 </button>
               </div>
             </div>

@@ -276,6 +276,28 @@ Cada componente tiene:
 > ```
 > La clave es usar `.map()` para crear **nuevos arrays** y `...` (spread) para crear **nuevos objetos** en CADA nivel del anidamiento. Esto garantiza que React detecte el cambio y re-renderice correctamente.
 
+#### Imágenes por Línea (PostImage URLs)
+
+Cada línea puede tener múltiples imágenes de referencia (foto de placa, extracto de esquemático, solución aplicada). Se renderiza como una sección adicional debajo de los componentes:
+
+| Campo | Tipo | Opciones |
+|-------|------|----------|
+| Tipo | `<select>` | 📸 Placa, 🗺️ Esquema, ✅ Solución |
+| URL | input text | URL de PostImage o hosting similar |
+
+Estructura en el estado:
+```js
+// Cada línea ahora tiene:
+{ id, nombre, componentes: [], imagenes: [] }
+
+// Cada imagen:
+{ id, url: '', tipo: 'placa' } // tipo: 'placa' | 'esquema' | 'solucion'
+```
+
+> ⚠️ **Manejar null safety:** Al acceder a `linea.imagenes` usa `linea.imagenes || []` porque las líneas guardadas en el historial ANTES de esta feature no tendrán el campo `imagenes`.
+
+Cada imagen tiene un botón 👁️ (enlace externo a la URL) y un botón 🗑️ para eliminarla.
+
 ### Botón Guardar
 
 ```jsx
