@@ -9,6 +9,8 @@ import { Sun, Moon, ArrowLeft, RefreshCcw, Zap, Smartphone, AlertTriangle, Chevr
 import FPCInteligente from '../components/FPCInteligente.js';
 import EscanerRFFE from '../components/EscanerRFFE.js';
 import FormularioIngresoAvanzado from '../components/FormularioIngresoAvanzado.js';
+import VisorReporteAvanzado from '../components/VisorReporteAvanzado.js';
+import { toPng } from 'html-to-image';
 import useAutoSave from '../hooks/useAutoSave';
 
 const obtenerUrlVideo = (url) => { if (!url) return ''; let v = ''; if (url.includes('youtu.be/')) v = url.split('youtu.be/')[1].split('?')[0]; else if (url.includes('youtube.com/watch')) v = new URLSearchParams(url.split('?')[1]).get('v'); else if (url.includes('youtube.com/embed/')) return url; return v ? `https://www.youtube.com/embed/${v}` : url; };
@@ -253,6 +255,8 @@ export default function AppDiagnostico() {
   const abrirReporte = (caso) => { setCasoReporte(caso); setReporteVisible(true); setHistorialCasosVisible(false); };
   const imprimirReporte = async () => { if (!casoReporte) return; try { const { pdf } = await import('@react-pdf/renderer'); const ReportePDF = (await import('../components/pdfx/ReportePDF')).default; const blob = await pdf(<ReportePDF caso={casoReporte} />).toBlob(); window.open(URL.createObjectURL(blob), '_blank'); } catch (error) { alert("Error generando PDF."); } };
   const enviarWhatsApp = () => { if (!casoReporte) return; const texto = `📱 *MARSHALL CELL - REPORTE TÉCNICO*\n\n*Equipo:* ${casoReporte.marca} ${casoReporte.modelo}\n*ID:* #${casoReporte.id.substring(0, 6).toUpperCase()}\n*Fecha:* ${new Date(casoReporte.fecha).toLocaleDateString()}\n\n⚠️ *Síntoma:* ${casoReporte.sintomas}\n\n🛠️ *Diagnóstico:* ${casoReporte.protocolo || 'Pendiente.'}\n\n👨‍🔧 *Técnico:* Marshall\n📍 *Laboratorio:* Oropesa, Cusco`; window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank'); };
+  const reporteRef = useRef(null);
+  const exportarComoImagen = async () => { if (!reporteRef.current) return; try { const dataUrl = await toPng(reporteRef.current, { backgroundColor: '#111827', pixelRatio: 2 }); const link = document.createElement('a'); link.download = `reporte_${casoReporte?.marca || 'marshall'}_${casoReporte?.modelo || 'cell'}.png`; link.href = dataUrl; link.click(); } catch (error) { alert("Error exportando imagen."); } };
 
   if (!pasoActual) return <div style={{ height: '100vh', backgroundColor: '#111827', display: 'flex', justifyContent: 'center', alignItems: 'center' }}><h2 style={{ color: '#0ff' }}>Iniciando Marshall Cell...</h2></div>;
   const t = estilos[tema]; const tieneTips = pasoActual.tabsNota && pasoActual.tabsNota.length > 0;
@@ -780,23 +784,61 @@ export default function AppDiagnostico() {
                   <p style={{ textAlign: 'center', color: t.textoSutil.color, padding: '40px' }}>Aún no hay casos registrados. Usa el botón <strong>INGRESO</strong> para añadir el primero.</p>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {casosGuardados.map(caso => (
-                      <div key={caso.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', borderRadius: '10px', border: t.bordeFantasma.border, ...t.cristalBgItem }}>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                            <span style={{ fontWeight: 'bold', fontSize: '0.9rem', ...t.textoPrincipal }}>{caso.marca} {caso.modelo}</span>
-                            <span style={{ fontSize: '0.65rem', color: '#6b7280', backgroundColor: '#1f2937', padding: '2px 8px', borderRadius: '10px' }}>#{caso.id.substring(0, 6).toUpperCase()}</span>
-                            <span style={{ fontSize: '0.7rem', color: t.textoSutil.color }}>{new Date(caso.fecha).toLocaleDateString()}</span>
+                    {casosGuardados.map(caso => {
+                      const tieneUsb = caso.consumoUsb && (caso.consumoUsb.voltaje || caso.consumoUsb.corriente || caso.consumoUsb.comportamiento);
+                      const tieneFuente = caso.consumoFuente && (caso.consumoFuente.inicial || caso.consumoFuente.postPower || caso.consumoFuente.comportamiento);
+                      const numLineas = (caso.lineasAfectadas || []).length;
+                      const numComponentes = (caso.lineasAfectadas || []).reduce((acc, l) => acc + (l.componentes || []).length, 0);
+                      const numImagenes = (caso.lineasAfectadas || []).reduce((acc, l) => acc + (l.imagenes || []).length, 0);
+                      return (
+                      <div key={caso.id} style={{ padding: '14px', borderRadius: '12px', border: t.bordeFantasma.border, ...t.cristalBgItem }}>
+                        {/* Header row */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px' }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '4px' }}>
+                              <span style={{ fontWeight: 'bold', fontSize: '0.9rem', ...t.textoPrincipal }}>{caso.marca} {caso.modelo}</span>
+                              <span style={{ fontSize: '0.6rem', color: '#6b7280', backgroundColor: '#1f2937', padding: '2px 8px', borderRadius: '10px' }}>#{caso.id.substring(0, 6).toUpperCase()}</span>
+                              <span style={{ fontSize: '0.65rem', color: t.textoSutil.color }}>{new Date(caso.fecha).toLocaleDateString()}</span>
+                            </div>
+                            <p style={{ fontSize: '0.78rem', color: t.textoSutil.color, margin: '4px 0 8px 0', lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{caso.sintomas}</p>
+                            {/* Badges de campos avanzados */}
+                            <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+                              {tieneUsb && (
+                                <span style={{ fontSize: '0.6rem', padding: '2px 7px', borderRadius: '8px', backgroundColor: 'rgba(59,130,246,0.15)', color: '#3b82f6', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                  <Usb size={10} /> USB: {caso.consumoUsb.corriente || caso.consumoUsb.voltaje || '✓'}
+                                </span>
+                              )}
+                              {tieneFuente && (
+                                <span style={{ fontSize: '0.6rem', padding: '2px 7px', borderRadius: '8px', backgroundColor: 'rgba(249,115,22,0.15)', color: '#f97316', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                  <Zap size={10} /> Fuente: {caso.consumoFuente.inicial || caso.consumoFuente.postPower || '✓'}
+                                </span>
+                              )}
+                              {numLineas > 0 && (
+                                <span style={{ fontSize: '0.6rem', padding: '2px 7px', borderRadius: '8px', backgroundColor: 'rgba(16,185,129,0.15)', color: '#10b981', fontWeight: 'bold' }}>
+                                  ⚡ {numLineas} línea{numLineas !== 1 ? 's' : ''}
+                                </span>
+                              )}
+                              {numComponentes > 0 && (
+                                <span style={{ fontSize: '0.6rem', padding: '2px 7px', borderRadius: '8px', backgroundColor: 'rgba(139,92,246,0.15)', color: '#8b5cf6', fontWeight: 'bold' }}>
+                                  🔧 {numComponentes} comp.
+                                </span>
+                              )}
+                              {numImagenes > 0 && (
+                                <span style={{ fontSize: '0.6rem', padding: '2px 7px', borderRadius: '8px', backgroundColor: 'rgba(236,72,153,0.15)', color: '#ec4899', fontWeight: 'bold' }}>
+                                  📸 {numImagenes} img.
+                                </span>
+                              )}
+                            </div>
                           </div>
-                          <p style={{ fontSize: '0.75rem', color: t.textoSutil.color, margin: '4px 0 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{caso.sintomas}</p>
-                        </div>
-                        <div style={{ display: 'flex', gap: '6px', flexShrink: 0, marginLeft: '10px' }}>
-                          <button onClick={() => { setFormCaso({ marca: caso.marca, modelo: caso.modelo, sintomas: caso.sintomas, protocolo: caso.protocolo || '', imgUrl: caso.imgUrl || '', consumoUsb: caso.consumoUsb || { voltaje: '', corriente: '', comportamiento: '', conBateria: '', sinBateria: '' }, consumoFuente: caso.consumoFuente || { inicial: '', postPower: '', comportamiento: '' }, lineasAfectadas: caso.lineasAfectadas || [] }); setCasoEditando(caso.id); setHistorialCasosVisible(false); setBitacoraVisible(true); }} style={{ background: 'rgba(234, 179, 8, 0.1)', border: '1px solid rgba(234, 179, 8, 0.3)', color: '#eab308', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.7rem' }}><Edit size={14} /></button>
-                          <button onClick={() => abrirReporte(caso)} style={{ background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.3)', color: '#3b82f6', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.7rem' }}><FileText size={14} /></button>
-                          <button onClick={() => eliminarCaso(caso.id)} style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#ef4444', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.7rem' }}><Trash2 size={14} /></button>
+                          <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                            <button onClick={() => { setFormCaso({ marca: caso.marca, modelo: caso.modelo, sintomas: caso.sintomas, protocolo: caso.protocolo || '', imgUrl: caso.imgUrl || '', consumoUsb: caso.consumoUsb || { voltaje: '', corriente: '', comportamiento: '', conBateria: '', sinBateria: '' }, consumoFuente: caso.consumoFuente || { inicial: '', postPower: '', comportamiento: '' }, lineasAfectadas: caso.lineasAfectadas || [] }); setCasoEditando(caso.id); setHistorialCasosVisible(false); setBitacoraVisible(true); }} style={{ background: 'rgba(234, 179, 8, 0.1)', border: '1px solid rgba(234, 179, 8, 0.3)', color: '#eab308', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center' }} title="Editar"><Edit size={14} /></button>
+                            <button onClick={() => abrirReporte(caso)} style={{ background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.3)', color: '#3b82f6', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center' }} title="Ver reporte"><FileText size={14} /></button>
+                            <button onClick={() => eliminarCaso(caso.id)} style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#ef4444', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center' }} title="Eliminar"><Trash2 size={14} /></button>
+                          </div>
                         </div>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -805,46 +847,30 @@ export default function AppDiagnostico() {
         )}
       </AnimatePresence>
 
-      {/* --- MODAL 12: REPORTE DE CASO (PDF + WHATSAPP) --- */}
+      {/* --- MODAL 12: REPORTE DE CASO (VISOR COMPLETO + EXPORT) --- */}
       <AnimatePresence>
         {reporteVisible && casoReporte && (
           <motion.div className="no-print" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={estilos.modalOverlay} onClick={() => setReporteVisible(false)}>
-            <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} style={{ ...estilos.modalCard, ...t.fondoPrincipal, ...t.bordeFantasma, width: '100%', maxWidth: '700px' }} onClick={(e) => e.stopPropagation()}>
+            <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} style={{ ...estilos.modalCard, ...t.fondoPrincipal, ...t.bordeFantasma, width: '100%', maxWidth: '860px' }} onClick={(e) => e.stopPropagation()}>
               <div style={estilos.modalHeader}>
-                <h3 style={{ margin: 0, ...t.textoPrincipal, display: 'flex', alignItems: 'center', gap: '8px' }}><FileText size={20} color="#0058bc" /> Reporte Técnico</h3>
+                <h3 style={{ margin: 0, ...t.textoPrincipal, display: 'flex', alignItems: 'center', gap: '8px' }}><FileText size={20} color="#0058bc" /> Reporte Técnico Completo</h3>
                 <button onClick={() => setReporteVisible(false)} style={estilos.btnCerrar}><X size={24} /></button>
               </div>
-              <div style={estilos.modalBody}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '15px' }}>
-                  <div style={{ backgroundColor: 'rgba(0,0,0,0.03)', padding: '10px', borderRadius: '8px' }}><span style={{ fontSize: '0.7rem', fontWeight: 'bold', color: '#6b7280', display: 'block' }}>MARCA</span><span style={{ fontWeight: 'bold', ...t.textoPrincipal }}>{casoReporte.marca}</span></div>
-                  <div style={{ backgroundColor: 'rgba(0,0,0,0.03)', padding: '10px', borderRadius: '8px' }}><span style={{ fontSize: '0.7rem', fontWeight: 'bold', color: '#6b7280', display: 'block' }}>MODELO</span><span style={{ fontWeight: 'bold', ...t.textoPrincipal }}>{casoReporte.modelo}</span></div>
-                  <div style={{ backgroundColor: 'rgba(0,0,0,0.03)', padding: '10px', borderRadius: '8px' }}><span style={{ fontSize: '0.7rem', fontWeight: 'bold', color: '#6b7280', display: 'block' }}>ID CASO</span><span style={{ fontWeight: 'bold', ...t.textoPrincipal }}>#{casoReporte.id.substring(0, 8).toUpperCase()}</span></div>
-                  <div style={{ backgroundColor: 'rgba(0,0,0,0.03)', padding: '10px', borderRadius: '8px' }}><span style={{ fontSize: '0.7rem', fontWeight: 'bold', color: '#6b7280', display: 'block' }}>FECHA</span><span style={{ fontWeight: 'bold', ...t.textoPrincipal }}>{new Date(casoReporte.fecha).toLocaleDateString()}</span></div>
+              <div style={{ ...estilos.modalBody, padding: '0' }}>
+                <div style={{ padding: '10px', overflowY: 'auto', maxHeight: '65vh' }}>
+                  <VisorReporteAvanzado ref={reporteRef} caso={casoReporte} />
                 </div>
-                <div style={{ marginBottom: '15px' }}>
-                  <span style={{ fontSize: '0.7rem', fontWeight: 'bold', color: '#ef4444', display: 'block', marginBottom: '4px' }}>⚠️ SÍNTOMAS</span>
-                  <p style={{ fontSize: '0.85rem', margin: 0, lineHeight: '1.5', ...t.textoPrincipal }}>{casoReporte.sintomas}</p>
-                </div>
-                <div style={{ marginBottom: '20px' }}>
-                  <span style={{ fontSize: '0.7rem', fontWeight: 'bold', color: '#0058bc', display: 'block', marginBottom: '4px' }}>🛠️ PROTOCOLO / DIAGNÓSTICO</span>
-                  <p style={{ fontSize: '0.85rem', margin: 0, lineHeight: '1.5', ...t.textoPrincipal, whiteSpace: 'pre-wrap' }}>{casoReporte.protocolo || 'Pendiente de evaluación técnica profunda.'}</p>
-                </div>
-                {casoReporte.imgUrl && (
-                  <div style={{ marginBottom: '20px', backgroundColor: '#000', borderRadius: '10px', padding: '10px', display: 'flex', justifyContent: 'center' }}>
-                    <img src={casoReporte.imgUrl} alt="Evidencia" referrerPolicy="no-referrer" style={{ maxWidth: '100%', maxHeight: '200px', objectFit: 'contain', borderRadius: '6px' }} />
-                  </div>
-                )}
-                <div style={{ display: 'flex', gap: '10px' }}>
-                  <button onClick={imprimirReporte} style={{ flex: 1, backgroundColor: '#0058bc', color: 'white', border: 'none', padding: '12px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '0.85rem' }}>
-                    <Printer size={18} /> Imprimir PDF
+                <div style={{ padding: '15px 20px', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                  <button onClick={imprimirReporte} style={{ flex: 1, backgroundColor: '#0058bc', color: 'white', border: 'none', padding: '12px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '0.85rem', minWidth: '140px' }}>
+                    <Printer size={18} /> PDF
                   </button>
-                  <button onClick={enviarWhatsApp} style={{ flex: 1, backgroundColor: '#25D366', color: 'white', border: 'none', padding: '12px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '0.85rem' }}>
+                  <button onClick={exportarComoImagen} style={{ flex: 1, backgroundColor: '#8b5cf6', color: 'white', border: 'none', padding: '12px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '0.85rem', minWidth: '140px' }}>
+                    <ImageIcon size={18} /> Imagen PNG
+                  </button>
+                  <button onClick={enviarWhatsApp} style={{ flex: 1, backgroundColor: '#25D366', color: 'white', border: 'none', padding: '12px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '0.85rem', minWidth: '140px' }}>
                     <MessageCircle size={18} /> WhatsApp
                   </button>
                 </div>
-                <p style={{ textAlign: 'center', fontSize: '0.65rem', color: '#9ca3af', marginTop: '15px' }}>
-                  Marshall Cell — Laboratorio de Microelectrónica, Oropesa, Cusco
-                </p>
               </div>
             </motion.div>
           </motion.div>
