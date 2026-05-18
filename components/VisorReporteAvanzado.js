@@ -280,27 +280,28 @@ const VisorReporteAvanzado = forwardRef(function VisorReporteAvanzado({ caso }, 
               {/* Imágenes de la línea */}
               {(linea.imagenes || []).length > 0 && (
                 <div>
-                  <span style={{ fontSize: '0.65rem', color: '#6b7280', fontWeight: 'bold', display: 'block', marginBottom: '6px' }}>
-                    IMÁGENES
+                  <span style={{ fontSize: '0.65rem', color: '#6b7280', fontWeight: 'bold', display: 'block', marginBottom: '10px' }}>
+                    IMÁGENES DE REFERENCIA
                   </span>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                     {(linea.imagenes || []).map((img, iImg) => {
                       const tipoInfo = TIPO_IMAGEN_LABEL[img.tipo] || TIPO_IMAGEN_LABEL.placa;
                       return img.url ? (
                         <div key={img.id || iImg}
                           onClick={() => setImgAmpliada(img.url)}
                           style={{
-                            backgroundColor: '#0a0a0a',
+                            backgroundColor: '#000',
                             border: '1px solid #374151',
-                            borderRadius: '8px',
+                            borderRadius: '12px',
                             overflow: 'hidden',
-                            width: '200px',
-                            cursor: 'zoom-in'
+                            width: '100%',
+                            cursor: 'zoom-in',
+                            textAlign: 'center'
                           }}
                         >
                           <img src={img.url} alt={tipoInfo.label} referrerPolicy="no-referrer"
-                            style={{ width: '100%', height: '150px', objectFit: 'contain', backgroundColor: '#000' }} />
-                          <div style={{ padding: '4px 6px', fontSize: '0.6rem', color: '#9ca3af', textAlign: 'center' }}>
+                            style={{ width: '100%', maxHeight: '500px', objectFit: 'contain', backgroundColor: '#000' }} />
+                          <div style={{ padding: '8px', fontSize: '0.75rem', color: '#9ca3af', backgroundColor: '#0a0a0a', borderTop: '1px solid #374151' }}>
                             {tipoInfo.icon} {tipoInfo.label}
                           </div>
                         </div>

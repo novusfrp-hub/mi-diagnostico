@@ -28,7 +28,7 @@ const styles = StyleSheet.create({
     lineaName: { fontSize: 10, fontWeight: 'bold', color: '#1e40af', marginBottom: 6 },
     imageContainer: { marginTop: 15, alignItems: 'center', padding: 10, border: '1pt solid #e5e7eb', borderRadius: 5 },
     image: { maxWidth: '100%', maxHeight: 600, objectFit: 'contain' },
-    imageSmall: { width: 150, height: 110, objectFit: 'contain', borderRadius: 3, backgroundColor: '#000' },
+    imageSmall: { width: '100%', height: 300, objectFit: 'contain', borderRadius: 5, backgroundColor: '#000' },
     footer: { position: 'absolute', bottom: 30, left: 40, right: 40, textAlign: 'center', fontSize: 9, color: '#9ca3af', borderTop: '1pt solid #e5e7eb', paddingTop: 10 },
     pageBreak: { marginBottom: 20 }
 });
@@ -146,7 +146,7 @@ const ReportePDF = ({ caso }) => {
                     <Text style={styles.sectionTitle}>TOPOLOGÍA AFECTADA</Text>
                     {lineas.map((linea, i) => (
                         <View key={i} style={styles.lineaBox}>
-                            <Text style={styles.lineaName}>🔵 {linea.nombre || `Línea #${i + 1}`}</Text>
+                            <Text style={styles.lineaName}>LINEA: {linea.nombre || `Línea #${i + 1}`}</Text>
                             {(linea.componentes || []).length > 0 && (
                                 <View style={{ marginBottom: 6 }}>
                                     <Text style={{ fontSize: 8, color: '#6b7280', marginBottom: 4 }}>Componentes afectados:</Text>
@@ -160,9 +160,13 @@ const ReportePDF = ({ caso }) => {
                                 </View>
                             )}
                             {(linea.imagenes || []).length > 0 && (
-                                <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
+                                <View style={{ gap: 10, marginTop: 10 }}>
                                     {(linea.imagenes || []).map((img, j) => (
-                                        img.url ? <Image key={j} src={img.url} style={styles.imageSmall} /> : null
+                                        img.url ? (
+                                            <View key={j} style={{ alignItems: 'center', backgroundColor: '#000', borderRadius: 5, padding: 5 }}>
+                                                <Image src={img.url} style={styles.imageSmall} />
+                                            </View>
+                                        ) : null
                                     ))}
                                 </View>
                             )}
