@@ -27,7 +27,7 @@ const styles = StyleSheet.create({
     lineaBox: { backgroundColor: '#ffffff', padding: 10, borderRadius: 4, border: '1pt solid #e5e7eb', marginBottom: 8 },
     lineaName: { fontSize: 10, fontWeight: 'bold', color: '#1e40af', marginBottom: 6 },
     imageContainer: { marginTop: 15, alignItems: 'center', padding: 10, border: '1pt solid #e5e7eb', borderRadius: 5 },
-    image: { maxWidth: '100%', maxHeight: 400, objectFit: 'contain' },
+    image: { maxWidth: '100%', maxHeight: 600, objectFit: 'contain' },
     imageSmall: { width: 150, height: 110, objectFit: 'contain', borderRadius: 3, backgroundColor: '#000' },
     footer: { position: 'absolute', bottom: 30, left: 40, right: 40, textAlign: 'center', fontSize: 9, color: '#9ca3af', borderTop: '1pt solid #e5e7eb', paddingTop: 10 },
     pageBreak: { marginBottom: 20 }
@@ -92,6 +92,13 @@ const ReportePDF = ({ caso }) => {
                 <Text style={styles.label}>Protocolo de Reparación / Diagnóstico</Text>
                 <Text style={styles.sectionText}>{caso.protocolo || 'Pendiente de evaluación técnica profunda.'}</Text>
             </View>
+
+            {caso.solucionEmpleada && (
+                <View style={{ ...styles.section, borderLeft: '4pt solid #10b981' }}>
+                    <Text style={{ ...styles.label, color: '#10b981' }}>Solución Empleada (Éxito)</Text>
+                    <Text style={{ ...styles.sectionText, fontWeight: 'bold' }}>{caso.solucionEmpleada}</Text>
+                </View>
+            )}
 
             {caso.imgUrl && (
                 <View style={styles.imageContainer}>

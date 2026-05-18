@@ -138,6 +138,15 @@ const VisorReporteAvanzado = forwardRef(function VisorReporteAvanzado({ caso }, 
         </p>
       </Seccion>
 
+      {/* --- SOLUCIÓN EMPLEADA --- */}
+      {caso.solucionEmpleada && (
+        <Seccion icon={<CheckCircle2 size={16} color="#10b981" />} titulo="SOLUCIÓN EMPLEADA" color="#10b981">
+          <p style={{ margin: 0, fontSize: '0.85rem', fontWeight: 'bold', color: '#10b981', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+            {caso.solucionEmpleada}
+          </p>
+        </Seccion>
+      )}
+
       {/* --- IMAGEN PRINCIPAL --- */}
       {caso.imgUrl && (
         <Seccion icon={<Camera size={16} color="#8b5cf6" />} titulo="EVIDENCIA PRINCIPAL" color="#8b5cf6">
@@ -146,7 +155,7 @@ const VisorReporteAvanzado = forwardRef(function VisorReporteAvanzado({ caso }, 
             style={{ display: 'flex', justifyContent: 'center', backgroundColor: '#000', borderRadius: '8px', padding: '10px', cursor: 'zoom-in' }}
           >
             <img src={caso.imgUrl} alt="Evidencia" referrerPolicy="no-referrer"
-              style={{ maxWidth: '100%', maxHeight: '450px', objectFit: 'contain', borderRadius: '8px' }} />
+              style={{ maxWidth: '100%', maxHeight: '750px', objectFit: 'contain', borderRadius: '8px' }} />
           </div>
         </Seccion>
       )}

@@ -129,11 +129,19 @@ export default function FormularioIngresoAvanzado({
   const aplicarSolucion = () => {
     if (!solucionTemp.operacion || !solucionTemp.destino) return;
     const nuevaFrase = `Se realizó ${solucionTemp.operacion} en ${solucionTemp.destino}.`;
+
+    // 1. Actualizar el protocolo (acumulativo)
     const protocoloActual = formCaso.protocolo || '';
-    const separador = protocoloActual.trim() ? '\n' : '';
+    const separadorProt = protocoloActual.trim() ? '\n' : '';
+
+    // 2. Actualizar la solución empleada (también acumulativa o reemplazo, según prefieras)
+    const solucionActual = formCaso.solucionEmpleada || '';
+    const separadorSol = solucionActual.trim() ? ', ' : '';
+
     setFormCaso(prev => ({
       ...prev,
-      protocolo: protocoloActual + separador + nuevaFrase
+      protocolo: protocoloActual + separadorProt + nuevaFrase,
+      solucionEmpleada: solucionActual + separadorSol + nuevaFrase
     }));
   };
 
@@ -379,15 +387,6 @@ export default function FormularioIngresoAvanzado({
         />
       </div>
       <div style={{ marginTop: '12px' }}>
-        <label style={labelStyle}>Protocolo / Diagnóstico</label>
-        <textarea
-          style={{ ...inputDark, minHeight: '80px', resize: 'vertical' }}
-          value={formCaso.protocolo}
-          onChange={(e) => handleChange('protocolo', e.target.value)}
-          placeholder="Pasos realizados, mediciones, diagnóstico..."
-        />
-      </div>
-      <div style={{ marginTop: '12px' }}>
         <label style={labelStyle}>URL de Imagen (opcional)</label>
         <input
           type="text"
@@ -593,6 +592,26 @@ export default function FormularioIngresoAvanzado({
             Aplicar
           </button>
         </div>
+      </div>
+
+      <div style={{ marginBottom: '15px' }}>
+        <label style={labelStyle}>Protocolo / Diagnóstico Detallado</label>
+        <textarea
+          style={{ ...inputDark, minHeight: '100px', resize: 'vertical' }}
+          value={formCaso.protocolo}
+          onChange={(e) => handleChange('protocolo', e.target.value)}
+          placeholder="Describe aquí el proceso técnico..."
+        />
+      </div>
+
+      <div style={{ marginBottom: '15px' }}>
+        <label style={{ ...labelStyle, color: '#10b981' }}>Solución Empleada (Éxito Final)</label>
+        <textarea
+          style={{ ...inputDark, minHeight: '60px', resize: 'vertical', border: '1px solid rgba(16, 185, 129, 0.3)' }}
+          value={formCaso.solucionEmpleada}
+          onChange={(e) => handleChange('solucionEmpleada', e.target.value)}
+          placeholder="Resumen de la reparación exitosa..."
+        />
       </div>
 
       <button
