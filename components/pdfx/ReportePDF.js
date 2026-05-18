@@ -19,6 +19,11 @@ const styles = StyleSheet.create({
     chipDanger: { backgroundColor: '#fef2f2', padding: '4 8', borderRadius: 4, fontSize: 8, color: '#dc2626', marginRight: 4, marginBottom: 4 },
     chipWarning: { backgroundColor: '#fff7ed', padding: '4 8', borderRadius: 4, fontSize: 8, color: '#ea580c', marginRight: 4, marginBottom: 4 },
     chipSuccess: { backgroundColor: '#ecfdf5', padding: '4 8', borderRadius: 4, fontSize: 8, color: '#059669', marginRight: 4, marginBottom: 4 },
+    badgeReparado: { backgroundColor: '#ecfdf5', color: '#059669', padding: '4 10', borderRadius: 10, fontSize: 9, fontWeight: 'bold' },
+    badgePendiente: { backgroundColor: '#fff7ed', color: '#c2410c', padding: '4 10', borderRadius: 10, fontSize: 9, fontWeight: 'bold' },
+    badgeFalla: { backgroundColor: '#fef2f2', color: '#dc2626', padding: '4 10', borderRadius: 10, fontSize: 9, fontWeight: 'bold' },
+    badgeEntregado: { backgroundColor: '#eff6ff', color: '#1d4ed8', padding: '4 10', borderRadius: 10, fontSize: 9, fontWeight: 'bold' },
+    hwSection: { flexDirection: 'row', gap: 10, marginBottom: 15, backgroundColor: '#f5f3ff', padding: 10, borderRadius: 5, border: '1pt solid #ddd6fe' },
     lineaBox: { backgroundColor: '#ffffff', padding: 10, borderRadius: 4, border: '1pt solid #e5e7eb', marginBottom: 8 },
     lineaName: { fontSize: 10, fontWeight: 'bold', color: '#1e40af', marginBottom: 6 },
     imageContainer: { marginTop: 15, alignItems: 'center', padding: 10, border: '1pt solid #e5e7eb', borderRadius: 5 },
@@ -54,9 +59,29 @@ const ReportePDF = ({ caso }) => {
                 <View style={styles.box}><Text style={styles.label}>Marca</Text><Text style={styles.value}>{caso.marca}</Text></View>
                 <View style={styles.box}><Text style={styles.label}>Modelo</Text><Text style={styles.value}>{caso.modelo}</Text></View>
             </View>
+
             <View style={styles.row}>
-                <View style={{ ...styles.box, width: '100%' }}><Text style={styles.label}>Técnico Responsable</Text><Text style={styles.value}>{caso.tecnico || 'Marshall Cell'}</Text></View>
+                <View style={{ ...styles.box, width: '68%' }}>
+                    <Text style={styles.label}>Técnico Responsable</Text>
+                    <Text style={styles.value}>{caso.tecnico || 'Marshall Cell'}</Text>
+                </View>
+                <View style={{ ...styles.box, width: '30%', alignItems: 'center', justifyContent: 'center' }}>
+                    <Text style={styles.label}>Estado Final</Text>
+                    {caso.estadoReparacion === 'Reparado' && <Text style={styles.badgeReparado}>REPARADO</Text>}
+                    {caso.estadoReparacion === 'Sin Solucion' && <Text style={styles.badgeFalla}>SIN SOLUCIÓN</Text>}
+                    {caso.estadoReparacion === 'Entregado' && <Text style={styles.badgeEntregado}>ENTREGADO</Text>}
+                    {(!caso.estadoReparacion || caso.estadoReparacion === 'Pendiente') && <Text style={styles.badgePendiente}>PENDIENTE</Text>}
+                </View>
             </View>
+
+            {/* --- FICHA TÉCNICA HARDWARE --- */}
+            {(caso.hardware?.cpu || caso.hardware?.pmic || caso.hardware?.memoria) && (
+                <View style={styles.hwSection}>
+                    {caso.hardware.cpu ? <View style={{ flex: 1 }}><Text style={styles.label}>Procesador</Text><Text style={{ fontSize: 10 }}>{caso.hardware.cpu}</Text></View> : null}
+                    {caso.hardware.pmic ? <View style={{ flex: 1 }}><Text style={styles.label}>PMIC</Text><Text style={{ fontSize: 10 }}>{caso.hardware.pmic}</Text></View> : null}
+                    {caso.hardware.memoria ? <View style={{ flex: 1 }}><Text style={styles.label}>Memoria</Text><Text style={{ fontSize: 10 }}>{caso.hardware.memoria}</Text></View> : null}
+                </View>
+            )}
 
             <View style={styles.section}>
                 <Text style={styles.label}>Síntomas Reportados</Text>

@@ -40,6 +40,16 @@ const VisorReporteAvanzado = forwardRef(function VisorReporteAvanzado({ caso }, 
     consumoUsb.conBateria || consumoUsb.sinBateria ||
     consumoFuente.inicial || consumoFuente.postPower || consumoFuente.comportamiento;
 
+  const hardware = caso.hardware || {};
+  const estadoRep = caso.estadoReparacion || 'Pendiente';
+
+  const infoEstado = {
+    'Pendiente': { color: '#eab308', bg: 'rgba(234, 179, 8, 0.1)', label: '🟡 PENDIENTE' },
+    'Reparado': { color: '#10b981', bg: 'rgba(16, 185, 129, 0.1)', label: '🟢 REPARADO' },
+    'Sin Solucion': { color: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)', label: '🔴 SIN SOLUCIÓN' },
+    'Entregado': { color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.1)', label: '🔵 ENTREGADO' }
+  }[estadoRep] || { color: '#9ca3af', bg: 'rgba(156, 163, 175, 0.1)', label: estadoRep };
+
   return (
     <div
       ref={ref}
@@ -81,7 +91,38 @@ const VisorReporteAvanzado = forwardRef(function VisorReporteAvanzado({ caso }, 
         <MiniCaja label="MARCA" valor={caso.marca} />
         <MiniCaja label="MODELO" valor={caso.modelo} />
         <MiniCaja label="TÉCNICO" valor={caso.tecnico || 'Marshall Cell'} />
+        <div style={{
+          backgroundColor: infoEstado.bg,
+          border: `1px solid ${infoEstado.color}44`,
+          borderRadius: '8px',
+          padding: '10px 12px',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center'
+        }}>
+          <span style={{ fontSize: '0.6rem', fontWeight: 'bold', color: infoEstado.color, display: 'block', marginBottom: '3px' }}>ESTADO FINAL</span>
+          <span style={{ fontWeight: '800', fontSize: '0.85rem', color: infoEstado.color }}>{infoEstado.label}</span>
+        </div>
       </div>
+
+      {/* --- FICHA TÉCNICA HARDWARE --- */}
+      {(hardware.cpu || hardware.pmic || hardware.memoria) && (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr 1fr',
+          gap: '10px',
+          marginBottom: '20px',
+          padding: '12px',
+          backgroundColor: 'rgba(139, 92, 246, 0.05)',
+          border: '1px solid rgba(139, 92, 246, 0.15)',
+          borderRadius: '12px'
+        }}>
+          <MiniCaja label="PROCESADOR" valor={hardware.cpu} />
+          <MiniCaja label="PMIC" valor={hardware.pmic} />
+          <MiniCaja label="MEMORIA" valor={hardware.memoria} />
+        </div>
+      )}
 
       {/* --- SÍNTOMAS --- */}
       <Seccion icon={<AlertTriangle size={16} color="#ef4444" />} titulo="SÍNTOMAS" color="#ef4444">

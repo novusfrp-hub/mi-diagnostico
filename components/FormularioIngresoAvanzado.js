@@ -1,10 +1,35 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { ClipboardList, Save, Plus, Trash2, Zap, Usb, ChevronDown, Image, Eye } from 'lucide-react';
+import { ClipboardList, Save, Plus, Trash2, Zap, Usb, ChevronDown, Image, Eye, Cpu, HardDrive, Settings, CheckCircle, XCircle, Clock } from 'lucide-react';
 
 const ESTADOS_COMPORTAMIENTO = ['Estático', 'Cíclico', 'Corto total', 'Fuga inicial', 'Congelado', 'Sube y cae'];
 
 const TIPOS_COMPONENTE = ['IC', 'Capacitor', 'Resistencia', 'Diodo', 'Bobina'];
 const ESTADOS_COMPONENTE = ['Corto', 'Fuga', 'Abierto', 'Daño Físico'];
+
+const OPERACIONES_SOLUCION = [
+  'Reballing',
+  'Puente (Jumper)',
+  'Limpieza Ultrasónica',
+  'Cambio de Componente',
+  'Línea Cortada/Interrumpida'
+];
+
+const DESTINOS_ESTATICOS = [
+  'CPU',
+  'PMIC',
+  'Codec de Audio',
+  'Transceiver',
+  'IC de Carga (IF-PMIC)',
+  'Baseband',
+  'Memoria RAM/ROM'
+];
+
+const ESTADOS_REPARACION = [
+  { id: 'Pendiente', label: 'Pendiente', color: '#eab308', icon: Clock },
+  { id: 'Reparado', label: 'Reparado', color: '#10b981', icon: CheckCircle },
+  { id: 'Sin Solucion', label: 'Sin Solución', color: '#ef4444', icon: XCircle },
+  { id: 'Entregado', label: 'Entregado', color: '#3b82f6', icon: Save }
+];
 
 const generarId = () => Date.now().toString() + Math.random().toString(36).slice(2, 6);
 
@@ -43,6 +68,7 @@ export default function FormularioIngresoAvanzado({
   casosGuardados
 }) {
   const [tabActiva, setTabActiva] = useState(0);
+  const [solucionTemp, setSolucionTemp] = useState({ operacion: '', destino: '' });
 
   // Extraer nombres únicos de líneas del historial para autocompletado
   const nombresLineasHistorial = useMemo(() => {
@@ -57,10 +83,59 @@ export default function FormularioIngresoAvanzado({
     return Array.from(nombres).sort();
   }, [casosGuardados]);
 
+  // Autocompletado Hardware
+  const hardwareHistorial = useMemo(() => {
+    const cpus = new Set();
+    const mems = new Set();
+    const pmics = new Set();
+    (casosGuardados || []).forEach(caso => {
+      const hw = caso.hardware || {};
+      if (hw.cpu) cpus.add(hw.cpu.trim());
+      if (hw.memoria) mems.add(hw.memoria.trim());
+      if (hw.pmic) pmics.add(hw.pmic.trim());
+    });
+    return {
+      cpus: Array.from(cpus).sort(),
+      mems: Array.from(mems).sort(),
+      pmics: Array.from(pmics).sort()
+    };
+  }, [casosGuardados]);
+
+  // Destinos Dinámicos para la Matriz
+  const destinosDinamicos = useMemo(() => {
+    const componentes = [];
+    (formCaso.lineasAfectadas || []).forEach(linea => {
+      (linea.componentes || []).forEach(comp => {
+        if (comp.nomenclatura) {
+          componentes.push(`${comp.nomenclatura} (${linea.nombre || 'Línea s/n'})`);
+        }
+      });
+    });
+    return [...DESTINOS_ESTATICOS, ...componentes];
+  }, [formCaso.lineasAfectadas]);
+
   // Handlers genéricos
   const handleChange = useCallback((campo, valor) => {
     setFormCaso(prev => ({ ...prev, [campo]: valor }));
   }, [setFormCaso]);
+
+  const handleHardwareChange = useCallback((campo, valor) => {
+    setFormCaso(prev => ({
+      ...prev,
+      hardware: { ...(prev.hardware || { cpu: '', memoria: '', pmic: '' }), [campo]: valor }
+    }));
+  }, [setFormCaso]);
+
+  const aplicarSolucion = () => {
+    if (!solucionTemp.operacion || !solucionTemp.destino) return;
+    const nuevaFrase = `Se realizó ${solucionTemp.operacion} en ${solucionTemp.destino}.`;
+    const protocoloActual = formCaso.protocolo || '';
+    const separador = protocoloActual.trim() ? '\n' : '';
+    setFormCaso(prev => ({
+      ...prev,
+      protocolo: protocoloActual + separador + nuevaFrase
+    }));
+  };
 
   const handleConsumoUsbChange = useCallback((campo, valor) => {
     setFormCaso(prev => ({
@@ -207,12 +282,18 @@ export default function FormularioIngresoAvanzado({
           <label style={labelStyle}>Marca</label>
           <input
             required
+            list="marcas-sugeridas"
             type="text"
             style={inputDark}
             value={formCaso.marca}
             onChange={(e) => handleChange('marca', e.target.value)}
             placeholder="Ej: Xiaomi"
           />
+          <datalist id="marcas-sugeridas">
+            {Array.from(new Set((casosGuardados || []).map(c => c.marca))).sort().map(m => (
+              <option key={m} value={m} />
+            ))}
+          </datalist>
         </div>
         <div>
           <label style={labelStyle}>Modelo</label>
@@ -226,6 +307,57 @@ export default function FormularioIngresoAvanzado({
           />
         </div>
       </div>
+
+      <div style={{ marginTop: '15px', padding: '15px', backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+        <label style={{ ...labelStyle, color: '#8b5cf6', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <Cpu size={14} /> ESPECIFICACIONES DE HARDWARE
+        </label>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginTop: '10px' }}>
+          <div>
+            <label style={labelStyle}>Procesador (CPU)</label>
+            <input
+              list="cpus-sugeridas"
+              type="text"
+              style={inputDark}
+              value={formCaso.hardware?.cpu || ''}
+              onChange={(e) => handleHardwareChange('cpu', e.target.value)}
+              placeholder="Ej: SM8250"
+            />
+            <datalist id="cpus-sugeridas">
+              {hardwareHistorial.cpus.map(c => <option key={c} value={c} />)}
+            </datalist>
+          </div>
+          <div>
+            <label style={labelStyle}>PMIC Principal</label>
+            <input
+              list="pmics-sugeridas"
+              type="text"
+              style={inputDark}
+              value={formCaso.hardware?.pmic || ''}
+              onChange={(e) => handleHardwareChange('pmic', e.target.value)}
+              placeholder="Ej: PM6150"
+            />
+            <datalist id="pmics-sugeridas">
+              {hardwareHistorial.pmics.map(p => <option key={p} value={p} />)}
+            </datalist>
+          </div>
+          <div>
+            <label style={labelStyle}>Memoria (ROM)</label>
+            <input
+              list="mems-sugeridas"
+              type="text"
+              style={inputDark}
+              value={formCaso.hardware?.memoria || ''}
+              onChange={(e) => handleHardwareChange('memoria', e.target.value)}
+              placeholder="Ej: UFS 3.1"
+            />
+            <datalist id="mems-sugeridas">
+              {hardwareHistorial.mems.map(m => <option key={m} value={m} />)}
+            </datalist>
+          </div>
+        </div>
+      </div>
+
       <div style={{ marginTop: '12px' }}>
         <label style={labelStyle}>Técnico Responsable</label>
         <input
@@ -410,6 +542,59 @@ export default function FormularioIngresoAvanzado({
 
   const renderTabTopologia = () => (
     <div>
+      {/* Matriz de Soluciones */}
+      <div style={{
+        backgroundColor: 'rgba(16, 185, 129, 0.05)',
+        border: '1px solid rgba(16, 185, 129, 0.2)',
+        borderRadius: '12px',
+        padding: '15px',
+        marginBottom: '15px'
+      }}>
+        <h4 style={{ color: '#10b981', margin: '0 0 12px 0', fontSize: '0.85rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <CheckCircle size={16} /> MATRIZ DE SOLUCIONES TÉCNICAS
+        </h4>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '10px', alignItems: 'flex-end' }}>
+          <div>
+            <label style={labelStyle}>Operación</label>
+            <select
+              style={selectDark}
+              value={solucionTemp.operacion}
+              onChange={(e) => setSolucionTemp(prev => ({ ...prev, operacion: e.target.value }))}
+            >
+              <option value="">Seleccionar...</option>
+              {OPERACIONES_SOLUCION.map(op => <option key={op} value={op}>{op}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={labelStyle}>Destino (IC o Componente)</label>
+            <select
+              style={selectDark}
+              value={solucionTemp.destino}
+              onChange={(e) => setSolucionTemp(prev => ({ ...prev, destino: e.target.value }))}
+            >
+              <option value="">Seleccionar...</option>
+              {destinosDinamicos.map(d => <option key={d} value={d}>{d}</option>)}
+            </select>
+          </div>
+          <button
+            type="button"
+            onClick={aplicarSolucion}
+            style={{
+              backgroundColor: '#10b981',
+              color: 'white',
+              border: 'none',
+              padding: '10px 15px',
+              borderRadius: '8px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              fontSize: '0.75rem'
+            }}
+          >
+            Aplicar
+          </button>
+        </div>
+      </div>
+
       <button
         type="button"
         onClick={agregarLinea}
@@ -719,19 +904,53 @@ export default function FormularioIngresoAvanzado({
           flexShrink: 0
         }}
       >
-        <h3
-          style={{
-            margin: 0,
-            color: 'white',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            fontSize: '1.1rem'
-          }}
-        >
-          <ClipboardList size={20} color="#10b981" />
-          {casoEditando ? 'Editar Caso' : 'Nuevo Ingreso'}
-        </h3>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+          <h3
+            style={{
+              margin: 0,
+              color: 'white',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontSize: '1.1rem'
+            }}
+          >
+            <ClipboardList size={20} color="#10b981" />
+            {casoEditando ? 'Editar Caso' : 'Nuevo Ingreso'}
+          </h3>
+
+          {/* Selector de Estado */}
+          <div style={{ display: 'flex', gap: '5px' }}>
+            {ESTADOS_REPARACION.map(est => {
+              const Icon = est.icon;
+              const activo = formCaso.estadoReparacion === est.id;
+              return (
+                <button
+                  key={est.id}
+                  type="button"
+                  onClick={() => handleChange('estadoReparacion', est.id)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '4px 8px',
+                    borderRadius: '6px',
+                    border: activo ? `1px solid ${est.color}` : '1px solid transparent',
+                    background: activo ? `${est.color}22` : 'transparent',
+                    color: activo ? est.color : '#6b7280',
+                    fontSize: '0.65rem',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <Icon size={12} />
+                  {est.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
         {/* El botón cerrar (X) se maneja desde el AnimatePresence padre en index.js */}
       </div>
 
