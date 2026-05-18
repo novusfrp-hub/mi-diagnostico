@@ -78,6 +78,7 @@ const VisorReporteAvanzado = forwardRef(function VisorReporteAvanzado({ caso }, 
         <MiniCaja label="ID CASO" valor={`#${(caso.id || '').substring(0, 8).toUpperCase()}`} />
         <MiniCaja label="MARCA" valor={caso.marca} />
         <MiniCaja label="MODELO" valor={caso.modelo} />
+        <MiniCaja label="TÉCNICO" valor={caso.tecnico || 'Marshall Cell'} />
       </div>
 
       {/* --- SÍNTOMAS --- */}
@@ -99,7 +100,7 @@ const VisorReporteAvanzado = forwardRef(function VisorReporteAvanzado({ caso }, 
         <Seccion icon={<Camera size={16} color="#8b5cf6" />} titulo="EVIDENCIA PRINCIPAL" color="#8b5cf6">
           <div style={{ display: 'flex', justifyContent: 'center', backgroundColor: '#000', borderRadius: '8px', padding: '10px' }}>
             <img src={caso.imgUrl} alt="Evidencia" referrerPolicy="no-referrer"
-              style={{ maxWidth: '100%', maxHeight: '250px', objectFit: 'contain', borderRadius: '4px' }} />
+              style={{ maxWidth: '100%', maxHeight: '450px', objectFit: 'contain', borderRadius: '8px' }} />
           </div>
         </Seccion>
       )}
@@ -236,10 +237,10 @@ const VisorReporteAvanzado = forwardRef(function VisorReporteAvanzado({ caso }, 
                           border: '1px solid #374151',
                           borderRadius: '8px',
                           overflow: 'hidden',
-                          width: '120px'
+                          width: '200px'
                         }}>
                           <img src={img.url} alt={tipoInfo.label} referrerPolicy="no-referrer"
-                            style={{ width: '100%', height: '80px', objectFit: 'cover' }} />
+                            style={{ width: '100%', height: '150px', objectFit: 'contain', backgroundColor: '#000' }} />
                           <div style={{ padding: '4px 6px', fontSize: '0.6rem', color: '#9ca3af', textAlign: 'center' }}>
                             {tipoInfo.icon} {tipoInfo.label}
                           </div>

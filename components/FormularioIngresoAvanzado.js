@@ -227,6 +227,16 @@ export default function FormularioIngresoAvanzado({
         </div>
       </div>
       <div style={{ marginTop: '12px' }}>
+        <label style={labelStyle}>Técnico Responsable</label>
+        <input
+          type="text"
+          style={inputDark}
+          value={formCaso.tecnico || ''}
+          onChange={(e) => handleChange('tecnico', e.target.value)}
+          placeholder="Nombre del técnico..."
+        />
+      </div>
+      <div style={{ marginTop: '12px' }}>
         <label style={labelStyle}>Síntomas</label>
         <textarea
           required

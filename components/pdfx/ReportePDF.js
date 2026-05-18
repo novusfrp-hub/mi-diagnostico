@@ -22,8 +22,8 @@ const styles = StyleSheet.create({
     lineaBox: { backgroundColor: '#ffffff', padding: 10, borderRadius: 4, border: '1pt solid #e5e7eb', marginBottom: 8 },
     lineaName: { fontSize: 10, fontWeight: 'bold', color: '#1e40af', marginBottom: 6 },
     imageContainer: { marginTop: 15, alignItems: 'center', padding: 10, border: '1pt solid #e5e7eb', borderRadius: 5 },
-    image: { maxWidth: '100%', maxHeight: 250, objectFit: 'contain' },
-    imageSmall: { width: 80, height: 60, objectFit: 'cover', borderRadius: 3 },
+    image: { maxWidth: '100%', maxHeight: 400, objectFit: 'contain' },
+    imageSmall: { width: 150, height: 110, objectFit: 'contain', borderRadius: 3, backgroundColor: '#000' },
     footer: { position: 'absolute', bottom: 30, left: 40, right: 40, textAlign: 'center', fontSize: 9, color: '#9ca3af', borderTop: '1pt solid #e5e7eb', paddingTop: 10 },
     pageBreak: { marginBottom: 20 }
 });
@@ -53,6 +53,9 @@ const ReportePDF = ({ caso }) => {
             <View style={styles.row}>
                 <View style={styles.box}><Text style={styles.label}>Marca</Text><Text style={styles.value}>{caso.marca}</Text></View>
                 <View style={styles.box}><Text style={styles.label}>Modelo</Text><Text style={styles.value}>{caso.modelo}</Text></View>
+            </View>
+            <View style={styles.row}>
+                <View style={{ ...styles.box, width: '100%' }}><Text style={styles.label}>Técnico Responsable</Text><Text style={styles.value}>{caso.tecnico || 'Marshall Cell'}</Text></View>
             </View>
 
             <View style={styles.section}>
