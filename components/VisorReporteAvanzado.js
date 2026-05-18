@@ -1,5 +1,5 @@
-import React, { forwardRef } from 'react';
-import { ClipboardList, Zap, Usb, Cpu, Camera, AlertTriangle, CheckCircle2, Image as ImageIcon } from 'lucide-react';
+import React, { forwardRef, useState } from 'react';
+import { ClipboardList, Zap, Usb, Cpu, Camera, AlertTriangle, CheckCircle2, Image as ImageIcon, X } from 'lucide-react';
 
 const ESTADOS_COMPORTAMIENTO_DESCRIPCION = {
   'Estático': { color: '#10b981', bg: 'rgba(16, 185, 129, 0.1)' },
@@ -29,6 +29,8 @@ const TIPO_IMAGEN_LABEL = {
  * Recibe `caso` (objeto completo) y `ref` para captura de imagen.
  */
 const VisorReporteAvanzado = forwardRef(function VisorReporteAvanzado({ caso }, ref) {
+  const [imgAmpliada, setImgAmpliada] = useState(null);
+
   if (!caso) return null;
 
   const consumoUsb = caso.consumoUsb || {};
@@ -98,7 +100,10 @@ const VisorReporteAvanzado = forwardRef(function VisorReporteAvanzado({ caso }, 
       {/* --- IMAGEN PRINCIPAL --- */}
       {caso.imgUrl && (
         <Seccion icon={<Camera size={16} color="#8b5cf6" />} titulo="EVIDENCIA PRINCIPAL" color="#8b5cf6">
-          <div style={{ display: 'flex', justifyContent: 'center', backgroundColor: '#000', borderRadius: '8px', padding: '10px' }}>
+          <div
+            onClick={() => setImgAmpliada(caso.imgUrl)}
+            style={{ display: 'flex', justifyContent: 'center', backgroundColor: '#000', borderRadius: '8px', padding: '10px', cursor: 'zoom-in' }}
+          >
             <img src={caso.imgUrl} alt="Evidencia" referrerPolicy="no-referrer"
               style={{ maxWidth: '100%', maxHeight: '450px', objectFit: 'contain', borderRadius: '8px' }} />
           </div>
@@ -232,13 +237,17 @@ const VisorReporteAvanzado = forwardRef(function VisorReporteAvanzado({ caso }, 
                     {(linea.imagenes || []).map((img, iImg) => {
                       const tipoInfo = TIPO_IMAGEN_LABEL[img.tipo] || TIPO_IMAGEN_LABEL.placa;
                       return img.url ? (
-                        <div key={img.id || iImg} style={{
-                          backgroundColor: '#0a0a0a',
-                          border: '1px solid #374151',
-                          borderRadius: '8px',
-                          overflow: 'hidden',
-                          width: '200px'
-                        }}>
+                        <div key={img.id || iImg}
+                          onClick={() => setImgAmpliada(img.url)}
+                          style={{
+                            backgroundColor: '#0a0a0a',
+                            border: '1px solid #374151',
+                            borderRadius: '8px',
+                            overflow: 'hidden',
+                            width: '200px',
+                            cursor: 'zoom-in'
+                          }}
+                        >
                           <img src={img.url} alt={tipoInfo.label} referrerPolicy="no-referrer"
                             style={{ width: '100%', height: '150px', objectFit: 'contain', backgroundColor: '#000' }} />
                           <div style={{ padding: '4px 6px', fontSize: '0.6rem', color: '#9ca3af', textAlign: 'center' }}>
@@ -266,6 +275,62 @@ const VisorReporteAvanzado = forwardRef(function VisorReporteAvanzado({ caso }, 
       }}>
         Marshall Cell — Laboratorio de Microelectrónica, Oropesa, Cusco
       </div>
+
+      {/* --- MODAL ZOOM (PANTALLA COMPLETA) --- */}
+      {imgAmpliada && (
+        <div
+          className="no-print"
+          onClick={() => setImgAmpliada(null)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.9)',
+            zIndex: 9999,
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: '20px'
+          }}
+        >
+          <button
+            onClick={() => setImgAmpliada(null)}
+            style={{
+              position: 'absolute',
+              top: '20px',
+              right: '20px',
+              background: 'rgba(255,255,255,0.1)',
+              border: 'none',
+              color: 'white',
+              padding: '10px',
+              borderRadius: '50%',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 10000
+            }}
+          >
+            <X size={24} />
+          </button>
+
+          <img
+            src={imgAmpliada}
+            alt="Zoom"
+            referrerPolicy="no-referrer"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: '95vw',
+              maxHeight: '90vh',
+              objectFit: 'contain',
+              borderRadius: '8px',
+              boxShadow: '0 0 30px rgba(0,0,0,0.5)'
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 });
