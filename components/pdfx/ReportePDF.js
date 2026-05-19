@@ -93,13 +93,6 @@ const ReportePDF = ({ caso }) => {
                 <Text style={styles.sectionText}>{caso.protocolo || 'Pendiente de evaluación técnica profunda.'}</Text>
             </View>
 
-            {caso.solucionEmpleada && (
-                <View style={{ ...styles.section, borderLeft: '4pt solid #10b981' }}>
-                    <Text style={{ ...styles.label, color: '#10b981' }}>Solución Empleada (Éxito)</Text>
-                    <Text style={{ ...styles.sectionText, fontWeight: 'bold' }}>{caso.solucionEmpleada}</Text>
-                </View>
-            )}
-
             {caso.imgUrl && (
                 <View style={styles.imageContainer}>
                     <Text style={styles.label}>Evidencia Técnica Adjunta</Text>
@@ -172,6 +165,14 @@ const ReportePDF = ({ caso }) => {
                             )}
                         </View>
                     ))}
+                </View>
+            )}
+
+            {/* --- SOLUCIÓN EMPLEADA (AL FINAL DE TODO) --- */}
+            {caso.solucionEmpleada && (
+                <View style={{ ...styles.section, borderLeft: '4pt solid #10b981', marginTop: 15 }}>
+                    <Text style={{ ...styles.label, color: '#10b981' }}>Solución Empleada (Éxito Final)</Text>
+                    <Text style={{ ...styles.sectionText, fontWeight: 'bold' }}>{caso.solucionEmpleada}</Text>
                 </View>
             )}
 
