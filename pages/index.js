@@ -254,7 +254,12 @@ export default function AppDiagnostico() {
   const eliminarCaso = async (id) => { if (window.confirm('¿Seguro de eliminar este caso?')) { try { await deleteDoc(doc(db, "historial_reparaciones", id)); cargarHistorialCasos(); } catch (error) { } } };
   const abrirReporte = (caso) => { setCasoReporte(caso); setReporteVisible(true); setHistorialCasosVisible(false); };
   const imprimirReporte = async () => { if (!casoReporte) return; try { const { pdf } = await import('@react-pdf/renderer'); const ReportePDF = (await import('../components/pdfx/ReportePDF')).default; const blob = await pdf(<ReportePDF caso={casoReporte} />).toBlob(); window.open(URL.createObjectURL(blob), '_blank'); } catch (error) { alert("Error generando PDF."); } };
-  const enviarWhatsApp = () => { if (!casoReporte) return; const texto = `📱 *MARSHALL CELL - REPORTE TÉCNICO*\n\n*Equipo:* ${casoReporte.marca} ${casoReporte.modelo}\n*ID:* #${casoReporte.id.substring(0, 6).toUpperCase()}\n*Fecha:* ${new Date(casoReporte.fecha).toLocaleDateString()}\n\n⚠️ *Síntoma:* ${casoReporte.sintomas}\n\n🛠️ *Diagnóstico:* ${casoReporte.protocolo || 'Pendiente.'}\n\n👨‍🔧 *Técnico:* ${casoReporte.tecnico || 'Marshall'}\n📍 *Laboratorio:* Oropesa, Cusco`; window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank'); };
+  const enviarWhatsApp = () => {
+    if (!casoReporte) return;
+    const solucion = casoReporte.solucionEmpleada ? `\n\n✅ *SOLUCIÓN:* ${casoReporte.solucionEmpleada}` : '';
+    const texto = `📱 *MARSHALL CELL - REPORTE TÉCNICO*\n\n*Equipo:* ${casoReporte.marca} ${casoReporte.modelo}\n*ID:* #${casoReporte.id.substring(0, 6).toUpperCase()}\n*Fecha:* ${new Date(casoReporte.fecha).toLocaleDateString()}\n\n⚠️ *Síntoma:* ${casoReporte.sintomas}\n\n🛠️ *Diagnóstico:* ${casoReporte.protocolo || 'Pendiente.'}${solucion}\n\n👨‍🔧 *Técnico:* ${casoReporte.tecnico || 'Marshall'}\n📍 *Laboratorio:* Oropesa, Cusco`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank');
+  };
   const reporteRef = useRef(null);
   const exportarComoImagen = async () => {
     if (!reporteRef.current) return;
