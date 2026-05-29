@@ -7,11 +7,18 @@ import { db, auth } from '../firebase';
 import { Sun, Moon, ArrowLeft, RefreshCcw, Zap, Smartphone, AlertTriangle, ChevronRight, Home, ShieldCheck, Camera, CheckCircle2, XCircle, Settings, Plus, Save, X, Trash2, Edit, ChevronDown, CornerDownRight, LogOut, Lightbulb, Usb, Map, Play, Flame, ClipboardList, History, Printer, FileText, MessageCircle, Link, Monitor, Mic, MicOff, Cpu, Image as ImageIcon } from 'lucide-react';
 
 import FPCInteligente from '../components/FPCInteligente.js';
+import ICInteligente from '../components/ICInteligente.js';
 import EscanerRFFE from '../components/EscanerRFFE.js';
 import FormularioIngresoAvanzado from '../components/FormularioIngresoAvanzado.js';
 import VisorReporteAvanzado from '../components/VisorReporteAvanzado.js';
 import { toPng } from 'html-to-image';
 import useAutoSave from '../hooks/useAutoSave';
+
+const LETRAS_FILAS = [
+  'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K', 'L', 'M', 'N', 'P', 'R', 'T', 'U', 'V', 'W', 'Y',
+  'AA', 'AB', 'AC', 'AD', 'AE', 'AF', 'AG', 'AH', 'AJ', 'AK', 'AL', 'AM', 'AN', 'AP', 'AR', 'AT', 'AU', 'AV', 'AW', 'AY'
+];
+
 
 const obtenerUrlVideo = (url) => { if (!url) return ''; let v = ''; if (url.includes('youtu.be/')) v = url.split('youtu.be/')[1].split('?')[0]; else if (url.includes('youtube.com/watch')) v = new URLSearchParams(url.split('?')[1]).get('v'); else if (url.includes('youtube.com/embed/')) return url; return v ? `https://www.youtube.com/embed/${v}` : url; };
 
@@ -51,6 +58,15 @@ export default function AppDiagnostico() {
   const [tipoImagenViendo, setTipoImagenViendo] = useState('placa');
   const [modalFpcAbierto, setModalFpcAbierto] = useState(false);
 
+  // ESTADOS LIBRERÍA IC
+  const [icActivo, setIcActivo] = useState(null);
+  const [modalIcAbierto, setModalIcAbierto] = useState(false);
+  const [formNuevoIc, setFormNuevoIc] = useState({ nombre: '', filas: 5, columnas: 5, esquinaGuia: 'top-left' });
+  const [padActivoIc, setPadActivoIc] = useState('A1');
+  const [modoIc, setModoIc] = useState('crear');
+  const [escalaIc, setEscalaIc] = useState('diodo');
+
+
   // ESTADOS MULTÍMETRO
   const [usbConectado, setUsbConectado] = useState(false); const [lecturaUsb, setLecturaUsb] = useState({ valor: '----', unidad: '---' }); const [dispositivoUsb, setDispositivoUsb] = useState(null); const ordenCamposDock = ['vbus', 'dp', 'dm', 'cc1', 'cc2']; const [campoActivoDock, setCampoActivoDock] = useState('vbus'); const [pinActivoFpc, setPinActivoFpc] = useState(1); const [modoFpc, setModoFpc] = useState('crear'); const [escalaFpc, setEscalaFpc] = useState('diodo');
 
@@ -70,15 +86,23 @@ export default function AppDiagnostico() {
   const campoActivoRef = useRef(campoActivoDock); useEffect(() => { campoActivoRef.current = campoActivoDock; }, [campoActivoDock]);
   const pinActivoFpcRef = useRef(pinActivoFpc); useEffect(() => { pinActivoFpcRef.current = pinActivoFpc; }, [pinActivoFpc]);
   const modoFpcRef = useRef(modoFpc); useEffect(() => { modoFpcRef.current = modoFpc; }, [modoFpc]);
+  
+  const icActivoRef = useRef(icActivo); useEffect(() => { icActivoRef.current = icActivo; }, [icActivo]);
+  const padActivoIcRef = useRef(padActivoIc); useEffect(() => { padActivoIcRef.current = padActivoIc; }, [padActivoIc]);
+  const modoIcRef = useRef(modoIc); useEffect(() => { modoIcRef.current = modoIc; }, [modoIc]);
+  const escalaIcRef = useRef(escalaIc); useEffect(() => { escalaIcRef.current = escalaIc; }, [escalaIc]);
+
   const [autoHoldActivo, setAutoHoldActivo] = useState(false); const autoHoldActivoRef = useRef(autoHoldActivo); useEffect(() => { autoHoldActivoRef.current = autoHoldActivo; }, [autoHoldActivo]);
   const lecturaRffeRef = useRef(lecturaRffe); useEffect(() => { lecturaRffeRef.current = lecturaRffe; }, [lecturaRffe]);
   const autoHoldValueRef = useRef(null); const autoHoldStartTimeRef = useRef(0); const autoHoldTriggeredRef = useRef(false);
+
 
   const reproducirBip = () => { try { const audioCtx = new (window.AudioContext || window.webkitAudioContext)(); const oscillator = audioCtx.createOscillator(); oscillator.type = 'sine'; oscillator.frequency.setValueAtTime(1200, audioCtx.currentTime); oscillator.connect(audioCtx.destination); oscillator.start(); oscillator.stop(audioCtx.currentTime + 0.1); } catch (e) { } };
 
   // GUARDADO UNIVERSAL
   const avanzarPinMagico = (valorForzado = null) => {
     const valVivo = valorForzado || lecturaUsbRef.current.valor; const campoActual = campoActivoRef.current; const mFpc = modoFpcRef.current; const pinAct = pinActivoFpcRef.current;
+    const mIc = modoIcRef.current; const padAct = padActivoIcRef.current;
     if (libreriaVisibleRef.current) {
       const modAct = modeloActivoRef.current; if (!modAct) return;
       let modeloActualizado = { ...modAct }; const seccion = seccionLibreriaRef.current;
@@ -102,6 +126,25 @@ export default function AppDiagnostico() {
             const pinInfo = fpcAct.pines.find(p => p.id === nextPin);
             if (pinInfo && (pinInfo.tipo === 'GND' || pinInfo.tipo === 'NC')) { nextPin++; } else { break; }
           } return nextPin <= fpcAct.pines.length ? nextPin : prev;
+        });
+      } else if (seccion === 'ic' && icActivoRef.current) {
+        const icAct = icActivoRef.current;
+        const nuevosIcs = (modeloActualizado.ics || []).map(ic => {
+          if (ic.id === icAct.id) {
+            const nuevosPines = ic.pines.map(p => { if (p.id === padAct) return mIc === 'crear' ? { ...p, valorSano: valVivo } : { ...p, valorActual: valVivo }; return p; });
+            const icMod = { ...ic, pines: nuevosPines }; setIcActivo(icMod); return icMod;
+          } return ic;
+        });
+        modeloActualizado.ics = nuevosIcs; setModeloActivo(modeloActualizado);
+        setPadActivoIc(prev => {
+          const idx = icAct.pines.findIndex(p => p.id === prev);
+          if (idx === -1) return prev;
+          let nextIdx = idx + 1;
+          while (nextIdx < icAct.pines.length) {
+            const pinInfo = icAct.pines[nextIdx];
+            if (pinInfo && (pinInfo.tipo === 'GND' || pinInfo.tipo === 'NC')) { nextIdx++; } else { break; }
+          }
+          return nextIdx < icAct.pines.length ? icAct.pines[nextIdx].id : prev;
         });
       }
     }
@@ -193,8 +236,57 @@ export default function AppDiagnostico() {
 
   // LIBRERÍA CRUD
   const cargarLibreriaDB = async () => { try { const qs = await getDocs(collection(db, "hardware_db")); const arr = []; qs.forEach(doc => arr.push({ id: doc.id, ...doc.data() })); setModelosLibreria(arr); } catch (error) { } };
-  const crearNuevoModeloDB = async (e) => { e.preventDefault(); if (!formNuevoModelo.marca || !formNuevoModelo.nombre) return; const idUnico = `${formNuevoModelo.marca}_${formNuevoModelo.nombre}`.toLowerCase().replace(/\s+/g, '_'); const nuevoObj = { marca: formNuevoModelo.marca, nombre: formNuevoModelo.nombre, fpcs: [], rffe_ics: [], docktestDiodo: { vbus: '---', dp: '---', dm: '---', cc1: '---', cc2: '---' }, docktestUa: { vbus: '---', dp: '---', dm: '---', cc1: '---', cc2: '---' } }; await setDoc(doc(db, "hardware_db", idUnico), nuevoObj); setFormNuevoModelo({ marca: '', nombre: '' }); cargarLibreriaDB(); setModeloActivo({ ...nuevoObj, id: idUnico }); };
+  const crearNuevoModeloDB = async (e) => { e.preventDefault(); if (!formNuevoModelo.marca || !formNuevoModelo.nombre) return; const idUnico = `${formNuevoModelo.marca}_${formNuevoModelo.nombre}`.toLowerCase().replace(/\s+/g, '_'); const nuevoObj = { marca: formNuevoModelo.marca, nombre: formNuevoModelo.nombre, fpcs: [], ics: [], rffe_ics: [], docktestDiodo: { vbus: '---', dp: '---', dm: '---', cc1: '---', cc2: '---' }, docktestUa: { vbus: '---', dp: '---', dm: '---', cc1: '---', cc2: '---' } }; await setDoc(doc(db, "hardware_db", idUnico), nuevoObj); setFormNuevoModelo({ marca: '', nombre: '' }); cargarLibreriaDB(); setModeloActivo({ ...nuevoObj, id: idUnico }); };
   const guardarModeloActualDB = async () => { if (!modeloActivo) return; await setDoc(doc(db, "hardware_db", modeloActivo.id), modeloActivo); alert("¡Placa guardada en la nube de Marshall Cell!"); cargarLibreriaDB(); };
+  
+  const crearNuevoIcEnModelo = () => {
+    if (!formNuevoIc.nombre || formNuevoIc.filas <= 0 || formNuevoIc.columnas <= 0) return;
+    const filasCount = parseInt(formNuevoIc.filas);
+    const columnasCount = parseInt(formNuevoIc.columnas);
+    const pinesArray = [];
+    const filasLetras = LETRAS_FILAS.slice(0, filasCount);
+    for (let r = 0; r < filasCount; r++) {
+      const letra = filasLetras[r];
+      for (let c = 1; c <= columnasCount; c++) {
+        pinesArray.push({
+          id: `${letra}${c}`,
+          nombre: `Linea_${letra}${c}`,
+          tipo: 'DATA',
+          valorSano: '---',
+          valorActual: '---'
+        });
+      }
+    }
+    const nuevoIc = {
+      id: Date.now().toString(),
+      nombre: formNuevoIc.nombre.replace(/ /g, '_'),
+      filas: filasCount,
+      columnas: columnasCount,
+      esquinaGuia: formNuevoIc.esquinaGuia || 'top-left',
+      pines: pinesArray
+    };
+    const modActualizado = { ...modeloActivo, ics: [...(modeloActivo.ics || []), nuevoIc] };
+    setModeloActivo(modActualizado);
+    setIcActivo(nuevoIc);
+    setFormNuevoIc({ nombre: '', filas: 5, columnas: 5, esquinaGuia: 'top-left' });
+    setPadActivoIc('A1');
+  };
+
+  const eliminarIcActivo = () => {
+    if (!icActivo || !window.confirm(`¿Seguro de eliminar el IC ${icActivo.nombre}?`)) return;
+    const modActualizado = { ...modeloActivo, ics: (modeloActivo.ics || []).filter(i => i.id !== icActivo.id) };
+    setModeloActivo(modActualizado);
+    setIcActivo(null);
+    setPadActivoIc('A1');
+  };
+
+  const cambiarEsquinaGuiaIc = (nuevaEsquina) => {
+    if (!icActivo) return;
+    const icMod = { ...icActivo, esquinaGuia: nuevaEsquina };
+    setIcActivo(icMod);
+    setModeloActivo(prev => ({ ...prev, ics: (prev.ics || []).map(i => i.id === icMod.id ? icMod : i) }));
+  };
+
   
   const crearNuevoFpcEnModelo = () => { if (!formNuevoFpc.nombre || formNuevoFpc.pines <= 0) return; const pinesArray = Array.from({ length: parseInt(formNuevoFpc.pines) }, (_, i) => ({ id: i + 1, nombre: `Linea_${i + 1}`, valorSano: '---', valorActual: '---', tipo: 'DATA' })); const nuevoFpc = { id: Date.now().toString(), nombre: formNuevoFpc.nombre.replace(/ /g, '_'), pines: pinesArray, imgPlaca: '', imgEsquema: '' }; const modActualizado = { ...modeloActivo, fpcs: [...modeloActivo.fpcs, nuevoFpc] }; setModeloActivo(modActualizado); setFpcActivo(nuevoFpc); setFormNuevoFpc({ nombre: '', pines: 40 }); setPinActivoFpc(1); };
   
@@ -222,6 +314,18 @@ export default function AppDiagnostico() {
   } = useAutoSave(
     fpcActivo ? `fpc_borrador_${modeloActivo?.id}_${fpcActivo.id}` : null,
     fpcActivo,
+    guardarModeloActualDB
+  );
+
+  const {
+    cambiosPendientes: cambiosPendientesIc,
+    guardando: guardandoIc,
+    ultimaSincronizacion: ultimaSincIc,
+    sincronizarAhora: sincronizarIcAhora,
+    descartarCambios: descartarCambiosIc
+  } = useAutoSave(
+    icActivo ? `ic_borrador_${modeloActivo?.id}_${icActivo.id}` : null,
+    icActivo,
     guardarModeloActualDB
   );
 
@@ -406,7 +510,7 @@ export default function AppDiagnostico() {
                 </div>
                 <div style={{ flex: 1, overflowY: 'auto', padding: '10px' }}>
                   {modelosLibreria.map(mod => (
-                    <button key={mod.id} onClick={() => { setModeloActivo(mod); setFpcActivo(mod.fpcs[0] || null); }} style={{ width: '100%', padding: '12px', textAlign: 'left', backgroundColor: modeloActivo?.id === mod.id ? '#1f2937' : 'transparent', border: 'none', color: modeloActivo?.id === mod.id ? '#00ffff' : '#9ca3af', borderLeft: modeloActivo?.id === mod.id ? '4px solid #00ffff' : '4px solid transparent', cursor: 'pointer', borderRadius: '0 8px 8px 0', marginBottom: '5px', fontWeight: 'bold' }}>
+                    <button key={mod.id} onClick={() => { setModeloActivo(mod); setFpcActivo(mod.fpcs[0] || null); setIcActivo(mod.ics?.[0] || null); }} style={{ width: '100%', padding: '12px', textAlign: 'left', backgroundColor: modeloActivo?.id === mod.id ? '#1f2937' : 'transparent', border: 'none', color: modeloActivo?.id === mod.id ? '#00ffff' : '#9ca3af', borderLeft: modeloActivo?.id === mod.id ? '4px solid #00ffff' : '4px solid transparent', cursor: 'pointer', borderRadius: '0 8px 8px 0', marginBottom: '5px', fontWeight: 'bold' }}>
                       {mod.marca} {mod.nombre}
                     </button>
                   ))}
@@ -416,7 +520,29 @@ export default function AppDiagnostico() {
                 <div style={{ padding: '15px 20px', borderBottom: '1px solid #374151', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
                   <h2 style={{ color: 'white', margin: 0, fontSize: '1.2rem' }}>{modeloActivo ? `${modeloActivo.marca} ${modeloActivo.nombre}` : 'Selecciona Modelo'}</h2>
                   <div style={{ display: 'flex', gap: '10px' }}>
-                    {modeloActivo && <button onClick={sincronizarFpcAhora} style={{ background: '#10b981', color: 'white', border: 'none', padding: '8px 15px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}><Save size={16} /> Guardar</button>}
+                    {modeloActivo && (
+                      <button 
+                        onClick={seccionLibreria === 'ic' ? sincronizarIcAhora : sincronizarFpcAhora} 
+                        style={{ 
+                          background: (seccionLibreria === 'ic' ? cambiosPendientesIc : cambiosPendientesFpc) ? '#f59e0b' : '#10b981', 
+                          color: 'white', 
+                          border: 'none', 
+                          padding: '8px 15px', 
+                          borderRadius: '8px', 
+                          fontWeight: 'bold', 
+                          cursor: 'pointer', 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '5px' 
+                        }}
+                      >
+                        <Save size={16} /> 
+                        {seccionLibreria === 'ic' 
+                          ? (guardandoIc ? 'Guardando...' : 'Guardar IC') 
+                          : (guardandoFpc ? 'Guardando...' : 'Guardar FPC')
+                        }
+                      </button>
+                    )}
                     <button onClick={() => setLibreriaVisible(false)} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', cursor: 'pointer', padding: '8px', borderRadius: '8px' }}><X size={16} /></button>
                   </div>
                 </div>
@@ -425,6 +551,7 @@ export default function AppDiagnostico() {
                     <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
                       <button onClick={() => setSeccionLibreria('docktest')} style={{ padding: '10px 15px', borderRadius: '8px', border: 'none', background: seccionLibreria === 'docktest' ? '#3b82f6' : '#1f2937', color: 'white', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>Docktest</button>
                       <button onClick={() => setSeccionLibreria('fpc')} style={{ padding: '10px 15px', borderRadius: '8px', border: 'none', background: seccionLibreria === 'fpc' ? '#8b5cf6' : '#1f2937', color: 'white', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>Planos FPC</button>
+                      <button onClick={() => setSeccionLibreria('ic')} style={{ padding: '10px 15px', borderRadius: '8px', border: 'none', background: seccionLibreria === 'ic' ? '#ec4899' : '#1f2937', color: 'white', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>Planos IC / BGA</button>
                       <button onClick={() => setSeccionLibreria('rffe')} style={{ padding: '10px 15px', borderRadius: '8px', border: 'none', background: seccionLibreria === 'rffe' ? '#10b981' : '#1f2937', color: 'white', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>Módulo RFFE</button>
                     </div>
                     <VisorHUD valor={lecturaUsb.valor} unidad={lecturaUsb.unidad} conectado={usbConectado} conectarFn={conectarMultimetroUSB} desconectarFn={desconectarMultimetroUSB} vozActiva={vozActiva} toggleVozFn={toggleVoz} autoHoldActivo={autoHoldActivo} toggleAutoHoldFn={() => setAutoHoldActivo(!autoHoldActivo)} />
@@ -476,6 +603,53 @@ export default function AppDiagnostico() {
                             </div>
                           </div>
                         ) : (<div style={{ textAlign: 'center', padding: '50px', color: 'gray' }}><Map size={48} style={{ opacity: 0.3, marginBottom: '10px' }} /><p>Crea un FPC arriba para empezar a mapear.</p></div>)}
+                      </div>
+                    )}
+
+                    {seccionLibreria === 'ic' && (
+                      <div>
+                        <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
+                          <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', flex: 1, paddingBottom: '5px', scrollbarWidth: 'thin' }}>
+                            {(modeloActivo.ics || []).map(ic => (
+                              <button key={ic.id} onClick={() => { setIcActivo(ic); setPadActivoIc('A1'); setModalIcAbierto(true); }} style={{ padding: '8px 15px', borderRadius: '20px', border: 'none', background: icActivo?.id === ic.id ? '#ec4899' : '#1f2937', color: 'white', fontWeight: 'bold', cursor: 'pointer', whiteSpace: 'nowrap' }}>{ic.nombre} ({ic.filas}x{ic.columnas})</button>
+                            ))}
+                          </div>
+                          <div style={{ display: 'flex', gap: '5px', background: '#1a1a1a', padding: '5px', borderRadius: '10px', border: '1px solid #333', flexWrap: 'wrap', alignItems: 'center' }}>
+                            <input placeholder="Nombre IC..." value={formNuevoIc.nombre} onChange={e => setFormNuevoIc({ ...formNuevoIc, nombre: e.target.value.replace(/ /g, '_') })} style={{ ...estilos.inputDark, width: '100px', padding: '5px', fontSize: '0.8rem' }} />
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                              <span style={{ color: 'gray', fontSize: '0.75rem' }}>Fil:</span>
+                              <input type="number" placeholder="Filas" min="1" max="40" value={formNuevoIc.filas} onChange={e => setFormNuevoIc({ ...formNuevoIc, filas: e.target.value })} style={{ ...estilos.inputDark, width: '40px', padding: '5px', textAlign: 'center', fontSize: '0.8rem' }} />
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                              <span style={{ color: 'gray', fontSize: '0.75rem' }}>Col:</span>
+                              <input type="number" placeholder="Col" min="1" max="40" value={formNuevoIc.columnas} onChange={e => setFormNuevoIc({ ...formNuevoIc, columnas: e.target.value })} style={{ ...estilos.inputDark, width: '40px', padding: '5px', textAlign: 'center', fontSize: '0.8rem' }} />
+                            </div>
+                            <select value={formNuevoIc.esquinaGuia} onChange={e => setFormNuevoIc({ ...formNuevoIc, esquinaGuia: e.target.value })} style={{ background: '#1f2937', color: 'white', border: '1px solid #333', padding: '5px', borderRadius: '5px', outline: 'none', fontSize: '0.8rem', cursor: 'pointer' }}>
+                              <option value="top-left">↖ Top-Left</option>
+                              <option value="top-right">↗ Top-Right</option>
+                              <option value="bottom-left">↙ Bottom-Left</option>
+                              <option value="bottom-right">↘ Bottom-Right</option>
+                            </select>
+                            <button onClick={crearNuevoIcEnModelo} style={{ background: '#10b981', border: 'none', borderRadius: '6px', color: 'white', fontWeight: 'bold', padding: '5px 10px', cursor: 'pointer', fontSize: '0.8rem' }}>+</button>
+                          </div>
+                        </div>
+                        {icActivo ? (
+                          <div style={{ textAlign: 'center', padding: '20px', color: '#6b7280', fontSize: '0.85rem' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px' }}>
+                              <span style={{ color: '#ec4899', fontWeight: 'bold', fontSize: '1rem' }}>{icActivo.nombre} ({icActivo.filas}x{icActivo.columnas})</span> 
+                              <span style={{ fontSize: '0.75rem' }}>seleccionado — haz click en el nombre arriba para abrir el visor del IC.</span>
+                              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                <span style={{ fontSize: '0.75rem', color: '#cbd5e1' }}>Cambiar Guía:</span>
+                                <select value={icActivo.esquinaGuia || 'top-left'} onChange={e => cambiarEsquinaGuiaIc(e.target.value)} style={{ background: '#1f2937', color: 'white', border: '1px solid #333', padding: '4px 8px', borderRadius: '5px', outline: 'none', fontSize: '0.75rem', cursor: 'pointer' }}>
+                                  <option value="top-left">↖ Top-Left</option>
+                                  <option value="top-right">↗ Top-Right</option>
+                                  <option value="bottom-left">↙ Bottom-Left</option>
+                                  <option value="bottom-right">↘ Bottom-Right</option>
+                                </select>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (<div style={{ textAlign: 'center', padding: '50px', color: 'gray' }}><Cpu size={48} style={{ opacity: 0.3, marginBottom: '10px' }} /><p>Crea un IC arriba para empezar a mapear.</p></div>)}
                       </div>
                     )}
 
@@ -553,6 +727,61 @@ export default function AppDiagnostico() {
                 cambiosPendientes={cambiosPendientesFpc}
                 guardando={guardandoFpc}
                 ultimaSincronizacion={ultimaSincFpc}
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* --- MODAL FULLSCREEN: VISOR DE PINES IC / BGA --- */}
+      <AnimatePresence>
+        {modalIcAbierto && icActivo && modeloActivo && (
+          <motion.div className="no-print" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#0a0b0f', zIndex: 2500, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div style={{ padding: '10px 20px', borderBottom: '1px solid #374151', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#111827', flexShrink: 0, flexWrap: 'wrap', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <button onClick={() => setModalIcAbierto(false)} style={{ background: 'none', border: 'none', color: '#ec4899', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px' }}><ArrowLeft size={22} /></button>
+                <Cpu size={20} color="#ec4899" />
+                <span style={{ color: 'white', fontWeight: 'bold', fontSize: '1.1rem' }}>{icActivo.nombre}</span>
+                <span style={{ fontSize: '0.7rem', padding: '3px 8px', borderRadius: '12px', background: '#1f2937', color: '#9ca3af', fontWeight: 'bold' }}>{icActivo.filas}x{icActivo.columnas} PADS</span>
+              </div>
+              <div className="fpc-tools" style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: '5px', backgroundColor: '#1a1a1a', padding: '4px', borderRadius: '8px', alignItems: 'center' }}>
+                  {cambiosPendientesIc && (
+                    <button onClick={() => { descartarCambiosIc(); setIcActivo(prev => prev ? {...prev} : null); }} style={{ padding: '6px 10px', borderRadius: '6px', border: '1px dashed #6b7280', background: 'transparent', color: '#9ca3af', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.65rem' }}>↩ Descartar</button>
+                  )}
+                  <button onClick={() => { eliminarIcActivo(); setModalIcAbierto(false); }} style={{ padding: '6px 10px', borderRadius: '6px', border: 'none', background: 'transparent', color: '#ef4444', fontWeight: 'bold', cursor: 'pointer' }}>🗑️ Eliminar IC</button>
+                </div>
+                <div style={{ display: 'flex', gap: '5px', backgroundColor: '#1a1a1a', padding: '4px', borderRadius: '8px' }}>
+                  <button onClick={() => setEscalaIc('diodo')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: escalaIc === 'diodo' ? '#ec4899' : 'transparent', color: escalaIc === 'diodo' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}>Diodo</button>
+                  <button onClick={() => setEscalaIc('ua')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: escalaIc === 'ua' ? '#10b981' : 'transparent', color: escalaIc === 'ua' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}>uA</button>
+                </div>
+                <div style={{ display: 'flex', gap: '5px', backgroundColor: '#1a1a1a', padding: '4px', borderRadius: '8px' }}>
+                  <button onClick={() => setModoIc('crear')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: modoIc === 'crear' ? '#ec4899' : 'transparent', color: modoIc === 'crear' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}>Grabar</button>
+                  <button onClick={() => setModoIc('diagnostico')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: modoIc === 'diagnostico' ? '#ef4444' : 'transparent', color: modoIc === 'diagnostico' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}>Diagnóstico</button>
+                </div>
+                <button onClick={() => setModalIcAbierto(false)} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', cursor: 'pointer', padding: '8px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}><X size={20} /></button>
+              </div>
+            </div>
+            <div style={{ padding: '10px 20px', flexShrink: 0 }}>
+              <VisorHUD valor={lecturaUsb.valor} unidad={lecturaUsb.unidad} conectado={usbConectado} conectarFn={conectarMultimetroUSB} desconectarFn={desconectarMultimetroUSB} vozActiva={vozActiva} toggleVozFn={toggleVoz} autoHoldActivo={autoHoldActivo} toggleAutoHoldFn={() => setAutoHoldActivo(!autoHoldActivo)} />
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '0 20px 20px 20px' }}>
+              <ICInteligente 
+                ic={icActivo} 
+                setPines={(updater) => {
+                  const arrNuevo = typeof updater === 'function' ? updater(icActivo.pines) : updater;
+                  const icMod = { ...icActivo, pines: arrNuevo }; setIcActivo(icMod);
+                  setModeloActivo(prev => ({ ...prev, ics: (prev.ics || []).map(i => i.id === icMod.id ? icMod : i) }));
+                }} 
+                padActivo={padActivoIc} 
+                setPadActivo={setPadActivoIc} 
+                modo={modoIc} 
+                escala={escalaIc} 
+                lecturaEnVivo={lecturaUsb.valor}
+                onGuardar={sincronizarIcAhora}
+                cambiosPendientes={cambiosPendientesIc}
+                guardando={guardandoIc}
+                ultimaSincronizacion={ultimaSincIc}
               />
             </div>
           </motion.div>
