@@ -65,11 +65,19 @@ export default function ICInteligente({
     if (pad.tipo === 'GND') return '#4b5563';
     if (pad.tipo === 'NC') return '#1e3a8a';
 
-    if (!pad.valorActual || pad.valorActual === '---') return colorBase;
-    if (pad.valorActual === 'OL' && pad.valorSano !== 'OL') return '#f97316';
+    const valActual = escala === 'diodo'
+      ? (pad.valorActualDiodo !== undefined ? pad.valorActualDiodo : pad.valorActual)
+      : (pad.valorActualUa !== undefined ? pad.valorActualUa : '---');
 
-    const vAct = parseFloat(pad.valorActual);
-    const vSano = parseFloat(pad.valorSano);
+    const valSano = escala === 'diodo'
+      ? (pad.valorSanoDiodo !== undefined ? pad.valorSanoDiodo : pad.valorSano)
+      : (pad.valorSanoUa !== undefined ? pad.valorSanoUa : '---');
+
+    if (!valActual || valActual === '---') return colorBase;
+    if (valActual === 'OL' && valSano !== 'OL') return '#f97316';
+
+    const vAct = parseFloat(valActual);
+    const vSano = parseFloat(valSano);
 
     if (escala === 'diodo') {
       if (vAct < 0.050) return '#ef4444'; // Corto
@@ -341,7 +349,15 @@ export default function ICInteligente({
 
                 const esActivo = padActivo === idPad;
                 const colorPad = obtenerColorPad(pad);
-                const valorTexto = modo === 'crear' ? formNum(pad.valorSano, pad.tipo) : formNum(pad.valorActual, pad.tipo);
+                const valSano = escala === 'diodo'
+                  ? (pad.valorSanoDiodo !== undefined ? pad.valorSanoDiodo : pad.valorSano)
+                  : (pad.valorSanoUa !== undefined ? pad.valorSanoUa : '---');
+
+                const valActual = escala === 'diodo'
+                  ? (pad.valorActualDiodo !== undefined ? pad.valorActualDiodo : pad.valorActual)
+                  : (pad.valorActualUa !== undefined ? pad.valorActualUa : '---');
+
+                const valorTexto = modo === 'crear' ? formNum(valSano, pad.tipo) : formNum(valActual, pad.tipo);
 
                 return (
                   <div
@@ -354,23 +370,29 @@ export default function ICInteligente({
                       boxShadow: esActivo ? '0 0 12px #ffffff' : 'inset 0 -2px 4px rgba(0,0,0,0.3)',
                       width: '56px',
                       height: '56px',
-                      padding: '5px 2px 7px 2px',
-                      boxSizing: 'border-box',
+                      position: 'relative',
                       display: 'flex',
                       flexDirection: 'column',
-                      justifyContent: 'space-between',
-                      alignItems: 'center'
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      boxSizing: 'border-box'
                     }}
                     title={`Pad ${idPad}: ${pad.nombre || 'Sin nombre'} (${pad.tipo})`}
                   >
                     <span
                       style={{
+                        position: 'absolute',
+                        top: '5px',
+                        left: '0',
+                        right: '0',
+                        textAlign: 'center',
                         fontSize: '0.5rem',
                         fontWeight: 'bold',
                         color: '#ffffff',
                         opacity: 0.6,
                         textShadow: '1px 1px 1px rgba(0,0,0,0.5)',
-                        lineHeight: '1'
+                        lineHeight: '1',
+                        pointerEvents: 'none'
                       }}
                     >
                       {idPad}
@@ -380,8 +402,11 @@ export default function ICInteligente({
                         fontSize: getValorFontSize(valorTexto),
                         color: pad.tipo === 'GND' || pad.tipo === 'NC' ? '#cbd5e1' : '#000000',
                         textShadow: pad.tipo !== 'GND' && pad.tipo !== 'NC' ? 'none' : '1px 1px 2px #000',
-                        fontWeight: 'extrabold',
-                        lineHeight: '1'
+                        fontWeight: 'bold',
+                        lineHeight: '1',
+                        marginTop: '8px',
+                        textAlign: 'center',
+                        pointerEvents: 'none'
                       }}
                     >
                       {valorTexto}
@@ -474,7 +499,10 @@ export default function ICInteligente({
             <span style={{ color: 'gray', fontSize: '0.75rem', display: 'block' }}>
               Valor Sano:{' '}
               <strong style={{ color: '#fff' }}>
-                {padActualInfo.valorSano || '---'} {escala === 'diodo' ? 'V' : 'uA'}
+                {(escala === 'diodo'
+                  ? (padActualInfo.valorSanoDiodo !== undefined ? padActualInfo.valorSanoDiodo : padActualInfo.valorSano)
+                  : (padActualInfo.valorSanoUa !== undefined ? padActualInfo.valorSanoUa : '---')) || '---'}{' '}
+                {escala === 'diodo' ? 'V' : 'uA'}
               </strong>
             </span>
             <span style={{ color: 'gray', fontSize: '0.75rem', display: 'block', marginTop: '4px' }}>
@@ -482,7 +510,9 @@ export default function ICInteligente({
               <strong style={{ color: '#fff', fontSize: '1.3rem' }}>
                 {padActivo === padActualInfo.id && lecturaEnVivo !== '----'
                   ? lecturaEnVivo
-                  : padActualInfo.valorActual || '---'}{' '}
+                  : (escala === 'diodo'
+                    ? (padActualInfo.valorActualDiodo !== undefined ? padActualInfo.valorActualDiodo : padActualInfo.valorActual)
+                    : (padActualInfo.valorActualUa !== undefined ? padActualInfo.valorActualUa : '---')) || '---'}{' '}
                 {escala === 'diodo' ? 'V' : 'uA'}
               </strong>
             </span>

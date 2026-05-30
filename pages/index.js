@@ -113,9 +113,23 @@ export default function AppDiagnostico() {
         setCampoActivoDock(prev => { const idx = ordenCamposDock.indexOf(prev); return (idx >= 0 && idx < ordenCamposDock.length - 1) ? ordenCamposDock[idx + 1] : prev; });
       } else if (seccion === 'fpc' && fpcActivoRef.current) {
         const fpcAct = fpcActivoRef.current;
+        const escala = escalaFpcRef.current;
         const nuevosFpcs = modeloActualizado.fpcs.map(fpc => {
           if (fpc.id === fpcAct.id) {
-            const nuevosPines = fpc.pines.map(p => { if (p.id === pinAct) return mFpc === 'crear' ? { ...p, valorSano: valVivo } : { ...p, valorActual: valVivo }; return p; });
+            const nuevosPines = fpc.pines.map(p => {
+               if (p.id === pinAct) {
+                  return { 
+                    ...p, 
+                    valorSanoDiodo: (mFpc === 'crear' && escala === 'diodo' ? valVivo : p.valorSanoDiodo), 
+                    valorSanoUa: (mFpc === 'crear' && escala === 'ua' ? valVivo : p.valorSanoUa),
+                    valorSano: (mFpc === 'crear' ? valVivo : p.valorSano),
+                    valorActual: (mFpc !== 'crear' ? valVivo : p.valorActual),
+                    valorActualDiodo: (mFpc !== 'crear' && escala === 'diodo' ? valVivo : p.valorActualDiodo), 
+                    valorActualUa: (mFpc !== 'crear' && escala === 'ua' ? valVivo : p.valorActualUa) 
+                  };
+               }
+               return p;
+            });
             const fpcMod = { ...fpc, pines: nuevosPines }; setFpcActivo(fpcMod); return fpcMod;
           } return fpc;
         });
@@ -129,9 +143,23 @@ export default function AppDiagnostico() {
         });
       } else if (seccion === 'ic' && icActivoRef.current) {
         const icAct = icActivoRef.current;
+        const escala = escalaIcRef.current;
         const nuevosIcs = (modeloActualizado.ics || []).map(ic => {
           if (ic.id === icAct.id) {
-            const nuevosPines = ic.pines.map(p => { if (p.id === padAct) return mIc === 'crear' ? { ...p, valorSano: valVivo } : { ...p, valorActual: valVivo }; return p; });
+            const nuevosPines = ic.pines.map(p => {
+               if (p.id === padAct) {
+                  return { 
+                     ...p, 
+                     valorSanoDiodo: (mIc === 'crear' && escala === 'diodo' ? valVivo : p.valorSanoDiodo), 
+                     valorSanoUa: (mIc === 'crear' && escala === 'ua' ? valVivo : p.valorSanoUa),
+                     valorSano: (mIc === 'crear' ? valVivo : p.valorSano),
+                     valorActual: (mIc !== 'crear' ? valVivo : p.valorActual),
+                     valorActualDiodo: (mIc !== 'crear' && escala === 'diodo' ? valVivo : p.valorActualDiodo), 
+                     valorActualUa: (mIc !== 'crear' && escala === 'ua' ? valVivo : p.valorActualUa) 
+                  };
+               }
+               return p;
+            });
             const icMod = { ...ic, pines: nuevosPines }; setIcActivo(icMod); return icMod;
           } return ic;
         });

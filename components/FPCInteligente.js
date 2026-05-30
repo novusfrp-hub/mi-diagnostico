@@ -39,11 +39,19 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
     if (pin.tipo === 'GND') return '#4b5563';
     if (pin.tipo === 'NC') return '#1e3a8a';
 
-    if (!pin.valorActual || pin.valorActual === '---') return colorBase;
-    if (pin.valorActual === 'OL' && pin.valorSano !== 'OL') return '#f97316';
+    const valActual = escala === 'diodo'
+      ? (pin.valorActualDiodo !== undefined ? pin.valorActualDiodo : pin.valorActual)
+      : (pin.valorActualUa !== undefined ? pin.valorActualUa : '---');
 
-    const vAct = parseFloat(pin.valorActual);
-    const vSano = parseFloat(pin.valorSano);
+    const valSano = escala === 'diodo'
+      ? (pin.valorSanoDiodo !== undefined ? pin.valorSanoDiodo : pin.valorSano)
+      : (pin.valorSanoUa !== undefined ? pin.valorSanoUa : '---');
+
+    if (!valActual || valActual === '---') return colorBase;
+    if (valActual === 'OL' && valSano !== 'OL') return '#f97316';
+
+    const vAct = parseFloat(valActual);
+    const vSano = parseFloat(valSano);
 
     if (escala === 'diodo') {
       if (vAct < 0.050) return '#ef4444';
@@ -63,49 +71,61 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
     return val.startsWith('0.') ? val.substring(1) : val;
   };
 
-  const renderPin = (pin, esArriba, isExtremo) => (
-    <div
-      key={pin.id}
-      onClick={() => setPinActivo(pin.id)}
-      style={{
-        width: isExtremo ? '70px' : '45px',
-        minWidth: isExtremo ? '70px' : '45px',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        cursor: 'pointer',
-        flexShrink: 0
-      }}
-    >
-      {esArriba && <span style={{ fontSize: '0.55rem', color: 'gray', marginBottom: '2px' }}>{pin.id}</span>}
+  const renderPin = (pin, esArriba, isExtremo) => {
+    const valSano = escala === 'diodo'
+      ? (pin.valorSanoDiodo !== undefined ? pin.valorSanoDiodo : pin.valorSano)
+      : (pin.valorSanoUa !== undefined ? pin.valorSanoUa : '---');
+
+    const valActual = escala === 'diodo'
+      ? (pin.valorActualDiodo !== undefined ? pin.valorActualDiodo : pin.valorActual)
+      : (pin.valorActualUa !== undefined ? pin.valorActualUa : '---');
+
+    const valorTexto = modo === 'crear' ? formNum(valSano, pin.tipo) : formNum(valActual, pin.tipo);
+
+    return (
       <div
+        key={pin.id}
+        onClick={() => setPinActivo(pin.id)}
         style={{
-          width: '100%',
-          height: '30px',
-          backgroundColor: obtenerColorPin(pin),
-          border: pinActivo === pin.id ? '2px solid #fff' : '1px solid #222',
-          borderRadius: '4px',
-          transition: 'all 0.2s',
+          width: isExtremo ? '70px' : '45px',
+          minWidth: isExtremo ? '70px' : '45px',
           display: 'flex',
           flexDirection: 'column',
-          justifyContent: 'center',
-          alignItems: 'center'
+          alignItems: 'center',
+          cursor: 'pointer',
+          flexShrink: 0
         }}
       >
-        <span
+        {esArriba && <span style={{ fontSize: '0.55rem', color: 'gray', marginBottom: '2px' }}>{pin.id}</span>}
+        <div
           style={{
-            fontSize: '0.6rem',
-            fontWeight: 'bold',
-            color: pin.tipo === 'GND' || pin.tipo === 'NC' ? '#cbd5e1' : '#000',
-            textShadow: pin.tipo !== 'GND' && pin.tipo !== 'NC' ? 'none' : '1px 1px 2px #000'
+            width: '100%',
+            height: '30px',
+            backgroundColor: obtenerColorPin(pin),
+            border: pinActivo === pin.id ? '2px solid #fff' : '1px solid #222',
+            borderRadius: '4px',
+            transition: 'all 0.2s',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            alignItems: 'center'
           }}
         >
-          {modo === 'crear' ? formNum(pin.valorSano, pin.tipo) : formNum(pin.valorActual, pin.tipo)}
-        </span>
+          <span
+            style={{
+              fontSize: '0.6rem',
+              fontWeight: 'bold',
+              color: pin.tipo === 'GND' || pin.tipo === 'NC' ? '#cbd5e1' : '#000',
+              textShadow: pin.tipo !== 'GND' && pin.tipo !== 'NC' ? 'none' : '1px 1px 2px #000'
+            }}
+          >
+            {valorTexto}
+          </span>
+        </div>
+        {!esArriba && <span style={{ fontSize: '0.55rem', color: 'gray', marginTop: '2px' }}>{pin.id}</span>}
       </div>
-      {!esArriba && <span style={{ fontSize: '0.55rem', color: 'gray', marginTop: '2px' }}>{pin.id}</span>}
-    </div>
-  );
+    );
+  };
 
   // Formatear tiempo relativo
   const tiempoRelativo = (fecha) => {
@@ -344,7 +364,10 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
             <span style={{ color: 'gray', fontSize: '0.75rem', display: 'block' }}>
               Valor Sano:{' '}
               <strong style={{ color: '#fff' }}>
-                {pines.find(p => p.id === pinActivo)?.valorSano || '---'} {escala === 'diodo' ? 'V' : 'uA'}
+                {(escala === 'diodo'
+                  ? (pines.find(p => p.id === pinActivo)?.valorSanoDiodo !== undefined ? pines.find(p => p.id === pinActivo)?.valorSanoDiodo : pines.find(p => p.id === pinActivo)?.valorSano)
+                  : (pines.find(p => p.id === pinActivo)?.valorSanoUa !== undefined ? pines.find(p => p.id === pinActivo)?.valorSanoUa : '---')) || '---'}{' '}
+                {escala === 'diodo' ? 'V' : 'uA'}
               </strong>
             </span>
             <span style={{ color: 'gray', fontSize: '0.75rem', display: 'block', marginTop: '4px' }}>
@@ -352,7 +375,9 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
               <strong style={{ color: '#fff', fontSize: '1.3rem' }}>
                 {pinActivo === pines.find(p => p.id === pinActivo)?.id && lecturaEnVivo !== '----'
                   ? lecturaEnVivo
-                  : pines.find(p => p.id === pinActivo)?.valorActual || '---'}{' '}
+                  : (escala === 'diodo'
+                    ? (pines.find(p => p.id === pinActivo)?.valorActualDiodo !== undefined ? pines.find(p => p.id === pinActivo)?.valorActualDiodo : pines.find(p => p.id === pinActivo)?.valorActual)
+                    : (pines.find(p => p.id === pinActivo)?.valorActualUa !== undefined ? pines.find(p => p.id === pinActivo)?.valorActualUa : '---')) || '---'}{' '}
                 {escala === 'diodo' ? 'V' : 'uA'}
               </strong>
             </span>
