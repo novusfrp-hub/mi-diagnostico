@@ -89,6 +89,14 @@ export default function ICInteligente({
     return val.startsWith('0.') ? val.substring(1) : val;
   };
 
+  const getValorFontSize = (valor) => {
+    if (!valor) return '0.75rem';
+    if (valor.length > 5) return '0.6rem';
+    if (valor.length === 5) return '0.68rem';
+    if (valor.length === 4) return '0.75rem';
+    return '0.8rem';
+  };
+
   const padActualInfo = pines.find(p => p.id === padActivo) || {};
 
   // Formatear tiempo relativo
@@ -103,7 +111,7 @@ export default function ICInteligente({
   // Posicionamiento de la guía del Pin 1
   const renderGuiaAngulo = () => {
     const size = '16px';
-    const offset = '8px';
+    const offset = '6px';
     const style = {
       position: 'absolute',
       width: size,
@@ -155,7 +163,7 @@ export default function ICInteligente({
           display: grid;
           gap: 6px;
           background-color: #0b0f19;
-          padding: 30px;
+          padding: 12px;
           border-radius: 12px;
           border: 4px solid #1f2937;
           position: relative;
@@ -164,8 +172,8 @@ export default function ICInteligente({
         }
 
         .ic-pad {
-          width: 48px;
-          height: 48px;
+          width: 56px;
+          height: 56px;
           border-radius: 50%;
           display: flex;
           flex-direction: column;
@@ -190,14 +198,14 @@ export default function ICInteligente({
           display: flex;
           justify-content: center;
           align-items: center;
-          height: 35px;
+          height: 30px;
         }
 
         .ic-label-row {
           color: #6b7280;
           font-size: 0.8rem;
           font-weight: bold;
-          width: 35px;
+          width: 30px;
           display: flex;
           justify-content: center;
           align-items: center;
@@ -299,7 +307,7 @@ export default function ICInteligente({
         <div
           className="ic-grid-wrapper"
           style={{
-            gridTemplateColumns: `35px repeat(${columnasCount}, 48px)`,
+            gridTemplateColumns: `30px repeat(${columnasCount}, 56px)`,
           }}
         >
           {/* Indicador de Ángulo (Pin 1) */}
@@ -333,6 +341,7 @@ export default function ICInteligente({
 
                 const esActivo = padActivo === idPad;
                 const colorPad = obtenerColorPad(pad);
+                const valorTexto = modo === 'crear' ? formNum(pad.valorSano, pad.tipo) : formNum(pad.valorActual, pad.tipo);
 
                 return (
                   <div
@@ -342,31 +351,40 @@ export default function ICInteligente({
                     style={{
                       backgroundColor: colorPad,
                       border: esActivo ? '3px solid #ffffff' : '1px solid #1a1a1a',
-                      boxShadow: esActivo ? '0 0 12px #ffffff' : 'inset 0 -2px 4px rgba(0,0,0,0.3)'
+                      boxShadow: esActivo ? '0 0 12px #ffffff' : 'inset 0 -2px 4px rgba(0,0,0,0.3)',
+                      width: '56px',
+                      height: '56px',
+                      padding: '5px 2px 7px 2px',
+                      boxSizing: 'border-box',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
                     }}
                     title={`Pad ${idPad}: ${pad.nombre || 'Sin nombre'} (${pad.tipo})`}
                   >
                     <span
                       style={{
-                        fontSize: '0.65rem',
+                        fontSize: '0.5rem',
                         fontWeight: 'bold',
                         color: '#ffffff',
-                        textShadow: '1px 1px 2px #000'
+                        opacity: 0.6,
+                        textShadow: '1px 1px 1px rgba(0,0,0,0.5)',
+                        lineHeight: '1'
                       }}
                     >
                       {idPad}
                     </span>
                     <span
                       style={{
-                        fontSize: '0.55rem',
-                        color: pad.tipo === 'GND' || pad.tipo === 'NC' ? '#cbd5e1' : '#000',
+                        fontSize: getValorFontSize(valorTexto),
+                        color: pad.tipo === 'GND' || pad.tipo === 'NC' ? '#cbd5e1' : '#000000',
                         textShadow: pad.tipo !== 'GND' && pad.tipo !== 'NC' ? 'none' : '1px 1px 2px #000',
-                        fontWeight: 'bold',
-                        lineHeight: '1',
-                        marginTop: '1px'
+                        fontWeight: 'extrabold',
+                        lineHeight: '1'
                       }}
                     >
-                      {modo === 'crear' ? formNum(pad.valorSano, pad.tipo) : formNum(pad.valorActual, pad.tipo)}
+                      {valorTexto}
                     </span>
                   </div>
                 );
@@ -391,7 +409,7 @@ export default function ICInteligente({
             <span style={{ color: '#00ffff', fontWeight: 'bold', fontSize: '1.1rem' }}>
               PAD {padActivo}
             </span>
-            
+
             {modo === 'crear' ? (
               <div style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
                 <input
