@@ -65,13 +65,25 @@ export default function ICInteligente({
     if (pad.tipo === 'GND') return '#4b5563';
     if (pad.tipo === 'NC') return '#1e3a8a';
 
-    const valActual = escala === 'diodo'
-      ? (pad.valorActualDiodo !== undefined ? pad.valorActualDiodo : pad.valorActual)
-      : (pad.valorActualUa !== undefined ? pad.valorActualUa : '---');
+    let valActual = '---';
+    let valSano = '---';
 
-    const valSano = escala === 'diodo'
-      ? (pad.valorSanoDiodo !== undefined ? pad.valorSanoDiodo : pad.valorSano)
-      : (pad.valorSanoUa !== undefined ? pad.valorSanoUa : '---');
+    if (escala === 'diodo') {
+      valActual = pad.valorActualDiodo !== undefined ? pad.valorActualDiodo : pad.valorActual;
+      valSano = pad.valorSanoDiodo !== undefined ? pad.valorSanoDiodo : pad.valorSano;
+    } else if (escala === 'ua') {
+      valActual = pad.valorActualUa !== undefined ? pad.valorActualUa : '---';
+      valSano = pad.valorSanoUa !== undefined ? pad.valorSanoUa : '---';
+    } else if (escala === 'voltio') {
+      valActual = pad.valorActualVoltio !== undefined ? pad.valorActualVoltio : '---';
+      valSano = pad.valorSanoVoltio !== undefined ? pad.valorSanoVoltio : '---';
+    } else if (escala === 'ohmio') {
+      valActual = pad.valorActualOhmio !== undefined ? pad.valorActualOhmio : '---';
+      valSano = pad.valorSanoOhmio !== undefined ? pad.valorSanoOhmio : '---';
+    } else if (escala === 'amperio') {
+      valActual = pad.valorActualAmperio !== undefined ? pad.valorActualAmperio : '---';
+      valSano = pad.valorSanoAmperio !== undefined ? pad.valorSanoAmperio : '---';
+    }
 
     if (!valActual || valActual === '---') return colorBase;
     if (valActual === 'OL' && valSano !== 'OL') return '#f97316';
@@ -82,9 +94,18 @@ export default function ICInteligente({
     if (escala === 'diodo') {
       if (vAct < 0.050) return '#ef4444'; // Corto
       if (!isNaN(vAct) && !isNaN(vSano) && Math.abs(vAct - vSano) <= 0.040) return '#10b981'; // Sano
-    } else {
+    } else if (escala === 'ua') {
       if (vAct > 2000) return '#ef4444'; // Exceso consumo
       if (!isNaN(vAct) && !isNaN(vSano) && Math.abs(vAct - vSano) <= 50) return '#10b981'; // Sano
+    } else if (escala === 'voltio') {
+      if (vAct < 0.1 && vSano >= 1.0) return '#ef4444';
+      if (!isNaN(vAct) && !isNaN(vSano) && Math.abs(vAct - vSano) <= 0.1) return '#10b981';
+    } else if (escala === 'ohmio') {
+      if (vAct < 2.0 && vSano > 10.0) return '#ef4444';
+      if (!isNaN(vAct) && !isNaN(vSano) && (Math.abs(vAct - vSano) <= 5.0 || Math.abs(vAct - vSano) / vSano <= 0.1)) return '#10b981';
+    } else if (escala === 'amperio') {
+      if (vAct > 1.5) return '#ef4444';
+      if (!isNaN(vAct) && !isNaN(vSano) && Math.abs(vAct - vSano) <= 0.05) return '#10b981';
     }
     return '#eab308'; // Alterado/Desviado
   };
@@ -349,13 +370,25 @@ export default function ICInteligente({
 
                 const esActivo = padActivo === idPad;
                 const colorPad = obtenerColorPad(pad);
-                const valSano = escala === 'diodo'
-                  ? (pad.valorSanoDiodo !== undefined ? pad.valorSanoDiodo : pad.valorSano)
-                  : (pad.valorSanoUa !== undefined ? pad.valorSanoUa : '---');
+                let valSano = '---';
+                let valActual = '---';
 
-                const valActual = escala === 'diodo'
-                  ? (pad.valorActualDiodo !== undefined ? pad.valorActualDiodo : pad.valorActual)
-                  : (pad.valorActualUa !== undefined ? pad.valorActualUa : '---');
+                if (escala === 'diodo') {
+                  valSano = pad.valorSanoDiodo !== undefined ? pad.valorSanoDiodo : pad.valorSano;
+                  valActual = pad.valorActualDiodo !== undefined ? pad.valorActualDiodo : pad.valorActual;
+                } else if (escala === 'ua') {
+                  valSano = pad.valorSanoUa !== undefined ? pad.valorSanoUa : '---';
+                  valActual = pad.valorActualUa !== undefined ? pad.valorActualUa : '---';
+                } else if (escala === 'voltio') {
+                  valSano = pad.valorSanoVoltio !== undefined ? pad.valorSanoVoltio : '---';
+                  valActual = pad.valorActualVoltio !== undefined ? pad.valorActualVoltio : '---';
+                } else if (escala === 'ohmio') {
+                  valSano = pad.valorSanoOhmio !== undefined ? pad.valorSanoOhmio : '---';
+                  valActual = pad.valorActualOhmio !== undefined ? pad.valorActualOhmio : '---';
+                } else if (escala === 'amperio') {
+                  valSano = pad.valorSanoAmperio !== undefined ? pad.valorSanoAmperio : '---';
+                  valActual = pad.valorActualAmperio !== undefined ? pad.valorActualAmperio : '---';
+                }
 
                 const valorTexto = modo === 'crear' ? formNum(valSano, pad.tipo) : formNum(valActual, pad.tipo);
 
@@ -499,10 +532,15 @@ export default function ICInteligente({
             <span style={{ color: 'gray', fontSize: '0.75rem', display: 'block' }}>
               Valor Sano:{' '}
               <strong style={{ color: '#fff' }}>
-                {(escala === 'diodo'
-                  ? (padActualInfo.valorSanoDiodo !== undefined ? padActualInfo.valorSanoDiodo : padActualInfo.valorSano)
-                  : (padActualInfo.valorSanoUa !== undefined ? padActualInfo.valorSanoUa : '---')) || '---'}{' '}
-                {escala === 'diodo' ? 'V' : 'uA'}
+                {(() => {
+                  if (escala === 'diodo') return (padActualInfo.valorSanoDiodo !== undefined ? padActualInfo.valorSanoDiodo : padActualInfo.valorSano) || '---';
+                  if (escala === 'ua') return padActualInfo.valorSanoUa || '---';
+                  if (escala === 'voltio') return padActualInfo.valorSanoVoltio || '---';
+                  if (escala === 'ohmio') return padActualInfo.valorSanoOhmio || '---';
+                  if (escala === 'amperio') return padActualInfo.valorSanoAmperio || '---';
+                  return '---';
+                })()}{' '}
+                {escala === 'diodo' ? 'V' : escala === 'ua' ? 'uA' : escala === 'voltio' ? 'V' : escala === 'ohmio' ? 'Ω' : 'A'}
               </strong>
             </span>
             <span style={{ color: 'gray', fontSize: '0.75rem', display: 'block', marginTop: '4px' }}>
@@ -510,10 +548,15 @@ export default function ICInteligente({
               <strong style={{ color: '#fff', fontSize: '1.3rem' }}>
                 {padActivo === padActualInfo.id && lecturaEnVivo !== '----'
                   ? lecturaEnVivo
-                  : (escala === 'diodo'
-                    ? (padActualInfo.valorActualDiodo !== undefined ? padActualInfo.valorActualDiodo : padActualInfo.valorActual)
-                    : (padActualInfo.valorActualUa !== undefined ? padActualInfo.valorActualUa : '---')) || '---'}{' '}
-                {escala === 'diodo' ? 'V' : 'uA'}
+                  : (() => {
+                      if (escala === 'diodo') return (padActualInfo.valorActualDiodo !== undefined ? padActualInfo.valorActualDiodo : padActualInfo.valorActual) || '---';
+                      if (escala === 'ua') return padActualInfo.valorActualUa || '---';
+                      if (escala === 'voltio') return padActualInfo.valorActualVoltio || '---';
+                      if (escala === 'ohmio') return padActualInfo.valorActualOhmio || '---';
+                      if (escala === 'amperio') return padActualInfo.valorActualAmperio || '---';
+                      return '---';
+                    })()}{' '}
+                {escala === 'diodo' ? 'V' : escala === 'ua' ? 'uA' : escala === 'voltio' ? 'V' : escala === 'ohmio' ? 'Ω' : 'A'}
               </strong>
             </span>
           </div>

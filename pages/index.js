@@ -105,6 +105,182 @@ const VisorHUD = ({ valor, unidad, conectado, conectarFn, desconectarFn, vozActi
   );
 };
 
+const OscilogramaPanel = ({ valor, unidad, escalaActiva }) => {
+  const [activo, setActivo] = useState(true);
+  const [pausado, setPausado] = useState(false);
+  const canvasRef = useRef(null);
+  const puntosRef = useRef([]);
+  const [minVal, setMinVal] = useState(null);
+  const [maxVal, setMaxVal] = useState(null);
+
+  useEffect(() => {
+    puntosRef.current = [];
+    setMinVal(null);
+    setMaxVal(null);
+  }, [escalaActiva]);
+
+  useEffect(() => {
+    if (pausado || valor === '----' || valor === '---' || !valor || valor === 'OL') return;
+    
+    let valNum = parseFloat(valor);
+    if (isNaN(valNum)) return;
+
+    const puntos = puntosRef.current;
+    puntos.push(valNum);
+    if (puntos.length > 150) {
+      puntos.shift();
+    }
+
+    let currentMin = puntos[0];
+    let currentMax = puntos[0];
+    for (let i = 1; i < puntos.length; i++) {
+      if (puntos[i] < currentMin) currentMin = puntos[i];
+      if (puntos[i] > currentMax) currentMax = puntos[i];
+    }
+    setMinVal(currentMin);
+    setMaxVal(currentMax);
+
+    dibujarGrafico();
+  }, [valor, pausado]);
+
+  useEffect(() => {
+    dibujarGrafico();
+  }, [pausado, activo]);
+
+  const dibujarGrafico = () => {
+    const canvas = canvasRef.current;
+    if (!canvas || !activo) return;
+    const ctx = canvas.getContext("2d");
+    
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width;
+    canvas.height = rect.height;
+
+    const W = canvas.width;
+    const H = canvas.height;
+
+    ctx.fillStyle = "#111827";
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.strokeStyle = "#1f2937";
+    ctx.lineWidth = 1;
+    const gridSize = 25;
+    for (let x = 0; x < W; x += gridSize) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, H);
+      ctx.stroke();
+    }
+    for (let y = 0; y < H; y += gridSize) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(W, y);
+      ctx.stroke();
+    }
+
+    const puntos = puntosRef.current;
+    if (puntos.length === 0) {
+      ctx.fillStyle = "gray";
+      ctx.font = "12px Consolas";
+      ctx.textAlign = "center";
+      ctx.fillText("Esperando lecturas...", W / 2, H / 2);
+      return;
+    }
+
+    let min = puntos[0];
+    let max = puntos[0];
+    for (let i = 1; i < puntos.length; i++) {
+      if (puntos[i] < min) min = puntos[i];
+      if (puntos[i] > max) max = puntos[i];
+    }
+    
+    let range = max - min;
+    if (range < 0.1) {
+      min -= 0.5;
+      max += 0.5;
+      range = max - min;
+    } else {
+      min -= range * 0.1;
+      max += range * 0.1;
+      range = max - min;
+    }
+
+    ctx.strokeStyle = "#00ffff";
+    ctx.lineWidth = 2.5;
+    ctx.shadowColor = "#00ffff";
+    ctx.shadowBlur = 8;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+
+    ctx.beginPath();
+    const len = puntos.length;
+    for (let i = 0; i < len; i++) {
+      const x = (i / 150) * (W - 80) + 15;
+      const y = H - ((puntos[i] - min) / range) * (H - 40) - 20;
+      
+      if (i === 0) {
+        ctx.moveTo(x, y);
+      } else {
+        ctx.lineTo(x, y);
+      }
+    }
+    ctx.stroke();
+
+    ctx.shadowBlur = 0;
+
+    ctx.fillStyle = "rgba(156, 163, 175, 0.8)";
+    ctx.font = "10px Consolas";
+    ctx.textAlign = "right";
+    ctx.fillText(`${max.toFixed(3)} ${unidad}`, W - 10, 20);
+    ctx.fillText(`${((min + max) / 2).toFixed(3)} ${unidad}`, W - 10, H / 2);
+    ctx.fillText(`${min.toFixed(3)} ${unidad}`, W - 10, H - 10);
+  };
+
+  const guardarFoto = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const url = canvas.toDataURL("image/png");
+    const link = document.createElement("a");
+    link.download = `Oscilograma_${escalaActiva.toUpperCase()}_${new Date().toISOString().slice(0, 19).replace(/[:]/g, "-")}.png`;
+    link.href = url;
+    link.click();
+  };
+
+  if (!activo) {
+    return (
+      <div style={{ width: "100%", display: "flex", justifyContent: "flex-end", marginTop: "5px" }} className="no-print">
+        <button onClick={() => setActivo(true)} style={{ background: "#1f2937", border: "1px solid #374151", color: "white", padding: "6px 12px", borderRadius: "8px", fontSize: "0.75rem", fontWeight: "bold", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}>
+          📈 VER OSCILOGRAMA
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ backgroundColor: "#1a1a1a", border: "1px solid #333", borderRadius: "15px", padding: "12px", marginTop: "10px", width: "100%" }} className="no-print">
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+        <span style={{ fontSize: "0.75rem", fontWeight: "bold", color: "#00ffff" }}>📈 OSCILOGRAMA DE CONSUMO ({escalaActiva.toUpperCase()})</span>
+        <div style={{ display: "flex", gap: "6px" }}>
+          <button onClick={() => setPausado(!pausado)} style={{ background: pausado ? "#10b981" : "#d97706", border: "none", color: "white", padding: "4px 10px", borderRadius: "6px", fontSize: "0.7rem", fontWeight: "bold", cursor: "pointer" }}>
+            {pausado ? "▶ REANUDAR" : "⏸ PAUSAR"}
+          </button>
+          <button onClick={guardarFoto} style={{ background: "#2563eb", border: "none", color: "white", padding: "4px 10px", borderRadius: "6px", fontSize: "0.7rem", fontWeight: "bold", cursor: "pointer" }}>
+            📷 FOTO
+          </button>
+          <button onClick={() => setActivo(false)} style={{ background: "transparent", border: "none", color: "gray", padding: "4px 6px", cursor: "pointer" }}>
+            ✕ Ocultar
+          </button>
+        </div>
+      </div>
+      <canvas ref={canvasRef} style={{ width: "100%", height: "110px", backgroundColor: "#111827", borderRadius: "8px", border: "1px solid #222", display: "block" }} />
+      <div style={{ display: "flex", justifyContent: "space-between", marginTop: "6px", fontSize: "0.7rem", color: "gray" }}>
+        <span>MIN: <strong style={{ color: "#ff5555" }}>{minVal !== null ? `${minVal.toFixed(3)} ${unidad}` : "----"}</strong></span>
+        <span>MAX: <strong style={{ color: "#55ff55" }}>{maxVal !== null ? `${maxVal.toFixed(3)} ${unidad}` : "----"}</strong></span>
+      </div>
+    </div>
+  );
+};
+
 export default function AppDiagnostico() {
   const [pasoActual, setPasoActual] = useState(null); const [historial, setHistorial] = useState([]); const [cargando, setCargando] = useState(true); const [tema, setTema] = useState('light');
 
@@ -180,7 +356,10 @@ export default function AppDiagnostico() {
     const escalaMultimetro = lecturaUsbRef.current.unidad;
     const esIncorrecta = usbConectado && (
       (escalaActiva === 'diodo' && (escalaMultimetro === 'uA' || escalaMultimetro === 'mA' || escalaMultimetro === 'A')) ||
-      (escalaActiva === 'ua' && (escalaMultimetro === 'V' || escalaMultimetro === 'Diod' || escalaMultimetro === 'Ω'))
+      (escalaActiva === 'ua' && (escalaMultimetro === 'V' || escalaMultimetro === 'Diod' || escalaMultimetro === 'Ω')) ||
+      (escalaActiva === 'amperio' && (escalaMultimetro === 'V' || escalaMultimetro === 'Diod' || escalaMultimetro === 'Ω')) ||
+      (escalaActiva === 'voltio' && (escalaMultimetro === 'uA' || escalaMultimetro === 'mA' || escalaMultimetro === 'A')) ||
+      (escalaActiva === 'ohmio' && (escalaMultimetro === 'uA' || escalaMultimetro === 'mA' || escalaMultimetro === 'A'))
     );
     if (esIncorrecta) return;
     
@@ -191,8 +370,16 @@ export default function AppDiagnostico() {
       const modAct = modeloActivoRef.current; if (!modAct) return;
       let modeloActualizado = { ...modAct }; const seccion = seccionLibreriaRef.current;
       if (seccion === 'docktest') {
-        const escala = escalaFpcRef.current; const key = escala === 'diodo' ? 'docktestDiodo' : 'docktestUa';
-        if (!modeloActualizado[key]) modeloActualizado[key] = { vbus: '---', dp: '---', dm: '---', cc1: '---', cc2: '---' };
+        const escala = escalaFpcRef.current;
+        let key = 'docktestDiodo';
+        if (escala === 'ua') key = 'docktestUa';
+        else if (escala === 'voltio') key = 'docktestVoltio';
+        else if (escala === 'ohmio') key = 'docktestOhmio';
+        else if (escala === 'amperio') key = 'docktestAmperio';
+        
+        if (!modeloActualizado[key]) {
+          modeloActualizado[key] = { vbus: '---', dp: '---', dm: '---', cc1: '---', cc2: '---' };
+        }
         modeloActualizado[key][campoActual] = valVivo; setModeloActivo(modeloActualizado);
         setCampoActivoDock(prev => { const idx = ordenCamposDock.indexOf(prev); return (idx >= 0 && idx < ordenCamposDock.length - 1) ? ordenCamposDock[idx + 1] : prev; });
       } else if (seccion === 'fpc' && fpcActivoRef.current) {
@@ -206,10 +393,16 @@ export default function AppDiagnostico() {
                     ...p, 
                     valorSanoDiodo: (mFpc === 'crear' && escala === 'diodo' ? valVivo : p.valorSanoDiodo), 
                     valorSanoUa: (mFpc === 'crear' && escala === 'ua' ? valVivo : p.valorSanoUa),
+                    valorSanoVoltio: (mFpc === 'crear' && escala === 'voltio' ? valVivo : p.valorSanoVoltio),
+                    valorSanoOhmio: (mFpc === 'crear' && escala === 'ohmio' ? valVivo : p.valorSanoOhmio),
+                    valorSanoAmperio: (mFpc === 'crear' && escala === 'amperio' ? valVivo : p.valorSanoAmperio),
                     valorSano: (mFpc === 'crear' ? valVivo : p.valorSano),
                     valorActual: (mFpc !== 'crear' ? valVivo : p.valorActual),
                     valorActualDiodo: (mFpc !== 'crear' && escala === 'diodo' ? valVivo : p.valorActualDiodo), 
-                    valorActualUa: (mFpc !== 'crear' && escala === 'ua' ? valVivo : p.valorActualUa) 
+                    valorActualUa: (mFpc !== 'crear' && escala === 'ua' ? valVivo : p.valorActualUa),
+                    valorActualVoltio: (mFpc !== 'crear' && escala === 'voltio' ? valVivo : p.valorActualVoltio),
+                    valorActualOhmio: (mFpc !== 'crear' && escala === 'ohmio' ? valVivo : p.valorActualOhmio),
+                    valorActualAmperio: (mFpc !== 'crear' && escala === 'amperio' ? valVivo : p.valorActualAmperio)
                   };
                }
                return p;
@@ -217,7 +410,7 @@ export default function AppDiagnostico() {
             const fpcMod = { ...fpc, pines: nuevosPines }; setFpcActivo(fpcMod); return fpcMod;
           } return fpc;
         });
-        modeloActualizado.fpcs = nuevosFpcs; setModeloActivo(modeloActualizado);
+        modeloActualizado.fpcs = nuevosFpcs; setModeloActualivo(modeloActualizado);
         setPinActivoFpc(prev => {
           let nextPin = prev + 1;
           while (nextPin <= fpcAct.pines.length) {
@@ -236,10 +429,16 @@ export default function AppDiagnostico() {
                      ...p, 
                      valorSanoDiodo: (mIc === 'crear' && escala === 'diodo' ? valVivo : p.valorSanoDiodo), 
                      valorSanoUa: (mIc === 'crear' && escala === 'ua' ? valVivo : p.valorSanoUa),
+                     valorSanoVoltio: (mIc === 'crear' && escala === 'voltio' ? valVivo : p.valorSanoVoltio),
+                     valorSanoOhmio: (mIc === 'crear' && escala === 'ohmio' ? valVivo : p.valorSanoOhmio),
+                     valorSanoAmperio: (mIc === 'crear' && escala === 'amperio' ? valVivo : p.valorSanoAmperio),
                      valorSano: (mIc === 'crear' ? valVivo : p.valorSano),
                      valorActual: (mIc !== 'crear' ? valVivo : p.valorActual),
                      valorActualDiodo: (mIc !== 'crear' && escala === 'diodo' ? valVivo : p.valorActualDiodo), 
-                     valorActualUa: (mIc !== 'crear' && escala === 'ua' ? valVivo : p.valorActualUa) 
+                     valorActualUa: (mIc !== 'crear' && escala === 'ua' ? valVivo : p.valorActualUa),
+                     valorActualVoltio: (mIc !== 'crear' && escala === 'voltio' ? valVivo : p.valorActualVoltio),
+                     valorActualOhmio: (mIc !== 'crear' && escala === 'ohmio' ? valVivo : p.valorActualOhmio),
+                     valorActualAmperio: (mIc !== 'crear' && escala === 'amperio' ? valVivo : p.valorActualAmperio)
                   };
                }
                return p;
@@ -267,8 +466,7 @@ export default function AppDiagnostico() {
     if (typeof navigator === 'undefined' || !navigator.hid) { alert("Navegador no compatible."); return; }
     try {
       const devices = await navigator.hid.requestDevice({ filters: [{ vendorId: 0x1A86, productId: 0xE429 }] });
-      if (devices.length === 0) return; const device = devices[0]; await device.open(); setDispositivoUsb(device); setUsbConectado(true);
-      device.addEventListener("inputreport", event => {
+      if (devices.length === 0) return; const device = devices[0]; await device.open(); setDispositivoUsb(device); setUsbConect      device.addEventListener("inputreport", event => {
         const text = new TextDecoder("latin1").decode(event.data);
         let parsedVal = null;
         let parsedUni = null;
@@ -278,6 +476,12 @@ export default function AppDiagnostico() {
           parsedVal = "OL";
           if (escalaActiva === 'ua') {
             parsedUni = "uA";
+          } else if (escalaActiva === 'amperio') {
+            parsedUni = "A";
+          } else if (escalaActiva === 'voltio') {
+            parsedUni = "V";
+          } else if (escalaActiva === 'ohmio') {
+            parsedUni = "Ω";
           } else if (escalaActiva === 'diodo') {
             parsedUni = "Diod";
           } else {
@@ -295,6 +499,15 @@ export default function AppDiagnostico() {
             const rawVal = match[1];
             if (escalaActiva === 'ua') {
               parsedUni = "uA";
+              parsedVal = rawVal;
+            } else if (escalaActiva === 'amperio') {
+              parsedUni = "A";
+              parsedVal = rawVal;
+            } else if (escalaActiva === 'voltio') {
+              parsedUni = "V";
+              parsedVal = parseFloat(rawVal).toFixed(3);
+            } else if (escalaActiva === 'ohmio') {
+              parsedUni = "Ω";
               parsedVal = rawVal;
             } else if (escalaActiva === 'diodo') {
               parsedUni = "Diod";
@@ -318,14 +531,31 @@ export default function AppDiagnostico() {
           setLecturaUsb({ valor: parsedVal, unidad: parsedUni });
           if (autoHoldActivoRef.current) {
             const valNum = parseFloat(parsedVal);
-            const esIncorrecta = (escalaActiva === 'diodo' && (parsedUni === 'uA' || parsedUni === 'mA' || parsedUni === 'A')) ||
-                                 (escalaActiva === 'ua' && (parsedUni === 'V' || parsedUni === 'Diod' || parsedUni === 'Ω'));
+            const esIncorrecta = (escalaActiva === 'diodo' && (parsedUni !== 'Diod' && parsedUni !== 'V')) ||
+                                 (escalaActiva === 'ua' && parsedUni !== 'uA') ||
+                                 (escalaActiva === 'amperio' && parsedUni !== 'A') ||
+                                 (escalaActiva === 'voltio' && parsedUni !== 'V') ||
+                                 (escalaActiva === 'ohmio' && parsedUni !== 'Ω');
             if (esIncorrecta) {
               autoHoldValueRef.current = null;
               autoHoldTriggeredRef.current = false;
             } else {
-              const tol = escalaActiva === 'ua' ? 1.5 : 0.003;
-              const esCeroInactivo = escalaActiva === 'ua' && valNum < 1.0;
+              let tol = 0.003;
+              let esCeroInactivo = false;
+              if (escalaActiva === 'ua') {
+                tol = 1.5;
+                esCeroInactivo = valNum < 1.0;
+              } else if (escalaActiva === 'amperio') {
+                tol = 0.05;
+                esCeroInactivo = valNum < 0.01;
+              } else if (escalaActiva === 'voltio') {
+                tol = 0.05;
+                esCeroInactivo = valNum < 0.1;
+              } else if (escalaActiva === 'ohmio') {
+                tol = 5.0;
+                esCeroInactivo = valNum < 1.0;
+              }
+              
               if (!isNaN(valNum) && !esCeroInactivo) {
                 if (autoHoldValueRef.current !== null && Math.abs(valNum - autoHoldValueRef.current) <= tol) {
                   if (!autoHoldTriggeredRef.current && Date.now() - autoHoldStartTimeRef.current >= 1500) { autoHoldTriggeredRef.current = true; avanzarPinMagico(parsedVal); }
@@ -333,6 +563,8 @@ export default function AppDiagnostico() {
               } else { autoHoldValueRef.current = null; autoHoldTriggeredRef.current = false; }
             }
           }
+        }
+      });
         }
       });
     } catch (error) { alert("Error USB."); }
@@ -398,7 +630,7 @@ export default function AppDiagnostico() {
 
   // LIBRERÍA CRUD
   const cargarLibreriaDB = async () => { try { const qs = await getDocs(collection(db, "hardware_db")); const arr = []; qs.forEach(doc => arr.push({ id: doc.id, ...doc.data() })); setModelosLibreria(arr); } catch (error) { } };
-  const crearNuevoModeloDB = async (e) => { e.preventDefault(); if (!formNuevoModelo.marca || !formNuevoModelo.nombre) return; const idUnico = `${formNuevoModelo.marca}_${formNuevoModelo.nombre}`.toLowerCase().replace(/\s+/g, '_'); const nuevoObj = { marca: formNuevoModelo.marca, nombre: formNuevoModelo.nombre, fpcs: [], ics: [], rffe_ics: [], docktestDiodo: { vbus: '---', dp: '---', dm: '---', cc1: '---', cc2: '---' }, docktestUa: { vbus: '---', dp: '---', dm: '---', cc1: '---', cc2: '---' } }; await setDoc(doc(db, "hardware_db", idUnico), nuevoObj); setFormNuevoModelo({ marca: '', nombre: '' }); cargarLibreriaDB(); setModeloActivo({ ...nuevoObj, id: idUnico }); };
+  const crearNuevoModeloDB = async (e) => { e.preventDefault(); if (!formNuevoModelo.marca || !formNuevoModelo.nombre) return; const idUnico = `${formNuevoModelo.marca}_${formNuevoModelo.nombre}`.toLowerCase().replace(/\s+/g, '_'); const nuevoObj = { marca: formNuevoModelo.marca, nombre: formNuevoModelo.nombre, fpcs: [], ics: [], rffe_ics: [], docktestDiodo: { vbus: '---', dp: '---', dm: '---', cc1: '---', cc2: '---' }, docktestUa: { vbus: '---', dp: '---', dm: '---', cc1: '---', cc2: '---' }, docktestVoltio: { vbus: '---', dp: '---', dm: '---', cc1: '---', cc2: '---' }, docktestOhmio: { vbus: '---', dp: '---', dm: '---', cc1: '---', cc2: '---' }, docktestAmperio: { vbus: '---', dp: '---', dm: '---', cc1: '---', cc2: '---' } }; await setDoc(doc(db, "hardware_db", idUnico), nuevoObj); setFormNuevoModelo({ marca: '', nombre: '' }); cargarLibreriaDB(); setModeloActivo({ ...nuevoObj, id: idUnico }); };
   const guardarModeloActualDB = async () => { if (!modeloActivo) return; await setDoc(doc(db, "hardware_db", modeloActivo.id), modeloActivo); alert("¡Placa guardada en la nube de Marshall Cell!"); cargarLibreriaDB(); };
   
   const crearNuevoIcEnModelo = () => {
@@ -764,26 +996,37 @@ export default function AppDiagnostico() {
                     <VisorHUD valor={lecturaUsb.valor} unidad={lecturaUsb.unidad} conectado={usbConectado} conectarFn={conectarMultimetroUSB} desconectarFn={desconectarMultimetroUSB} vozActiva={vozActiva} toggleVozFn={toggleVoz} autoHoldActivo={autoHoldActivo} toggleAutoHoldFn={() => setAutoHoldActivo(!autoHoldActivo)} capturarFn={avanzarPinMagico} escalaActiva={seccionLibreria === 'ic' ? escalaIc : escalaFpc} />
 
                     {seccionLibreria === 'docktest' && (
-                      <div style={{ backgroundColor: '#000', padding: '20px', borderRadius: '15px', border: '1px solid #333' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px', flexWrap: 'wrap', gap: '10px' }}>
-                          <h3 style={{ color: '#3b82f6', margin: 0 }}>Captura de Docktest</h3>
-                          <div style={{ display: 'flex', gap: '5px', backgroundColor: '#1a1a1a', padding: '4px', borderRadius: '8px' }}>
-                            <button onClick={() => setEscalaFpc('diodo')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: escalaFpc === 'diodo' ? '#3b82f6' : 'transparent', color: escalaFpc === 'diodo' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}>Diodo</button>
-                            <button onClick={() => setEscalaFpc('ua')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: escalaFpc === 'ua' ? '#10b981' : 'transparent', color: escalaFpc === 'ua' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}>uA</button>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        <div style={{ backgroundColor: '#000', padding: '20px', borderRadius: '15px', border: '1px solid #333' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px', flexWrap: 'wrap', gap: '10px' }}>
+                            <h3 style={{ color: '#3b82f6', margin: 0 }}>Captura de Docktest</h3>
+                            <div style={{ display: 'flex', gap: '5px', backgroundColor: '#1a1a1a', padding: '4px', borderRadius: '8px', flexWrap: 'wrap' }}>
+                              <button onClick={() => setEscalaFpc('diodo')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: escalaFpc === 'diodo' ? '#3b82f6' : 'transparent', color: escalaFpc === 'diodo' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}>Diodo</button>
+                              <button onClick={() => setEscalaFpc('ua')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: escalaFpc === 'ua' ? '#10b981' : 'transparent', color: escalaFpc === 'ua' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}>uA</button>
+                              <button onClick={() => setEscalaFpc('amperio')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: escalaFpc === 'amperio' ? '#f59e0b' : 'transparent', color: escalaFpc === 'amperio' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}>Amperios</button>
+                              <button onClick={() => setEscalaFpc('voltio')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: escalaFpc === 'voltio' ? '#ef4444' : 'transparent', color: escalaFpc === 'voltio' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}>Voltios</button>
+                              <button onClick={() => setEscalaFpc('ohmio')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: escalaFpc === 'ohmio' ? '#a855f7' : 'transparent', color: escalaFpc === 'ohmio' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}>Ohmios</button>
+                            </div>
+                          </div>
+                          <div className="grid-dock" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '15px' }}>
+                            {ordenCamposDock.map(c => {
+                              let valuesObj = modeloActivo.docktestDiodo;
+                              if (escalaFpc === 'ua') valuesObj = modeloActivo.docktestUa;
+                              else if (escalaFpc === 'voltio') valuesObj = modeloActivo.docktestVoltio;
+                              else if (escalaFpc === 'ohmio') valuesObj = modeloActivo.docktestOhmio;
+                              else if (escalaFpc === 'amperio') valuesObj = modeloActivo.docktestAmperio;
+                              
+                              const valActual = valuesObj ? valuesObj[c] : '---';
+                              return (
+                                <div key={c} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                  <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: campoActivoDock === c ? '#00ffff' : 'gray', marginBottom: '8px', textTransform: 'uppercase' }}>{c}</span>
+                                  <input readOnly onClick={() => setCampoActivoDock(c)} value={valActual} style={{ width: '100%', padding: '15px', textAlign: 'center', fontFamily: 'Consolas', fontWeight: 'bold', fontSize: '1.2rem', border: campoActivoDock === c ? '2px solid #00ffff' : '1px solid #333', backgroundColor: campoActivoDock === c ? 'rgba(0, 255, 255, 0.1)' : '#1a1a1a', color: campoActivoDock === c ? '#00ffff' : 'white', borderRadius: '8px', cursor: 'pointer', outline: 'none' }} />
+                                </div>
+                              )
+                            })}
                           </div>
                         </div>
-                        <div className="grid-dock" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '15px' }}>
-                          {ordenCamposDock.map(c => {
-                            const valuesObj = escalaFpc === 'diodo' ? modeloActivo.docktestDiodo : modeloActivo.docktestUa;
-                            const valActual = valuesObj ? valuesObj[c] : '---';
-                            return (
-                              <div key={c} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                                <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: campoActivoDock === c ? '#00ffff' : 'gray', marginBottom: '8px', textTransform: 'uppercase' }}>{c}</span>
-                                <input readOnly onClick={() => setCampoActivoDock(c)} value={valActual} style={{ width: '100%', padding: '15px', textAlign: 'center', fontFamily: 'Consolas', fontWeight: 'bold', fontSize: '1.2rem', border: campoActivoDock === c ? '2px solid #00ffff' : '1px solid #333', backgroundColor: campoActivoDock === c ? 'rgba(0, 255, 255, 0.1)' : '#1a1a1a', color: campoActivoDock === c ? '#00ffff' : 'white', borderRadius: '8px', cursor: 'pointer', outline: 'none' }} />
-                              </div>
-                            )
-                          })}
-                        </div>
+                        <OscilogramaPanel valor={lecturaUsb.valor} unidad={lecturaUsb.unidad} escalaActiva={escalaFpc} />
                       </div>
                     )}
 
@@ -903,9 +1146,12 @@ export default function AppDiagnostico() {
                   )}
                   <button onClick={() => { eliminarFpcActivo(); setModalFpcAbierto(false); }} style={{ padding: '6px 10px', borderRadius: '6px', border: 'none', background: 'transparent', color: '#ef4444', fontWeight: 'bold', cursor: 'pointer' }}>🗑️</button>
                 </div>
-                <div style={{ display: 'flex', gap: '5px', backgroundColor: '#1a1a1a', padding: '4px', borderRadius: '8px' }}>
+                <div style={{ display: 'flex', gap: '5px', backgroundColor: '#1a1a1a', padding: '4px', borderRadius: '8px', flexWrap: 'wrap' }}>
                   <button onClick={() => setEscalaFpc('diodo')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: escalaFpc === 'diodo' ? '#8b5cf6' : 'transparent', color: escalaFpc === 'diodo' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}>Diodo</button>
                   <button onClick={() => setEscalaFpc('ua')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: escalaFpc === 'ua' ? '#10b981' : 'transparent', color: escalaFpc === 'ua' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}>uA</button>
+                  <button onClick={() => setEscalaFpc('amperio')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: escalaFpc === 'amperio' ? '#f59e0b' : 'transparent', color: escalaFpc === 'amperio' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}>Amperios</button>
+                  <button onClick={() => setEscalaFpc('voltio')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: escalaFpc === 'voltio' ? '#ef4444' : 'transparent', color: escalaFpc === 'voltio' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}>Voltios</button>
+                  <button onClick={() => setEscalaFpc('ohmio')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: escalaFpc === 'ohmio' ? '#a855f7' : 'transparent', color: escalaFpc === 'ohmio' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}>Ohmios</button>
                 </div>
                 <div style={{ display: 'flex', gap: '5px', backgroundColor: '#1a1a1a', padding: '4px', borderRadius: '8px' }}>
                   <button onClick={() => setModoFpc('crear')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: modoFpc === 'crear' ? '#8b5cf6' : 'transparent', color: modoFpc === 'crear' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}>Grabar</button>
@@ -916,6 +1162,7 @@ export default function AppDiagnostico() {
             </div>
             <div style={{ padding: '10px 20px', flexShrink: 0 }}>
               <VisorHUD valor={lecturaUsb.valor} unidad={lecturaUsb.unidad} conectado={usbConectado} conectarFn={conectarMultimetroUSB} desconectarFn={desconectarMultimetroUSB} vozActiva={vozActiva} toggleVozFn={toggleVoz} autoHoldActivo={autoHoldActivo} toggleAutoHoldFn={() => setAutoHoldActivo(!autoHoldActivo)} capturarFn={avanzarPinMagico} escalaActiva={escalaFpc} />
+              <OscilogramaPanel valor={lecturaUsb.valor} unidad={lecturaUsb.unidad} escalaActiva={escalaFpc} />
             </div>
             <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '0 20px 20px 20px' }}>
               <FPCInteligente 
@@ -959,9 +1206,12 @@ export default function AppDiagnostico() {
                   )}
                   <button onClick={() => { eliminarIcActivo(); setModalIcAbierto(false); }} style={{ padding: '6px 10px', borderRadius: '6px', border: 'none', background: 'transparent', color: '#ef4444', fontWeight: 'bold', cursor: 'pointer' }}>🗑️ Eliminar IC</button>
                 </div>
-                <div style={{ display: 'flex', gap: '5px', backgroundColor: '#1a1a1a', padding: '4px', borderRadius: '8px' }}>
+                <div style={{ display: 'flex', gap: '5px', backgroundColor: '#1a1a1a', padding: '4px', borderRadius: '8px', flexWrap: 'wrap' }}>
                   <button onClick={() => setEscalaIc('diodo')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: escalaIc === 'diodo' ? '#ec4899' : 'transparent', color: escalaIc === 'diodo' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}>Diodo</button>
                   <button onClick={() => setEscalaIc('ua')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: escalaIc === 'ua' ? '#10b981' : 'transparent', color: escalaIc === 'ua' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}>uA</button>
+                  <button onClick={() => setEscalaIc('amperio')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: escalaIc === 'amperio' ? '#f59e0b' : 'transparent', color: escalaIc === 'amperio' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}>Amperios</button>
+                  <button onClick={() => setEscalaIc('voltio')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: escalaIc === 'voltio' ? '#ef4444' : 'transparent', color: escalaIc === 'voltio' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}>Voltios</button>
+                  <button onClick={() => setEscalaIc('ohmio')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: escalaIc === 'ohmio' ? '#a855f7' : 'transparent', color: escalaIc === 'ohmio' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}>Ohmios</button>
                 </div>
                 <div style={{ display: 'flex', gap: '5px', backgroundColor: '#1a1a1a', padding: '4px', borderRadius: '8px' }}>
                   <button onClick={() => setModoIc('crear')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: modoIc === 'crear' ? '#ec4899' : 'transparent', color: modoIc === 'crear' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}>Grabar</button>
@@ -972,6 +1222,7 @@ export default function AppDiagnostico() {
             </div>
             <div style={{ padding: '10px 20px', flexShrink: 0 }}>
               <VisorHUD valor={lecturaUsb.valor} unidad={lecturaUsb.unidad} conectado={usbConectado} conectarFn={conectarMultimetroUSB} desconectarFn={desconectarMultimetroUSB} vozActiva={vozActiva} toggleVozFn={toggleVoz} autoHoldActivo={autoHoldActivo} toggleAutoHoldFn={() => setAutoHoldActivo(!autoHoldActivo)} capturarFn={avanzarPinMagico} escalaActiva={escalaIc} />
+              <OscilogramaPanel valor={lecturaUsb.valor} unidad={lecturaUsb.unidad} escalaActiva={escalaIc} />
             </div>
             <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '0 20px 20px 20px' }}>
               <ICInteligente 

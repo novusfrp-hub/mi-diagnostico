@@ -39,13 +39,25 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
     if (pin.tipo === 'GND') return '#4b5563';
     if (pin.tipo === 'NC') return '#1e3a8a';
 
-    const valActual = escala === 'diodo'
-      ? (pin.valorActualDiodo !== undefined ? pin.valorActualDiodo : pin.valorActual)
-      : (pin.valorActualUa !== undefined ? pin.valorActualUa : '---');
+    let valActual = '---';
+    let valSano = '---';
 
-    const valSano = escala === 'diodo'
-      ? (pin.valorSanoDiodo !== undefined ? pin.valorSanoDiodo : pin.valorSano)
-      : (pin.valorSanoUa !== undefined ? pin.valorSanoUa : '---');
+    if (escala === 'diodo') {
+      valActual = pin.valorActualDiodo !== undefined ? pin.valorActualDiodo : pin.valorActual;
+      valSano = pin.valorSanoDiodo !== undefined ? pin.valorSanoDiodo : pin.valorSano;
+    } else if (escala === 'ua') {
+      valActual = pin.valorActualUa !== undefined ? pin.valorActualUa : '---';
+      valSano = pin.valorSanoUa !== undefined ? pin.valorSanoUa : '---';
+    } else if (escala === 'voltio') {
+      valActual = pin.valorActualVoltio !== undefined ? pin.valorActualVoltio : '---';
+      valSano = pin.valorSanoVoltio !== undefined ? pin.valorSanoVoltio : '---';
+    } else if (escala === 'ohmio') {
+      valActual = pin.valorActualOhmio !== undefined ? pin.valorActualOhmio : '---';
+      valSano = pin.valorSanoOhmio !== undefined ? pin.valorSanoOhmio : '---';
+    } else if (escala === 'amperio') {
+      valActual = pin.valorActualAmperio !== undefined ? pin.valorActualAmperio : '---';
+      valSano = pin.valorSanoAmperio !== undefined ? pin.valorSanoAmperio : '---';
+    }
 
     if (!valActual || valActual === '---') return colorBase;
     if (valActual === 'OL' && valSano !== 'OL') return '#f97316';
@@ -56,9 +68,18 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
     if (escala === 'diodo') {
       if (vAct < 0.050) return '#ef4444';
       if (!isNaN(vAct) && !isNaN(vSano) && Math.abs(vAct - vSano) <= 0.040) return '#10b981';
-    } else {
+    } else if (escala === 'ua') {
       if (vAct > 2000) return '#ef4444';
       if (!isNaN(vAct) && !isNaN(vSano) && Math.abs(vAct - vSano) <= 50) return '#10b981';
+    } else if (escala === 'voltio') {
+      if (vAct < 0.1 && vSano >= 1.0) return '#ef4444';
+      if (!isNaN(vAct) && !isNaN(vSano) && Math.abs(vAct - vSano) <= 0.1) return '#10b981';
+    } else if (escala === 'ohmio') {
+      if (vAct < 2.0 && vSano > 10.0) return '#ef4444';
+      if (!isNaN(vAct) && !isNaN(vSano) && (Math.abs(vAct - vSano) <= 5.0 || Math.abs(vAct - vSano) / vSano <= 0.1)) return '#10b981';
+    } else if (escala === 'amperio') {
+      if (vAct > 1.5) return '#ef4444';
+      if (!isNaN(vAct) && !isNaN(vSano) && Math.abs(vAct - vSano) <= 0.05) return '#10b981';
     }
     return '#eab308';
   };
@@ -72,13 +93,25 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
   };
 
   const renderPin = (pin, esArriba, isExtremo) => {
-    const valSano = escala === 'diodo'
-      ? (pin.valorSanoDiodo !== undefined ? pin.valorSanoDiodo : pin.valorSano)
-      : (pin.valorSanoUa !== undefined ? pin.valorSanoUa : '---');
+    let valSano = '---';
+    let valActual = '---';
 
-    const valActual = escala === 'diodo'
-      ? (pin.valorActualDiodo !== undefined ? pin.valorActualDiodo : pin.valorActual)
-      : (pin.valorActualUa !== undefined ? pin.valorActualUa : '---');
+    if (escala === 'diodo') {
+      valSano = pin.valorSanoDiodo !== undefined ? pin.valorSanoDiodo : pin.valorSano;
+      valActual = pin.valorActualDiodo !== undefined ? pin.valorActualDiodo : pin.valorActual;
+    } else if (escala === 'ua') {
+      valSano = pin.valorSanoUa !== undefined ? pin.valorSanoUa : '---';
+      valActual = pin.valorActualUa !== undefined ? pin.valorActualUa : '---';
+    } else if (escala === 'voltio') {
+      valSano = pin.valorSanoVoltio !== undefined ? pin.valorSanoVoltio : '---';
+      valActual = pin.valorActualVoltio !== undefined ? pin.valorActualVoltio : '---';
+    } else if (escala === 'ohmio') {
+      valSano = pin.valorSanoOhmio !== undefined ? pin.valorSanoOhmio : '---';
+      valActual = pin.valorActualOhmio !== undefined ? pin.valorActualOhmio : '---';
+    } else if (escala === 'amperio') {
+      valSano = pin.valorSanoAmperio !== undefined ? pin.valorSanoAmperio : '---';
+      valActual = pin.valorActualAmperio !== undefined ? pin.valorActualAmperio : '---';
+    }
 
     const valorTexto = modo === 'crear' ? formNum(valSano, pin.tipo) : formNum(valActual, pin.tipo);
 
@@ -364,10 +397,17 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
             <span style={{ color: 'gray', fontSize: '0.75rem', display: 'block' }}>
               Valor Sano:{' '}
               <strong style={{ color: '#fff' }}>
-                {(escala === 'diodo'
-                  ? (pines.find(p => p.id === pinActivo)?.valorSanoDiodo !== undefined ? pines.find(p => p.id === pinActivo)?.valorSanoDiodo : pines.find(p => p.id === pinActivo)?.valorSano)
-                  : (pines.find(p => p.id === pinActivo)?.valorSanoUa !== undefined ? pines.find(p => p.id === pinActivo)?.valorSanoUa : '---')) || '---'}{' '}
-                {escala === 'diodo' ? 'V' : 'uA'}
+                {(() => {
+                  const pinObj = pines.find(p => p.id === pinActivo);
+                  if (!pinObj) return '---';
+                  if (escala === 'diodo') return (pinObj.valorSanoDiodo !== undefined ? pinObj.valorSanoDiodo : pinObj.valorSano) || '---';
+                  if (escala === 'ua') return pinObj.valorSanoUa || '---';
+                  if (escala === 'voltio') return pinObj.valorSanoVoltio || '---';
+                  if (escala === 'ohmio') return pinObj.valorSanoOhmio || '---';
+                  if (escala === 'amperio') return pinObj.valorSanoAmperio || '---';
+                  return '---';
+                })()}{' '}
+                {escala === 'diodo' ? 'V' : escala === 'ua' ? 'uA' : escala === 'voltio' ? 'V' : escala === 'ohmio' ? 'Ω' : 'A'}
               </strong>
             </span>
             <span style={{ color: 'gray', fontSize: '0.75rem', display: 'block', marginTop: '4px' }}>
@@ -375,10 +415,17 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
               <strong style={{ color: '#fff', fontSize: '1.3rem' }}>
                 {pinActivo === pines.find(p => p.id === pinActivo)?.id && lecturaEnVivo !== '----'
                   ? lecturaEnVivo
-                  : (escala === 'diodo'
-                    ? (pines.find(p => p.id === pinActivo)?.valorActualDiodo !== undefined ? pines.find(p => p.id === pinActivo)?.valorActualDiodo : pines.find(p => p.id === pinActivo)?.valorActual)
-                    : (pines.find(p => p.id === pinActivo)?.valorActualUa !== undefined ? pines.find(p => p.id === pinActivo)?.valorActualUa : '---')) || '---'}{' '}
-                {escala === 'diodo' ? 'V' : 'uA'}
+                  : (() => {
+                      const pinObj = pines.find(p => p.id === pinActivo);
+                      if (!pinObj) return '---';
+                      if (escala === 'diodo') return (pinObj.valorActualDiodo !== undefined ? pinObj.valorActualDiodo : pinObj.valorActual) || '---';
+                      if (escala === 'ua') return pinObj.valorActualUa || '---';
+                      if (escala === 'voltio') return pinObj.valorActualVoltio || '---';
+                      if (escala === 'ohmio') return pinObj.valorActualOhmio || '---';
+                      if (escala === 'amperio') return pinObj.valorActualAmperio || '---';
+                      return '---';
+                    })()}{' '}
+                {escala === 'diodo' ? 'V' : escala === 'ua' ? 'uA' : escala === 'voltio' ? 'V' : escala === 'ohmio' ? 'Ω' : 'A'}
               </strong>
             </span>
           </div>
