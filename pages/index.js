@@ -410,7 +410,7 @@ export default function AppDiagnostico() {
             const fpcMod = { ...fpc, pines: nuevosPines }; setFpcActivo(fpcMod); return fpcMod;
           } return fpc;
         });
-        modeloActualizado.fpcs = nuevosFpcs; setModeloActualivo(modeloActualizado);
+        modeloActualizado.fpcs = nuevosFpcs; setModeloActivo(modeloActualizado);
         setPinActivoFpc(prev => {
           let nextPin = prev + 1;
           while (nextPin <= fpcAct.pines.length) {
@@ -466,7 +466,8 @@ export default function AppDiagnostico() {
     if (typeof navigator === 'undefined' || !navigator.hid) { alert("Navegador no compatible."); return; }
     try {
       const devices = await navigator.hid.requestDevice({ filters: [{ vendorId: 0x1A86, productId: 0xE429 }] });
-      if (devices.length === 0) return; const device = devices[0]; await device.open(); setDispositivoUsb(device); setUsbConect      device.addEventListener("inputreport", event => {
+      if (devices.length === 0) return; const device = devices[0]; await device.open(); setDispositivoUsb(device); setUsbConectado(true);
+      device.addEventListener("inputreport", event => {
         const text = new TextDecoder("latin1").decode(event.data);
         let parsedVal = null;
         let parsedUni = null;
