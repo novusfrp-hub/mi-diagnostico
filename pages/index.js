@@ -22,7 +22,7 @@ const LETRAS_FILAS = [
 
 const obtenerUrlVideo = (url) => { if (!url) return ''; let v = ''; if (url.includes('youtu.be/')) v = url.split('youtu.be/')[1].split('?')[0]; else if (url.includes('youtube.com/watch')) v = new URLSearchParams(url.split('?')[1]).get('v'); else if (url.includes('youtube.com/embed/')) return url; return v ? `https://www.youtube.com/embed/${v}` : url; };
 
-const VisorHUD = ({ valor, unidad, conectado, conectarFn, desconectarFn, vozActiva, toggleVozFn, autoHoldActivo, toggleAutoHoldFn }) => (
+const VisorHUD = ({ valor, unidad, conectado, conectarFn, desconectarFn, vozActiva, toggleVozFn, autoHoldActivo, toggleAutoHoldFn, capturarFn }) => (
   <div style={{ backgroundColor: '#1a1a1a', border: '2px solid #333333', borderRadius: '15px', padding: '15px', display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '15px', position: 'relative', overflow: 'hidden', boxShadow: conectado ? '0 0 20px rgba(0, 255, 255, 0.2)' : 'none' }}>
     <div className="tools-row" style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
       <span style={{ color: '#555', fontSize: '0.8rem', fontWeight: 'bold' }} className="hide-on-mobile">UT61E+ ANALYZER</span>
@@ -30,6 +30,9 @@ const VisorHUD = ({ valor, unidad, conectado, conectarFn, desconectarFn, vozActi
         <button onClick={conectado ? desconectarFn : conectarFn} style={{ background: conectado ? 'rgba(239, 68, 68, 0.2)' : '#333', color: conectado ? '#ef4444' : 'white', border: 'none', padding: '8px 15px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}><Link size={14} /> {conectado ? 'DESCONECTAR' : 'CONECTAR USB'}</button>
         <button onClick={toggleVozFn} style={{ background: vozActiva ? 'rgba(234, 179, 8, 0.2)' : '#333', color: vozActiva ? '#eab308' : 'white', border: 'none', padding: '8px 15px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', boxShadow: vozActiva ? '0 0 10px rgba(234,179,8,0.5)' : 'none' }}>{vozActiva ? <Mic size={14} /> : <MicOff size={14} />} VOZ</button>
         <button onClick={toggleAutoHoldFn} style={{ background: autoHoldActivo ? 'rgba(16, 185, 129, 0.2)' : '#333', color: autoHoldActivo ? '#10b981' : 'white', border: 'none', padding: '8px 15px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', boxShadow: autoHoldActivo ? '0 0 10px rgba(16,185,129,0.5)' : 'none' }}><Zap size={14} /> {autoHoldActivo ? 'HOLD ON' : 'HOLD'}</button>
+        {conectado && capturarFn && (
+          <button onClick={capturarFn} style={{ background: '#3b82f6', color: 'white', border: 'none', padding: '8px 15px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', boxShadow: '0 0 12px rgba(59,130,246,0.6)', transition: 'transform 0.1s' }} onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.95)'} onMouseUp={(e) => e.currentTarget.style.transform = 'scale(1)'}><ChevronRight size={14} /> CAPTURAR / SIGUIENTE</button>
+        )}
       </div>
     </div>
     <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', marginTop: '10px' }}>
@@ -97,10 +100,28 @@ export default function AppDiagnostico() {
   const autoHoldValueRef = useRef(null); const autoHoldStartTimeRef = useRef(0); const autoHoldTriggeredRef = useRef(false);
 
 
+  const cambiarSeccionLibreria = (nuevaSeccion) => {
+    setSeccionLibreria(nuevaSeccion);
+    setPinActivoFpc(1);
+    setPadActivoIc('A1');
+    setCampoActivoDock('vbus');
+    setModoFpc('crear');
+    setModoIc('crear');
+  };
+
   const reproducirBip = () => { try { const audioCtx = new (window.AudioContext || window.webkitAudioContext)(); const oscillator = audioCtx.createOscillator(); oscillator.type = 'sine'; oscillator.frequency.setValueAtTime(1200, audioCtx.currentTime); oscillator.connect(audioCtx.destination); oscillator.start(); oscillator.stop(audioCtx.currentTime + 0.1); } catch (e) { } };
 
   // GUARDADO UNIVERSAL
   const avanzarPinMagico = (valorForzado = null) => {
+    const escalaActiva = seccionLibreriaRef.current === 'ic' ? escalaIcRef.current : escalaFpcRef.current;
+    const escalaMultimetro = lecturaUsbRef.current.unidad;
+    const esIncorrecta = usbConectado && (
+      (escalaActiva === 'diodo' && escalaMultimetro === 'uA') ||
+      (escalaActiva === 'ua' && (escalaMultimetro === 'V' || escalaMultimetro === 'Diod'))
+    );
+    if (esIncorrecta) return;
+    
+    reproducirBip();
     const valVivo = valorForzado || lecturaUsbRef.current.valor; const campoActual = campoActivoRef.current; const mFpc = modoFpcRef.current; const pinAct = pinActivoFpcRef.current;
     const mIc = modoIcRef.current; const padAct = padActivoIcRef.current;
     if (libreriaVisibleRef.current) {
@@ -188,17 +209,38 @@ export default function AppDiagnostico() {
         const text = new TextDecoder().decode(event.data); let valStr = "---"; let uniStr = "---";
         if (text.includes("OL") || text.includes("?0")) { valStr = "OL"; }
         else {
-          const match = text.match(/([-+]?\d+\.\d+)/);
-          if (match) { valStr = parseFloat(match[1]).toFixed(3); if (text.includes("V")) uniStr = "V"; else if (text.includes("Ohm") || text.includes("kOhm")) uniStr = "Ω"; else if (text.includes("A") || text.includes("uA")) uniStr = "A"; else uniStr = "Diod"; }
+          const match = text.match(/([-+]?\d+(?:\.\d+)?)/);
+          if (match) {
+            const rawVal = match[1];
+            const textLower = text.toLowerCase();
+            if (text.includes("V")) { uniStr = "V"; }
+            else if (textLower.includes("ohm") || text.includes("Ω")) { uniStr = "Ω"; }
+            else if (textLower.includes("ua") || text.includes("µa") || text.includes("µA") || text.includes("μA") || text.includes("μa")) { uniStr = "uA"; }
+            else if (textLower.includes("ma")) { uniStr = "mA"; }
+            else if (text.includes("A") || textLower.includes("amp")) { uniStr = "A"; }
+            else { uniStr = "Diod"; }
+            
+            if (uniStr === "V") { valStr = parseFloat(rawVal).toFixed(3); }
+            else { valStr = rawVal; }
+          }
         }
         setLecturaUsb({ valor: valStr, unidad: uniStr });
         if (autoHoldActivoRef.current) {
           const valNum = parseFloat(valStr);
-          if (!isNaN(valNum)) {
-            if (autoHoldValueRef.current !== null && Math.abs(valNum - autoHoldValueRef.current) <= 0.003) {
-              if (!autoHoldTriggeredRef.current && Date.now() - autoHoldStartTimeRef.current >= 1500) { autoHoldTriggeredRef.current = true; reproducirBip(); avanzarPinMagico(valStr); }
-            } else { autoHoldValueRef.current = valNum; autoHoldStartTimeRef.current = Date.now(); autoHoldTriggeredRef.current = false; }
-          } else { autoHoldValueRef.current = null; autoHoldTriggeredRef.current = false; }
+          const escalaActiva = seccionLibreriaRef.current === 'ic' ? escalaIcRef.current : escalaFpcRef.current;
+          const esIncorrecta = (escalaActiva === 'diodo' && uniStr === 'uA') || (escalaActiva === 'ua' && (uniStr === 'V' || uniStr === 'Diod'));
+          if (esIncorrecta) {
+            autoHoldValueRef.current = null;
+            autoHoldTriggeredRef.current = false;
+          } else {
+            const tol = escalaActiva === 'ua' ? 1.5 : 0.003;
+            const esCeroInactivo = escalaActiva === 'ua' && valNum < 1.0;
+            if (!isNaN(valNum) && !esCeroInactivo) {
+              if (autoHoldValueRef.current !== null && Math.abs(valNum - autoHoldValueRef.current) <= tol) {
+                if (!autoHoldTriggeredRef.current && Date.now() - autoHoldStartTimeRef.current >= 1500) { autoHoldTriggeredRef.current = true; avanzarPinMagico(valStr); }
+              } else { autoHoldValueRef.current = valNum; autoHoldStartTimeRef.current = Date.now(); autoHoldTriggeredRef.current = false; }
+            } else { autoHoldValueRef.current = null; autoHoldTriggeredRef.current = false; }
+          }
         }
       });
     } catch (error) { alert("Error USB."); }
@@ -243,7 +285,7 @@ export default function AppDiagnostico() {
     if (vozActiva) { if (recognitionRef.current) { recognitionRef.current.onend = null; recognitionRef.current.stop(); } setVozActiva(false); }
     else {
       const recognition = new SpeechRecognition(); recognition.continuous = true; recognition.lang = 'es-PE'; recognition.interimResults = false;
-      recognition.onresult = (event) => { const transcript = event.results[event.resultIndex][0].transcript.toLowerCase().trim(); if (transcript.includes('ok') || transcript.includes('okay') || transcript.includes('siguiente') || transcript.includes('listo') || transcript.includes('ya')) { reproducirBip(); avanzarPinMagico(); } };
+      recognition.onresult = (event) => { const transcript = event.results[event.resultIndex][0].transcript.toLowerCase().trim(); if (transcript.includes('ok') || transcript.includes('okay') || transcript.includes('siguiente') || transcript.includes('listo') || transcript.includes('ya')) { avanzarPinMagico(); } };
       recognition.onend = () => { if (vozActivaRef.current) try { recognition.start() } catch (e) { } }; recognition.start(); recognitionRef.current = recognition; setVozActiva(true);
     }
   };
@@ -329,6 +371,17 @@ export default function AppDiagnostico() {
         const fpcMod = { ...fpcActivo, [tipo === 'placa' ? 'imgPlaca' : 'imgEsquema']: nuevaUrl }; 
         setFpcActivo(fpcMod); 
         setModeloActivo(prev => ({ ...prev, fpcs: prev.fpcs.map(f => f.id === fpcMod.id ? fpcMod : f) })); 
+    } 
+  };
+
+  const editarUbicacionIc = (tipo) => { 
+    if (!icActivo) return; 
+    const actual = tipo === 'placa' ? icActivo.imgPlaca : icActivo.imgEsquema;
+    const nuevaUrl = window.prompt(`Ingresa el enlace de la imagen (${tipo}):`, actual || ""); 
+    if (nuevaUrl !== null) { 
+        const icMod = { ...icActivo, [tipo === 'placa' ? 'imgPlaca' : 'imgEsquema']: nuevaUrl }; 
+        setIcActivo(icMod); 
+        setModeloActivo(prev => ({ ...prev, ics: (prev.ics || []).map(i => i.id === icMod.id ? icMod : i) })); 
     } 
   };
 
@@ -442,6 +495,36 @@ export default function AppDiagnostico() {
           <button onClick={() => editarUbicacionFpc('esquema')} 
             style={{ padding: compacto ? '4px 8px' : '6px 10px', borderRadius: '6px', border: '1px dashed #4b5563', background: 'transparent', color: '#9ca3af', fontWeight: 'bold', cursor: 'pointer', fontSize: compacto ? '0.6rem' : '0.7rem' }}>
             + Esquema
+          </button>
+        )}
+      </div>
+    );
+  };
+
+  const BotonesImagenIC = ({ compacto = false }) => {
+    if (!icActivo) return null;
+    return (
+      <div style={{ display: 'flex', gap: '5px' }}>
+        {icActivo.imgPlaca ? (
+          <button onClick={() => { setTipoImagenViendo('placa_ic'); setImagenFpcVisible(true); }} 
+            style={{ padding: compacto ? '4px 8px' : '6px 10px', borderRadius: '6px', border: 'none', background: '#3b82f6', color: 'white', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', fontSize: compacto ? '0.65rem' : '0.75rem' }}>
+            <ImageIcon size={compacto ? 12 : 14} /> {compacto ? '' : 'Placa'}
+          </button>
+        ) : (
+          <button onClick={() => editarUbicacionIc('placa')} 
+            style={{ padding: compacto ? '4px 8px' : '6px 10px', borderRadius: '6px', border: '1px dashed #4b5563', background: 'transparent', color: '#9ca3af', fontWeight: 'bold', cursor: 'pointer', fontSize: compacto ? '0.6rem' : '0.7rem' }}>
+            + Placa
+          </button>
+        )}
+        {icActivo.imgEsquema ? (
+          <button onClick={() => { setTipoImagenViendo('esquema_ic'); setImagenFpcVisible(true); }} 
+            style={{ padding: compacto ? '4px 8px' : '6px 10px', borderRadius: '6px', border: 'none', background: '#8b5cf6', color: 'white', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', fontSize: compacto ? '0.65rem' : '0.75rem' }}>
+            <Map size={compacto ? 12 : 14} /> {compacto ? '' : 'Datasheet'}
+          </button>
+        ) : (
+          <button onClick={() => editarUbicacionIc('esquema')} 
+            style={{ padding: compacto ? '4px 8px' : '6px 10px', borderRadius: '6px', border: '1px dashed #4b5563', background: 'transparent', color: '#9ca3af', fontWeight: 'bold', cursor: 'pointer', fontSize: compacto ? '0.6rem' : '0.7rem' }}>
+            + Datasheet
           </button>
         )}
       </div>
@@ -567,7 +650,11 @@ export default function AppDiagnostico() {
                         <Save size={16} /> 
                         {seccionLibreria === 'ic' 
                           ? (guardandoIc ? 'Guardando...' : 'Guardar IC') 
-                          : (guardandoFpc ? 'Guardando...' : 'Guardar FPC')
+                          : seccionLibreria === 'fpc'
+                            ? (guardandoFpc ? 'Guardando...' : 'Guardar FPC')
+                            : seccionLibreria === 'docktest'
+                              ? (guardandoFpc ? 'Guardando...' : 'Guardar Docktest')
+                              : (guardandoFpc ? 'Guardando...' : 'Guardar RFFE')
                         }
                       </button>
                     )}
@@ -577,12 +664,12 @@ export default function AppDiagnostico() {
                 {modeloActivo ? (
                   <div style={{ flex: 1, overflowY: 'auto', padding: '15px' }}>
                     <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
-                      <button onClick={() => setSeccionLibreria('docktest')} style={{ padding: '10px 15px', borderRadius: '8px', border: 'none', background: seccionLibreria === 'docktest' ? '#3b82f6' : '#1f2937', color: 'white', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>Docktest</button>
-                      <button onClick={() => setSeccionLibreria('fpc')} style={{ padding: '10px 15px', borderRadius: '8px', border: 'none', background: seccionLibreria === 'fpc' ? '#8b5cf6' : '#1f2937', color: 'white', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>Planos FPC</button>
-                      <button onClick={() => setSeccionLibreria('ic')} style={{ padding: '10px 15px', borderRadius: '8px', border: 'none', background: seccionLibreria === 'ic' ? '#ec4899' : '#1f2937', color: 'white', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>Planos IC / BGA</button>
-                      <button onClick={() => setSeccionLibreria('rffe')} style={{ padding: '10px 15px', borderRadius: '8px', border: 'none', background: seccionLibreria === 'rffe' ? '#10b981' : '#1f2937', color: 'white', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>Módulo RFFE</button>
+                      <button onClick={() => cambiarSeccionLibreria('docktest')} style={{ padding: '10px 15px', borderRadius: '8px', border: 'none', background: seccionLibreria === 'docktest' ? '#3b82f6' : '#1f2937', color: 'white', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>Docktest</button>
+                      <button onClick={() => cambiarSeccionLibreria('fpc')} style={{ padding: '10px 15px', borderRadius: '8px', border: 'none', background: seccionLibreria === 'fpc' ? '#8b5cf6' : '#1f2937', color: 'white', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>Planos FPC</button>
+                      <button onClick={() => cambiarSeccionLibreria('ic')} style={{ padding: '10px 15px', borderRadius: '8px', border: 'none', background: seccionLibreria === 'ic' ? '#ec4899' : '#1f2937', color: 'white', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>Planos IC / BGA</button>
+                      <button onClick={() => cambiarSeccionLibreria('rffe')} style={{ padding: '10px 15px', borderRadius: '8px', border: 'none', background: seccionLibreria === 'rffe' ? '#10b981' : '#1f2937', color: 'white', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>Módulo RFFE</button>
                     </div>
-                    <VisorHUD valor={lecturaUsb.valor} unidad={lecturaUsb.unidad} conectado={usbConectado} conectarFn={conectarMultimetroUSB} desconectarFn={desconectarMultimetroUSB} vozActiva={vozActiva} toggleVozFn={toggleVoz} autoHoldActivo={autoHoldActivo} toggleAutoHoldFn={() => setAutoHoldActivo(!autoHoldActivo)} />
+                    <VisorHUD valor={lecturaUsb.valor} unidad={lecturaUsb.unidad} conectado={usbConectado} conectarFn={conectarMultimetroUSB} desconectarFn={desconectarMultimetroUSB} vozActiva={vozActiva} toggleVozFn={toggleVoz} autoHoldActivo={autoHoldActivo} toggleAutoHoldFn={() => setAutoHoldActivo(!autoHoldActivo)} capturarFn={avanzarPinMagico} escalaActiva={seccionLibreria === 'ic' ? escalaIc : escalaFpc} />
 
                     {seccionLibreria === 'docktest' && (
                       <div style={{ backgroundColor: '#000', padding: '20px', borderRadius: '15px', border: '1px solid #333' }}>
@@ -736,7 +823,7 @@ export default function AppDiagnostico() {
               </div>
             </div>
             <div style={{ padding: '10px 20px', flexShrink: 0 }}>
-              <VisorHUD valor={lecturaUsb.valor} unidad={lecturaUsb.unidad} conectado={usbConectado} conectarFn={conectarMultimetroUSB} desconectarFn={desconectarMultimetroUSB} vozActiva={vozActiva} toggleVozFn={toggleVoz} autoHoldActivo={autoHoldActivo} toggleAutoHoldFn={() => setAutoHoldActivo(!autoHoldActivo)} />
+              <VisorHUD valor={lecturaUsb.valor} unidad={lecturaUsb.unidad} conectado={usbConectado} conectarFn={conectarMultimetroUSB} desconectarFn={desconectarMultimetroUSB} vozActiva={vozActiva} toggleVozFn={toggleVoz} autoHoldActivo={autoHoldActivo} toggleAutoHoldFn={() => setAutoHoldActivo(!autoHoldActivo)} capturarFn={avanzarPinMagico} escalaActiva={escalaFpc} />
             </div>
             <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '0 20px 20px 20px' }}>
               <FPCInteligente 
@@ -774,6 +861,7 @@ export default function AppDiagnostico() {
               </div>
               <div className="fpc-tools" style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                 <div style={{ display: 'flex', gap: '5px', backgroundColor: '#1a1a1a', padding: '4px', borderRadius: '8px', alignItems: 'center' }}>
+                  <BotonesImagenIC />
                   {cambiosPendientesIc && (
                     <button onClick={() => { descartarCambiosIc(); setIcActivo(prev => prev ? {...prev} : null); }} style={{ padding: '6px 10px', borderRadius: '6px', border: '1px dashed #6b7280', background: 'transparent', color: '#9ca3af', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.65rem' }}>↩ Descartar</button>
                   )}
@@ -791,7 +879,7 @@ export default function AppDiagnostico() {
               </div>
             </div>
             <div style={{ padding: '10px 20px', flexShrink: 0 }}>
-              <VisorHUD valor={lecturaUsb.valor} unidad={lecturaUsb.unidad} conectado={usbConectado} conectarFn={conectarMultimetroUSB} desconectarFn={desconectarMultimetroUSB} vozActiva={vozActiva} toggleVozFn={toggleVoz} autoHoldActivo={autoHoldActivo} toggleAutoHoldFn={() => setAutoHoldActivo(!autoHoldActivo)} />
+              <VisorHUD valor={lecturaUsb.valor} unidad={lecturaUsb.unidad} conectado={usbConectado} conectarFn={conectarMultimetroUSB} desconectarFn={desconectarMultimetroUSB} vozActiva={vozActiva} toggleVozFn={toggleVoz} autoHoldActivo={autoHoldActivo} toggleAutoHoldFn={() => setAutoHoldActivo(!autoHoldActivo)} capturarFn={avanzarPinMagico} escalaActiva={escalaIc} />
             </div>
             <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '0 20px 20px 20px' }}>
               <ICInteligente 
@@ -818,30 +906,44 @@ export default function AppDiagnostico() {
 
       {/* --- VISUALIZADOR DE IMAGENES (PLACA O ESQUEMA) --- */}
       <AnimatePresence>
-        {imagenFpcVisible && fpcActivo && (
-          <motion.div className="no-print" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.9)', zIndex: 3000, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }} onClick={() => setImagenFpcVisible(false)}>
-            <motion.div initial={{ scale: 0.8 }} animate={{ scale: 1 }} exit={{ scale: 0.8 }} style={{ width: '95vw', maxWidth: '1000px', height: '80vh', backgroundColor: '#111827', borderRadius: '1.5rem', display: 'flex', flexDirection: 'column', overflow: 'hidden', border: `2px solid ${tipoImagenViendo === 'placa' ? '#3b82f6' : '#8b5cf6'}` }} onClick={(e) => e.stopPropagation()}>
-              <div style={{ padding: '15px 20px', borderBottom: '1px solid #374151', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  {tipoImagenViendo === 'placa' ? <ImageIcon size={20} color="#3b82f6" /> : <Map size={20} color="#8b5cf6" />}
-                  <span style={{ color: 'white', fontWeight: 'bold' }}>Vista: {tipoImagenViendo === 'placa' ? 'Placa Base' : 'Esquemático'} ({fpcActivo.nombre})</span>
-                </div>
-                <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
-                  {fpcActivo.imgPlaca && fpcActivo.imgEsquema && (
-                    <div style={{ display: 'flex', gap: '5px', backgroundColor: '#1a1a1a', padding: '4px', borderRadius: '8px' }}>
-                      <button onClick={() => setTipoImagenViendo('placa')} style={{ padding: '6px 10px', borderRadius: '6px', border: 'none', background: tipoImagenViendo === 'placa' ? '#3b82f6' : 'transparent', color: tipoImagenViendo === 'placa' ? 'white' : '#9ca3af', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}><ImageIcon size={14} /> Placa</button>
-                      <button onClick={() => setTipoImagenViendo('esquema')} style={{ padding: '6px 10px', borderRadius: '6px', border: 'none', background: tipoImagenViendo === 'esquema' ? '#8b5cf6' : 'transparent', color: tipoImagenViendo === 'esquema' ? 'white' : '#9ca3af', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}><Map size={14} /> Esquema</button>
+        {imagenFpcVisible && (fpcActivo || icActivo) && (
+          (() => {
+            const esIc = tipoImagenViendo.endsWith('_ic');
+            const itemActivo = esIc ? icActivo : fpcActivo;
+            if (!itemActivo) return null;
+            const tipoLimpio = esIc ? tipoImagenViendo.replace('_ic', '') : tipoImagenViendo;
+            const imgPlaca = itemActivo.imgPlaca || '';
+            const imgEsquema = itemActivo.imgEsquema || '';
+            const urlImg = tipoLimpio === 'placa' ? imgPlaca : imgEsquema;
+            const colorBorde = tipoLimpio === 'placa' ? '#3b82f6' : '#8b5cf6';
+            const tituloText = `Vista: ${tipoLimpio === 'placa' ? (esIc ? 'Ubicación IC en Placa' : 'Placa Base') : (esIc ? 'Datasheet del IC' : 'Esquemático')} (${itemActivo.nombre})`;
+            
+            return (
+              <motion.div className="no-print" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.9)', zIndex: 3000, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }} onClick={() => setImagenFpcVisible(false)}>
+                <motion.div initial={{ scale: 0.8 }} animate={{ scale: 1 }} exit={{ scale: 0.8 }} style={{ width: '95vw', maxWidth: '1000px', height: '80vh', backgroundColor: '#111827', borderRadius: '1.5rem', display: 'flex', flexDirection: 'column', overflow: 'hidden', border: `2px solid ${colorBorde}` }} onClick={(e) => e.stopPropagation()}>
+                  <div style={{ padding: '15px 20px', borderBottom: '1px solid #374151', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      {tipoLimpio === 'placa' ? <ImageIcon size={20} color="#3b82f6" /> : <Map size={20} color="#8b5cf6" />}
+                      <span style={{ color: 'white', fontWeight: 'bold' }}>{tituloText}</span>
                     </div>
-                  )}
-                  <button onClick={() => { setImagenFpcVisible(false); setTimeout(() => editarUbicacionFpc(tipoImagenViendo), 300); }} style={{ background: 'transparent', border: 'none', color: '#eab308', cursor: 'pointer', fontWeight: 'bold' }}>Cambiar Foto</button>
-                  <button onClick={() => setImagenFpcVisible(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={24} color="white" /></button>
-                </div>
-              </div>
-              <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden', padding: '10px', backgroundColor: '#000' }}>
-                <img src={tipoImagenViendo === 'placa' ? fpcActivo.imgPlaca : fpcActivo.imgEsquema} alt={`Vista ${tipoImagenViendo}`} referrerPolicy="no-referrer" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
-              </div>
-            </motion.div>
-          </motion.div>
+                    <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
+                      {imgPlaca && imgEsquema && (
+                        <div style={{ display: 'flex', gap: '5px', backgroundColor: '#1a1a1a', padding: '4px', borderRadius: '8px' }}>
+                          <button onClick={() => setTipoImagenViendo(esIc ? 'placa_ic' : 'placa')} style={{ padding: '6px 10px', borderRadius: '6px', border: 'none', background: tipoLimpio === 'placa' ? '#3b82f6' : 'transparent', color: tipoLimpio === 'placa' ? 'white' : '#9ca3af', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}><ImageIcon size={14} /> Placa</button>
+                          <button onClick={() => setTipoImagenViendo(esIc ? 'esquema_ic' : 'esquema')} style={{ padding: '6px 10px', borderRadius: '6px', border: 'none', background: tipoLimpio === 'esquema' ? '#8b5cf6' : 'transparent', color: tipoLimpio === 'esquema' ? 'white' : '#9ca3af', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}><Map size={14} /> Datasheet</button>
+                        </div>
+                      )}
+                      <button onClick={() => { setImagenFpcVisible(false); setTimeout(() => { if (esIc) { editarUbicacionIc(tipoLimpio); } else { editarUbicacionFpc(tipoLimpio); } }, 300); }} style={{ background: 'transparent', border: 'none', color: '#eab308', cursor: 'pointer', fontWeight: 'bold' }}>Cambiar Foto</button>
+                      <button onClick={() => setImagenFpcVisible(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={24} color="white" /></button>
+                    </div>
+                  </div>
+                  <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden', padding: '10px', backgroundColor: '#000' }}>
+                    <img src={urlImg} alt={`Vista ${tipoLimpio}`} referrerPolicy="no-referrer" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+                  </div>
+                </motion.div>
+              </motion.div>
+            );
+          })()
         )}
       </AnimatePresence>
 
