@@ -272,20 +272,15 @@ export default function AppDiagnostico() {
         const text = new TextDecoder("latin1").decode(event.data);
         let parsedVal = null;
         let parsedUni = null;
+        const escalaActiva = seccionLibreriaRef.current === 'ic' ? escalaIcRef.current : escalaFpcRef.current;
         
         if (text.includes("OL") || text.includes("?0")) {
           parsedVal = "OL";
-          const textLower = text.toLowerCase();
-          if (text.includes("V")) { parsedUni = "V"; }
-          else if (textLower.includes("ohm") || text.includes("Ω")) { parsedUni = "Ω"; }
-          else if (textLower.includes("ua") || text.includes("µ") || text.includes("μ") || textLower.includes("micro")) { parsedUni = "uA"; }
-          else if (textLower.includes("ma")) { parsedUni = "mA"; }
-          else if (text.includes("A") || textLower.includes("amp")) { parsedUni = "A"; }
-          else { parsedUni = "Diod"; }
-        } else {
-          const match = text.match(/([-+]?\d+(?:\.\d+)?)/);
-          if (match) {
-            const rawVal = match[1];
+          if (escalaActiva === 'ua') {
+            parsedUni = "uA";
+          } else if (escalaActiva === 'diodo') {
+            parsedUni = "Diod";
+          } else {
             const textLower = text.toLowerCase();
             if (text.includes("V")) { parsedUni = "V"; }
             else if (textLower.includes("ohm") || text.includes("Ω")) { parsedUni = "Ω"; }
@@ -293,9 +288,29 @@ export default function AppDiagnostico() {
             else if (textLower.includes("ma")) { parsedUni = "mA"; }
             else if (text.includes("A") || textLower.includes("amp")) { parsedUni = "A"; }
             else { parsedUni = "Diod"; }
-            
-            if (parsedUni === "V") { parsedVal = parseFloat(rawVal).toFixed(3); }
-            else { parsedVal = rawVal; }
+          }
+        } else {
+          const match = text.match(/([-+]?\d+(?:\.\d+)?)/);
+          if (match) {
+            const rawVal = match[1];
+            if (escalaActiva === 'ua') {
+              parsedUni = "uA";
+              parsedVal = rawVal;
+            } else if (escalaActiva === 'diodo') {
+              parsedUni = "Diod";
+              parsedVal = parseFloat(rawVal).toFixed(3);
+            } else {
+              const textLower = text.toLowerCase();
+              if (text.includes("V")) { parsedUni = "V"; }
+              else if (textLower.includes("ohm") || text.includes("Ω")) { parsedUni = "Ω"; }
+              else if (textLower.includes("ua") || text.includes("µ") || text.includes("μ") || textLower.includes("micro")) { parsedUni = "uA"; }
+              else if (textLower.includes("ma")) { parsedUni = "mA"; }
+              else if (text.includes("A") || textLower.includes("amp")) { parsedUni = "A"; }
+              else { parsedUni = "Diod"; }
+              
+              if (parsedUni === "V" || parsedUni === "Diod") { parsedVal = parseFloat(rawVal).toFixed(3); }
+              else { parsedVal = rawVal; }
+            }
           }
         }
         
@@ -303,7 +318,6 @@ export default function AppDiagnostico() {
           setLecturaUsb({ valor: parsedVal, unidad: parsedUni });
           if (autoHoldActivoRef.current) {
             const valNum = parseFloat(parsedVal);
-            const escalaActiva = seccionLibreriaRef.current === 'ic' ? escalaIcRef.current : escalaFpcRef.current;
             const esIncorrecta = (escalaActiva === 'diodo' && (parsedUni === 'uA' || parsedUni === 'mA' || parsedUni === 'A')) ||
                                  (escalaActiva === 'ua' && (parsedUni === 'V' || parsedUni === 'Diod' || parsedUni === 'Ω'));
             if (esIncorrecta) {
