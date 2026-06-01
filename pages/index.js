@@ -566,8 +566,6 @@ export default function AppDiagnostico() {
           }
         }
       });
-        }
-      });
     } catch (error) { alert("Error USB."); }
   };
   const desconectarMultimetroUSB = async () => { if (dispositivoUsb) { try { await dispositivoUsb.close(); } catch (e) { } setDispositivoUsb(null); } setUsbConectado(false); setLecturaUsb({ valor: '----', unidad: '---' }); };
