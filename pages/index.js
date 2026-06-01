@@ -22,25 +22,88 @@ const LETRAS_FILAS = [
 
 const obtenerUrlVideo = (url) => { if (!url) return ''; let v = ''; if (url.includes('youtu.be/')) v = url.split('youtu.be/')[1].split('?')[0]; else if (url.includes('youtube.com/watch')) v = new URLSearchParams(url.split('?')[1]).get('v'); else if (url.includes('youtube.com/embed/')) return url; return v ? `https://www.youtube.com/embed/${v}` : url; };
 
-const VisorHUD = ({ valor, unidad, conectado, conectarFn, desconectarFn, vozActiva, toggleVozFn, autoHoldActivo, toggleAutoHoldFn, capturarFn }) => (
-  <div style={{ backgroundColor: '#1a1a1a', border: '2px solid #333333', borderRadius: '15px', padding: '15px', display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '15px', position: 'relative', overflow: 'hidden', boxShadow: conectado ? '0 0 20px rgba(0, 255, 255, 0.2)' : 'none' }}>
-    <div className="tools-row" style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
-      <span style={{ color: '#555', fontSize: '0.8rem', fontWeight: 'bold' }} className="hide-on-mobile">UT61E+ ANALYZER</span>
-      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center', width: '100%' }}>
-        <button onClick={conectado ? desconectarFn : conectarFn} style={{ background: conectado ? 'rgba(239, 68, 68, 0.2)' : '#333', color: conectado ? '#ef4444' : 'white', border: 'none', padding: '8px 15px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}><Link size={14} /> {conectado ? 'DESCONECTAR' : 'CONECTAR USB'}</button>
-        <button onClick={toggleVozFn} style={{ background: vozActiva ? 'rgba(234, 179, 8, 0.2)' : '#333', color: vozActiva ? '#eab308' : 'white', border: 'none', padding: '8px 15px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', boxShadow: vozActiva ? '0 0 10px rgba(234,179,8,0.5)' : 'none' }}>{vozActiva ? <Mic size={14} /> : <MicOff size={14} />} VOZ</button>
-        <button onClick={toggleAutoHoldFn} style={{ background: autoHoldActivo ? 'rgba(16, 185, 129, 0.2)' : '#333', color: autoHoldActivo ? '#10b981' : 'white', border: 'none', padding: '8px 15px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', boxShadow: autoHoldActivo ? '0 0 10px rgba(16,185,129,0.5)' : 'none' }}><Zap size={14} /> {autoHoldActivo ? 'HOLD ON' : 'HOLD'}</button>
-        {conectado && capturarFn && (
-          <button onClick={capturarFn} style={{ background: '#3b82f6', color: 'white', border: 'none', padding: '8px 15px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', boxShadow: '0 0 12px rgba(59,130,246,0.6)', transition: 'transform 0.1s' }} onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.95)'} onMouseUp={(e) => e.currentTarget.style.transform = 'scale(1)'}><ChevronRight size={14} /> CAPTURAR / SIGUIENTE</button>
-        )}
+const VisorHUD = ({ valor, unidad, conectado, conectarFn, desconectarFn, vozActiva, toggleVozFn, autoHoldActivo, toggleAutoHoldFn, capturarFn, escalaActiva }) => {
+  const esIncorrecta = conectado && (
+    (escalaActiva === 'diodo' && (unidad === 'uA' || unidad === 'mA' || unidad === 'A')) ||
+    (escalaActiva === 'ua' && (unidad === 'V' || unidad === 'Diod' || unidad === 'Ω'))
+  );
+
+  return (
+    <div style={{ 
+      backgroundColor: '#1a1a1a', 
+      border: esIncorrecta ? '2px solid #ef4444' : '2px solid #333333', 
+      borderRadius: '15px', 
+      padding: '15px', 
+      display: 'flex', 
+      flexDirection: 'column', 
+      alignItems: 'center', 
+      marginBottom: '15px', 
+      position: 'relative', 
+      overflow: 'hidden', 
+      boxShadow: esIncorrecta ? '0 0 25px rgba(239, 68, 68, 0.8)' : (conectado ? '0 0 20px rgba(0, 255, 255, 0.2)' : 'none') 
+    }}>
+      <div className="tools-row" style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
+        <span style={{ color: '#555', fontSize: '0.8rem', fontWeight: 'bold' }} className="hide-on-mobile">UT61E+ ANALYZER</span>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center', width: '100%' }}>
+          <button onClick={conectado ? desconectarFn : conectarFn} style={{ background: conectado ? 'rgba(239, 68, 68, 0.2)' : '#333', color: conectado ? '#ef4444' : 'white', border: 'none', padding: '8px 15px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}><Link size={14} /> {conectado ? 'DESCONECTAR' : 'CONECTAR USB'}</button>
+          <button onClick={toggleVozFn} style={{ background: vozActiva ? 'rgba(234, 179, 8, 0.2)' : '#333', color: vozActiva ? '#eab308' : 'white', border: 'none', padding: '8px 15px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', boxShadow: vozActiva ? '0 0 10px rgba(234,179,8,0.5)' : 'none' }}>{vozActiva ? <Mic size={14} /> : <MicOff size={14} />} VOZ</button>
+          <button onClick={toggleAutoHoldFn} style={{ background: autoHoldActivo ? 'rgba(16, 185, 129, 0.2)' : '#333', color: autoHoldActivo ? '#10b981' : 'white', border: 'none', padding: '8px 15px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', boxShadow: autoHoldActivo ? '0 0 10px rgba(16,185,129,0.5)' : 'none' }}><Zap size={14} /> {autoHoldActivo ? 'HOLD ON' : 'HOLD'}</button>
+          {conectado && capturarFn && (
+            <button 
+              onClick={esIncorrecta ? null : capturarFn} 
+              disabled={esIncorrecta}
+              style={{ 
+                background: esIncorrecta ? '#4b5563' : '#3b82f6', 
+                color: esIncorrecta ? '#9ca3af' : 'white', 
+                border: 'none', 
+                padding: '8px 15px', 
+                borderRadius: '20px', 
+                fontSize: '0.7rem', 
+                fontWeight: 'bold', 
+                cursor: esIncorrecta ? 'not-allowed' : 'pointer', 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '5px', 
+                boxShadow: esIncorrecta ? 'none' : '0 0 12px rgba(59,130,246,0.6)', 
+                transition: 'transform 0.1s' 
+              }} 
+              onMouseDown={(e) => !esIncorrecta && (e.currentTarget.style.transform = 'scale(0.95)')} 
+              onMouseUp={(e) => !esIncorrecta && (e.currentTarget.style.transform = 'scale(1)')}
+            >
+              <ChevronRight size={14} /> CAPTURAR / SIGUIENTE
+            </button>
+          )}
+        </div>
       </div>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', marginTop: '10px' }}>
+        <span className="hud-valor-text" style={{ color: valor === 'OL' ? '#ff0000' : '#00ffff', fontSize: '4rem', fontWeight: 'bold', fontFamily: 'Consolas, monospace', textShadow: valor === 'OL' ? '0 0 15px rgba(255,0,0,0.5)' : '0 0 15px rgba(0,255,255,0.4)', lineHeight: '1' }}>{valor}</span>
+        <span style={{ color: 'gray', fontSize: '1.2rem', fontWeight: 'bold' }}>{unidad}</span>
+      </div>
+      {esIncorrecta && (
+        <div style={{ 
+          width: '100%', 
+          background: 'rgba(239, 68, 68, 0.2)', 
+          border: '1px solid #ef4444', 
+          color: '#ff6b6b', 
+          padding: '8px 12px', 
+          borderRadius: '8px', 
+          fontSize: '0.8rem', 
+          fontWeight: 'bold', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center', 
+          gap: '8px', 
+          marginTop: '10px', 
+          textAlign: 'center',
+          boxShadow: '0 0 10px rgba(239, 68, 68, 0.3)'
+        }}>
+          <AlertTriangle size={16} color="#ef4444" />
+          ⚠️ ESCALA INCORRECTA: CONFIGURA EL DIAL FÍSICO O LA APP A LA MISMA FUNCIÓN
+        </div>
+      )}
     </div>
-    <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', marginTop: '10px' }}>
-      <span className="hud-valor-text" style={{ color: valor === 'OL' ? '#ff0000' : '#00ffff', fontSize: '4rem', fontWeight: 'bold', fontFamily: 'Consolas, monospace', textShadow: valor === 'OL' ? '0 0 15px rgba(255,0,0,0.5)' : '0 0 15px rgba(0,255,255,0.4)', lineHeight: '1' }}>{valor}</span>
-      <span style={{ color: 'gray', fontSize: '1.2rem', fontWeight: 'bold' }}>{unidad}</span>
-    </div>
-  </div>
-);
+  );
+};
 
 export default function AppDiagnostico() {
   const [pasoActual, setPasoActual] = useState(null); const [historial, setHistorial] = useState([]); const [cargando, setCargando] = useState(true); const [tema, setTema] = useState('light');
@@ -116,8 +179,8 @@ export default function AppDiagnostico() {
     const escalaActiva = seccionLibreriaRef.current === 'ic' ? escalaIcRef.current : escalaFpcRef.current;
     const escalaMultimetro = lecturaUsbRef.current.unidad;
     const esIncorrecta = usbConectado && (
-      (escalaActiva === 'diodo' && escalaMultimetro === 'uA') ||
-      (escalaActiva === 'ua' && (escalaMultimetro === 'V' || escalaMultimetro === 'Diod'))
+      (escalaActiva === 'diodo' && (escalaMultimetro === 'uA' || escalaMultimetro === 'mA' || escalaMultimetro === 'A')) ||
+      (escalaActiva === 'ua' && (escalaMultimetro === 'V' || escalaMultimetro === 'Diod' || escalaMultimetro === 'Ω'))
     );
     if (esIncorrecta) return;
     
@@ -206,40 +269,55 @@ export default function AppDiagnostico() {
       const devices = await navigator.hid.requestDevice({ filters: [{ vendorId: 0x1A86, productId: 0xE429 }] });
       if (devices.length === 0) return; const device = devices[0]; await device.open(); setDispositivoUsb(device); setUsbConectado(true);
       device.addEventListener("inputreport", event => {
-        const text = new TextDecoder().decode(event.data); let valStr = "---"; let uniStr = "---";
-        if (text.includes("OL") || text.includes("?0")) { valStr = "OL"; }
-        else {
+        const text = new TextDecoder("latin1").decode(event.data);
+        let parsedVal = null;
+        let parsedUni = null;
+        
+        if (text.includes("OL") || text.includes("?0")) {
+          parsedVal = "OL";
+          const textLower = text.toLowerCase();
+          if (text.includes("V")) { parsedUni = "V"; }
+          else if (textLower.includes("ohm") || text.includes("Ω")) { parsedUni = "Ω"; }
+          else if (textLower.includes("ua") || text.includes("µ") || text.includes("μ") || textLower.includes("micro")) { parsedUni = "uA"; }
+          else if (textLower.includes("ma")) { parsedUni = "mA"; }
+          else if (text.includes("A") || textLower.includes("amp")) { parsedUni = "A"; }
+          else { parsedUni = "Diod"; }
+        } else {
           const match = text.match(/([-+]?\d+(?:\.\d+)?)/);
           if (match) {
             const rawVal = match[1];
             const textLower = text.toLowerCase();
-            if (text.includes("V")) { uniStr = "V"; }
-            else if (textLower.includes("ohm") || text.includes("Ω")) { uniStr = "Ω"; }
-            else if (textLower.includes("ua") || text.includes("µa") || text.includes("µA") || text.includes("μA") || text.includes("μa")) { uniStr = "uA"; }
-            else if (textLower.includes("ma")) { uniStr = "mA"; }
-            else if (text.includes("A") || textLower.includes("amp")) { uniStr = "A"; }
-            else { uniStr = "Diod"; }
+            if (text.includes("V")) { parsedUni = "V"; }
+            else if (textLower.includes("ohm") || text.includes("Ω")) { parsedUni = "Ω"; }
+            else if (textLower.includes("ua") || text.includes("µ") || text.includes("μ") || textLower.includes("micro")) { parsedUni = "uA"; }
+            else if (textLower.includes("ma")) { parsedUni = "mA"; }
+            else if (text.includes("A") || textLower.includes("amp")) { parsedUni = "A"; }
+            else { parsedUni = "Diod"; }
             
-            if (uniStr === "V") { valStr = parseFloat(rawVal).toFixed(3); }
-            else { valStr = rawVal; }
+            if (parsedUni === "V") { parsedVal = parseFloat(rawVal).toFixed(3); }
+            else { parsedVal = rawVal; }
           }
         }
-        setLecturaUsb({ valor: valStr, unidad: uniStr });
-        if (autoHoldActivoRef.current) {
-          const valNum = parseFloat(valStr);
-          const escalaActiva = seccionLibreriaRef.current === 'ic' ? escalaIcRef.current : escalaFpcRef.current;
-          const esIncorrecta = (escalaActiva === 'diodo' && uniStr === 'uA') || (escalaActiva === 'ua' && (uniStr === 'V' || uniStr === 'Diod'));
-          if (esIncorrecta) {
-            autoHoldValueRef.current = null;
-            autoHoldTriggeredRef.current = false;
-          } else {
-            const tol = escalaActiva === 'ua' ? 1.5 : 0.003;
-            const esCeroInactivo = escalaActiva === 'ua' && valNum < 1.0;
-            if (!isNaN(valNum) && !esCeroInactivo) {
-              if (autoHoldValueRef.current !== null && Math.abs(valNum - autoHoldValueRef.current) <= tol) {
-                if (!autoHoldTriggeredRef.current && Date.now() - autoHoldStartTimeRef.current >= 1500) { autoHoldTriggeredRef.current = true; avanzarPinMagico(valStr); }
-              } else { autoHoldValueRef.current = valNum; autoHoldStartTimeRef.current = Date.now(); autoHoldTriggeredRef.current = false; }
-            } else { autoHoldValueRef.current = null; autoHoldTriggeredRef.current = false; }
+        
+        if (parsedVal !== null && parsedUni !== null) {
+          setLecturaUsb({ valor: parsedVal, unidad: parsedUni });
+          if (autoHoldActivoRef.current) {
+            const valNum = parseFloat(parsedVal);
+            const escalaActiva = seccionLibreriaRef.current === 'ic' ? escalaIcRef.current : escalaFpcRef.current;
+            const esIncorrecta = (escalaActiva === 'diodo' && (parsedUni === 'uA' || parsedUni === 'mA' || parsedUni === 'A')) ||
+                                 (escalaActiva === 'ua' && (parsedUni === 'V' || parsedUni === 'Diod' || parsedUni === 'Ω'));
+            if (esIncorrecta) {
+              autoHoldValueRef.current = null;
+              autoHoldTriggeredRef.current = false;
+            } else {
+              const tol = escalaActiva === 'ua' ? 1.5 : 0.003;
+              const esCeroInactivo = escalaActiva === 'ua' && valNum < 1.0;
+              if (!isNaN(valNum) && !esCeroInactivo) {
+                if (autoHoldValueRef.current !== null && Math.abs(valNum - autoHoldValueRef.current) <= tol) {
+                  if (!autoHoldTriggeredRef.current && Date.now() - autoHoldStartTimeRef.current >= 1500) { autoHoldTriggeredRef.current = true; avanzarPinMagico(parsedVal); }
+                } else { autoHoldValueRef.current = valNum; autoHoldStartTimeRef.current = Date.now(); autoHoldTriggeredRef.current = false; }
+              } else { autoHoldValueRef.current = null; autoHoldTriggeredRef.current = false; }
+            }
           }
         }
       });
