@@ -22,7 +22,7 @@ const LETRAS_FILAS = [
 
 const obtenerUrlVideo = (url) => { if (!url) return ''; let v = ''; if (url.includes('youtu.be/')) v = url.split('youtu.be/')[1].split('?')[0]; else if (url.includes('youtube.com/watch')) v = new URLSearchParams(url.split('?')[1]).get('v'); else if (url.includes('youtube.com/embed/')) return url; return v ? `https://www.youtube.com/embed/${v}` : url; };
 
-const VisorHUD = ({ valor, unidad, conectado, conectarFn, desconectarFn, vozActiva, toggleVozFn, autoHoldActivo, toggleAutoHoldFn, capturarFn, escalaActiva }) => {
+const VisorHUD = ({ valor, unidad, conectado, conectarFn, desconectarFn, vozActiva, toggleVozFn, autoHoldActivo, toggleAutoHoldFn, capturarFn, escalaActiva, oscilogramaActivo, toggleOscilogramaFn }) => {
   const esIncorrecta = conectado && (
     (escalaActiva === 'diodo' && (unidad === 'uA' || unidad === 'mA' || unidad === 'A')) ||
     (escalaActiva === 'ua' && (unidad === 'V' || unidad === 'Diod' || unidad === 'Ω'))
@@ -48,6 +48,26 @@ const VisorHUD = ({ valor, unidad, conectado, conectarFn, desconectarFn, vozActi
           <button onClick={conectado ? desconectarFn : conectarFn} style={{ background: conectado ? 'rgba(239, 68, 68, 0.2)' : '#333', color: conectado ? '#ef4444' : 'white', border: 'none', padding: '8px 15px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}><Link size={14} /> {conectado ? 'DESCONECTAR' : 'CONECTAR USB'}</button>
           <button onClick={toggleVozFn} style={{ background: vozActiva ? 'rgba(234, 179, 8, 0.2)' : '#333', color: vozActiva ? '#eab308' : 'white', border: 'none', padding: '8px 15px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', boxShadow: vozActiva ? '0 0 10px rgba(234,179,8,0.5)' : 'none' }}>{vozActiva ? <Mic size={14} /> : <MicOff size={14} />} VOZ</button>
           <button onClick={toggleAutoHoldFn} style={{ background: autoHoldActivo ? 'rgba(16, 185, 129, 0.2)' : '#333', color: autoHoldActivo ? '#10b981' : 'white', border: 'none', padding: '8px 15px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', boxShadow: autoHoldActivo ? '0 0 10px rgba(16,185,129,0.5)' : 'none' }}><Zap size={14} /> {autoHoldActivo ? 'HOLD ON' : 'HOLD'}</button>
+          <button 
+            onClick={toggleOscilogramaFn} 
+            style={{ 
+              background: oscilogramaActivo ? 'rgba(6, 182, 212, 0.2)' : '#333', 
+              color: oscilogramaActivo ? '#06b6d4' : 'white', 
+              border: 'none', 
+              padding: '8px 15px', 
+              borderRadius: '20px', 
+              fontSize: '0.7rem', 
+              fontWeight: 'bold', 
+              cursor: 'pointer', 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '5px', 
+              boxShadow: oscilogramaActivo ? '0 0 10px rgba(6,182,212,0.5)' : 'none',
+              transition: 'all 0.2s ease-in-out' 
+            }}
+          >
+            <Monitor size={14} /> OSCILOGRAMA AMPERIOS
+          </button>
           {conectado && capturarFn && (
             <button 
               onClick={esIncorrecta ? null : capturarFn} 
@@ -105,8 +125,7 @@ const VisorHUD = ({ valor, unidad, conectado, conectarFn, desconectarFn, vozActi
   );
 };
 
-const OscilogramaPanel = ({ valor, unidad, escalaActiva }) => {
-  const [activo, setActivo] = useState(true);
+const OscilogramaPanel = ({ valor, unidad, escalaActiva, onClose }) => {
   const [pausado, setPausado] = useState(false);
   const canvasRef = useRef(null);
   const puntosRef = useRef([]);
@@ -145,11 +164,11 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva }) => {
 
   useEffect(() => {
     dibujarGrafico();
-  }, [pausado, activo]);
+  }, [pausado]);
 
   const dibujarGrafico = () => {
     const canvas = canvasRef.current;
-    if (!canvas || !activo) return;
+    if (!canvas) return;
     const ctx = canvas.getContext("2d");
     
     const rect = canvas.getBoundingClientRect();
@@ -246,16 +265,6 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva }) => {
     link.click();
   };
 
-  if (!activo) {
-    return (
-      <div style={{ width: "100%", display: "flex", justifyContent: "flex-end", marginTop: "5px" }} className="no-print">
-        <button onClick={() => setActivo(true)} style={{ background: "#1f2937", border: "1px solid #374151", color: "white", padding: "6px 12px", borderRadius: "8px", fontSize: "0.75rem", fontWeight: "bold", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}>
-          📈 VER OSCILOGRAMA
-        </button>
-      </div>
-    );
-  }
-
   return (
     <div style={{ backgroundColor: "#1a1a1a", border: "1px solid #333", borderRadius: "15px", padding: "12px", marginTop: "10px", width: "100%" }} className="no-print">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
@@ -267,9 +276,11 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva }) => {
           <button onClick={guardarFoto} style={{ background: "#2563eb", border: "none", color: "white", padding: "4px 10px", borderRadius: "6px", fontSize: "0.7rem", fontWeight: "bold", cursor: "pointer" }}>
             📷 FOTO
           </button>
-          <button onClick={() => setActivo(false)} style={{ background: "transparent", border: "none", color: "gray", padding: "4px 6px", cursor: "pointer" }}>
-            ✕ Ocultar
-          </button>
+          {onClose && (
+            <button onClick={onClose} style={{ background: "transparent", border: "none", color: "gray", padding: "4px 6px", cursor: "pointer" }}>
+              ✕ Ocultar
+            </button>
+          )}
         </div>
       </div>
       <canvas ref={canvasRef} style={{ width: "100%", height: "110px", backgroundColor: "#111827", borderRadius: "8px", border: "1px solid #222", display: "block" }} />
@@ -283,6 +294,7 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva }) => {
 
 export default function AppDiagnostico() {
   const [pasoActual, setPasoActual] = useState(null); const [historial, setHistorial] = useState([]); const [cargando, setCargando] = useState(true); const [tema, setTema] = useState('light');
+  const [mostrarOscilograma, setMostrarOscilograma] = useState(false);
 
   // MODALES GLOBALES
   const [mostrarAdmin, setMostrarAdmin] = useState(false); const [vistaAdmin, setVistaAdmin] = useState('login');
@@ -992,7 +1004,7 @@ export default function AppDiagnostico() {
                       <button onClick={() => cambiarSeccionLibreria('ic')} style={{ padding: '10px 15px', borderRadius: '8px', border: 'none', background: seccionLibreria === 'ic' ? '#ec4899' : '#1f2937', color: 'white', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>Planos IC / BGA</button>
                       <button onClick={() => cambiarSeccionLibreria('rffe')} style={{ padding: '10px 15px', borderRadius: '8px', border: 'none', background: seccionLibreria === 'rffe' ? '#10b981' : '#1f2937', color: 'white', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>Módulo RFFE</button>
                     </div>
-                    <VisorHUD valor={lecturaUsb.valor} unidad={lecturaUsb.unidad} conectado={usbConectado} conectarFn={conectarMultimetroUSB} desconectarFn={desconectarMultimetroUSB} vozActiva={vozActiva} toggleVozFn={toggleVoz} autoHoldActivo={autoHoldActivo} toggleAutoHoldFn={() => setAutoHoldActivo(!autoHoldActivo)} capturarFn={avanzarPinMagico} escalaActiva={seccionLibreria === 'ic' ? escalaIc : escalaFpc} />
+                    <VisorHUD valor={lecturaUsb.valor} unidad={lecturaUsb.unidad} conectado={usbConectado} conectarFn={conectarMultimetroUSB} desconectarFn={desconectarMultimetroUSB} vozActiva={vozActiva} toggleVozFn={toggleVoz} autoHoldActivo={autoHoldActivo} toggleAutoHoldFn={() => setAutoHoldActivo(!autoHoldActivo)} capturarFn={avanzarPinMagico} escalaActiva={seccionLibreria === 'ic' ? escalaIc : escalaFpc} oscilogramaActivo={mostrarOscilograma} toggleOscilogramaFn={() => setMostrarOscilograma(!mostrarOscilograma)} />
 
                     {seccionLibreria === 'docktest' && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -1025,7 +1037,7 @@ export default function AppDiagnostico() {
                             })}
                           </div>
                         </div>
-                        <OscilogramaPanel valor={lecturaUsb.valor} unidad={lecturaUsb.unidad} escalaActiva={escalaFpc} />
+                        {mostrarOscilograma && <OscilogramaPanel valor={lecturaUsb.valor} unidad={lecturaUsb.unidad} escalaActiva={escalaFpc} onClose={() => setMostrarOscilograma(false)} />}
                       </div>
                     )}
 
@@ -1160,8 +1172,8 @@ export default function AppDiagnostico() {
               </div>
             </div>
             <div style={{ padding: '10px 20px', flexShrink: 0 }}>
-              <VisorHUD valor={lecturaUsb.valor} unidad={lecturaUsb.unidad} conectado={usbConectado} conectarFn={conectarMultimetroUSB} desconectarFn={desconectarMultimetroUSB} vozActiva={vozActiva} toggleVozFn={toggleVoz} autoHoldActivo={autoHoldActivo} toggleAutoHoldFn={() => setAutoHoldActivo(!autoHoldActivo)} capturarFn={avanzarPinMagico} escalaActiva={escalaFpc} />
-              <OscilogramaPanel valor={lecturaUsb.valor} unidad={lecturaUsb.unidad} escalaActiva={escalaFpc} />
+              <VisorHUD valor={lecturaUsb.valor} unidad={lecturaUsb.unidad} conectado={usbConectado} conectarFn={conectarMultimetroUSB} desconectarFn={desconectarMultimetroUSB} vozActiva={vozActiva} toggleVozFn={toggleVoz} autoHoldActivo={autoHoldActivo} toggleAutoHoldFn={() => setAutoHoldActivo(!autoHoldActivo)} capturarFn={avanzarPinMagico} escalaActiva={escalaFpc} oscilogramaActivo={mostrarOscilograma} toggleOscilogramaFn={() => setMostrarOscilograma(!mostrarOscilograma)} />
+              {mostrarOscilograma && <OscilogramaPanel valor={lecturaUsb.valor} unidad={lecturaUsb.unidad} escalaActiva={escalaFpc} onClose={() => setMostrarOscilograma(false)} />}
             </div>
             <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '0 20px 20px 20px' }}>
               <FPCInteligente 
@@ -1220,8 +1232,8 @@ export default function AppDiagnostico() {
               </div>
             </div>
             <div style={{ padding: '10px 20px', flexShrink: 0 }}>
-              <VisorHUD valor={lecturaUsb.valor} unidad={lecturaUsb.unidad} conectado={usbConectado} conectarFn={conectarMultimetroUSB} desconectarFn={desconectarMultimetroUSB} vozActiva={vozActiva} toggleVozFn={toggleVoz} autoHoldActivo={autoHoldActivo} toggleAutoHoldFn={() => setAutoHoldActivo(!autoHoldActivo)} capturarFn={avanzarPinMagico} escalaActiva={escalaIc} />
-              <OscilogramaPanel valor={lecturaUsb.valor} unidad={lecturaUsb.unidad} escalaActiva={escalaIc} />
+              <VisorHUD valor={lecturaUsb.valor} unidad={lecturaUsb.unidad} conectado={usbConectado} conectarFn={conectarMultimetroUSB} desconectarFn={desconectarMultimetroUSB} vozActiva={vozActiva} toggleVozFn={toggleVoz} autoHoldActivo={autoHoldActivo} toggleAutoHoldFn={() => setAutoHoldActivo(!autoHoldActivo)} capturarFn={avanzarPinMagico} escalaActiva={escalaIc} oscilogramaActivo={mostrarOscilograma} toggleOscilogramaFn={() => setMostrarOscilograma(!mostrarOscilograma)} />
+              {mostrarOscilograma && <OscilogramaPanel valor={lecturaUsb.valor} unidad={lecturaUsb.unidad} escalaActiva={escalaIc} onClose={() => setMostrarOscilograma(false)} />}
             </div>
             <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '0 20px 20px 20px' }}>
               <ICInteligente 
