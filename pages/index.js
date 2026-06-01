@@ -290,7 +290,7 @@ export default function AppDiagnostico() {
             else { parsedUni = "Diod"; }
           }
         } else {
-          const match = text.match(/([-+]?\d+(?:\.\d+)?)/);
+          const match = text.match(/([-+]?\d+\.\d+)/);
           if (match) {
             const rawVal = match[1];
             if (escalaActiva === 'ua') {
