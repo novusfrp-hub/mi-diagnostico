@@ -644,8 +644,47 @@ export default function AppDiagnostico() {
   };
 
   // LIBRERÍA CRUD
+  const cargarLibreriaDB = async () => {
+    try {
+      const qs = await getDocs(collection(db, "hardware_db"));
+      const arr = [];
+      qs.forEach(doc => arr.push({ id: doc.id, ...doc.data() }));
+      setModelosLibreria(arr);
+    } catch (error) {
+      console.error("Error al cargar la librería de modelos:", error);
+    }
+  };
+
+  const crearNuevoModeloDB = async (e) => {
+    e.preventDefault();
+    if (!formNuevoModelo.marca || !formNuevoModelo.nombre) return;
+    const idUnico = `${formNuevoModelo.marca}_${formNuevoModelo.nombre}`.toLowerCase().replace(/\s+/g, '_');
+    const nuevoObj = {
+      marca: formNuevoModelo.marca,
+      nombre: formNuevoModelo.nombre,
+      fpcs: [],
+      ics: [],
+      rffe_ics: [],
+      docktestDiodo: { vbus: '---', dp: '---', dm: '---', cc1: '---', cc2: '---' },
+      docktestUa: { vbus: '---', dp: '---', dm: '---', cc1: '---', cc2: '---' },
+      docktestVoltio: { vbus: '---', dp: '---', dm: '---', cc1: '---', cc2: '---' },
+      docktestOhmio: { vbus: '---', dp: '---', dm: '---', cc1: '---', cc2: '---' },
+      docktestAmperio: { vbus: '---', dp: '---', dm: '---', cc1: '---', cc2: '---' }
+    };
+    try {
+      await setDoc(doc(db, "hardware_db", idUnico), nuevoObj);
+      setFormNuevoModelo({ marca: '', nombre: '' });
+      await cargarLibreriaDB();
+      setModeloActivo({ ...nuevoObj, id: idUnico });
+    } catch (error) {
+      console.error("Error al crear modelo:", error);
+      alert("❌ Error al añadir modelo: " + error.message);
+    }
+  };
+
   const guardarModeloActualDB = async () => { 
     if (!modeloActivo) return; 
+
     try {
       await setDoc(doc(db, "hardware_db", modeloActivo.id), modeloActivo); 
       alert("¡Placa guardada en la nube de Marshall Cell!"); 
@@ -723,10 +762,10 @@ export default function AppDiagnostico() {
   };
 
   
-  const crearNuevoFpcEnModelo = () => { if (!formNuevoFpc.nombre || formNuevoFpc.pines <= 0) return; const pinesArray = Array.from({ length: parseInt(formNuevoFpc.pines) }, (_, i) => ({ id: i + 1, nombre: `Linea_${i + 1}`, valorSano: '---', valorActual: '---', tipo: 'DATA' })); const nuevoFpc = { id: Date.now().toString(), nombre: formNuevoFpc.nombre.replace(/ /g, '_'), pines: pinesArray, imgPlaca: '', imgEsquema: '' }; const modActualizado = { ...modeloActivo, fpcs: [...modeloActivo.fpcs, nuevoFpc] }; setModeloActivo(modActualizado); setFpcActivo(nuevoFpc); setFormNuevoFpc({ nombre: '', pines: 40 }); setPinActivoFpc(1); };
+  const crearNuevoFpcEnModelo = () => { if (!formNuevoFpc.nombre || formNuevoFpc.pines <= 0) return; const pinesArray = Array.from({ length: parseInt(formNuevoFpc.pines) }, (_, i) => ({ id: i + 1, nombre: `Linea_${i + 1}`, valorSano: '---', valorActual: '---', tipo: 'DATA' })); const nuevoFpc = { id: Date.now().toString(), nombre: formNuevoFpc.nombre.replace(/ /g, '_'), pines: pinesArray, imgPlaca: '', imgEsquema: '' }; const modActualizado = { ...modeloActivo, fpcs: [...(modeloActivo.fpcs || []), nuevoFpc] }; setModeloActivo(modActualizado); setFpcActivo(nuevoFpc); setFormNuevoFpc({ nombre: '', pines: 40 }); setPinActivoFpc(1); };
   
-  const eliminarFpcActivo = () => { if (!fpcActivo || !window.confirm(`¿Seguro de eliminar el FPC ${fpcActivo.nombre}?`)) return; const modActualizado = { ...modeloActivo, fpcs: modeloActivo.fpcs.filter(f => f.id !== fpcActivo.id) }; setModeloActivo(modActualizado); setFpcActivo(null); setPinActivoFpc(1); };
-  const editarPinesFpcActivo = () => { if (!fpcActivo) return; const newCount = window.prompt("Ingresa el nuevo número total de pines:", fpcActivo.pines.length); if (!newCount || isNaN(newCount) || parseInt(newCount) <= 0) return; const count = parseInt(newCount); let nuevosPines = [...fpcActivo.pines]; if (count > nuevosPines.length) { for (let i = nuevosPines.length + 1; i <= count; i++) { nuevosPines.push({ id: i, nombre: `Linea_${i}`, valorSano: '---', valorActual: '---', tipo: 'DATA' }); } } else if (count < nuevosPines.length) { if (!window.confirm(`Se eliminarán ${nuevosPines.length - count} pines del final. ¿Continuar?`)) return; nuevosPines = nuevosPines.slice(0, count); } const fpcMod = { ...fpcActivo, pines: nuevosPines }; setFpcActivo(fpcMod); setModeloActivo(prev => ({ ...prev, fpcs: prev.fpcs.map(f => f.id === fpcMod.id ? fpcMod : f) })); if (pinActivoFpc > count) setPinActivoFpc(1); };
+  const eliminarFpcActivo = () => { if (!fpcActivo || !window.confirm(`¿Seguro de eliminar el FPC ${fpcActivo.nombre}?`)) return; const modActualizado = { ...modeloActivo, fpcs: (modeloActivo.fpcs || []).filter(f => f.id !== fpcActivo.id) }; setModeloActivo(modActualizado); setFpcActivo(null); setPinActivoFpc(1); };
+  const editarPinesFpcActivo = () => { if (!fpcActivo) return; const newCount = window.prompt("Ingresa el nuevo número total de pines:", fpcActivo.pines.length); if (!newCount || isNaN(newCount) || parseInt(newCount) <= 0) return; const count = parseInt(newCount); let nuevosPines = [...fpcActivo.pines]; if (count > nuevosPines.length) { for (let i = nuevosPines.length + 1; i <= count; i++) { nuevosPines.push({ id: i, nombre: `Linea_${i}`, valorSano: '---', valorActual: '---', tipo: 'DATA' }); } } else if (count < nuevosPines.length) { if (!window.confirm(`Se eliminarán ${nuevosPines.length - count} pines del final. ¿Continuar?`)) return; nuevosPines = nuevosPines.slice(0, count); } const fpcMod = { ...fpcActivo, pines: nuevosPines }; setFpcActivo(fpcMod); setModeloActivo(prev => ({ ...prev, fpcs: (prev.fpcs || []).map(f => f.id === fpcMod.id ? fpcMod : f) })); if (pinActivoFpc > count) setPinActivoFpc(1); };
   
   const editarUbicacionFpc = (tipo) => { 
     if (!fpcActivo) return; 
@@ -735,7 +774,7 @@ export default function AppDiagnostico() {
     if (nuevaUrl !== null) { 
         const fpcMod = { ...fpcActivo, [tipo === 'placa' ? 'imgPlaca' : 'imgEsquema']: nuevaUrl }; 
         setFpcActivo(fpcMod); 
-        setModeloActivo(prev => ({ ...prev, fpcs: prev.fpcs.map(f => f.id === fpcMod.id ? fpcMod : f) })); 
+        setModeloActivo(prev => ({ ...prev, fpcs: (prev.fpcs || []).map(f => f.id === fpcMod.id ? fpcMod : f) })); 
     } 
   };
 
@@ -986,7 +1025,7 @@ export default function AppDiagnostico() {
                 </div>
                 <div style={{ flex: 1, overflowY: 'auto', padding: '10px' }}>
                   {modelosLibreria.map(mod => (
-                    <button key={mod.id} onClick={() => { setModeloActivo(mod); setFpcActivo(mod.fpcs[0] || null); setIcActivo(mod.ics?.[0] || null); setCambiosPendientesDocktest(false); }} style={{ width: '100%', padding: '12px', textAlign: 'left', backgroundColor: modeloActivo?.id === mod.id ? '#1f2937' : 'transparent', border: 'none', color: modeloActivo?.id === mod.id ? '#00ffff' : '#9ca3af', borderLeft: modeloActivo?.id === mod.id ? '4px solid #00ffff' : '4px solid transparent', cursor: 'pointer', borderRadius: '0 8px 8px 0', marginBottom: '5px', fontWeight: 'bold' }}>
+                    <button key={mod.id} onClick={() => { setModeloActivo(mod); setFpcActivo(mod.fpcs?.[0] || null); setIcActivo(mod.ics?.[0] || null); setCambiosPendientesDocktest(false); }} style={{ width: '100%', padding: '12px', textAlign: 'left', backgroundColor: modeloActivo?.id === mod.id ? '#1f2937' : 'transparent', border: 'none', color: modeloActivo?.id === mod.id ? '#00ffff' : '#9ca3af', borderLeft: modeloActivo?.id === mod.id ? '4px solid #00ffff' : '4px solid transparent', cursor: 'pointer', borderRadius: '0 8px 8px 0', marginBottom: '5px', fontWeight: 'bold' }}>
                       {mod.marca} {mod.nombre}
                     </button>
                   ))}
