@@ -407,18 +407,18 @@ export default function AppDiagnostico() {
                if (p.id === pinAct) {
                   return { 
                     ...p, 
-                    valorSanoDiodo: (mFpc === 'crear' && escala === 'diodo' ? valVivo : p.valorSanoDiodo), 
-                    valorSanoUa: (mFpc === 'crear' && escala === 'ua' ? valVivo : p.valorSanoUa),
-                    valorSanoVoltio: (mFpc === 'crear' && escala === 'voltio' ? valVivo : p.valorSanoVoltio),
-                    valorSanoOhmio: (mFpc === 'crear' && escala === 'ohmio' ? valVivo : p.valorSanoOhmio),
-                    valorSanoAmperio: (mFpc === 'crear' && escala === 'amperio' ? valVivo : p.valorSanoAmperio),
-                    valorSano: (mFpc === 'crear' ? valVivo : p.valorSano),
-                    valorActual: (mFpc !== 'crear' ? valVivo : p.valorActual),
-                    valorActualDiodo: (mFpc !== 'crear' && escala === 'diodo' ? valVivo : p.valorActualDiodo), 
-                    valorActualUa: (mFpc !== 'crear' && escala === 'ua' ? valVivo : p.valorActualUa),
-                    valorActualVoltio: (mFpc !== 'crear' && escala === 'voltio' ? valVivo : p.valorActualVoltio),
-                    valorActualOhmio: (mFpc !== 'crear' && escala === 'ohmio' ? valVivo : p.valorActualOhmio),
-                    valorActualAmperio: (mFpc !== 'crear' && escala === 'amperio' ? valVivo : p.valorActualAmperio)
+                    valorSanoDiodo: (mFpc === 'crear' && escala === 'diodo' ? valVivo : (p.valorSanoDiodo ?? '---')), 
+                    valorSanoUa: (mFpc === 'crear' && escala === 'ua' ? valVivo : (p.valorSanoUa ?? '---')),
+                    valorSanoVoltio: (mFpc === 'crear' && escala === 'voltio' ? valVivo : (p.valorSanoVoltio ?? '---')),
+                    valorSanoOhmio: (mFpc === 'crear' && escala === 'ohmio' ? valVivo : (p.valorSanoOhmio ?? '---')),
+                    valorSanoAmperio: (mFpc === 'crear' && escala === 'amperio' ? valVivo : (p.valorSanoAmperio ?? '---')),
+                    valorSano: (mFpc === 'crear' ? valVivo : (p.valorSano ?? '---')),
+                    valorActual: (mFpc !== 'crear' ? valVivo : (p.valorActual ?? '---')),
+                    valorActualDiodo: (mFpc !== 'crear' && escala === 'diodo' ? valVivo : (p.valorActualDiodo ?? '---')), 
+                    valorActualUa: (mFpc !== 'crear' && escala === 'ua' ? valVivo : (p.valorActualUa ?? '---')),
+                    valorActualVoltio: (mFpc !== 'crear' && escala === 'voltio' ? valVivo : (p.valorActualVoltio ?? '---')),
+                    valorActualOhmio: (mFpc !== 'crear' && escala === 'ohmio' ? valVivo : (p.valorActualOhmio ?? '---')),
+                    valorActualAmperio: (mFpc !== 'crear' && escala === 'amperio' ? valVivo : (p.valorActualAmperio ?? '---'))
                   };
                }
                return p;
@@ -443,18 +443,18 @@ export default function AppDiagnostico() {
                if (p.id === padAct) {
                   return { 
                      ...p, 
-                     valorSanoDiodo: (mIc === 'crear' && escala === 'diodo' ? valVivo : p.valorSanoDiodo), 
-                     valorSanoUa: (mIc === 'crear' && escala === 'ua' ? valVivo : p.valorSanoUa),
-                     valorSanoVoltio: (mIc === 'crear' && escala === 'voltio' ? valVivo : p.valorSanoVoltio),
-                     valorSanoOhmio: (mIc === 'crear' && escala === 'ohmio' ? valVivo : p.valorSanoOhmio),
-                     valorSanoAmperio: (mIc === 'crear' && escala === 'amperio' ? valVivo : p.valorSanoAmperio),
-                     valorSano: (mIc === 'crear' ? valVivo : p.valorSano),
-                     valorActual: (mIc !== 'crear' ? valVivo : p.valorActual),
-                     valorActualDiodo: (mIc !== 'crear' && escala === 'diodo' ? valVivo : p.valorActualDiodo), 
-                     valorActualUa: (mIc !== 'crear' && escala === 'ua' ? valVivo : p.valorActualUa),
-                     valorActualVoltio: (mIc !== 'crear' && escala === 'voltio' ? valVivo : p.valorActualVoltio),
-                     valorActualOhmio: (mIc !== 'crear' && escala === 'ohmio' ? valVivo : p.valorActualOhmio),
-                     valorActualAmperio: (mIc !== 'crear' && escala === 'amperio' ? valVivo : p.valorActualAmperio)
+                     valorSanoDiodo: (mIc === 'crear' && escala === 'diodo' ? valVivo : (p.valorSanoDiodo ?? '---')), 
+                     valorSanoUa: (mIc === 'crear' && escala === 'ua' ? valVivo : (p.valorSanoUa ?? '---')),
+                     valorSanoVoltio: (mIc === 'crear' && escala === 'voltio' ? valVivo : (p.valorSanoVoltio ?? '---')),
+                     valorSanoOhmio: (mIc === 'crear' && escala === 'ohmio' ? valVivo : (p.valorSanoOhmio ?? '---')),
+                     valorSanoAmperio: (mIc === 'crear' && escala === 'amperio' ? valVivo : (p.valorSanoAmperio ?? '---')),
+                     valorSano: (mIc === 'crear' ? valVivo : (p.valorSano ?? '---')),
+                     valorActual: (mIc !== 'crear' ? valVivo : (p.valorActual ?? '---')),
+                     valorActualDiodo: (mIc !== 'crear' && escala === 'diodo' ? valVivo : (p.valorActualDiodo ?? '---')), 
+                     valorActualUa: (mIc !== 'crear' && escala === 'ua' ? valVivo : (p.valorActualUa ?? '---')),
+                     valorActualVoltio: (mIc !== 'crear' && escala === 'voltio' ? valVivo : (p.valorActualVoltio ?? '---')),
+                     valorActualOhmio: (mIc !== 'crear' && escala === 'ohmio' ? valVivo : (p.valorActualOhmio ?? '---')),
+                     valorActualAmperio: (mIc !== 'crear' && escala === 'amperio' ? valVivo : (p.valorActualAmperio ?? '---'))
                   };
                }
                return p;
@@ -655,6 +655,26 @@ export default function AppDiagnostico() {
     }
   };
 
+  const sanitizarObjetoParaFirestore = (obj) => {
+    if (obj === null || obj === undefined) return null;
+    if (Array.isArray(obj)) {
+      return obj.map(item => sanitizarObjetoParaFirestore(item));
+    }
+    if (typeof obj === 'object') {
+      const nuevoObj = {};
+      for (const key in obj) {
+        if (Object.prototype.hasOwnProperty.call(obj, key)) {
+          const val = obj[key];
+          if (val !== undefined) {
+            nuevoObj[key] = sanitizarObjetoParaFirestore(val);
+          }
+        }
+      }
+      return nuevoObj;
+    }
+    return obj;
+  };
+
   const crearNuevoModeloDB = async (e) => {
     e.preventDefault();
     if (!formNuevoModelo.marca || !formNuevoModelo.nombre) return;
@@ -672,7 +692,7 @@ export default function AppDiagnostico() {
       docktestAmperio: { vbus: '---', dp: '---', dm: '---', cc1: '---', cc2: '---' }
     };
     try {
-      await setDoc(doc(db, "hardware_db", idUnico), nuevoObj);
+      await setDoc(doc(db, "hardware_db", idUnico), sanitizarObjetoParaFirestore(nuevoObj));
       setFormNuevoModelo({ marca: '', nombre: '' });
       await cargarLibreriaDB();
       setModeloActivo({ ...nuevoObj, id: idUnico });
@@ -686,7 +706,8 @@ export default function AppDiagnostico() {
     if (!modeloActivo) return; 
 
     try {
-      await setDoc(doc(db, "hardware_db", modeloActivo.id), modeloActivo); 
+      const modeloSanitizado = sanitizarObjetoParaFirestore(modeloActivo);
+      await setDoc(doc(db, "hardware_db", modeloActivo.id), modeloSanitizado); 
       alert("¡Placa guardada en la nube de Marshall Cell!"); 
       setCambiosPendientesDocktest(false);
       await cargarLibreriaDB(); 
@@ -701,7 +722,8 @@ export default function AppDiagnostico() {
     if (!modeloActivo) return;
     setGuardandoDocktest(true);
     try {
-      await setDoc(doc(db, "hardware_db", modeloActivo.id), modeloActivo);
+      const modeloSanitizado = sanitizarObjetoParaFirestore(modeloActivo);
+      await setDoc(doc(db, "hardware_db", modeloActivo.id), modeloSanitizado);
       alert("¡Docktest guardado en la nube de Marshall Cell!");
       setCambiosPendientesDocktest(false);
       await cargarLibreriaDB();
