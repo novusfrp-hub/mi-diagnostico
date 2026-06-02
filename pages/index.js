@@ -295,6 +295,8 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, onClose }) => {
 export default function AppDiagnostico() {
   const [pasoActual, setPasoActual] = useState(null); const [historial, setHistorial] = useState([]); const [cargando, setCargando] = useState(true); const [tema, setTema] = useState('light');
   const [mostrarOscilograma, setMostrarOscilograma] = useState(false);
+  const [cambiosPendientesDocktest, setCambiosPendientesDocktest] = useState(false);
+  const [guardandoDocktest, setGuardandoDocktest] = useState(false);
 
   // MODALES GLOBALES
   const [mostrarAdmin, setMostrarAdmin] = useState(false); const [vistaAdmin, setVistaAdmin] = useState('login');
@@ -392,7 +394,9 @@ export default function AppDiagnostico() {
         if (!modeloActualizado[key]) {
           modeloActualizado[key] = { vbus: '---', dp: '---', dm: '---', cc1: '---', cc2: '---' };
         }
-        modeloActualizado[key][campoActual] = valVivo; setModeloActivo(modeloActualizado);
+        modeloActualizado[key][campoActual] = valVivo; 
+        setModeloActivo(modeloActualizado);
+        setCambiosPendientesDocktest(true);
         setCampoActivoDock(prev => { const idx = ordenCamposDock.indexOf(prev); return (idx >= 0 && idx < ordenCamposDock.length - 1) ? ordenCamposDock[idx + 1] : prev; });
       } else if (seccion === 'fpc' && fpcActivoRef.current) {
         const fpcAct = fpcActivoRef.current;
@@ -640,9 +644,35 @@ export default function AppDiagnostico() {
   };
 
   // LIBRERÍA CRUD
-  const cargarLibreriaDB = async () => { try { const qs = await getDocs(collection(db, "hardware_db")); const arr = []; qs.forEach(doc => arr.push({ id: doc.id, ...doc.data() })); setModelosLibreria(arr); } catch (error) { } };
-  const crearNuevoModeloDB = async (e) => { e.preventDefault(); if (!formNuevoModelo.marca || !formNuevoModelo.nombre) return; const idUnico = `${formNuevoModelo.marca}_${formNuevoModelo.nombre}`.toLowerCase().replace(/\s+/g, '_'); const nuevoObj = { marca: formNuevoModelo.marca, nombre: formNuevoModelo.nombre, fpcs: [], ics: [], rffe_ics: [], docktestDiodo: { vbus: '---', dp: '---', dm: '---', cc1: '---', cc2: '---' }, docktestUa: { vbus: '---', dp: '---', dm: '---', cc1: '---', cc2: '---' }, docktestVoltio: { vbus: '---', dp: '---', dm: '---', cc1: '---', cc2: '---' }, docktestOhmio: { vbus: '---', dp: '---', dm: '---', cc1: '---', cc2: '---' }, docktestAmperio: { vbus: '---', dp: '---', dm: '---', cc1: '---', cc2: '---' } }; await setDoc(doc(db, "hardware_db", idUnico), nuevoObj); setFormNuevoModelo({ marca: '', nombre: '' }); cargarLibreriaDB(); setModeloActivo({ ...nuevoObj, id: idUnico }); };
-  const guardarModeloActualDB = async () => { if (!modeloActivo) return; await setDoc(doc(db, "hardware_db", modeloActivo.id), modeloActivo); alert("¡Placa guardada en la nube de Marshall Cell!"); cargarLibreriaDB(); };
+  const guardarModeloActualDB = async () => { 
+    if (!modeloActivo) return; 
+    try {
+      await setDoc(doc(db, "hardware_db", modeloActivo.id), modeloActivo); 
+      alert("¡Placa guardada en la nube de Marshall Cell!"); 
+      setCambiosPendientesDocktest(false);
+      await cargarLibreriaDB(); 
+    } catch (error) {
+      console.error("Error al guardar la placa en Firestore:", error);
+      alert("❌ Error al guardar en la nube: " + (error.message || error));
+      throw error;
+    }
+  };
+
+  const guardarDocktestAhora = async () => {
+    if (!modeloActivo) return;
+    setGuardandoDocktest(true);
+    try {
+      await setDoc(doc(db, "hardware_db", modeloActivo.id), modeloActivo);
+      alert("¡Docktest guardado en la nube de Marshall Cell!");
+      setCambiosPendientesDocktest(false);
+      await cargarLibreriaDB();
+    } catch (error) {
+      console.error("Error al guardar Docktest:", error);
+      alert("❌ Error al guardar Docktest en la nube: " + (error.message || error));
+    } finally {
+      setGuardandoDocktest(false);
+    }
+  };
   
   const crearNuevoIcEnModelo = () => {
     if (!formNuevoIc.nombre || formNuevoIc.filas <= 0 || formNuevoIc.columnas <= 0) return;
@@ -956,7 +986,7 @@ export default function AppDiagnostico() {
                 </div>
                 <div style={{ flex: 1, overflowY: 'auto', padding: '10px' }}>
                   {modelosLibreria.map(mod => (
-                    <button key={mod.id} onClick={() => { setModeloActivo(mod); setFpcActivo(mod.fpcs[0] || null); setIcActivo(mod.ics?.[0] || null); }} style={{ width: '100%', padding: '12px', textAlign: 'left', backgroundColor: modeloActivo?.id === mod.id ? '#1f2937' : 'transparent', border: 'none', color: modeloActivo?.id === mod.id ? '#00ffff' : '#9ca3af', borderLeft: modeloActivo?.id === mod.id ? '4px solid #00ffff' : '4px solid transparent', cursor: 'pointer', borderRadius: '0 8px 8px 0', marginBottom: '5px', fontWeight: 'bold' }}>
+                    <button key={mod.id} onClick={() => { setModeloActivo(mod); setFpcActivo(mod.fpcs[0] || null); setIcActivo(mod.ics?.[0] || null); setCambiosPendientesDocktest(false); }} style={{ width: '100%', padding: '12px', textAlign: 'left', backgroundColor: modeloActivo?.id === mod.id ? '#1f2937' : 'transparent', border: 'none', color: modeloActivo?.id === mod.id ? '#00ffff' : '#9ca3af', borderLeft: modeloActivo?.id === mod.id ? '4px solid #00ffff' : '4px solid transparent', cursor: 'pointer', borderRadius: '0 8px 8px 0', marginBottom: '5px', fontWeight: 'bold' }}>
                       {mod.marca} {mod.nombre}
                     </button>
                   ))}
@@ -968,9 +998,17 @@ export default function AppDiagnostico() {
                   <div style={{ display: 'flex', gap: '10px' }}>
                     {modeloActivo && (
                       <button 
-                        onClick={seccionLibreria === 'ic' ? sincronizarIcAhora : sincronizarFpcAhora} 
+                        onClick={
+                          seccionLibreria === 'ic' 
+                            ? sincronizarIcAhora 
+                            : (seccionLibreria === 'docktest' ? guardarDocktestAhora : sincronizarFpcAhora)
+                        } 
                         style={{ 
-                          background: (seccionLibreria === 'ic' ? cambiosPendientesIc : cambiosPendientesFpc) ? '#f59e0b' : '#10b981', 
+                          background: (
+                            seccionLibreria === 'ic' 
+                              ? cambiosPendientesIc 
+                              : (seccionLibreria === 'docktest' ? cambiosPendientesDocktest : cambiosPendientesFpc)
+                          ) ? '#f59e0b' : '#10b981', 
                           color: 'white', 
                           border: 'none', 
                           padding: '8px 15px', 
@@ -988,7 +1026,7 @@ export default function AppDiagnostico() {
                           : seccionLibreria === 'fpc'
                             ? (guardandoFpc ? 'Guardando...' : 'Guardar FPC')
                             : seccionLibreria === 'docktest'
-                              ? (guardandoFpc ? 'Guardando...' : 'Guardar Docktest')
+                              ? (guardandoDocktest ? 'Guardando...' : 'Guardar Docktest')
                               : (guardandoFpc ? 'Guardando...' : 'Guardar RFFE')
                         }
                       </button>
@@ -1168,6 +1206,31 @@ export default function AppDiagnostico() {
                   <button onClick={() => setModoFpc('crear')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: modoFpc === 'crear' ? '#8b5cf6' : 'transparent', color: modoFpc === 'crear' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}>Grabar</button>
                   <button onClick={() => setModoFpc('diagnostico')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: modoFpc === 'diagnostico' ? '#ef4444' : 'transparent', color: modoFpc === 'diagnostico' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}>Diagnóstico</button>
                 </div>
+                <button
+                  onClick={sincronizarFpcAhora}
+                  disabled={guardandoFpc}
+                  style={{
+                    background: cambiosPendientesFpc ? '#f59e0b' : '#10b981',
+                    color: 'white',
+                    border: 'none',
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    fontWeight: 'bold',
+                    cursor: guardandoFpc ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    fontSize: '0.8rem',
+                    boxShadow: cambiosPendientesFpc
+                      ? '0 0 15px rgba(245, 158, 11, 0.4)'
+                      : '0 0 10px rgba(16, 185, 129, 0.3)',
+                    transition: 'all 0.3s'
+                  }}
+                  title={cambiosPendientesFpc ? 'Hay cambios sin guardar en la nube' : 'Todo está sincronizado'}
+                >
+                  <Save size={16} />
+                  {guardandoFpc ? 'GUARDANDO...' : (cambiosPendientesFpc ? 'SINCRONIZAR AHORA' : 'GUARDADO EN NUBE')}
+                </button>
                 <button onClick={() => setModalFpcAbierto(false)} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', cursor: 'pointer', padding: '8px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}><X size={20} /></button>
               </div>
             </div>
@@ -1228,6 +1291,31 @@ export default function AppDiagnostico() {
                   <button onClick={() => setModoIc('crear')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: modoIc === 'crear' ? '#ec4899' : 'transparent', color: modoIc === 'crear' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}>Grabar</button>
                   <button onClick={() => setModoIc('diagnostico')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: modoIc === 'diagnostico' ? '#ef4444' : 'transparent', color: modoIc === 'diagnostico' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}>Diagnóstico</button>
                 </div>
+                <button
+                  onClick={sincronizarIcAhora}
+                  disabled={guardandoIc}
+                  style={{
+                    background: cambiosPendientesIc ? '#f59e0b' : '#10b981',
+                    color: 'white',
+                    border: 'none',
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    fontWeight: 'bold',
+                    cursor: guardandoIc ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    fontSize: '0.8rem',
+                    boxShadow: cambiosPendientesIc
+                      ? '0 0 15px rgba(245, 158, 11, 0.4)'
+                      : '0 0 10px rgba(16, 185, 129, 0.3)',
+                    transition: 'all 0.3s'
+                  }}
+                  title={cambiosPendientesIc ? 'Hay cambios sin guardar en la nube' : 'Todo está sincronizado'}
+                >
+                  <Save size={16} />
+                  {guardandoIc ? 'GUARDANDO...' : (cambiosPendientesIc ? 'SINCRONIZAR AHORA' : 'GUARDADO EN NUBE')}
+                </button>
                 <button onClick={() => setModalIcAbierto(false)} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', cursor: 'pointer', padding: '8px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}><X size={20} /></button>
               </div>
             </div>

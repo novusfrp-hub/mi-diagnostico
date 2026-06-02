@@ -7,10 +7,19 @@ export default function useAutoSave(claveLocalStorage, datosActuales, guardarEnN
   
   const datosPreviosRef = useRef(null);
   const guardandoRef = useRef(false);
-  const inicializadoRef = useRef(false);
+  const prevClaveRef = useRef(null);
 
+  // Cargar borrador si cambia la clave
   useEffect(() => {
-    if (claveLocalStorage && !inicializadoRef.current) {
+    if (!claveLocalStorage) {
+      setCambiosPendientes(false);
+      datosPreviosRef.current = null;
+      prevClaveRef.current = null;
+      return;
+    }
+
+    if (prevClaveRef.current !== claveLocalStorage) {
+      prevClaveRef.current = claveLocalStorage;
       const guardado = localStorage.getItem(claveLocalStorage);
       if (guardado) {
         try {
@@ -18,21 +27,31 @@ export default function useAutoSave(claveLocalStorage, datosActuales, guardarEnN
           datosPreviosRef.current = datos;
           setCambiosPendientes(true);
           setUltimaSincronizacion(new Date(datos._timestamp || Date.now()));
+          return;
         } catch (e) {
           console.warn('Error al leer localStorage:', e);
         }
       }
-      inicializadoRef.current = true;
+      // Si no hay borrador previo, usar el estado actual como base
+      datosPreviosRef.current = datosActuales;
+      setCambiosPendientes(false);
     }
-  }, [claveLocalStorage]);
+  }, [claveLocalStorage, datosActuales]);
 
+  // Guardar en localStorage si hay cambios reales (sin considerar _timestamp)
   useEffect(() => {
-    if (!claveLocalStorage || !inicializadoRef.current || guardandoRef.current) return;
+    if (!claveLocalStorage || prevClaveRef.current !== claveLocalStorage || guardandoRef.current || !datosActuales) return;
 
-    const datosActualesStr = JSON.stringify({ ...datosActuales, _timestamp: Date.now() });
-    const datosPreviosStr = JSON.stringify(datosPreviosRef.current);
+    const limpiarTimestamp = (obj) => {
+      if (!obj) return null;
+      const { _timestamp, ...resto } = obj;
+      return resto;
+    };
+
+    const datosActualesLimpiosStr = JSON.stringify(limpiarTimestamp(datosActuales));
+    const datosPreviosLimpiosStr = JSON.stringify(limpiarTimestamp(datosPreviosRef.current));
     
-    if (datosPreviosStr !== datosActualesStr) {
+    if (datosPreviosLimpiosStr !== datosActualesLimpiosStr) {
       try {
         const datosParaGuardar = { ...datosActuales, _timestamp: Date.now() };
         localStorage.setItem(claveLocalStorage, JSON.stringify(datosParaGuardar));
@@ -74,9 +93,9 @@ export default function useAutoSave(claveLocalStorage, datosActuales, guardarEnN
     if (claveLocalStorage) {
       localStorage.removeItem(claveLocalStorage);
     }
-    datosPreviosRef.current = null;
+    datosPreviosRef.current = datosActuales;
     setCambiosPendientes(false);
-  }, [claveLocalStorage]);
+  }, [claveLocalStorage, datosActuales]);
 
   return {
     cambiosPendientes,
@@ -85,4 +104,4 @@ export default function useAutoSave(claveLocalStorage, datosActuales, guardarEnN
     sincronizarAhora,
     descartarCambios
   };
-}
+}
