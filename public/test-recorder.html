@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Test Canvas Recorder - Diagnóstico</title>
+  <style>
+    body { background: #111; color: #fff; font-family: Consolas, monospace; padding: 20px; }
+    canvas { border: 1px solid #333; display: block; margin: 10px 0; }
+    button { padding: 10px 20px; margin: 5px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 14px; }
+    .start { background: #10b981; color: white; }
+    .stop { background: #ef4444; color: white; }
+    #log { background: #1a1a1a; border: 1px solid #333; padding: 10px; max-height: 400px; overflow-y: auto; font-size: 12px; white-space: pre-wrap; margin-top: 10px; }
+    .ok { color: #10b981; }
+    .err { color: #ef4444; }
+    .warn { color: #eab308; }
+    .info { color: #06b6d4; }
+  </style>
+</head>
+<body>
+  <h2>🔬 Test Aislado: Canvas + MediaRecorder</h2>
+  <p>Esta página prueba la grabación de un canvas SIN React, SIN WebHID, SIN nada más. Solo un canvas animado y MediaRecorder.</p>
+  
+  <h3>Test 1: Canvas Pequeño (320x180)</h3>
+  <canvas id="canvas-small" width="320" height="180"></canvas>
+  <button class="start" onclick="startTest('small')">▶ Grabar Canvas Pequeño</button>
+  <button class="stop" onclick="stopTest('small')">⏹ Detener</button>
+
+  <h3>Test 2: Canvas Mediano (640x360)</h3>
+  <canvas id="canvas-medium" width="640" height="360"></canvas>
+  <button class="start" onclick="startTest('medium')">▶ Grabar Canvas Mediano</button>
+  <button class="stop" onclick="stopTest('medium')">⏹ Detener</button>
+
+  <h3>Test 3: Canvas HD (1280x720) — Mismo tamaño que tu oscilograma</h3>
+  <canvas id="canvas-hd" width="1280" height="720" style="max-width:640px;height:auto;"></canvas>
+  <button class="start" onclick="startTest('hd')">▶ Grabar Canvas HD</button>
+  <button class="stop" onclick="stopTest('hd')">⏹ Detener</button>
+
+  <h3>📋 Log de Diagnóstico</h3>
+  <div id="log"></div>
+
+  <script>
+    const logEl = document.getElementById('log');
+    function log(msg, cls = 'info') {
+      const time = new Date().toLocaleTimeString();
+      logEl.innerHTML += `<span class="${cls}">[${time}] ${msg}</span>\n`;
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    // Detect supported codecs
+    log('=== DIAGNÓSTICO DEL SISTEMA ===', 'warn');
+    log(`Navigator.userAgent: ${navigator.userAgent}`);
+    
+    if (typeof MediaRecorder === 'undefined') {
+      log('❌ MediaRecorder NO está disponible en este navegador', 'err');
+    } else {
+      log('✅ MediaRecorder disponible', 'ok');
+      const codecs = [
+        'video/webm;codecs=vp8',
+        'video/webm;codecs=vp9',
+        'video/webm;codecs=h264',
+        'video/webm',
+        'video/mp4;codecs=h264',
+        'video/mp4'
+      ];
+      codecs.forEach(c => {
+        const supported = MediaRecorder.isTypeSupported(c);
+        log(`  ${supported ? '✅' : '❌'} ${c}`, supported ? 'ok' : 'err');
+      });
+    }
+
+    // Check memory
+    if (performance.memory) {
+      const mem = performance.memory;
+      log(`Memoria JS: usado=${(mem.usedJSHeapSize/1024/1024).toFixed(1)}MB, límite=${(mem.jsHeapSizeLimit/1024/1024).toFixed(1)}MB`);
+    } else {
+      log('⚠️ performance.memory no disponible (solo Chrome)', 'warn');
+    }
+
+    // Animation frames for each canvas
+    const state = {};
+    let frameCount = 0;
+
+    function drawCanvas(id, w, h) {
+      const canvas = document.getElementById(`canvas-${id}`);
+      const ctx = canvas.getContext('2d');
+      
+      // Background
+      ctx.fillStyle = '#0d1117';
+      ctx.fillRect(0, 0, w, h);
+      
+      // Grid
+      ctx.strokeStyle = '#1f293d';
+      ctx.lineWidth = 1;
+      for (let x = 0; x < w; x += 40) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+      }
+      for (let y = 0; y < h; y += 40) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+      }
+      
+      // Animated sine wave (simulating oscilloscope)
+      const t = Date.now() / 1000;
+      ctx.strokeStyle = '#00ffff';
+      ctx.lineWidth = 3;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      for (let x = 0; x < w; x += 2) {
+        const y = h/2 + Math.sin((x/w) * 6 * Math.PI + t * 2) * (h * 0.3) + Math.random() * 5;
+        if (x === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      
+      // Text overlays (like your oscilloscope)
+      ctx.fillStyle = '#00ffff';
+      ctx.font = `bold ${Math.floor(h/20)}px Arial`;
+      ctx.textAlign = 'right';
+      ctx.fillText('MARSHALL CELL - TEST', w - 10, 30);
+      
+      ctx.fillStyle = '#8b949e';
+      ctx.font = `${Math.floor(h/30)}px Consolas`;
+      ctx.fillText(new Date().toLocaleTimeString(), w - 10, 55);
+      
+      // Simulated value
+      ctx.fillStyle = '#00ffff';
+      ctx.font = `bold ${Math.floor(h/12)}px Consolas`;
+      ctx.textAlign = 'left';
+      ctx.fillText(`${(Math.sin(t) * 0.5 + 0.5).toFixed(4)} A`, 20, h/3);
+      
+      ctx.fillStyle = '#8b949e';
+      ctx.font = `bold ${Math.floor(h/30)}px Consolas`;
+      ctx.fillText(`Frame: ${frameCount++}`, 20, h - 20);
+    }
+
+    // Animate all canvases
+    function animateAll() {
+      drawCanvas('small', 320, 180);
+      drawCanvas('medium', 640, 360);
+      drawCanvas('hd', 1280, 720);
+      requestAnimationFrame(animateAll);
+    }
+    animateAll();
+    log('✅ Animación de los 3 canvas iniciada a 60 FPS', 'ok');
+
+    function startTest(size) {
+      if (state[size]) {
+        log(`⚠️ Test ${size} ya está grabando`, 'warn');
+        return;
+      }
+
+      const canvasId = `canvas-${size}`;
+      const canvas = document.getElementById(canvasId);
+      
+      log(`\n=== INICIANDO TEST ${size.toUpperCase()} (${canvas.width}x${canvas.height}) ===`, 'warn');
+      
+      try {
+        log(`Paso 1: Llamando canvas.captureStream(10)...`);
+        const stream = canvas.captureStream(10);
+        log(`✅ Stream capturado. Tracks: ${stream.getTracks().length}`, 'ok');
+        
+        // Find codec
+        let mimeType = 'video/webm';
+        for (const mime of ['video/webm;codecs=vp8', 'video/webm', 'video/mp4']) {
+          if (MediaRecorder.isTypeSupported(mime)) {
+            mimeType = mime;
+            break;
+          }
+        }
+        log(`Paso 2: Creando MediaRecorder con mimeType=${mimeType}...`);
+        
+        const chunks = [];
+        const recorder = new MediaRecorder(stream, { mimeType });
+        log(`✅ MediaRecorder creado. State: ${recorder.state}`, 'ok');
+        
+        recorder.ondataavailable = (e) => {
+          if (e.data && e.data.size > 0) {
+            chunks.push(e.data);
+            const totalSize = chunks.reduce((acc, c) => acc + c.size, 0);
+            log(`📦 Chunk ${size}: ${e.data.size} bytes (total acumulado: ${(totalSize/1024).toFixed(1)} KB)`);
+            
+            // Memory check
+            if (performance.memory) {
+              const mem = performance.memory;
+              log(`   Memoria: ${(mem.usedJSHeapSize/1024/1024).toFixed(1)}MB / ${(mem.jsHeapSizeLimit/1024/1024).toFixed(1)}MB`);
+            }
+          }
+        };
+        
+        recorder.onerror = (e) => {
+          log(`❌ ERROR en MediaRecorder ${size}: ${e.error?.message || e}`, 'err');
+        };
+        
+        recorder.onstop = () => {
+          log(`Grabación ${size} detenida. Chunks: ${chunks.length}`, 'ok');
+          if (chunks.length > 0) {
+            const blob = new Blob(chunks, { type: mimeType });
+            log(`✅ Video generado: ${(blob.size/1024).toFixed(1)} KB`, 'ok');
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `test-${size}-${Date.now()}.webm`;
+            a.click();
+            setTimeout(() => URL.revokeObjectURL(url), 5000);
+            log(`✅ Descarga iniciada`, 'ok');
+          } else {
+            log(`⚠️ No se generaron chunks`, 'warn');
+          }
+          
+          try {
+            stream.getTracks().forEach(t => t.stop());
+          } catch(e) {}
+          
+          state[size] = null;
+        };
+        
+        log(`Paso 3: Llamando recorder.start(2000)...`);
+        recorder.start(2000);
+        log(`✅ Grabación INICIADA. State: ${recorder.state}`, 'ok');
+        
+        state[size] = { recorder, stream, chunks };
+        
+      } catch (err) {
+        log(`❌ EXCEPCIÓN: ${err.message}\n${err.stack}`, 'err');
+      }
+    }
+
+    function stopTest(size) {
+      if (!state[size]) {
+        log(`⚠️ Test ${size} no está grabando`, 'warn');
+        return;
+      }
+      log(`Deteniendo test ${size}...`);
+      try {
+        state[size].recorder.stop();
+      } catch(e) {
+        log(`❌ Error al detener: ${e.message}`, 'err');
+      }
+    }
+  </script>
+</body>
+</html>

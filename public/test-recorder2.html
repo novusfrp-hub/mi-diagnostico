@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Test 2: Grabación SIN captureStream - Diagnóstico</title>
+  <style>
+    body { background: #111; color: #fff; font-family: Consolas, monospace; padding: 20px; }
+    canvas { border: 1px solid #333; display: block; margin: 10px 0; max-width: 640px; height: auto; }
+    button { padding: 10px 20px; margin: 5px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 14px; }
+    .start { background: #10b981; color: white; }
+    .stop { background: #ef4444; color: white; }
+    #log { background: #1a1a1a; border: 1px solid #333; padding: 10px; max-height: 400px; overflow-y: auto; font-size: 12px; white-space: pre-wrap; margin-top: 10px; }
+    .ok { color: #10b981; } .err { color: #ef4444; } .warn { color: #eab308; } .info { color: #06b6d4; }
+    #status { font-size: 18px; padding: 10px; margin: 10px 0; }
+  </style>
+</head>
+<body>
+  <h2>🔬 Test 2: Grabación SIN captureStream (Frame-by-Frame)</h2>
+  <p>Esta prueba <strong>NO usa captureStream ni MediaRecorder</strong>. Captura frames como imágenes WebP y los ensambla en un video WebM con JavaScript puro.</p>
+
+  <div id="status">⏸ Esperando...</div>
+  <canvas id="canvas" width="640" height="360"></canvas>
+  <button class="start" onclick="startRecording()">🎥 GRABAR VIDEO (sin captureStream)</button>
+  <button class="stop" onclick="stopRecording()">🔴 DETENER Y DESCARGAR</button>
+
+  <h3>📋 Log</h3>
+  <div id="log"></div>
+
+  <script>
+    const logEl = document.getElementById('log');
+    const statusEl = document.getElementById('status');
+    function log(msg, cls = 'info') {
+      const time = new Date().toLocaleTimeString();
+      logEl.innerHTML += `<span class="${cls}">[${time}] ${msg}</span>\n`;
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    log('=== TEST 2: GRABACIÓN SIN captureStream ===', 'warn');
+    log('Este método captura frames con canvas.toDataURL() y los ensambla en WebM con JS puro.');
+    log(`Chrome: ${navigator.userAgent.match(/Chrome\/(\d+)/)?.[1] || '?'}`);
+
+    // =====================================================
+    // MINI WHAMMY.JS - WebM encoder puro en JavaScript
+    // Basado en Whammy.js de antimatter15
+    // =====================================================
+    const WhammyEncoder = (() => {
+      function toWebM(frames, outputAsArray) {
+        const info = checkFrames(frames);
+        if (!info) return null;
+
+        const EBML = [
+          { id: 0x1a45dfa3, data: [ // EBML Header
+            { data: 1, id: 0x4286 },
+            { data: 1, id: 0x42f7 },
+            { data: 4, id: 0x42f2 },
+            { data: 8, id: 0x42f3 },
+            { data: "webm", id: 0x4282 },
+            { data: 2, id: 0x4287 },
+            { data: 2, id: 0x4285 }
+          ]},
+          { id: 0x18538067, data: [ // Segment
+            { id: 0x1549a966, data: [ // Segment Info
+              { data: 1e6, id: 0x2ad7b1 },
+              { data: "whammyjs", id: 0x4d80 },
+              { data: "whammyjs", id: 0x5741 },
+              { data: doubleToString(info.duration), id: 0x4489 }
+            ]},
+            { id: 0x1654ae6b, data: [ // Tracks
+              { id: 0xae, data: [ // Track Entry
+                { data: 1, id: 0xd7 },
+                { data: 1, id: 0x73c5 },
+                { data: 0, id: 0x9c },
+                { data: "V_VP8", id: 0x86 },
+                { data: 1, id: 0x83 },
+                { id: 0xe0, data: [
+                  { data: info.width, id: 0xb0 },
+                  { data: info.height, id: 0xba }
+                ]}
+              ]}
+            ]},
+            { id: 0x1f43b675, data: [ // Cluster
+              { data: 0, id: 0xe7 }
+            ].concat(frames.map((f, i) => {
+              const block = makeSimpleBlock({ discardable: 0, frame: f.data, invisible: 0, keyframe: 1, lacing: 0, trackNum: 1, timecode: Math.round(f.timestamp) });
+              return { data: block, id: 0xa3 };
+            }))}
+          ]}
+        ];
+
+        return generateEBML(EBML, outputAsArray);
+      }
+
+      function checkFrames(frames) {
+        if (!frames || frames.length === 0) return null;
+        const dominated = frames[0];
+        const width = dominated.width;
+        const height = dominated.height;
+        let duration = 0;
+        frames.forEach(f => { duration += f.duration; });
+        return { duration, width, height };
+      }
+
+      function numToBuffer(num) {
+        const parts = [];
+        while (num > 0) {
+          parts.push(num & 0xff);
+          num >>= 8;
+        }
+        return new Uint8Array(parts.reverse());
+      }
+
+      function numToFixedBuffer(num, size) {
+        const parts = new Uint8Array(size);
+        for (let i = size - 1; i >= 0; i--) {
+          parts[i] = num & 0xff;
+          num >>= 8;
+        }
+        return parts;
+      }
+
+      function strToBuffer(str) {
+        const arr = new Uint8Array(str.length);
+        for (let i = 0; i < str.length; i++) arr[i] = str.charCodeAt(i);
+        return arr;
+      }
+
+      function bitsToBuffer(bits) {
+        const data = [];
+        const pad = (bits.length % 8) ? (new Array(1 + 8 - (bits.length % 8))).join('0') : '';
+        bits = pad + bits;
+        for (let i = 0; i < bits.length; i += 8) {
+          data.push(parseInt(bits.substr(i, 8), 2));
+        }
+        return new Uint8Array(data);
+      }
+
+      function doubleToString(num) {
+        return [].slice.call(new Uint8Array(new Float64Array([num]).buffer), 0).map(e => String.fromCharCode(e)).reverse().join('');
+      }
+
+      function makeSimpleBlock(data) {
+        let flags = 0;
+        if (data.keyframe) flags |= 128;
+        if (data.invisible) flags |= 8;
+        if (data.lacing) flags |= (data.lacing << 1);
+        if (data.discardable) flags |= 1;
+        if (data.trackNum > 127) throw "TrackNumber > 127 not supported";
+        const out = [data.trackNum | 0x80, data.timecode >> 8, data.timecode & 0xff, flags].map(e => String.fromCharCode(e)).join('') + data.frame;
+        return out;
+      }
+
+      function generateEBML(json, outputAsArray) {
+        const ebml = [];
+        for (const item of json) {
+          if (!('id' in item)) continue;
+
+          let data;
+          if (typeof item.data === 'string') {
+            data = strToBuffer(item.data);
+          } else if (typeof item.data === 'number') {
+            data = bitsToBuffer(item.data.toString(2));
+          } else if (item.data instanceof Uint8Array) {
+            data = item.data;
+          } else if (Array.isArray(item.data)) {
+            data = generateEBML(item.data, true);
+          }
+
+          if (!data) continue;
+
+          const idBuf = numToBuffer(item.id);
+          const sizeBuf = (data.length < 127) 
+            ? bitsToBuffer('0' + data.length.toString(2).padStart(7, '0'))
+            : bitsToBuffer('00' + data.length.toString(2).padStart(14, '0'));
+
+          ebml.push(idBuf);
+          ebml.push(sizeBuf);
+          ebml.push(data);
+        }
+
+        if (outputAsArray) {
+          const totalLen = ebml.reduce((acc, b) => acc + b.length, 0);
+          const merged = new Uint8Array(totalLen);
+          let offset = 0;
+          for (const buf of ebml) {
+            merged.set(buf, offset);
+            offset += buf.length;
+          }
+          return merged;
+        }
+        return new Blob(ebml, { type: "video/webm" });
+      }
+
+      function parseWebP(riff) {
+        const offset = riff.indexOf("VP8 ");
+        if (offset === -1) throw "Invalid WebP: VP8 chunk not found";
+        const len = new DataView(new Uint8Array(riff.split('').map(c => c.charCodeAt(0))).buffer).getUint32(offset + 4, true);
+        return riff.substr(offset + 8, len);
+      }
+
+      function parseRIFF(data) {
+        const dv = new DataView(new Uint8Array(data.split('').map(c => c.charCodeAt(0))).buffer);
+        // Check for RIFF header
+        if (String.fromCharCode(dv.getUint8(0), dv.getUint8(1), dv.getUint8(2), dv.getUint8(3)) !== 'RIFF') {
+          throw "Invalid RIFF";
+        }
+        return data;
+      }
+
+      function Encoder(fps) {
+        this.frames = [];
+        this.fps = fps || 10;
+        this.quality = 0.8;
+      }
+
+      Encoder.prototype.addFrame = function(canvas) {
+        const dataUrl = (canvas instanceof HTMLCanvasElement)
+          ? canvas.toDataURL('image/webp', this.quality)
+          : canvas; // Allow passing data URLs directly
+
+        // Extract binary data from data URL
+        const data = atob(dataUrl.slice(dataUrl.indexOf(',') + 1));
+        const frame = parseWebP(parseRIFF(data));
+        
+        // Parse width/height from VP8 bitstream
+        const raw = new Uint8Array(data.split('').map(c => c.charCodeAt(0)));
+        // VP8 keyframe: after 3 bytes, next 7 bytes contain size info
+        // Bytes 6-7 contain width, bytes 8-9 contain height (in VP8 format)
+        const vp8Offset = data.indexOf("VP8 ");
+        
+        this.frames.push({
+          data: frame,
+          width: canvas.width || 640,
+          height: canvas.height || 360,
+          duration: 1000 / this.fps,
+          timestamp: this.frames.length * (1000 / this.fps)
+        });
+      };
+
+      Encoder.prototype.compile = function() {
+        return toWebM(this.frames);
+      };
+
+      return { Encoder };
+    })();
+
+    // =====================================================
+    // CANVAS ANIMATION
+    // =====================================================
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    let frameCount = 0;
+
+    function drawFrame() {
+      const W = 640, H = 360;
+      ctx.fillStyle = '#0d1117';
+      ctx.fillRect(0, 0, W, H);
+
+      // Grid
+      ctx.strokeStyle = '#1f293d';
+      ctx.lineWidth = 1;
+      for (let x = 0; x < W; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+      for (let y = 0; y < H; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+
+      // Sine wave
+      const t = Date.now() / 1000;
+      ctx.strokeStyle = '#00ffff';
+      ctx.lineWidth = 3;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      for (let x = 0; x < W; x += 2) {
+        const y = H/2 + Math.sin((x/W) * 6 * Math.PI + t * 2) * (H * 0.3) + Math.random() * 3;
+        if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+
+      // Text
+      ctx.fillStyle = '#00ffff';
+      ctx.font = 'bold 18px Arial';
+      ctx.textAlign = 'right';
+      ctx.fillText('MARSHALL CELL - TEST', W - 10, 25);
+      ctx.fillStyle = '#8b949e';
+      ctx.font = '14px Consolas';
+      ctx.fillText(new Date().toLocaleTimeString(), W - 10, 45);
+
+      ctx.fillStyle = '#00ffff';
+      ctx.font = 'bold 36px Consolas';
+      ctx.textAlign = 'left';
+      ctx.fillText(`${(Math.sin(t) * 0.5 + 0.5).toFixed(4)} A`, 20, H/3);
+
+      ctx.fillStyle = '#555';
+      ctx.font = '12px Consolas';
+      ctx.fillText(`Frame: ${frameCount++}`, 20, H - 10);
+
+      requestAnimationFrame(drawFrame);
+    }
+    drawFrame();
+    log('✅ Canvas 640x360 animado a 60 FPS.', 'ok');
+
+    // =====================================================
+    // RECORDING (sin captureStream, sin MediaRecorder)
+    // =====================================================
+    let recording = false;
+    let encoder = null;
+    let captureInterval = null;
+    let capturedFrames = 0;
+
+    function startRecording() {
+      if (recording) { log('⚠️ Ya está grabando.', 'warn'); return; }
+
+      log('\n=== INICIANDO GRABACIÓN (Frame-by-Frame, sin captureStream) ===', 'warn');
+      
+      try {
+        // Verificar que WebP está soportado
+        const testUrl = canvas.toDataURL('image/webp', 0.8);
+        if (!testUrl.startsWith('data:image/webp')) {
+          log('❌ Este navegador no soporta WebP en canvas.toDataURL(). Intentando alternativa...', 'err');
+          return;
+        }
+        log('✅ WebP soportado para canvas.toDataURL()', 'ok');
+
+        encoder = new WhammyEncoder.Encoder(10); // 10 FPS
+        capturedFrames = 0;
+        recording = true;
+
+        statusEl.textContent = '🔴 GRABANDO...';
+        statusEl.style.color = '#ef4444';
+
+        // Capturar un frame cada 100ms (10 FPS)
+        captureInterval = setInterval(() => {
+          try {
+            encoder.addFrame(canvas);
+            capturedFrames++;
+            if (capturedFrames % 10 === 0) { // Log cada segundo
+              log(`📸 ${capturedFrames} frames capturados (${capturedFrames / 10}s de video)`);
+              if (performance.memory) {
+                log(`   Memoria: ${(performance.memory.usedJSHeapSize/1024/1024).toFixed(1)}MB`);
+              }
+            }
+          } catch (e) {
+            log(`❌ Error capturando frame: ${e.message}`, 'err');
+          }
+        }, 100);
+
+        log('✅ Grabación iniciada. Capturando 10 frames/segundo.', 'ok');
+        log('Haz clic en "DETENER Y DESCARGAR" cuando quieras terminar.', 'info');
+
+      } catch (e) {
+        log(`❌ Error: ${e.message}`, 'err');
+        recording = false;
+      }
+    }
+
+    function stopRecording() {
+      if (!recording) { log('⚠️ No está grabando.', 'warn'); return; }
+
+      log('\nDeteniendo grabación...', 'warn');
+      recording = false;
+      clearInterval(captureInterval);
+
+      statusEl.textContent = '⏳ Procesando video...';
+      statusEl.style.color = '#eab308';
+
+      try {
+        log(`Total frames capturados: ${capturedFrames}`);
+        log('Ensamblando video WebM... (esto puede tomar unos segundos)');
+
+        const blob = encoder.compile();
+        
+        if (!blob || blob.size === 0) {
+          log('❌ Error: El video generado está vacío.', 'err');
+          statusEl.textContent = '❌ Error al generar video';
+          return;
+        }
+
+        log(`✅ Video WebM generado: ${(blob.size / 1024).toFixed(1)} KB (${(blob.size / 1024 / 1024).toFixed(2)} MB)`, 'ok');
+
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `test-whammy-${Date.now()}.webm`;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
+
+        log('✅ ¡DESCARGA INICIADA! El video se descargó correctamente.', 'ok');
+        statusEl.textContent = '✅ ¡Video descargado!';
+        statusEl.style.color = '#10b981';
+
+      } catch (e) {
+        log(`❌ Error ensamblando video: ${e.message}\n${e.stack}`, 'err');
+        statusEl.textContent = '❌ Error';
+        statusEl.style.color = '#ef4444';
+      }
+
+      encoder = null;
+    }
+  </script>
+</body>
+</html>
