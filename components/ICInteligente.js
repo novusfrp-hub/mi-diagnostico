@@ -20,7 +20,8 @@ export default function ICInteligente({
   onGuardar,
   cambiosPendientes = false,
   guardando = false,
-  ultimaSincronizacion = null
+  ultimaSincronizacion = null,
+  onRegistrarOL
 }) {
 
   const filasCount = parseInt(ic.filas) || 5;
@@ -44,7 +45,7 @@ export default function ICInteligente({
       if (setTiposCustom) {
         setTiposCustom([...tiposCustom, tipoLimpio]);
         setPines(prev => prev.map(p =>
-          p.id === padActivo ? { ...p, tipo: tipoLimpio, nombre: tipoLimpio } : p
+          String(p.id) === String(padActivo) ? { ...p, tipo: tipoLimpio, nombre: tipoLimpio } : p
         ));
       }
     }
@@ -55,7 +56,7 @@ export default function ICInteligente({
     const colorBase = pad.colorCustom || '#d4af37';
 
     if (modo === 'crear') {
-      if (padActivo === pad.id) return '#00ffff';
+      if (String(padActivo) === String(pad.id)) return '#00ffff';
       if (pad.tipo === 'GND') return '#4b5563';
       if (pad.tipo === 'NC') return '#1e3a8a';
       if (pad.tipo === 'VCC') return '#7f1d1d';
@@ -126,7 +127,7 @@ export default function ICInteligente({
     return '0.8rem';
   };
 
-  const padActualInfo = pines.find(p => p.id === padActivo) || {};
+  const padActualInfo = pines.find(p => String(p.id) === String(padActivo)) || {};
 
   // Formatear tiempo relativo
   const tiempoRelativo = (fecha) => {
@@ -368,7 +369,7 @@ export default function ICInteligente({
                   valorActual: '---'
                 };
 
-                const esActivo = padActivo === idPad;
+                const esActivo = String(padActivo) === String(idPad);
                 const colorPad = obtenerColorPad(pad);
                 let valSano = '---';
                 let valActual = '---';
@@ -442,7 +443,7 @@ export default function ICInteligente({
                         pointerEvents: 'none'
                       }}
                     >
-                      {valorTexto}
+                      {valorTexto || '---'}
                     </span>
                   </div>
                 );
@@ -459,7 +460,7 @@ export default function ICInteligente({
           padding: '12px 15px',
           backgroundColor: '#1a1a1a',
           borderRadius: '10px',
-          borderLeft: `4px solid ${obtenerColorPad(pines.find(p => p.id === padActivo) || { id: padActivo })}`
+          borderLeft: `4px solid ${obtenerColorPad(pines.find(p => String(p.id) === String(padActivo)) || { id: padActivo })}`
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px' }}>
@@ -473,7 +474,7 @@ export default function ICInteligente({
                 <input
                   type="color"
                   value={padActualInfo.colorCustom || '#d4af37'}
-                  onChange={(e) => setPines(prev => prev.map(p => p.id === padActivo ? { ...p, colorCustom: e.target.value } : p))}
+                  onChange={(e) => setPines(prev => prev.map(p => String(p.id) === String(padActivo) ? { ...p, colorCustom: e.target.value } : p))}
                   style={{ padding: '0', border: 'none', borderRadius: '5px', width: '28px', height: '28px', cursor: 'pointer', background: 'transparent' }}
                   title="Color personalizado"
                 />
@@ -481,7 +482,7 @@ export default function ICInteligente({
                 <input
                   value={padActualInfo.nombre || ''}
                   onChange={(e) =>
-                    setPines(prev => prev.map(p => p.id === padActivo ? { ...p, nombre: e.target.value.replace(/ /g, '_') } : p))
+                    setPines(prev => prev.map(p => String(p.id) === String(padActivo) ? { ...p, nombre: e.target.value.replace(/ /g, '_') } : p))
                   }
                   placeholder="Nombre_de_linea"
                   style={{ background: '#000', color: 'white', border: '1px solid #333', padding: '6px 10px', borderRadius: '5px', width: '130px', outline: 'none', fontSize: '0.85rem' }}
@@ -492,7 +493,7 @@ export default function ICInteligente({
                   onChange={(val) => {
                     setPines(prev =>
                       prev.map(p =>
-                        p.id === padActivo ? {
+                        String(p.id) === String(padActivo) ? {
                           ...p,
                           tipo: val,
                           nombre: val === 'GND' || val === 'NC' ? val : p.nombre
@@ -505,15 +506,7 @@ export default function ICInteligente({
                 />
 
                 <button
-                  onClick={() => {
-                    setPines(prev => prev.map(p => {
-                      if (p.id === padActivo) {
-                        const scaleKey = escala === 'diodo' ? 'valorSanoDiodo' : escala === 'ua' ? 'valorSanoUa' : escala === 'voltio' ? 'valorSanoVoltio' : escala === 'ohmio' ? 'valorSanoOhmio' : 'valorSanoAmperio';
-                        return { ...p, [scaleKey]: 'OL', valorSano: 'OL' };
-                      }
-                      return p;
-                    }));
-                  }}
+                  onClick={onRegistrarOL}
                   style={{ background: '#f59e0b', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '5px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}
                   title="Asigna OL a esta línea"
                 >
@@ -530,15 +523,7 @@ export default function ICInteligente({
                   {padActualInfo.tipo || 'DATA'}
                 </span>
                 <button
-                  onClick={() => {
-                    setPines(prev => prev.map(p => {
-                      if (p.id === padActivo) {
-                        const scaleKey = escala === 'diodo' ? 'valorActualDiodo' : escala === 'ua' ? 'valorActualUa' : escala === 'voltio' ? 'valorActualVoltio' : escala === 'ohmio' ? 'valorActualOhmio' : 'valorActualAmperio';
-                        return { ...p, [scaleKey]: 'OL', valorActual: 'OL' };
-                      }
-                      return p;
-                    }));
-                  }}
+                  onClick={onRegistrarOL}
                   style={{ background: 'rgba(245,158,11,0.2)', border: '1px solid #f59e0b', color: '#f59e0b', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.7rem', fontWeight: 'bold' }}
                   title="Marcar medición actual como OL"
                 >
@@ -566,7 +551,7 @@ export default function ICInteligente({
             <span style={{ color: 'gray', fontSize: '0.75rem', display: 'block', marginTop: '4px' }}>
               Actual:{' '}
               <strong style={{ color: '#fff', fontSize: '1.3rem' }}>
-                {padActivo === padActualInfo.id && lecturaEnVivo !== '----'
+                {String(padActivo) === String(padActualInfo.id) && lecturaEnVivo !== '----'
                   ? lecturaEnVivo
                   : (() => {
                       if (escala === 'diodo') return (padActualInfo.valorActualDiodo !== undefined ? padActualInfo.valorActualDiodo : padActualInfo.valorActual) || '---';

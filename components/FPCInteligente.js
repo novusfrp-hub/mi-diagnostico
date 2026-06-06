@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Save, Cloud, CloudOff, Check, AlertCircle } from 'lucide-react';
 import SelectorTipoLinea from './SelectorTipoLinea.js';
 
-export default function FPCInteligente({ pines, setPines, pinActivo, setPinActivo, modo = 'diagnostico', escala = 'diodo', lecturaEnVivo, tiposCustom = [], setTiposCustom, onGuardar, cambiosPendientes = false, guardando = false, ultimaSincronizacion = null }) {
+export default function FPCInteligente({ pines, setPines, pinActivo, setPinActivo, modo = 'diagnostico', escala = 'diodo', lecturaEnVivo, tiposCustom = [], setTiposCustom, onGuardar, cambiosPendientes = false, guardando = false, ultimaSincronizacion = null, onRegistrarOL }) {
   const mitad = Math.ceil(pines.length / 2);
   const filaSup = pines.slice(0, mitad);
   const filaInf = pines.slice(mitad);
@@ -18,7 +18,7 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
       if (setTiposCustom) {
         setTiposCustom([...tiposCustom, tipoLimpio]);
         setPines(prev => prev.map(p =>
-          p.id === pinActivo ? { ...p, tipo: tipoLimpio, nombre: tipoLimpio } : p
+          String(p.id) === String(pinActivo) ? { ...p, tipo: tipoLimpio, nombre: tipoLimpio } : p
         ));
       }
     }
@@ -28,7 +28,7 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
     const colorBase = pin.colorCustom || '#d4af37';
 
     if (modo === 'crear') {
-      if (pinActivo === pin.id) return '#00ffff';
+      if (String(pinActivo) === String(pin.id)) return '#00ffff';
       if (pin.tipo === 'GND') return '#4b5563';
       if (pin.tipo === 'NC') return '#1e3a8a';
       if (pin.tipo === 'VCC') return '#7f1d1d';
@@ -134,7 +134,7 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
             width: '100%',
             height: '30px',
             backgroundColor: obtenerColorPin(pin),
-            border: pinActivo === pin.id ? '2px solid #fff' : '1px solid #222',
+            border: String(pinActivo) === String(pin.id) ? '2px solid #fff' : '1px solid #222',
             borderRadius: '4px',
             transition: 'all 0.2s',
             display: 'flex',
@@ -151,7 +151,7 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
               textShadow: pin.tipo !== 'GND' && pin.tipo !== 'NC' ? 'none' : '1px 1px 2px #000'
             }}
           >
-            {valorTexto}
+            {valorTexto || '---'}
           </span>
         </div>
         {!esArriba && <span style={{ fontSize: '0.55rem', color: 'gray', marginTop: '2px' }}>{pin.id}</span>}
@@ -309,7 +309,7 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
           padding: '10px',
           backgroundColor: '#1a1a1a',
           borderRadius: '10px',
-          borderLeft: `4px solid ${obtenerColorPin(pines.find(p => p.id === pinActivo) || {})}`
+          borderLeft: `4px solid ${obtenerColorPin(pines.find(p => String(p.id) === String(pinActivo)) || {})}`
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px' }}>
@@ -322,27 +322,27 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
 
                 <input
                   type="color"
-                  value={pines.find(p => p.id === pinActivo)?.colorCustom || '#d4af37'}
-                  onChange={(e) => setPines(prev => prev.map(p => p.id === pinActivo ? { ...p, colorCustom: e.target.value } : p))}
+                  value={pines.find(p => String(p.id) === String(pinActivo))?.colorCustom || '#d4af37'}
+                  onChange={(e) => setPines(prev => prev.map(p => String(p.id) === String(pinActivo) ? { ...p, colorCustom: e.target.value } : p))}
                   style={{ padding: '0', border: 'none', borderRadius: '5px', width: '28px', height: '28px', cursor: 'pointer', background: 'transparent' }}
                   title="Color personalizado de la línea"
                 />
 
                 <input
-                  value={pines.find(p => p.id === pinActivo)?.nombre || ''}
+                  value={pines.find(p => String(p.id) === String(pinActivo))?.nombre || ''}
                   onChange={(e) =>
-                    setPines(prev => prev.map(p => p.id === pinActivo ? { ...p, nombre: e.target.value.replace(/ /g, '_') } : p))
+                    setPines(prev => prev.map(p => String(p.id) === String(pinActivo) ? { ...p, nombre: e.target.value.replace(/ /g, '_') } : p))
                   }
                   placeholder="Nombre_de_linea"
                   style={{ background: '#000', color: 'white', border: '1px solid #333', padding: '6px 10px', borderRadius: '5px', width: '140px', outline: 'none', fontSize: '0.85rem' }}
                 />
 
                 <SelectorTipoLinea
-                  valor={pines.find(p => p.id === pinActivo)?.tipo || 'DATA'}
+                  valor={pines.find(p => String(p.id) === String(pinActivo))?.tipo || 'DATA'}
                   onChange={(val) => {
                     setPines(prev =>
                       prev.map(p =>
-                        p.id === pinActivo ? {
+                        String(p.id) === String(pinActivo) ? {
                           ...p,
                           tipo: val,
                           nombre: val === 'GND' || val === 'NC' ? val : p.nombre
@@ -355,15 +355,7 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
                 />
 
                 <button
-                  onClick={() => {
-                    setPines(prev => prev.map(p => {
-                      if (p.id === pinActivo) {
-                        const scaleKey = escala === 'diodo' ? 'valorSanoDiodo' : escala === 'ua' ? 'valorSanoUa' : escala === 'voltio' ? 'valorSanoVoltio' : escala === 'ohmio' ? 'valorSanoOhmio' : 'valorSanoAmperio';
-                        return { ...p, [scaleKey]: 'OL', valorSano: 'OL' };
-                      }
-                      return p;
-                    }));
-                  }}
+                  onClick={onRegistrarOL}
                   style={{ background: '#f59e0b', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '5px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}
                   title="Asigna OL a esta línea"
                 >
@@ -375,7 +367,7 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
                     if (pines.length <= 1) return alert('No puedes eliminar el último pin.');
                     if (!window.confirm('¿Seguro de eliminar este pin específico?')) return;
                     setPines(prev => {
-                      const nuevosPines = prev.filter(p => p.id !== pinActivo);
+                      const nuevosPines = prev.filter(p => String(p.id) !== String(pinActivo));
                       return nuevosPines.map((p, i) => ({ ...p, id: i + 1 }));
                     });
                     setPinActivo(1);
@@ -387,23 +379,15 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
               </div>
             ) : (
               <div style={{ marginTop: '5px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ display: 'inline-block', width: '12px', height: '12px', borderRadius: '50%', backgroundColor: pines.find(p => p.id === pinActivo)?.colorCustom || '#d4af37' }}></span>
+                <span style={{ display: 'inline-block', width: '12px', height: '12px', borderRadius: '50%', backgroundColor: pines.find(p => String(p.id) === String(pinActivo))?.colorCustom || '#d4af37' }}></span>
                 <span style={{ color: '#fff', fontSize: '0.85rem', fontWeight: 'bold' }}>
-                  {pines.find(p => p.id === pinActivo)?.nombre || 'Línea sin nombre'}
+                  {pines.find(p => String(p.id) === String(pinActivo))?.nombre || 'Línea sin nombre'}
                 </span>
                 <span style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', background: '#374151', color: 'white', fontWeight: 'bold' }}>
-                  {pines.find(p => p.id === pinActivo)?.tipo || 'DATA'}
+                  {pines.find(p => String(p.id) === String(pinActivo))?.tipo || 'DATA'}
                 </span>
                 <button
-                  onClick={() => {
-                    setPines(prev => prev.map(p => {
-                      if (p.id === pinActivo) {
-                        const scaleKey = escala === 'diodo' ? 'valorActualDiodo' : escala === 'ua' ? 'valorActualUa' : escala === 'voltio' ? 'valorActualVoltio' : escala === 'ohmio' ? 'valorActualOhmio' : 'valorActualAmperio';
-                        return { ...p, [scaleKey]: 'OL', valorActual: 'OL' };
-                      }
-                      return p;
-                    }));
-                  }}
+                  onClick={onRegistrarOL}
                   style={{ background: 'rgba(245,158,11,0.2)', border: '1px solid #f59e0b', color: '#f59e0b', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.7rem', fontWeight: 'bold' }}
                   title="Marcar medición actual como OL"
                 >
@@ -417,7 +401,7 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
               Valor Sano:{' '}
               <strong style={{ color: '#fff' }}>
                 {(() => {
-                  const pinObj = pines.find(p => p.id === pinActivo);
+                  const pinObj = pines.find(p => String(p.id) === String(pinActivo));
                   if (!pinObj) return '---';
                   if (escala === 'diodo') return (pinObj.valorSanoDiodo !== undefined ? pinObj.valorSanoDiodo : pinObj.valorSano) || '---';
                   if (escala === 'ua') return pinObj.valorSanoUa || '---';
@@ -432,10 +416,10 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
             <span style={{ color: 'gray', fontSize: '0.75rem', display: 'block', marginTop: '4px' }}>
               Actual:{' '}
               <strong style={{ color: '#fff', fontSize: '1.3rem' }}>
-                {pinActivo === pines.find(p => p.id === pinActivo)?.id && lecturaEnVivo !== '----'
+                {String(pinActivo) === String(pines.find(p => String(p.id) === String(pinActivo))?.id) && lecturaEnVivo !== '----'
                   ? lecturaEnVivo
                   : (() => {
-                      const pinObj = pines.find(p => p.id === pinActivo);
+                      const pinObj = pines.find(p => String(p.id) === String(pinActivo));
                       if (!pinObj) return '---';
                       if (escala === 'diodo') return (pinObj.valorActualDiodo !== undefined ? pinObj.valorActualDiodo : pinObj.valorActual) || '---';
                       if (escala === 'ua') return pinObj.valorActualUa || '---';

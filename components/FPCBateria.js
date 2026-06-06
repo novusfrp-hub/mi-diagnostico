@@ -16,7 +16,8 @@ export default function FPCBateria({
   cambiosPendientes = false,
   guardando = false,
   ultimaSincronizacion = null,
-  esIPhone = false
+  esIPhone = false,
+  onRegistrarOL
 }) {
 
   const manejarAgregarTipo = () => {
@@ -30,7 +31,7 @@ export default function FPCBateria({
       if (setTiposCustom) {
         setTiposCustom([...tiposCustom, tipoLimpio]);
         setPines(prev => prev.map(p =>
-          p.id === pinActivo ? { ...p, tipo: tipoLimpio, nombre: tipoLimpio } : p
+          String(p.id) === String(pinActivo) ? { ...p, tipo: tipoLimpio, nombre: tipoLimpio } : p
         ));
       }
     }
@@ -41,7 +42,7 @@ export default function FPCBateria({
     const colorBase = pin.colorCustom || '#d4af37';
 
     if (modo === 'crear') {
-      if (pinActivo === pin.id) return '#00ffff';
+      if (String(pinActivo) === String(pin.id)) return '#00ffff';
       if (pin.tipo === 'GND') return '#4b5563';
       if (pin.tipo === 'NC') return '#1e3a8a';
       if (pin.tipo === 'VCC' || pin.tipo === 'VBAT' || pin.tipo === 'PP_BATT') return '#7f1d1d';
@@ -92,26 +93,9 @@ export default function FPCBateria({
     return val.startsWith('0.') ? val.substring(1) : val;
   };
 
-  const handleSetQuickOL = () => {
-    setPines(prev => prev.map(p => {
-      if (p.id === pinActivo) {
-        const key = modo === 'crear'
-          ? (escala === 'diodo' ? 'valorSanoDiodo' : escala === 'ua' ? 'valorSanoUa' : 'valorSanoOhmio')
-          : (escala === 'diodo' ? 'valorActualDiodo' : escala === 'ua' ? 'valorActualUa' : 'valorActualOhmio');
-        
-        const backupKey = modo === 'crear' ? 'valorSano' : 'valorActual';
 
-        return {
-          ...p,
-          [key]: 'OL',
-          [backupKey]: 'OL'
-        };
-      }
-      return p;
-    }));
-  };
 
-  const activePinInfo = pines.find(p => p.id === pinActivo) || {};
+  const activePinInfo = pines.find(p => String(p.id) === String(pinActivo)) || {};
 
   const tiempoRelativo = (fecha) => {
     if (!fecha) return '';
@@ -158,14 +142,14 @@ export default function FPCBateria({
 
           {/* RENDER PINES */}
           {pines.map((pin) => {
-            const isAct = pin.id === pinActivo;
+            const isAct = String(pin.id) === String(pinActivo);
             const pinColor = obtenerColorPin(pin);
             const refVal = escala === 'diodo' ? (pin.valorSanoDiodo || pin.valorSano) : escala === 'ua' ? pin.valorSanoUa : pin.valorSanoOhmio;
             const actVal = escala === 'diodo' ? (pin.valorActualDiodo || pin.valorActual) : escala === 'ua' ? pin.valorActualUa : pin.valorActualOhmio;
             const textVal = modo === 'crear' ? formNum(refVal || '---', pin.tipo) : formNum(actVal || '---', pin.tipo);
 
             // Coordenadas y formas para iPhone (6 pines)
-            if (pin.id === 1) {
+            if (Number(pin.id) === 1) {
               // Left Bracket (VCC)
               return (
                 <g key={pin.id} style={{ cursor: 'pointer' }} onClick={() => setPinActivo(1)}>
@@ -185,13 +169,15 @@ export default function FPCBateria({
                       fillOpacity={0.9}
                     />
                   )}
-                  <text x="50" y="105" fill={isAct ? '#000' : '#fff'} fontSize="10" fontWeight="bold" textAnchor="middle" style={{ pointerEvents: 'none' }}>PIN 1</text>
-                  <text x="50" y="122" fill={isAct ? '#000' : '#eab308'} fontSize="9" fontWeight="bold" textAnchor="middle" style={{ pointerEvents: 'none' }}>{textVal || pin.nombre}</text>
+                  {/* Pin number above the shape */}
+                  <text x="65" y="32" fill="#9ca3af" fontSize="9" fontWeight="bold" textAnchor="middle">PIN 1</text>
+                  {/* Measurement value inside the shape */}
+                  <text x="65" y="105" fill={pin.tipo === 'GND' || pin.tipo === 'NC' ? '#cbd5e1' : (isAct ? '#000' : '#fff')} fontSize="9" fontWeight="bold" textAnchor="middle" style={{ pointerEvents: 'none' }}>{textVal || '---'}</text>
                 </g>
               );
             }
 
-            if (pin.id === 2) {
+            if (Number(pin.id) === 2) {
               // Right Bracket (GND)
               return (
                 <g key={pin.id} style={{ cursor: 'pointer' }} onClick={() => setPinActivo(2)}>
@@ -211,8 +197,10 @@ export default function FPCBateria({
                       fillOpacity={0.9}
                     />
                   )}
-                  <text x="465" y="105" fill={isAct ? '#000' : '#fff'} fontSize="10" fontWeight="bold" textAnchor="middle" style={{ pointerEvents: 'none' }}>PIN 2</text>
-                  <text x="465" y="122" fill={isAct ? '#000' : '#eab308'} fontSize="9" fontWeight="bold" textAnchor="middle" style={{ pointerEvents: 'none' }}>{textVal || pin.nombre}</text>
+                  {/* Pin number above the shape */}
+                  <text x="455" y="32" fill="#9ca3af" fontSize="9" fontWeight="bold" textAnchor="middle">PIN 2</text>
+                  {/* Measurement value inside the shape */}
+                  <text x="455" y="105" fill={pin.tipo === 'GND' || pin.tipo === 'NC' ? '#cbd5e1' : (isAct ? '#000' : '#fff')} fontSize="9" fontWeight="bold" textAnchor="middle" style={{ pointerEvents: 'none' }}>{textVal || '---'}</text>
                 </g>
               );
             }
@@ -220,10 +208,12 @@ export default function FPCBateria({
             // Pines del medio (3, 4 en la parte superior; 5, 6 en la parte inferior)
             let x = 0;
             let y = 0;
-            if (pin.id === 3) { x = 140; y = 50; }
-            if (pin.id === 4) { x = 280; y = 50; }
-            if (pin.id === 5) { x = 140; y = 110; }
-            if (pin.id === 6) { x = 280; y = 110; }
+            let numY = 0;
+            let valY = 0;
+            if (Number(pin.id) === 3) { x = 140; y = 50; numY = 42; valY = 75; }
+            if (Number(pin.id) === 4) { x = 280; y = 50; numY = 42; valY = 75; }
+            if (Number(pin.id) === 5) { x = 140; y = 110; numY = 102; valY = 135; }
+            if (Number(pin.id) === 6) { x = 280; y = 110; numY = 102; valY = 135; }
 
             return (
               <g key={pin.id} style={{ cursor: 'pointer' }} onClick={() => setPinActivo(pin.id)}>
@@ -251,8 +241,10 @@ export default function FPCBateria({
                     fillOpacity={0.9}
                   />
                 )}
-                <text x={x + 50} y={y + 16} fill={isAct ? '#000' : '#fff'} fontSize="9" fontWeight="bold" textAnchor="middle" style={{ pointerEvents: 'none' }}>PIN {pin.id}</text>
-                <text x={x + 50} y={y + 30} fill={isAct ? '#000' : '#eab308'} fontSize="9" fontWeight="bold" textAnchor="middle" style={{ pointerEvents: 'none' }}>{textVal || pin.nombre}</text>
+                {/* Pin number above the shape */}
+                <text x={x + 50} y={numY} fill="#9ca3af" fontSize="9" fontWeight="bold" textAnchor="middle">PIN {pin.id}</text>
+                {/* Measurement value inside the shape */}
+                <text x={x + 50} y={valY} fill={pin.tipo === 'GND' || pin.tipo === 'NC' ? '#cbd5e1' : (isAct ? '#000' : '#fff')} fontSize="9" fontWeight="bold" textAnchor="middle" style={{ pointerEvents: 'none' }}>{textVal || '---'}</text>
               </g>
             );
           })}
@@ -292,7 +284,7 @@ export default function FPCBateria({
 
           {/* Render pins: Top row (1-4) and Bottom row (5-8) */}
           {pines.map((pin) => {
-            const isAct = pin.id === pinActivo;
+            const isAct = String(pin.id) === String(pinActivo);
             const pinColor = obtenerColorPin(pin);
             const refVal = escala === 'diodo' ? (pin.valorSanoDiodo || pin.valorSano) : escala === 'ua' ? pin.valorSanoUa : pin.valorSanoOhmio;
             const actVal = escala === 'diodo' ? (pin.valorActualDiodo || pin.valorActual) : escala === 'ua' ? pin.valorActualUa : pin.valorActualOhmio;
@@ -304,14 +296,17 @@ export default function FPCBateria({
             const colWidth = 80;
             const startX = 95;
 
-            if (pin.id <= 4) {
+            let numY = 0;
+            if (Number(pin.id) <= 4) {
               // Row top
-              x = startX + (pin.id - 1) * colWidth;
+              x = startX + (Number(pin.id) - 1) * colWidth;
               y = 35;
+              numY = 27;
             } else {
               // Row bottom
-              x = startX + (pin.id - 5) * colWidth;
+              x = startX + (Number(pin.id) - 5) * colWidth;
               y = 115;
+              numY = 107;
             }
 
             return (
@@ -340,8 +335,10 @@ export default function FPCBateria({
                     fillOpacity={0.9}
                   />
                 )}
-                <text x={x + 35} y={y + 18} fill={isAct ? '#000' : '#fff'} fontSize="9" fontWeight="bold" textAnchor="middle" style={{ pointerEvents: 'none' }}>PIN {pin.id}</text>
-                <text x={x + 35} y={y + 35} fill={isAct ? '#000' : '#eab308'} fontSize="9" fontWeight="bold" textAnchor="middle" style={{ pointerEvents: 'none' }}>{textVal || pin.nombre}</text>
+                {/* Pin number above the shape */}
+                <text x={x + 35} y={numY} fill="#9ca3af" fontSize="9" fontWeight="bold" textAnchor="middle">PIN {pin.id}</text>
+                {/* Measurement value inside the shape */}
+                <text x={x + 35} y={y + 30} fill={pin.tipo === 'GND' || pin.tipo === 'NC' ? '#cbd5e1' : (isAct ? '#000' : '#fff')} fontSize="9" fontWeight="bold" textAnchor="middle" style={{ pointerEvents: 'none' }}>{textVal || '---'}</text>
               </g>
             );
           })}
@@ -468,7 +465,7 @@ export default function FPCBateria({
                 <input
                   type="color"
                   value={activePinInfo.colorCustom || '#d4af37'}
-                  onChange={(e) => setPines(prev => prev.map(p => p.id === pinActivo ? { ...p, colorCustom: e.target.value } : p))}
+                  onChange={(e) => setPines(prev => prev.map(p => String(p.id) === String(pinActivo) ? { ...p, colorCustom: e.target.value } : p))}
                   style={{ padding: '0', border: 'none', borderRadius: '5px', width: '28px', height: '28px', cursor: 'pointer', background: 'transparent' }}
                   title="Color personalizado"
                 />
@@ -476,7 +473,7 @@ export default function FPCBateria({
                 <input
                   value={activePinInfo.nombre || ''}
                   onChange={(e) =>
-                    setPines(prev => prev.map(p => p.id === pinActivo ? { ...p, nombre: e.target.value.replace(/ /g, '_') } : p))
+                    setPines(prev => prev.map(p => String(p.id) === String(pinActivo) ? { ...p, nombre: e.target.value.replace(/ /g, '_') } : p))
                   }
                   placeholder="Nombre_de_linea"
                   style={{ background: '#000', color: 'white', border: '1px solid #333', padding: '6px 10px', borderRadius: '5px', width: '140px', outline: 'none', fontSize: '0.85rem' }}
@@ -487,7 +484,7 @@ export default function FPCBateria({
                   onChange={(val) => {
                     setPines(prev =>
                       prev.map(p =>
-                        p.id === pinActivo ? {
+                        String(p.id) === String(pinActivo) ? {
                           ...p,
                           tipo: val,
                           nombre: val === 'GND' || val === 'NC' ? val : p.nombre
@@ -500,7 +497,7 @@ export default function FPCBateria({
                 />
 
                 <button
-                  onClick={handleSetQuickOL}
+                  onClick={onRegistrarOL}
                   style={{ background: '#f59e0b', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '5px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}
                   title="Asigna OL a esta línea"
                 >
@@ -517,7 +514,7 @@ export default function FPCBateria({
                   {activePinInfo.tipo || 'DATA'}
                 </span>
                 <button
-                  onClick={handleSetQuickOL}
+                  onClick={onRegistrarOL}
                   style={{ background: 'rgba(245,158,11,0.2)', border: '1px solid #f59e0b', color: '#f59e0b', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.7rem', fontWeight: 'bold' }}
                   title="Marcar medición actual como OL"
                 >
@@ -543,7 +540,7 @@ export default function FPCBateria({
             <span style={{ color: 'gray', fontSize: '0.75rem', display: 'block', marginTop: '4px' }}>
               Actual:{' '}
               <strong style={{ color: '#fff', fontSize: '1.3rem' }}>
-                {pinActivo === activePinInfo.id && lecturaEnVivo !== '----'
+                {String(pinActivo) === String(activePinInfo.id) && lecturaEnVivo !== '----'
                   ? lecturaEnVivo
                   : (() => {
                       if (escala === 'diodo') return (activePinInfo.valorActualDiodo !== undefined ? activePinInfo.valorActualDiodo : activePinInfo.valorActual) || '---';

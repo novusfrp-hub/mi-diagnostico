@@ -390,154 +390,161 @@ export default function AppDiagnostico() {
 
   // GUARDADO UNIVERSAL
   const avanzarPinMagico = (valorForzado = null) => {
-    let escalaActiva = escalaFpcRef.current;
-    if (seccionLibreriaRef.current === 'ic') {
-      escalaActiva = escalaIcRef.current;
-    } else if (seccionLibreriaRef.current === 'fpc_bateria') {
-      escalaActiva = escalaFpcBateriaRef.current;
-    }
-    const escalaMultimetro = lecturaUsbRef.current.unidad;
-    const esIncorrecta = usbConectado && (
-      (escalaActiva === 'diodo' && (escalaMultimetro === 'uA' || escalaMultimetro === 'mA' || escalaMultimetro === 'A')) ||
-      (escalaActiva === 'ua' && (escalaMultimetro === 'V' || escalaMultimetro === 'Diod' || escalaMultimetro === 'Ω')) ||
-      (escalaActiva === 'amperio' && (escalaMultimetro === 'V' || escalaMultimetro === 'Diod' || escalaMultimetro === 'Ω')) ||
-      (escalaActiva === 'voltio' && (escalaMultimetro === 'uA' || escalaMultimetro === 'mA' || escalaMultimetro === 'A')) ||
-      (escalaActiva === 'ohmio' && (escalaMultimetro === 'uA' || escalaMultimetro === 'mA' || escalaMultimetro === 'A'))
-    );
-    if (esIncorrecta) return;
-    
-    reproducirBip();
-    const valVivo = valorForzado || lecturaUsbRef.current.valor; const campoActual = campoActivoRef.current; const mFpc = modoFpcRef.current; const pinAct = pinActivoFpcRef.current;
-    const mIc = modoIcRef.current; const padAct = padActivoIcRef.current;
-    if (libreriaVisibleRef.current) {
-      const modAct = modeloActivoRef.current; if (!modAct) return;
-      let modeloActualizado = { ...modAct }; const seccion = seccionLibreriaRef.current;
-      if (seccion === 'docktest') {
-        const escala = escalaFpcRef.current;
-        let key = 'docktestDiodo';
-        if (escala === 'ua') key = 'docktestUa';
-        else if (escala === 'voltio') key = 'docktestVoltio';
-        else if (escala === 'ohmio') key = 'docktestOhmio';
-        else if (escala === 'amperio') key = 'docktestAmperio';
-        
-        if (!modeloActualizado[key]) {
-          modeloActualizado[key] = { vbus: '---', dp: '---', dm: '---', cc1: '---', cc2: '---' };
-        }
-        modeloActualizado[key][campoActual] = valVivo; 
-        setModeloActivo(modeloActualizado);
-        setCambiosPendientesDocktest(true);
-        setCampoActivoDock(prev => { const idx = ordenCamposDock.indexOf(prev); return (idx >= 0 && idx < ordenCamposDock.length - 1) ? ordenCamposDock[idx + 1] : prev; });
-      } else if (seccion === 'fpc' && fpcActivoRef.current) {
-        const fpcAct = fpcActivoRef.current;
-        const escala = escalaFpcRef.current;
-        const nuevosFpcs = modeloActualizado.fpcs.map(fpc => {
-          if (fpc.id === fpcAct.id) {
-            const nuevosPines = fpc.pines.map(p => {
-               if (p.id === pinAct) {
-                  return { 
-                    ...p, 
-                    valorSanoDiodo: (mFpc === 'crear' && escala === 'diodo' ? valVivo : (p.valorSanoDiodo ?? '---')), 
-                    valorSanoUa: (mFpc === 'crear' && escala === 'ua' ? valVivo : (p.valorSanoUa ?? '---')),
-                    valorSanoVoltio: (mFpc === 'crear' && escala === 'voltio' ? valVivo : (p.valorSanoVoltio ?? '---')),
-                    valorSanoOhmio: (mFpc === 'crear' && escala === 'ohmio' ? valVivo : (p.valorSanoOhmio ?? '---')),
-                    valorSanoAmperio: (mFpc === 'crear' && escala === 'amperio' ? valVivo : (p.valorSanoAmperio ?? '---')),
-                    valorSano: (mFpc === 'crear' ? valVivo : (p.valorSano ?? '---')),
-                    valorActual: (mFpc !== 'crear' ? valVivo : (p.valorActual ?? '---')),
-                    valorActualDiodo: (mFpc !== 'crear' && escala === 'diodo' ? valVivo : (p.valorActualDiodo ?? '---')), 
-                    valorActualUa: (mFpc !== 'crear' && escala === 'ua' ? valVivo : (p.valorActualUa ?? '---')),
-                    valorActualVoltio: (mFpc !== 'crear' && escala === 'voltio' ? valVivo : (p.valorActualVoltio ?? '---')),
-                    valorActualOhmio: (mFpc !== 'crear' && escala === 'ohmio' ? valVivo : (p.valorActualOhmio ?? '---')),
-                    valorActualAmperio: (mFpc !== 'crear' && escala === 'amperio' ? valVivo : (p.valorActualAmperio ?? '---'))
-                  };
-               }
-               return p;
-            });
-            const fpcMod = { ...fpc, pines: nuevosPines }; setFpcActivo(fpcMod); return fpcMod;
-          } return fpc;
-        });
-        modeloActualizado.fpcs = nuevosFpcs; setModeloActivo(modeloActualizado);
-        setPinActivoFpc(prev => {
-          let nextPin = prev + 1;
-          while (nextPin <= fpcAct.pines.length) {
-            const pinInfo = fpcAct.pines.find(p => p.id === nextPin);
-            if (pinInfo && (pinInfo.tipo === 'GND' || pinInfo.tipo === 'NC')) { nextPin++; } else { break; }
-          } return nextPin <= fpcAct.pines.length ? nextPin : prev;
-        });
-      } else if (seccion === 'ic' && icActivoRef.current) {
-        const icAct = icActivoRef.current;
-        const escala = escalaIcRef.current;
-        const nuevosIcs = (modeloActualizado.ics || []).map(ic => {
-          if (ic.id === icAct.id) {
-            const nuevosPines = ic.pines.map(p => {
-               if (p.id === padAct) {
-                  return { 
-                     ...p, 
-                     valorSanoDiodo: (mIc === 'crear' && escala === 'diodo' ? valVivo : (p.valorSanoDiodo ?? '---')), 
-                     valorSanoUa: (mIc === 'crear' && escala === 'ua' ? valVivo : (p.valorSanoUa ?? '---')),
-                     valorSanoVoltio: (mIc === 'crear' && escala === 'voltio' ? valVivo : (p.valorSanoVoltio ?? '---')),
-                     valorSanoOhmio: (mIc === 'crear' && escala === 'ohmio' ? valVivo : (p.valorSanoOhmio ?? '---')),
-                     valorSanoAmperio: (mIc === 'crear' && escala === 'amperio' ? valVivo : (p.valorSanoAmperio ?? '---')),
-                     valorSano: (mIc === 'crear' ? valVivo : (p.valorSano ?? '---')),
-                     valorActual: (mIc !== 'crear' ? valVivo : (p.valorActual ?? '---')),
-                     valorActualDiodo: (mIc !== 'crear' && escala === 'diodo' ? valVivo : (p.valorActualDiodo ?? '---')), 
-                     valorActualUa: (mIc !== 'crear' && escala === 'ua' ? valVivo : (p.valorActualUa ?? '---')),
-                     valorActualVoltio: (mIc !== 'crear' && escala === 'voltio' ? valVivo : (p.valorActualVoltio ?? '---')),
-                     valorActualOhmio: (mIc !== 'crear' && escala === 'ohmio' ? valVivo : (p.valorActualOhmio ?? '---')),
-                     valorActualAmperio: (mIc !== 'crear' && escala === 'amperio' ? valVivo : (p.valorActualAmperio ?? '---'))
-                  };
-               }
-               return p;
-            });
-            const icMod = { ...ic, pines: nuevosPines }; setIcActivo(icMod); return icMod;
-          } return ic;
-        });
-        modeloActualizado.ics = nuevosIcs; setModeloActivo(modeloActualizado);
-        setPadActivoIc(prev => {
-          const idx = icAct.pines.findIndex(p => p.id === prev);
-          if (idx === -1) return prev;
-          let nextIdx = idx + 1;
-          while (nextIdx < icAct.pines.length) {
-            const pinInfo = icAct.pines[nextIdx];
-            if (pinInfo && (pinInfo.tipo === 'GND' || pinInfo.tipo === 'NC')) { nextIdx++; } else { break; }
-          }
-          return nextIdx < icAct.pines.length ? icAct.pines[nextIdx].id : prev;
-        });
-      } else if (seccion === 'fpc_bateria' && modeloActualizado.fpcBateria) {
-        const bateriaAct = modeloActualizado.fpcBateria;
-        const escala = escalaFpcBateriaRef.current;
-        const mBateria = modoFpcBateriaRef.current;
-        const pinAct = pinActivoFpcBateriaRef.current;
-        const nuevosPines = bateriaAct.pines.map(p => {
-          if (p.id === pinAct) {
-            return {
-              ...p,
-              valorSanoDiodo: (mBateria === 'crear' && escala === 'diodo' ? valVivo : (p.valorSanoDiodo ?? '---')),
-              valorSanoUa: (mBateria === 'crear' && escala === 'ua' ? valVivo : (p.valorSanoUa ?? '---')),
-              valorSanoOhmio: (mBateria === 'crear' && escala === 'ohmio' ? valVivo : (p.valorSanoOhmio ?? '---')),
-              valorSano: (mBateria === 'crear' ? valVivo : (p.valorSano ?? '---')),
-              valorActual: (mBateria !== 'crear' ? valVivo : (p.valorActual ?? '---')),
-              valorActualDiodo: (mBateria !== 'crear' && escala === 'diodo' ? valVivo : (p.valorActualDiodo ?? '---')),
-              valorActualUa: (mBateria !== 'crear' && escala === 'ua' ? valVivo : (p.valorActualUa ?? '---')),
-              valorActualOhmio: (mBateria !== 'crear' && escala === 'ohmio' ? valVivo : (p.valorActualOhmio ?? '---'))
-            };
-          }
-          return p;
-        });
-        const bateriaMod = { ...bateriaAct, pines: nuevosPines };
-        modeloActualizado.fpcBateria = bateriaMod;
-        setModeloActivo(modeloActualizado);
-        setCambiosPendientesFpcBateria(true);
-        setPinActivoFpcBateria(prev => {
-          let nextPin = prev + 1;
-          while (nextPin <= bateriaAct.pines.length) {
-            const pinInfo = bateriaAct.pines.find(p => p.id === nextPin);
-            if (pinInfo && (pinInfo.tipo === 'GND' || pinInfo.tipo === 'NC')) { nextPin++; } else { break; }
-          }
-          return nextPin <= bateriaAct.pines.length ? nextPin : prev;
-        });
+    try {
+      let escalaActiva = escalaFpcRef.current;
+      if (seccionLibreriaRef.current === 'ic') {
+        escalaActiva = escalaIcRef.current;
+      } else if (seccionLibreriaRef.current === 'fpc_bateria') {
+        escalaActiva = escalaFpcBateriaRef.current;
       }
+      const escalaMultimetro = lecturaUsbRef.current.unidad;
+      const esIncorrecta = usbConectado && (
+        (escalaActiva === 'diodo' && (escalaMultimetro === 'uA' || escalaMultimetro === 'mA' || escalaMultimetro === 'A')) ||
+        (escalaActiva === 'ua' && (escalaMultimetro === 'V' || escalaMultimetro === 'Diod' || escalaMultimetro === 'Ω')) ||
+        (escalaActiva === 'amperio' && (escalaMultimetro === 'V' || escalaMultimetro === 'Diod' || escalaMultimetro === 'Ω')) ||
+        (escalaActiva === 'voltio' && (escalaMultimetro === 'uA' || escalaMultimetro === 'mA' || escalaMultimetro === 'A')) ||
+        (escalaActiva === 'ohmio' && (escalaMultimetro === 'uA' || escalaMultimetro === 'mA' || escalaMultimetro === 'A'))
+      );
+      if (esIncorrecta) return;
+      
+      reproducirBip();
+      const valVivo = valorForzado || lecturaUsbRef.current.valor; const campoActual = campoActivoRef.current; const mFpc = modoFpcRef.current; const pinAct = pinActivoFpcRef.current;
+      const mIc = modoIcRef.current; const padAct = padActivoIcRef.current;
+      if (libreriaVisibleRef.current) {
+        const modAct = modeloActivoRef.current; if (!modAct) return;
+        let modeloActualizado = { ...modAct }; const seccion = seccionLibreriaRef.current;
+        if (seccion === 'docktest') {
+          const escala = escalaFpcRef.current;
+          let key = 'docktestDiodo';
+          if (escala === 'ua') key = 'docktestUa';
+          else if (escala === 'voltio') key = 'docktestVoltio';
+          else if (escala === 'ohmio') key = 'docktestOhmio';
+          else if (escala === 'amperio') key = 'docktestAmperio';
+          
+          if (!modeloActualizado[key]) {
+            modeloActualizado[key] = { vbus: '---', dp: '---', dm: '---', cc1: '---', cc2: '---' };
+          }
+          modeloActualizado[key][campoActual] = valVivo; 
+          setModeloActivo(modeloActualizado);
+          setCambiosPendientesDocktest(true);
+          setCampoActivoDock(prev => { const idx = ordenCamposDock.indexOf(prev); return (idx >= 0 && idx < ordenCamposDock.length - 1) ? ordenCamposDock[idx + 1] : prev; });
+        } else if (seccion === 'fpc' && fpcActivoRef.current) {
+          const fpcAct = fpcActivoRef.current;
+          const escala = escalaFpcRef.current;
+          const nuevosFpcs = (modeloActualizado.fpcs || []).map(fpc => {
+            if (String(fpc.id) === String(fpcAct.id)) {
+              const nuevosPines = (fpc.pines || []).map(p => {
+                 if (String(p.id) === String(pinAct)) {
+                    return { 
+                      ...p, 
+                      valorSanoDiodo: (mFpc === 'crear' && escala === 'diodo' ? valVivo : (p.valorSanoDiodo ?? '---')), 
+                      valorSanoUa: (mFpc === 'crear' && escala === 'ua' ? valVivo : (p.valorSanoUa ?? '---')),
+                      valorSanoVoltio: (mFpc === 'crear' && escala === 'voltio' ? valVivo : (p.valorSanoVoltio ?? '---')),
+                      valorSanoOhmio: (mFpc === 'crear' && escala === 'ohmio' ? valVivo : (p.valorSanoOhmio ?? '---')),
+                      valorSanoAmperio: (mFpc === 'crear' && escala === 'amperio' ? valVivo : (p.valorSanoAmperio ?? '---')),
+                      valorSano: (mFpc === 'crear' ? valVivo : (p.valorSano ?? '---')),
+                      valorActual: (mFpc !== 'crear' ? valVivo : (p.valorActual ?? '---')),
+                      valorActualDiodo: (mFpc !== 'crear' && escala === 'diodo' ? valVivo : (p.valorActualDiodo ?? '---')), 
+                      valorActualUa: (mFpc !== 'crear' && escala === 'ua' ? valVivo : (p.valorActualUa ?? '---')),
+                      valorActualVoltio: (mFpc !== 'crear' && escala === 'voltio' ? valVivo : (p.valorActualVoltio ?? '---')),
+                      valorActualOhmio: (mFpc !== 'crear' && escala === 'ohmio' ? valVivo : (p.valorActualOhmio ?? '---')),
+                      valorActualAmperio: (mFpc !== 'crear' && escala === 'amperio' ? valVivo : (p.valorActualAmperio ?? '---'))
+                    };
+                 }
+                 return p;
+              });
+              const fpcMod = { ...fpc, pines: nuevosPines }; setFpcActivo(fpcMod); return fpcMod;
+            } return fpc;
+          });
+          modeloActualizado.fpcs = nuevosFpcs; setModeloActivo(modeloActualizado);
+          setPinActivoFpc(prev => {
+            let nextPin = Number(prev) + 1;
+            const totalPines = fpcAct?.pines?.length || 0;
+            while (nextPin <= totalPines) {
+              const pinInfo = (fpcAct.pines || []).find(p => Number(p.id) === nextPin);
+              if (pinInfo && (pinInfo.tipo === 'GND' || pinInfo.tipo === 'NC')) { nextPin++; } else { break; }
+            } 
+            return nextPin <= totalPines ? nextPin : Number(prev);
+          });
+        } else if (seccion === 'ic' && icActivoRef.current) {
+          const icAct = icActivoRef.current;
+          const escala = escalaIcRef.current;
+          const nuevosIcs = (modeloActualizado.ics || []).map(ic => {
+            if (String(ic.id) === String(icAct.id)) {
+              const nuevosPines = (ic.pines || []).map(p => {
+                 if (String(p.id) === String(padAct)) {
+                    return { 
+                       ...p, 
+                       valorSanoDiodo: (mIc === 'crear' && escala === 'diodo' ? valVivo : (p.valorSanoDiodo ?? '---')), 
+                       valorSanoUa: (mIc === 'crear' && escala === 'ua' ? valVivo : (p.valorSanoUa ?? '---')),
+                       valorSanoVoltio: (mIc === 'crear' && escala === 'voltio' ? valVivo : (p.valorSanoVoltio ?? '---')),
+                       valorSanoOhmio: (mIc === 'crear' && escala === 'ohmio' ? valVivo : (p.valorSanoOhmio ?? '---')),
+                       valorSanoAmperio: (mIc === 'crear' && escala === 'amperio' ? valVivo : (p.valorSanoAmperio ?? '---')),
+                       valorSano: (mIc === 'crear' ? valVivo : (p.valorSano ?? '---')),
+                       valorActual: (mIc !== 'crear' ? valVivo : (p.valorActual ?? '---')),
+                       valorActualDiodo: (mIc !== 'crear' && escala === 'diodo' ? valVivo : (p.valorActualDiodo ?? '---')), 
+                       valorActualUa: (mIc !== 'crear' && escala === 'ua' ? valVivo : (p.valorActualUa ?? '---')),
+                       valorActualVoltio: (mIc !== 'crear' && escala === 'voltio' ? valVivo : (p.valorActualVoltio ?? '---')),
+                       valorActualOhmio: (mIc !== 'crear' && escala === 'ohmio' ? valVivo : (p.valorActualOhmio ?? '---')),
+                       valorActualAmperio: (mIc !== 'crear' && escala === 'amperio' ? valVivo : (p.valorActualAmperio ?? '---'))
+                    };
+                 }
+                 return p;
+              });
+              const icMod = { ...ic, pines: nuevosPines }; setIcActivo(icMod); return icMod;
+            } return ic;
+          });
+          modeloActualizado.ics = nuevosIcs; setModeloActivo(modeloActualizado);
+          setPadActivoIc(prev => {
+            const idx = (icAct.pines || []).findIndex(p => String(p.id) === String(prev));
+            if (idx === -1) return prev;
+            let nextIdx = idx + 1;
+            while (nextIdx < icAct.pines.length) {
+              const pinInfo = icAct.pines[nextIdx];
+              if (pinInfo && (pinInfo.tipo === 'GND' || pinInfo.tipo === 'NC')) { nextIdx++; } else { break; }
+            }
+            return nextIdx < icAct.pines.length ? icAct.pines[nextIdx].id : prev;
+          });
+        } else if (seccion === 'fpc_bateria' && modeloActualizado.fpcBateria) {
+          const bateriaAct = modeloActualizado.fpcBateria;
+          const escala = escalaFpcBateriaRef.current;
+          const mBateria = modoFpcBateriaRef.current;
+          const pinAct = pinActivoFpcBateriaRef.current;
+          const nuevosPines = (bateriaAct.pines || []).map(p => {
+            if (String(p.id) === String(pinAct)) {
+              return {
+                ...p,
+                valorSanoDiodo: (mBateria === 'crear' && escala === 'diodo' ? valVivo : (p.valorSanoDiodo ?? '---')),
+                valorSanoUa: (mBateria === 'crear' && escala === 'ua' ? valVivo : (p.valorSanoUa ?? '---')),
+                valorSanoOhmio: (mBateria === 'crear' && escala === 'ohmio' ? valVivo : (p.valorSanoOhmio ?? '---')),
+                valorSano: (mBateria === 'crear' ? valVivo : (p.valorSano ?? '---')),
+                valorActual: (mBateria !== 'crear' ? valVivo : (p.valorActual ?? '---')),
+                valorActualDiodo: (mBateria !== 'crear' && escala === 'diodo' ? valVivo : (p.valorActualDiodo ?? '---')),
+                valorActualUa: (mBateria !== 'crear' && escala === 'ua' ? valVivo : (p.valorActualUa ?? '---')),
+                valorActualOhmio: (mBateria !== 'crear' && escala === 'ohmio' ? valVivo : (p.valorActualOhmio ?? '---'))
+              };
+            }
+            return p;
+          });
+          const bateriaMod = { ...bateriaAct, pines: nuevosPines };
+          modeloActualizado.fpcBateria = bateriaMod;
+          setModeloActivo(modeloActualizado);
+          setCambiosPendientesFpcBateria(true);
+          setPinActivoFpcBateria(prev => {
+            let nextPin = Number(prev) + 1;
+            const totalPines = bateriaAct?.pines?.length || 0;
+            while (nextPin <= totalPines) {
+              const pinInfo = (bateriaAct.pines || []).find(p => Number(p.id) === nextPin);
+              if (pinInfo && (pinInfo.tipo === 'GND' || pinInfo.tipo === 'NC')) { nextPin++; } else { break; }
+            }
+            return nextPin <= totalPines ? nextPin : Number(prev);
+          });
+        }
+      }
+    } catch (err) {
+      console.error("Error en avanzarPinMagico:", err);
     }
-  };
+  }
 
   // WEBHID
   const conectarMultimetroUSB = async () => {
@@ -1376,6 +1383,7 @@ export default function AppDiagnostico() {
                           guardando={guardandoFpcBateria}
                           ultimaSincronizacion={ultimaSincFpcBateria}
                           esIPhone={modeloActivo.fpcBateria.esIPhone}
+                          onRegistrarOL={() => avanzarPinMagico('OL')}
                         />
                       </div>
                     )}
@@ -1532,6 +1540,7 @@ export default function AppDiagnostico() {
                 cambiosPendientes={cambiosPendientesFpc}
                 guardando={guardandoFpc}
                 ultimaSincronizacion={ultimaSincFpc}
+                onRegistrarOL={() => avanzarPinMagico('OL')}
               />
             </div>
           </motion.div>
@@ -1619,6 +1628,7 @@ export default function AppDiagnostico() {
                 cambiosPendientes={cambiosPendientesIc}
                 guardando={guardandoIc}
                 ultimaSincronizacion={ultimaSincIc}
+                onRegistrarOL={() => avanzarPinMagico('OL')}
               />
             </div>
           </motion.div>
