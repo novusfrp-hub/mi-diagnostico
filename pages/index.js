@@ -207,8 +207,6 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
 
     const W = 1280;
     const H = 720;
-    canvas.width = W;
-    canvas.height = H;
 
     // Background
     ctx.fillStyle = "#0d1117";
@@ -321,6 +319,9 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
 
     // Draw watermark and header overlays
     dibujarHeaderYWatermark(ctx, W, H);
+
+    // Draw large numeric display overlay
+    dibujarValorActual(ctx, W, H);
 
     // Draw stats box inside canvas
     dibujarStatsBox(ctx, W, H, min, max);
@@ -484,6 +485,35 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
     ctx.fillText(`${max.toFixed(4)} ${unidad}`, boxX + 285, boxY + 31);
   };
 
+  const dibujarValorActual = (ctx, W, H) => {
+    const boxW = 340;
+    const boxH = 75;
+    const boxX = 130;
+    const boxY = 85;
+
+    ctx.fillStyle = "rgba(13, 17, 23, 0.75)";
+    ctx.strokeStyle = "#30363d";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    if (ctx.roundRect) {
+      ctx.roundRect(boxX, boxY, boxW, boxH, 8);
+    } else {
+      ctx.rect(boxX, boxY, boxW, boxH);
+    }
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.textAlign = "left";
+    ctx.font = "bold 44px Consolas, monospace";
+    ctx.fillStyle = "#00ffff";
+    ctx.shadowColor = "#00ffff";
+    ctx.shadowBlur = 8;
+    
+    const texto = `${valor} ${unidad}`;
+    ctx.fillText(texto, boxX + 20, boxY + 52);
+    ctx.shadowBlur = 0;
+  };
+
   // Continuous animation frame loop for smooth drawing and blinking clock
   useEffect(() => {
     const loop = () => {
@@ -627,6 +657,8 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
       <div style={{ maxWidth: "664px", margin: "0 auto", width: "100%", aspectRatio: "16/9", position: "relative" }}>
         <canvas
           ref={canvasRef}
+          width={1280}
+          height={720}
           onMouseMove={(e) => {
             const canvas = canvasRef.current;
             if (!canvas) return;
