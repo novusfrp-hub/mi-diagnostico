@@ -23,25 +23,25 @@ const LETRAS_FILAS = [
 
 const obtenerUrlVideo = (url) => { if (!url) return ''; let v = ''; if (url.includes('youtu.be/')) v = url.split('youtu.be/')[1].split('?')[0]; else if (url.includes('youtube.com/watch')) v = new URLSearchParams(url.split('?')[1]).get('v'); else if (url.includes('youtube.com/embed/')) return url; return v ? `https://www.youtube.com/embed/${v}` : url; };
 
-const VisorHUD = ({ valor, unidad, conectado, conectarFn, desconectarFn, vozActiva, toggleVozFn, autoHoldActivo, toggleAutoHoldFn, capturarFn, escalaActiva, oscilogramaActivo, toggleOscilogramaFn }) => {
+const VisorHUD = ({ valor, unidad, conectado, conectarFn, desconectarFn, vozActiva, toggleVozFn, autoHoldActivo, toggleAutoHoldFn, capturarFn, escalaActiva, oscilogramaActivo, toggleOscilogramaFn, mostrarOscilogramaBtn = false }) => {
   const esIncorrecta = conectado && (
     (escalaActiva === 'diodo' && (unidad === 'uA' || unidad === 'mA' || unidad === 'A')) ||
     (escalaActiva === 'ua' && (unidad === 'V' || unidad === 'Diod' || unidad === 'Ω'))
   );
 
   return (
-    <div style={{ 
-      backgroundColor: '#1a1a1a', 
-      border: esIncorrecta ? '2px solid #ef4444' : '2px solid #333333', 
-      borderRadius: '15px', 
-      padding: '15px', 
-      display: 'flex', 
-      flexDirection: 'column', 
-      alignItems: 'center', 
-      marginBottom: '15px', 
-      position: 'relative', 
-      overflow: 'hidden', 
-      boxShadow: esIncorrecta ? '0 0 25px rgba(239, 68, 68, 0.8)' : (conectado ? '0 0 20px rgba(0, 255, 255, 0.2)' : 'none') 
+    <div style={{
+      backgroundColor: '#1a1a1a',
+      border: esIncorrecta ? '2px solid #ef4444' : '2px solid #333333',
+      borderRadius: '15px',
+      padding: '15px',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      marginBottom: '15px',
+      position: 'relative',
+      overflow: 'hidden',
+      boxShadow: esIncorrecta ? '0 0 25px rgba(239, 68, 68, 0.8)' : (conectado ? '0 0 20px rgba(0, 255, 255, 0.2)' : 'none')
     }}>
       <div className="tools-row" style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
         <span style={{ color: '#555', fontSize: '0.8rem', fontWeight: 'bold' }} className="hide-on-mobile">UT61E+ ANALYZER</span>
@@ -49,46 +49,48 @@ const VisorHUD = ({ valor, unidad, conectado, conectarFn, desconectarFn, vozActi
           <button onClick={conectado ? desconectarFn : conectarFn} style={{ background: conectado ? 'rgba(239, 68, 68, 0.2)' : '#333', color: conectado ? '#ef4444' : 'white', border: 'none', padding: '8px 15px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}><Link size={14} /> {conectado ? 'DESCONECTAR' : 'CONECTAR USB'}</button>
           <button onClick={toggleVozFn} style={{ background: vozActiva ? 'rgba(234, 179, 8, 0.2)' : '#333', color: vozActiva ? '#eab308' : 'white', border: 'none', padding: '8px 15px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', boxShadow: vozActiva ? '0 0 10px rgba(234,179,8,0.5)' : 'none' }}>{vozActiva ? <Mic size={14} /> : <MicOff size={14} />} VOZ</button>
           <button onClick={toggleAutoHoldFn} style={{ background: autoHoldActivo ? 'rgba(16, 185, 129, 0.2)' : '#333', color: autoHoldActivo ? '#10b981' : 'white', border: 'none', padding: '8px 15px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', boxShadow: autoHoldActivo ? '0 0 10px rgba(16,185,129,0.5)' : 'none' }}><Zap size={14} /> {autoHoldActivo ? 'HOLD ON' : 'HOLD'}</button>
-          <button 
-            onClick={toggleOscilogramaFn} 
-            style={{ 
-              background: oscilogramaActivo ? 'rgba(6, 182, 212, 0.2)' : '#333', 
-              color: oscilogramaActivo ? '#06b6d4' : 'white', 
-              border: 'none', 
-              padding: '8px 15px', 
-              borderRadius: '20px', 
-              fontSize: '0.7rem', 
-              fontWeight: 'bold', 
-              cursor: 'pointer', 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '5px', 
-              boxShadow: oscilogramaActivo ? '0 0 10px rgba(6,182,212,0.5)' : 'none',
-              transition: 'all 0.2s ease-in-out' 
-            }}
-          >
-            <Monitor size={14} /> OSCILOGRAMA AMPERIOS
-          </button>
+          {mostrarOscilogramaBtn && (
+            <button
+              onClick={toggleOscilogramaFn}
+              style={{
+                background: oscilogramaActivo ? 'rgba(6, 182, 212, 0.2)' : '#333',
+                color: oscilogramaActivo ? '#06b6d4' : 'white',
+                border: 'none',
+                padding: '8px 15px',
+                borderRadius: '20px',
+                fontSize: '0.7rem',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                boxShadow: oscilogramaActivo ? '0 0 10px rgba(6,182,212,0.5)' : 'none',
+                transition: 'all 0.2s ease-in-out'
+              }}
+            >
+              <Monitor size={14} /> OSCILOGRAMA AMPERIOS
+            </button>
+          )}
           {conectado && capturarFn && (
-            <button 
-              onClick={esIncorrecta ? null : capturarFn} 
+            <button
+              onClick={esIncorrecta ? null : capturarFn}
               disabled={esIncorrecta}
-              style={{ 
-                background: esIncorrecta ? '#4b5563' : '#3b82f6', 
-                color: esIncorrecta ? '#9ca3af' : 'white', 
-                border: 'none', 
-                padding: '8px 15px', 
-                borderRadius: '20px', 
-                fontSize: '0.7rem', 
-                fontWeight: 'bold', 
-                cursor: esIncorrecta ? 'not-allowed' : 'pointer', 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '5px', 
-                boxShadow: esIncorrecta ? 'none' : '0 0 12px rgba(59,130,246,0.6)', 
-                transition: 'transform 0.1s' 
-              }} 
-              onMouseDown={(e) => !esIncorrecta && (e.currentTarget.style.transform = 'scale(0.95)')} 
+              style={{
+                background: esIncorrecta ? '#4b5563' : '#3b82f6',
+                color: esIncorrecta ? '#9ca3af' : 'white',
+                border: 'none',
+                padding: '8px 15px',
+                borderRadius: '20px',
+                fontSize: '0.7rem',
+                fontWeight: 'bold',
+                cursor: esIncorrecta ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                boxShadow: esIncorrecta ? 'none' : '0 0 12px rgba(59,130,246,0.6)',
+                transition: 'transform 0.1s'
+              }}
+              onMouseDown={(e) => !esIncorrecta && (e.currentTarget.style.transform = 'scale(0.95)')}
               onMouseUp={(e) => !esIncorrecta && (e.currentTarget.style.transform = 'scale(1)')}
             >
               <ChevronRight size={14} /> CAPTURAR / SIGUIENTE
@@ -101,20 +103,20 @@ const VisorHUD = ({ valor, unidad, conectado, conectarFn, desconectarFn, vozActi
         <span style={{ color: 'gray', fontSize: '1.2rem', fontWeight: 'bold' }}>{unidad}</span>
       </div>
       {esIncorrecta && (
-        <div style={{ 
-          width: '100%', 
-          background: 'rgba(239, 68, 68, 0.2)', 
-          border: '1px solid #ef4444', 
-          color: '#ff6b6b', 
-          padding: '8px 12px', 
-          borderRadius: '8px', 
-          fontSize: '0.8rem', 
-          fontWeight: 'bold', 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'center', 
-          gap: '8px', 
-          marginTop: '10px', 
+        <div style={{
+          width: '100%',
+          background: 'rgba(239, 68, 68, 0.2)',
+          border: '1px solid #ef4444',
+          color: '#ff6b6b',
+          padding: '8px 12px',
+          borderRadius: '8px',
+          fontSize: '0.8rem',
+          fontWeight: 'bold',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '8px',
+          marginTop: '10px',
           textAlign: 'center',
           boxShadow: '0 0 10px rgba(239, 68, 68, 0.3)'
         }}>
@@ -141,7 +143,7 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, onClose }) => {
 
   useEffect(() => {
     if (pausado || valor === '----' || valor === '---' || !valor || valor === 'OL') return;
-    
+
     let valNum = parseFloat(valor);
     if (isNaN(valNum)) return;
 
@@ -171,7 +173,7 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, onClose }) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
-    
+
     const rect = canvas.getBoundingClientRect();
     canvas.width = rect.width;
     canvas.height = rect.height;
@@ -213,7 +215,7 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, onClose }) => {
       if (puntos[i] < min) min = puntos[i];
       if (puntos[i] > max) max = puntos[i];
     }
-    
+
     let range = max - min;
     if (range < 0.1) {
       min -= 0.5;
@@ -237,7 +239,7 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, onClose }) => {
     for (let i = 0; i < len; i++) {
       const x = (i / 150) * (W - 80) + 15;
       const y = H - ((puntos[i] - min) / range) * (H - 40) - 20;
-      
+
       if (i === 0) {
         ctx.moveTo(x, y);
       } else {
@@ -306,12 +308,12 @@ export default function AppDiagnostico() {
   const [notaVisible, setNotaVisible] = useState(false); const [tipTabActiva, setTipTabActiva] = useState(0);
   const [imgModalVisible, setImgModalVisible] = useState(false); const [videoModalVisible, setVideoModalVisible] = useState(false);
   const [fallasEnSerie, setFallasEnSerie] = useState([]);
-  const [bitacoraVisible, setBitacoraVisible] = useState(false); const [historialCasosVisible, setHistorialCasosVisible] = useState(false);  const [casosGuardados, setCasosGuardados] = useState([]); const [casoEditando, setCasoEditando] = useState(null); const [formCaso, setFormCaso] = useState({ marca: '', modelo: '', tecnico: 'Marshall Cell', sintomas: '', protocolo: '', solucionEmpleada: '', imgUrl: '', estadoReparacion: 'Pendiente', hardware: { cpu: '', memoria: '', pmic: '' }, consumoUsb: { voltaje: '', corriente: '', comportamiento: '', conBateria: '', sinBateria: '' }, consumoFuente: { inicial: '', postPower: '', comportamiento: '' }, lineasAfectadas: [] }); const [mensajeCaso, setMensajeCaso] = useState('');
+  const [bitacoraVisible, setBitacoraVisible] = useState(false); const [historialCasosVisible, setHistorialCasosVisible] = useState(false); const [casosGuardados, setCasosGuardados] = useState([]); const [casoEditando, setCasoEditando] = useState(null); const [formCaso, setFormCaso] = useState({ marca: '', modelo: '', tecnico: 'Marshall Cell', sintomas: '', protocolo: '', solucionEmpleada: '', imgUrl: '', estadoReparacion: 'Pendiente', hardware: { cpu: '', memoria: '', pmic: '' }, consumoUsb: { voltaje: '', corriente: '', comportamiento: '', conBateria: '', sinBateria: '' }, consumoFuente: { inicial: '', postPower: '', comportamiento: '' }, lineasAfectadas: [] }); const [mensajeCaso, setMensajeCaso] = useState('');
   const [reporteVisible, setReporteVisible] = useState(false); const [casoReporte, setCasoReporte] = useState(null);
 
   // ESTADOS LIBRERÍA
-  const [libreriaVisible, setLibreriaVisible] = useState(false); const [modelosLibreria, setModelosLibreria] = useState([]); const [modeloActivo, setModeloActivo] = useState(null); const [fpcActivo, setFpcActivo] = useState(null); const [formNuevoModelo, setFormNuevoModelo] = useState({ marca: '', nombre: '' }); const [formNuevoFpc, setFormNuevoFpc] = useState({ nombre: '', pines: 40 }); const [seccionLibreria, setSeccionLibreria] = useState('fpc'); 
-  const [imagenFpcVisible, setImagenFpcVisible] = useState(false); 
+  const [libreriaVisible, setLibreriaVisible] = useState(false); const [modelosLibreria, setModelosLibreria] = useState([]); const [modeloActivo, setModeloActivo] = useState(null); const [fpcActivo, setFpcActivo] = useState(null); const [formNuevoModelo, setFormNuevoModelo] = useState({ marca: '', nombre: '' }); const [formNuevoFpc, setFormNuevoFpc] = useState({ nombre: '', pines: 40 }); const [seccionLibreria, setSeccionLibreria] = useState('fpc');
+  const [imagenFpcVisible, setImagenFpcVisible] = useState(false);
   const [tipoImagenViendo, setTipoImagenViendo] = useState('placa');
   const [modalFpcAbierto, setModalFpcAbierto] = useState(false);
 
@@ -319,7 +321,7 @@ export default function AppDiagnostico() {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('tipos_lineas_disponibles');
       if (saved) {
-        try { return JSON.parse(saved); } catch (e) {}
+        try { return JSON.parse(saved); } catch (e) { }
       }
     }
     return [];
@@ -360,7 +362,7 @@ export default function AppDiagnostico() {
   const campoActivoRef = useRef(campoActivoDock); useEffect(() => { campoActivoRef.current = campoActivoDock; }, [campoActivoDock]);
   const pinActivoFpcRef = useRef(pinActivoFpc); useEffect(() => { pinActivoFpcRef.current = pinActivoFpc; }, [pinActivoFpc]);
   const modoFpcRef = useRef(modoFpc); useEffect(() => { modoFpcRef.current = modoFpc; }, [modoFpc]);
-  
+
   const icActivoRef = useRef(icActivo); useEffect(() => { icActivoRef.current = icActivo; }, [icActivo]);
   const padActivoIcRef = useRef(padActivoIc); useEffect(() => { padActivoIcRef.current = padActivoIc; }, [padActivoIc]);
   const modoIcRef = useRef(modoIc); useEffect(() => { modoIcRef.current = modoIc; }, [modoIc]);
@@ -406,7 +408,7 @@ export default function AppDiagnostico() {
         (escalaActiva === 'ohmio' && (escalaMultimetro === 'uA' || escalaMultimetro === 'mA' || escalaMultimetro === 'A'))
       );
       if (esIncorrecta) return;
-      
+
       reproducirBip();
       const valVivo = valorForzado || lecturaUsbRef.current.valor; const campoActual = campoActivoRef.current; const mFpc = modoFpcRef.current; const pinAct = pinActivoFpcRef.current;
       const mIc = modoIcRef.current; const padAct = padActivoIcRef.current;
@@ -420,11 +422,11 @@ export default function AppDiagnostico() {
           else if (escala === 'voltio') key = 'docktestVoltio';
           else if (escala === 'ohmio') key = 'docktestOhmio';
           else if (escala === 'amperio') key = 'docktestAmperio';
-          
+
           if (!modeloActualizado[key]) {
             modeloActualizado[key] = { vbus: '---', dp: '---', dm: '---', cc1: '---', cc2: '---' };
           }
-          modeloActualizado[key][campoActual] = valVivo; 
+          modeloActualizado[key][campoActual] = valVivo;
           setModeloActivo(modeloActualizado);
           setCambiosPendientesDocktest(true);
           setCampoActivoDock(prev => { const idx = ordenCamposDock.indexOf(prev); return (idx >= 0 && idx < ordenCamposDock.length - 1) ? ordenCamposDock[idx + 1] : prev; });
@@ -434,24 +436,24 @@ export default function AppDiagnostico() {
           const nuevosFpcs = (modeloActualizado.fpcs || []).map(fpc => {
             if (String(fpc.id) === String(fpcAct.id)) {
               const nuevosPines = (fpc.pines || []).map(p => {
-                 if (String(p.id) === String(pinAct)) {
-                    return { 
-                      ...p, 
-                      valorSanoDiodo: (mFpc === 'crear' && escala === 'diodo' ? valVivo : (p.valorSanoDiodo ?? '---')), 
-                      valorSanoUa: (mFpc === 'crear' && escala === 'ua' ? valVivo : (p.valorSanoUa ?? '---')),
-                      valorSanoVoltio: (mFpc === 'crear' && escala === 'voltio' ? valVivo : (p.valorSanoVoltio ?? '---')),
-                      valorSanoOhmio: (mFpc === 'crear' && escala === 'ohmio' ? valVivo : (p.valorSanoOhmio ?? '---')),
-                      valorSanoAmperio: (mFpc === 'crear' && escala === 'amperio' ? valVivo : (p.valorSanoAmperio ?? '---')),
-                      valorSano: (mFpc === 'crear' ? valVivo : (p.valorSano ?? '---')),
-                      valorActual: (mFpc !== 'crear' ? valVivo : (p.valorActual ?? '---')),
-                      valorActualDiodo: (mFpc !== 'crear' && escala === 'diodo' ? valVivo : (p.valorActualDiodo ?? '---')), 
-                      valorActualUa: (mFpc !== 'crear' && escala === 'ua' ? valVivo : (p.valorActualUa ?? '---')),
-                      valorActualVoltio: (mFpc !== 'crear' && escala === 'voltio' ? valVivo : (p.valorActualVoltio ?? '---')),
-                      valorActualOhmio: (mFpc !== 'crear' && escala === 'ohmio' ? valVivo : (p.valorActualOhmio ?? '---')),
-                      valorActualAmperio: (mFpc !== 'crear' && escala === 'amperio' ? valVivo : (p.valorActualAmperio ?? '---'))
-                    };
-                 }
-                 return p;
+                if (String(p.id) === String(pinAct)) {
+                  return {
+                    ...p,
+                    valorSanoDiodo: (mFpc === 'crear' && escala === 'diodo' ? valVivo : (p.valorSanoDiodo ?? '---')),
+                    valorSanoUa: (mFpc === 'crear' && escala === 'ua' ? valVivo : (p.valorSanoUa ?? '---')),
+                    valorSanoVoltio: (mFpc === 'crear' && escala === 'voltio' ? valVivo : (p.valorSanoVoltio ?? '---')),
+                    valorSanoOhmio: (mFpc === 'crear' && escala === 'ohmio' ? valVivo : (p.valorSanoOhmio ?? '---')),
+                    valorSanoAmperio: (mFpc === 'crear' && escala === 'amperio' ? valVivo : (p.valorSanoAmperio ?? '---')),
+                    valorSano: (mFpc === 'crear' ? valVivo : (p.valorSano ?? '---')),
+                    valorActual: (mFpc !== 'crear' ? valVivo : (p.valorActual ?? '---')),
+                    valorActualDiodo: (mFpc !== 'crear' && escala === 'diodo' ? valVivo : (p.valorActualDiodo ?? '---')),
+                    valorActualUa: (mFpc !== 'crear' && escala === 'ua' ? valVivo : (p.valorActualUa ?? '---')),
+                    valorActualVoltio: (mFpc !== 'crear' && escala === 'voltio' ? valVivo : (p.valorActualVoltio ?? '---')),
+                    valorActualOhmio: (mFpc !== 'crear' && escala === 'ohmio' ? valVivo : (p.valorActualOhmio ?? '---')),
+                    valorActualAmperio: (mFpc !== 'crear' && escala === 'amperio' ? valVivo : (p.valorActualAmperio ?? '---'))
+                  };
+                }
+                return p;
               });
               const fpcMod = { ...fpc, pines: nuevosPines }; setFpcActivo(fpcMod); return fpcMod;
             } return fpc;
@@ -463,7 +465,7 @@ export default function AppDiagnostico() {
             while (nextPin <= totalPines) {
               const pinInfo = (fpcAct.pines || []).find(p => Number(p.id) === nextPin);
               if (pinInfo && (pinInfo.tipo === 'GND' || pinInfo.tipo === 'NC')) { nextPin++; } else { break; }
-            } 
+            }
             return nextPin <= totalPines ? nextPin : Number(prev);
           });
         } else if (seccion === 'ic' && icActivoRef.current) {
@@ -472,24 +474,24 @@ export default function AppDiagnostico() {
           const nuevosIcs = (modeloActualizado.ics || []).map(ic => {
             if (String(ic.id) === String(icAct.id)) {
               const nuevosPines = (ic.pines || []).map(p => {
-                 if (String(p.id) === String(padAct)) {
-                    return { 
-                       ...p, 
-                       valorSanoDiodo: (mIc === 'crear' && escala === 'diodo' ? valVivo : (p.valorSanoDiodo ?? '---')), 
-                       valorSanoUa: (mIc === 'crear' && escala === 'ua' ? valVivo : (p.valorSanoUa ?? '---')),
-                       valorSanoVoltio: (mIc === 'crear' && escala === 'voltio' ? valVivo : (p.valorSanoVoltio ?? '---')),
-                       valorSanoOhmio: (mIc === 'crear' && escala === 'ohmio' ? valVivo : (p.valorSanoOhmio ?? '---')),
-                       valorSanoAmperio: (mIc === 'crear' && escala === 'amperio' ? valVivo : (p.valorSanoAmperio ?? '---')),
-                       valorSano: (mIc === 'crear' ? valVivo : (p.valorSano ?? '---')),
-                       valorActual: (mIc !== 'crear' ? valVivo : (p.valorActual ?? '---')),
-                       valorActualDiodo: (mIc !== 'crear' && escala === 'diodo' ? valVivo : (p.valorActualDiodo ?? '---')), 
-                       valorActualUa: (mIc !== 'crear' && escala === 'ua' ? valVivo : (p.valorActualUa ?? '---')),
-                       valorActualVoltio: (mIc !== 'crear' && escala === 'voltio' ? valVivo : (p.valorActualVoltio ?? '---')),
-                       valorActualOhmio: (mIc !== 'crear' && escala === 'ohmio' ? valVivo : (p.valorActualOhmio ?? '---')),
-                       valorActualAmperio: (mIc !== 'crear' && escala === 'amperio' ? valVivo : (p.valorActualAmperio ?? '---'))
-                    };
-                 }
-                 return p;
+                if (String(p.id) === String(padAct)) {
+                  return {
+                    ...p,
+                    valorSanoDiodo: (mIc === 'crear' && escala === 'diodo' ? valVivo : (p.valorSanoDiodo ?? '---')),
+                    valorSanoUa: (mIc === 'crear' && escala === 'ua' ? valVivo : (p.valorSanoUa ?? '---')),
+                    valorSanoVoltio: (mIc === 'crear' && escala === 'voltio' ? valVivo : (p.valorSanoVoltio ?? '---')),
+                    valorSanoOhmio: (mIc === 'crear' && escala === 'ohmio' ? valVivo : (p.valorSanoOhmio ?? '---')),
+                    valorSanoAmperio: (mIc === 'crear' && escala === 'amperio' ? valVivo : (p.valorSanoAmperio ?? '---')),
+                    valorSano: (mIc === 'crear' ? valVivo : (p.valorSano ?? '---')),
+                    valorActual: (mIc !== 'crear' ? valVivo : (p.valorActual ?? '---')),
+                    valorActualDiodo: (mIc !== 'crear' && escala === 'diodo' ? valVivo : (p.valorActualDiodo ?? '---')),
+                    valorActualUa: (mIc !== 'crear' && escala === 'ua' ? valVivo : (p.valorActualUa ?? '---')),
+                    valorActualVoltio: (mIc !== 'crear' && escala === 'voltio' ? valVivo : (p.valorActualVoltio ?? '---')),
+                    valorActualOhmio: (mIc !== 'crear' && escala === 'ohmio' ? valVivo : (p.valorActualOhmio ?? '---')),
+                    valorActualAmperio: (mIc !== 'crear' && escala === 'amperio' ? valVivo : (p.valorActualAmperio ?? '---'))
+                  };
+                }
+                return p;
               });
               const icMod = { ...ic, pines: nuevosPines }; setIcActivo(icMod); return icMod;
             } return ic;
@@ -562,7 +564,7 @@ export default function AppDiagnostico() {
         } else if (seccionLibreriaRef.current === 'fpc_bateria') {
           escalaActiva = escalaFpcBateriaRef.current;
         }
-        
+
         if (text.includes("OL") || text.includes("?0")) {
           parsedVal = "OL";
           if (escalaActiva === 'ua') {
@@ -611,22 +613,22 @@ export default function AppDiagnostico() {
               else if (textLower.includes("ma")) { parsedUni = "mA"; }
               else if (text.includes("A") || textLower.includes("amp")) { parsedUni = "A"; }
               else { parsedUni = "Diod"; }
-              
+
               if (parsedUni === "V" || parsedUni === "Diod") { parsedVal = parseFloat(rawVal).toFixed(3); }
               else { parsedVal = rawVal; }
             }
           }
         }
-        
+
         if (parsedVal !== null && parsedUni !== null) {
           setLecturaUsb({ valor: parsedVal, unidad: parsedUni });
           if (autoHoldActivoRef.current) {
             const valNum = parseFloat(parsedVal);
             const esIncorrecta = (escalaActiva === 'diodo' && (parsedUni !== 'Diod' && parsedUni !== 'V')) ||
-                                 (escalaActiva === 'ua' && parsedUni !== 'uA') ||
-                                 (escalaActiva === 'amperio' && parsedUni !== 'A') ||
-                                 (escalaActiva === 'voltio' && parsedUni !== 'V') ||
-                                 (escalaActiva === 'ohmio' && parsedUni !== 'Ω');
+              (escalaActiva === 'ua' && parsedUni !== 'uA') ||
+              (escalaActiva === 'amperio' && parsedUni !== 'A') ||
+              (escalaActiva === 'voltio' && parsedUni !== 'V') ||
+              (escalaActiva === 'ohmio' && parsedUni !== 'Ω');
             if (esIncorrecta) {
               autoHoldValueRef.current = null;
               autoHoldTriggeredRef.current = false;
@@ -646,7 +648,7 @@ export default function AppDiagnostico() {
                 tol = 5.0;
                 esCeroInactivo = valNum < 1.0;
               }
-              
+
               if (!isNaN(valNum) && !esCeroInactivo) {
                 if (autoHoldValueRef.current !== null && Math.abs(valNum - autoHoldValueRef.current) <= tol) {
                   if (!autoHoldTriggeredRef.current && Date.now() - autoHoldStartTimeRef.current >= 1500) { autoHoldTriggeredRef.current = true; avanzarPinMagico(parsedVal); }
@@ -777,15 +779,15 @@ export default function AppDiagnostico() {
     }
   };
 
-  const guardarModeloActualDB = async () => { 
-    if (!modeloActivo) return; 
+  const guardarModeloActualDB = async () => {
+    if (!modeloActivo) return;
 
     try {
       const modeloSanitizado = sanitizarObjetoParaFirestore(modeloActivo);
-      await setDoc(doc(db, "hardware_db", modeloActivo.id), modeloSanitizado); 
-      alert("¡Placa guardada en la nube de Marshall Cell!"); 
+      await setDoc(doc(db, "hardware_db", modeloActivo.id), modeloSanitizado);
+      alert("¡Placa guardada en la nube de Marshall Cell!");
       setCambiosPendientesDocktest(false);
-      await cargarLibreriaDB(); 
+      await cargarLibreriaDB();
     } catch (error) {
       console.error("Error al guardar la placa en Firestore:", error);
       alert("❌ Error al guardar en la nube: " + (error.message || error));
@@ -809,7 +811,7 @@ export default function AppDiagnostico() {
       setGuardandoDocktest(false);
     }
   };
-  
+
   const crearNuevoIcEnModelo = () => {
     if (!formNuevoIc.nombre || formNuevoIc.filas <= 0 || formNuevoIc.columnas <= 0) return;
     const filasCount = parseInt(formNuevoIc.filas);
@@ -858,32 +860,32 @@ export default function AppDiagnostico() {
     setModeloActivo(prev => ({ ...prev, ics: (prev.ics || []).map(i => i.id === icMod.id ? icMod : i) }));
   };
 
-  
+
   const crearNuevoFpcEnModelo = () => { if (!formNuevoFpc.nombre || formNuevoFpc.pines <= 0) return; const pinesArray = Array.from({ length: parseInt(formNuevoFpc.pines) }, (_, i) => ({ id: i + 1, nombre: `Linea_${i + 1}`, valorSano: '---', valorActual: '---', tipo: 'DATA' })); const nuevoFpc = { id: Date.now().toString(), nombre: formNuevoFpc.nombre.replace(/ /g, '_'), pines: pinesArray, imgPlaca: '', imgEsquema: '' }; const modActualizado = { ...modeloActivo, fpcs: [...(modeloActivo.fpcs || []), nuevoFpc] }; setModeloActivo(modActualizado); setFpcActivo(nuevoFpc); setFormNuevoFpc({ nombre: '', pines: 40 }); setPinActivoFpc(1); };
-  
+
   const eliminarFpcActivo = () => { if (!fpcActivo || !window.confirm(`¿Seguro de eliminar el FPC ${fpcActivo.nombre}?`)) return; const modActualizado = { ...modeloActivo, fpcs: (modeloActivo.fpcs || []).filter(f => f.id !== fpcActivo.id) }; setModeloActivo(modActualizado); setFpcActivo(null); setPinActivoFpc(1); };
   const editarPinesFpcActivo = () => { if (!fpcActivo) return; const newCount = window.prompt("Ingresa el nuevo número total de pines:", fpcActivo.pines.length); if (!newCount || isNaN(newCount) || parseInt(newCount) <= 0) return; const count = parseInt(newCount); let nuevosPines = [...fpcActivo.pines]; if (count > nuevosPines.length) { for (let i = nuevosPines.length + 1; i <= count; i++) { nuevosPines.push({ id: i, nombre: `Linea_${i}`, valorSano: '---', valorActual: '---', tipo: 'DATA' }); } } else if (count < nuevosPines.length) { if (!window.confirm(`Se eliminarán ${nuevosPines.length - count} pines del final. ¿Continuar?`)) return; nuevosPines = nuevosPines.slice(0, count); } const fpcMod = { ...fpcActivo, pines: nuevosPines }; setFpcActivo(fpcMod); setModeloActivo(prev => ({ ...prev, fpcs: (prev.fpcs || []).map(f => f.id === fpcMod.id ? fpcMod : f) })); if (pinActivoFpc > count) setPinActivoFpc(1); };
-  
-  const editarUbicacionFpc = (tipo) => { 
-    if (!fpcActivo) return; 
+
+  const editarUbicacionFpc = (tipo) => {
+    if (!fpcActivo) return;
     const actual = tipo === 'placa' ? fpcActivo.imgPlaca : fpcActivo.imgEsquema;
-    const nuevaUrl = window.prompt(`Ingresa el enlace de la imagen (${tipo}):`, actual || ""); 
-    if (nuevaUrl !== null) { 
-        const fpcMod = { ...fpcActivo, [tipo === 'placa' ? 'imgPlaca' : 'imgEsquema']: nuevaUrl }; 
-        setFpcActivo(fpcMod); 
-        setModeloActivo(prev => ({ ...prev, fpcs: (prev.fpcs || []).map(f => f.id === fpcMod.id ? fpcMod : f) })); 
-    } 
+    const nuevaUrl = window.prompt(`Ingresa el enlace de la imagen (${tipo}):`, actual || "");
+    if (nuevaUrl !== null) {
+      const fpcMod = { ...fpcActivo, [tipo === 'placa' ? 'imgPlaca' : 'imgEsquema']: nuevaUrl };
+      setFpcActivo(fpcMod);
+      setModeloActivo(prev => ({ ...prev, fpcs: (prev.fpcs || []).map(f => f.id === fpcMod.id ? fpcMod : f) }));
+    }
   };
 
-  const editarUbicacionIc = (tipo) => { 
-    if (!icActivo) return; 
+  const editarUbicacionIc = (tipo) => {
+    if (!icActivo) return;
     const actual = tipo === 'placa' ? icActivo.imgPlaca : icActivo.imgEsquema;
-    const nuevaUrl = window.prompt(`Ingresa el enlace de la imagen (${tipo}):`, actual || ""); 
-    if (nuevaUrl !== null) { 
-        const icMod = { ...icActivo, [tipo === 'placa' ? 'imgPlaca' : 'imgEsquema']: nuevaUrl }; 
-        setIcActivo(icMod); 
-        setModeloActivo(prev => ({ ...prev, ics: (prev.ics || []).map(i => i.id === icMod.id ? icMod : i) })); 
-    } 
+    const nuevaUrl = window.prompt(`Ingresa el enlace de la imagen (${tipo}):`, actual || "");
+    if (nuevaUrl !== null) {
+      const icMod = { ...icActivo, [tipo === 'placa' ? 'imgPlaca' : 'imgEsquema']: nuevaUrl };
+      setIcActivo(icMod);
+      setModeloActivo(prev => ({ ...prev, ics: (prev.ics || []).map(i => i.id === icMod.id ? icMod : i) }));
+    }
   };
 
   const esIPhoneModelo = (mod) => {
@@ -897,7 +899,7 @@ export default function AppDiagnostico() {
     const numPines = esIPhone ? 6 : 8;
     const nombresDefecto = Array(numPines).fill('');
     const tiposDefecto = Array(numPines).fill('DATA');
-    
+
     const pines = Array.from({ length: numPines }, (_, i) => ({
       id: i + 1,
       nombre: nombresDefecto[i],
@@ -1037,23 +1039,23 @@ export default function AppDiagnostico() {
     return (
       <div style={{ display: 'flex', gap: '5px' }}>
         {fpcActivo.imgPlaca ? (
-          <button onClick={() => { setTipoImagenViendo('placa'); setImagenFpcVisible(true); }} 
+          <button onClick={() => { setTipoImagenViendo('placa'); setImagenFpcVisible(true); }}
             style={{ padding: compacto ? '4px 8px' : '6px 10px', borderRadius: '6px', border: 'none', background: '#3b82f6', color: 'white', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', fontSize: compacto ? '0.65rem' : '0.75rem' }}>
             <ImageIcon size={compacto ? 12 : 14} /> {compacto ? '' : 'Placa'}
           </button>
         ) : (
-          <button onClick={() => editarUbicacionFpc('placa')} 
+          <button onClick={() => editarUbicacionFpc('placa')}
             style={{ padding: compacto ? '4px 8px' : '6px 10px', borderRadius: '6px', border: '1px dashed #4b5563', background: 'transparent', color: '#9ca3af', fontWeight: 'bold', cursor: 'pointer', fontSize: compacto ? '0.6rem' : '0.7rem' }}>
             + Placa
           </button>
         )}
         {fpcActivo.imgEsquema ? (
-          <button onClick={() => { setTipoImagenViendo('esquema'); setImagenFpcVisible(true); }} 
+          <button onClick={() => { setTipoImagenViendo('esquema'); setImagenFpcVisible(true); }}
             style={{ padding: compacto ? '4px 8px' : '6px 10px', borderRadius: '6px', border: 'none', background: '#8b5cf6', color: 'white', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', fontSize: compacto ? '0.65rem' : '0.75rem' }}>
             <Map size={compacto ? 12 : 14} /> {compacto ? '' : 'Esquema'}
           </button>
         ) : (
-          <button onClick={() => editarUbicacionFpc('esquema')} 
+          <button onClick={() => editarUbicacionFpc('esquema')}
             style={{ padding: compacto ? '4px 8px' : '6px 10px', borderRadius: '6px', border: '1px dashed #4b5563', background: 'transparent', color: '#9ca3af', fontWeight: 'bold', cursor: 'pointer', fontSize: compacto ? '0.6rem' : '0.7rem' }}>
             + Esquema
           </button>
@@ -1067,23 +1069,23 @@ export default function AppDiagnostico() {
     return (
       <div style={{ display: 'flex', gap: '5px' }}>
         {icActivo.imgPlaca ? (
-          <button onClick={() => { setTipoImagenViendo('placa_ic'); setImagenFpcVisible(true); }} 
+          <button onClick={() => { setTipoImagenViendo('placa_ic'); setImagenFpcVisible(true); }}
             style={{ padding: compacto ? '4px 8px' : '6px 10px', borderRadius: '6px', border: 'none', background: '#3b82f6', color: 'white', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', fontSize: compacto ? '0.65rem' : '0.75rem' }}>
             <ImageIcon size={compacto ? 12 : 14} /> {compacto ? '' : 'Placa'}
           </button>
         ) : (
-          <button onClick={() => editarUbicacionIc('placa')} 
+          <button onClick={() => editarUbicacionIc('placa')}
             style={{ padding: compacto ? '4px 8px' : '6px 10px', borderRadius: '6px', border: '1px dashed #4b5563', background: 'transparent', color: '#9ca3af', fontWeight: 'bold', cursor: 'pointer', fontSize: compacto ? '0.6rem' : '0.7rem' }}>
             + Placa
           </button>
         )}
         {icActivo.imgEsquema ? (
-          <button onClick={() => { setTipoImagenViendo('esquema_ic'); setImagenFpcVisible(true); }} 
+          <button onClick={() => { setTipoImagenViendo('esquema_ic'); setImagenFpcVisible(true); }}
             style={{ padding: compacto ? '4px 8px' : '6px 10px', borderRadius: '6px', border: 'none', background: '#8b5cf6', color: 'white', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', fontSize: compacto ? '0.65rem' : '0.75rem' }}>
             <Map size={compacto ? 12 : 14} /> {compacto ? '' : 'Datasheet'}
           </button>
         ) : (
-          <button onClick={() => editarUbicacionIc('esquema')} 
+          <button onClick={() => editarUbicacionIc('esquema')}
             style={{ padding: compacto ? '4px 8px' : '6px 10px', borderRadius: '6px', border: '1px dashed #4b5563', background: 'transparent', color: '#9ca3af', fontWeight: 'bold', cursor: 'pointer', fontSize: compacto ? '0.6rem' : '0.7rem' }}>
             + Datasheet
           </button>
@@ -1098,23 +1100,23 @@ export default function AppDiagnostico() {
     return (
       <div style={{ display: 'flex', gap: '5px' }}>
         {bat.imgPlaca ? (
-          <button onClick={() => { setTipoImagenViendo('placa_bateria'); setImagenFpcVisible(true); }} 
+          <button onClick={() => { setTipoImagenViendo('placa_bateria'); setImagenFpcVisible(true); }}
             style={{ padding: compacto ? '4px 8px' : '6px 10px', borderRadius: '6px', border: 'none', background: '#3b82f6', color: 'white', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', fontSize: compacto ? '0.65rem' : '0.75rem' }}>
             <ImageIcon size={compacto ? 12 : 14} /> {compacto ? '' : 'Placa'}
           </button>
         ) : (
-          <button onClick={() => editarUbicacionFpcBateria('placa')} 
+          <button onClick={() => editarUbicacionFpcBateria('placa')}
             style={{ padding: compacto ? '4px 8px' : '6px 10px', borderRadius: '6px', border: '1px dashed #4b5563', background: 'transparent', color: '#9ca3af', fontWeight: 'bold', cursor: 'pointer', fontSize: compacto ? '0.6rem' : '0.7rem' }}>
             + Placa
           </button>
         )}
         {bat.imgEsquema ? (
-          <button onClick={() => { setTipoImagenViendo('esquema_bateria'); setImagenFpcVisible(true); }} 
+          <button onClick={() => { setTipoImagenViendo('esquema_bateria'); setImagenFpcVisible(true); }}
             style={{ padding: compacto ? '4px 8px' : '6px 10px', borderRadius: '6px', border: 'none', background: '#8b5cf6', color: 'white', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', fontSize: compacto ? '0.65rem' : '0.75rem' }}>
             <Map size={compacto ? 12 : 14} /> {compacto ? '' : 'Esquema'}
           </button>
         ) : (
-          <button onClick={() => editarUbicacionFpcBateria('esquema')} 
+          <button onClick={() => editarUbicacionFpcBateria('esquema')}
             style={{ padding: compacto ? '4px 8px' : '6px 10px', borderRadius: '6px', border: '1px dashed #4b5563', background: 'transparent', color: '#9ca3af', fontWeight: 'bold', cursor: 'pointer', fontSize: compacto ? '0.6rem' : '0.7rem' }}>
             + Esquema
           </button>
@@ -1234,36 +1236,36 @@ export default function AppDiagnostico() {
                   <h2 style={{ color: 'white', margin: 0, fontSize: '1.2rem' }}>{modeloActivo ? `${modeloActivo.marca} ${modeloActivo.nombre}` : 'Selecciona Modelo'}</h2>
                   <div style={{ display: 'flex', gap: '10px' }}>
                     {modeloActivo && (
-                      <button 
+                      <button
                         onClick={
-                          seccionLibreria === 'ic' 
-                            ? sincronizarIcAhora 
+                          seccionLibreria === 'ic'
+                            ? sincronizarIcAhora
                             : seccionLibreria === 'fpc_bateria'
                               ? sincronizarFpcBateriaAhora
                               : (seccionLibreria === 'docktest' ? guardarDocktestAhora : sincronizarFpcAhora)
-                        } 
-                        style={{ 
+                        }
+                        style={{
                           background: (
-                            seccionLibreria === 'ic' 
-                              ? cambiosPendientesIc 
+                            seccionLibreria === 'ic'
+                              ? cambiosPendientesIc
                               : seccionLibreria === 'fpc_bateria'
                                 ? cambiosPendientesFpcBateria
                                 : (seccionLibreria === 'docktest' ? cambiosPendientesDocktest : cambiosPendientesFpc)
-                          ) ? '#f59e0b' : '#10b981', 
-                          color: 'white', 
-                          border: 'none', 
-                          padding: '8px 15px', 
-                          borderRadius: '8px', 
-                          fontWeight: 'bold', 
-                          cursor: 'pointer', 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          gap: '5px' 
+                          ) ? '#f59e0b' : '#10b981',
+                          color: 'white',
+                          border: 'none',
+                          padding: '8px 15px',
+                          borderRadius: '8px',
+                          fontWeight: 'bold',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '5px'
                         }}
                       >
-                        <Save size={16} /> 
-                        {seccionLibreria === 'ic' 
-                          ? (guardandoIc ? 'Guardando...' : 'Guardar IC') 
+                        <Save size={16} />
+                        {seccionLibreria === 'ic'
+                          ? (guardandoIc ? 'Guardando...' : 'Guardar IC')
                           : seccionLibreria === 'fpc'
                             ? (guardandoFpc ? 'Guardando...' : 'Guardar FPC')
                             : seccionLibreria === 'fpc_bateria'
@@ -1277,6 +1279,60 @@ export default function AppDiagnostico() {
                     <button onClick={() => setLibreriaVisible(false)} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', cursor: 'pointer', padding: '8px', borderRadius: '8px' }}><X size={16} /></button>
                   </div>
                 </div>
+                
+                <div style={{ padding: '15px 20px', borderBottom: '1px solid #374151', flexShrink: 0 }}>
+                  <VisorHUD
+                    valor={lecturaUsb.valor}
+                    unidad={lecturaUsb.unidad}
+                    conectado={usbConectado}
+                    conectarFn={conectarMultimetroUSB}
+                    desconectarFn={desconectarMultimetroUSB}
+                    vozActiva={vozActiva}
+                    toggleVozFn={toggleVoz}
+                    autoHoldActivo={autoHoldActivo}
+                    toggleAutoHoldFn={() => setAutoHoldActivo(!autoHoldActivo)}
+                    capturarFn={modeloActivo ? avanzarPinMagico : null}
+                    escalaActiva={
+                      modeloActivo
+                        ? (seccionLibreria === 'ic'
+                            ? escalaIc
+                            : (seccionLibreria === 'fpc_bateria'
+                                ? escalaFpcBateria
+                                : escalaFpc))
+                        : 'amperio'
+                    }
+                    oscilogramaActivo={mostrarOscilograma}
+                    toggleOscilogramaFn={() => {
+                      const nuevoEstado = !mostrarOscilograma;
+                      setMostrarOscilograma(nuevoEstado);
+                      if (nuevoEstado) {
+                        if (modeloActivo) {
+                          if (seccionLibreria === 'ic') {
+                            setEscalaIc('amperio');
+                          } else if (seccionLibreria === 'fpc_bateria') {
+                            setEscalaFpcBateria('diodo');
+                          } else {
+                            setEscalaFpc('amperio');
+                          }
+                        }
+                      }
+                    }}
+                    mostrarOscilogramaBtn={true}
+                  />
+                  {mostrarOscilograma && (
+                    <OscilogramaPanel
+                      valor={lecturaUsb.valor}
+                      unidad={lecturaUsb.unidad}
+                      escalaActiva={
+                        modeloActivo
+                          ? (seccionLibreria === 'ic' ? escalaIc : escalaFpc)
+                          : 'amperio'
+                      }
+                      onClose={() => setMostrarOscilograma(false)}
+                    />
+                  )}
+                </div>
+
                 {modeloActivo ? (
                   <div style={{ flex: 1, overflowY: 'auto', padding: '15px' }}>
                     <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
@@ -1286,7 +1342,6 @@ export default function AppDiagnostico() {
                       <button onClick={() => cambiarSeccionLibreria('ic')} style={{ padding: '10px 15px', borderRadius: '8px', border: 'none', background: seccionLibreria === 'ic' ? '#ec4899' : '#1f2937', color: 'white', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>Planos IC / BGA</button>
                       <button onClick={() => cambiarSeccionLibreria('rffe')} style={{ padding: '10px 15px', borderRadius: '8px', border: 'none', background: seccionLibreria === 'rffe' ? '#10b981' : '#1f2937', color: 'white', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>Módulo RFFE</button>
                     </div>
-                    <VisorHUD valor={lecturaUsb.valor} unidad={lecturaUsb.unidad} conectado={usbConectado} conectarFn={conectarMultimetroUSB} desconectarFn={desconectarMultimetroUSB} vozActiva={vozActiva} toggleVozFn={toggleVoz} autoHoldActivo={autoHoldActivo} toggleAutoHoldFn={() => setAutoHoldActivo(!autoHoldActivo)} capturarFn={avanzarPinMagico} escalaActiva={seccionLibreria === 'ic' ? escalaIc : (seccionLibreria === 'fpc_bateria' ? escalaFpcBateria : escalaFpc)} oscilogramaActivo={mostrarOscilograma} toggleOscilogramaFn={() => setMostrarOscilograma(!mostrarOscilograma)} />
 
                     {seccionLibreria === 'docktest' && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -1308,7 +1363,7 @@ export default function AppDiagnostico() {
                               else if (escalaFpc === 'voltio') valuesObj = modeloActivo.docktestVoltio;
                               else if (escalaFpc === 'ohmio') valuesObj = modeloActivo.docktestOhmio;
                               else if (escalaFpc === 'amperio') valuesObj = modeloActivo.docktestAmperio;
-                              
+
                               const valActual = valuesObj ? valuesObj[c] : '---';
                               return (
                                 <div key={c} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -1319,7 +1374,6 @@ export default function AppDiagnostico() {
                             })}
                           </div>
                         </div>
-                        {mostrarOscilograma && <OscilogramaPanel valor={lecturaUsb.valor} unidad={lecturaUsb.unidad} escalaActiva={escalaFpc} onClose={() => setMostrarOscilograma(false)} />}
                       </div>
                     )}
 
@@ -1340,7 +1394,7 @@ export default function AppDiagnostico() {
                         {fpcActivo ? (
                           <div style={{ textAlign: 'center', padding: '20px', color: '#6b7280', fontSize: '0.85rem' }}>
                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px' }}>
-                              <span style={{ color: '#8b5cf6', fontWeight: 'bold' }}>{fpcActivo.nombre}</span> 
+                              <span style={{ color: '#8b5cf6', fontWeight: 'bold' }}>{fpcActivo.nombre}</span>
                               <span style={{ fontSize: '0.75rem' }}>seleccionado — haz click en el nombre arriba para abrir el visor.</span>
                               <BotonesImagenFPC compacto={true} />
                             </div>
@@ -1418,7 +1472,7 @@ export default function AppDiagnostico() {
                         {icActivo ? (
                           <div style={{ textAlign: 'center', padding: '20px', color: '#6b7280', fontSize: '0.85rem' }}>
                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px' }}>
-                              <span style={{ color: '#ec4899', fontWeight: 'bold', fontSize: '1rem' }}>{icActivo.nombre} ({icActivo.filas}x{icActivo.columnas})</span> 
+                              <span style={{ color: '#ec4899', fontWeight: 'bold', fontSize: '1rem' }}>{icActivo.nombre} ({icActivo.filas}x{icActivo.columnas})</span>
                               <span style={{ fontSize: '0.75rem' }}>seleccionado — haz click en el nombre arriba para abrir el visor del IC.</span>
                               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                                 <span style={{ fontSize: '0.75rem', color: '#cbd5e1' }}>Cambiar Guía:</span>
@@ -1438,9 +1492,9 @@ export default function AppDiagnostico() {
                     {seccionLibreria === 'rffe' && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                         <div style={{ backgroundColor: '#000', padding: '15px', borderRadius: '12px', border: '1px solid #333', display: 'flex', justifyContent: 'center' }}>
-                           <button onClick={conectarEscanerRFFE} style={{ background: dispositivoSerial ? 'rgba(16, 185, 129, 0.2)' : '#333', color: dispositivoSerial ? '#10b981' : 'white', border: 'none', padding: '10px 20px', borderRadius: '25px', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                             <Link size={18} /> {dispositivoSerial ? 'ESCÁNER RFFE CONECTADO' : 'CONECTAR ESCÁNER RP2040'}
-                           </button>
+                          <button onClick={conectarEscanerRFFE} style={{ background: dispositivoSerial ? 'rgba(16, 185, 129, 0.2)' : '#333', color: dispositivoSerial ? '#10b981' : 'white', border: 'none', padding: '10px 20px', borderRadius: '25px', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <Link size={18} /> {dispositivoSerial ? 'ESCÁNER RFFE CONECTADO' : 'CONECTAR ESCÁNER RP2040'}
+                          </button>
                         </div>
                         <EscanerRFFE
                           modeloActivo={modeloActivo}
@@ -1474,7 +1528,7 @@ export default function AppDiagnostico() {
                   <BotonesImagenFPC />
                   <button onClick={editarPinesFpcActivo} style={{ padding: '6px 10px', borderRadius: '6px', border: 'none', background: 'transparent', color: '#eab308', fontWeight: 'bold', cursor: 'pointer', marginLeft: '5px' }}>✏️ Pines</button>
                   {cambiosPendientesFpc && (
-                    <button onClick={() => { descartarCambiosFpc(); setFpcActivo(prev => prev ? {...prev} : null); }} style={{ padding: '6px 10px', borderRadius: '6px', border: '1px dashed #6b7280', background: 'transparent', color: '#9ca3af', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.65rem' }}>↩ Descartar</button>
+                    <button onClick={() => { descartarCambiosFpc(); setFpcActivo(prev => prev ? { ...prev } : null); }} style={{ padding: '6px 10px', borderRadius: '6px', border: '1px dashed #6b7280', background: 'transparent', color: '#9ca3af', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.65rem' }}>↩ Descartar</button>
                   )}
                   <button onClick={() => { eliminarFpcActivo(); setModalFpcAbierto(false); }} style={{ padding: '6px 10px', borderRadius: '6px', border: 'none', background: 'transparent', color: '#ef4444', fontWeight: 'bold', cursor: 'pointer' }}>🗑️</button>
                 </div>
@@ -1518,21 +1572,33 @@ export default function AppDiagnostico() {
               </div>
             </div>
             <div style={{ padding: '10px 20px', flexShrink: 0 }}>
-              <VisorHUD valor={lecturaUsb.valor} unidad={lecturaUsb.unidad} conectado={usbConectado} conectarFn={conectarMultimetroUSB} desconectarFn={desconectarMultimetroUSB} vozActiva={vozActiva} toggleVozFn={toggleVoz} autoHoldActivo={autoHoldActivo} toggleAutoHoldFn={() => setAutoHoldActivo(!autoHoldActivo)} capturarFn={avanzarPinMagico} escalaActiva={escalaFpc} oscilogramaActivo={mostrarOscilograma} toggleOscilogramaFn={() => setMostrarOscilograma(!mostrarOscilograma)} />
-              {mostrarOscilograma && <OscilogramaPanel valor={lecturaUsb.valor} unidad={lecturaUsb.unidad} escalaActiva={escalaFpc} onClose={() => setMostrarOscilograma(false)} />}
+              <VisorHUD
+                valor={lecturaUsb.valor}
+                unidad={lecturaUsb.unidad}
+                conectado={usbConectado}
+                conectarFn={conectarMultimetroUSB}
+                desconectarFn={desconectarMultimetroUSB}
+                vozActiva={vozActiva}
+                toggleVozFn={toggleVoz}
+                autoHoldActivo={autoHoldActivo}
+                toggleAutoHoldFn={() => setAutoHoldActivo(!autoHoldActivo)}
+                capturarFn={avanzarPinMagico}
+                escalaActiva={escalaFpc}
+                mostrarOscilogramaBtn={false}
+              />
             </div>
             <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '0 20px 20px 20px' }}>
-              <FPCInteligente 
-                pines={fpcActivo.pines} 
+              <FPCInteligente
+                pines={fpcActivo.pines}
                 setPines={(updater) => {
                   const arrNuevo = typeof updater === 'function' ? updater(fpcActivo.pines) : updater;
                   const fpcMod = { ...fpcActivo, pines: arrNuevo }; setFpcActivo(fpcMod);
                   setModeloActivo(prev => ({ ...prev, fpcs: prev.fpcs.map(f => f.id === fpcMod.id ? fpcMod : f) }));
-                }} 
-                pinActivo={pinActivoFpc} 
-                setPinActivo={setPinActivoFpc} 
-                modo={modoFpc} 
-                escala={escalaFpc} 
+                }}
+                pinActivo={pinActivoFpc}
+                setPinActivo={setPinActivoFpc}
+                modo={modoFpc}
+                escala={escalaFpc}
                 lecturaEnVivo={lecturaUsb.valor}
                 tiposCustom={tiposCustom}
                 setTiposCustom={setTiposCustom}
@@ -1562,7 +1628,7 @@ export default function AppDiagnostico() {
                 <div style={{ display: 'flex', gap: '5px', backgroundColor: '#1a1a1a', padding: '4px', borderRadius: '8px', alignItems: 'center' }}>
                   <BotonesImagenIC />
                   {cambiosPendientesIc && (
-                    <button onClick={() => { descartarCambiosIc(); setIcActivo(prev => prev ? {...prev} : null); }} style={{ padding: '6px 10px', borderRadius: '6px', border: '1px dashed #6b7280', background: 'transparent', color: '#9ca3af', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.65rem' }}>↩ Descartar</button>
+                    <button onClick={() => { descartarCambiosIc(); setIcActivo(prev => prev ? { ...prev } : null); }} style={{ padding: '6px 10px', borderRadius: '6px', border: '1px dashed #6b7280', background: 'transparent', color: '#9ca3af', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.65rem' }}>↩ Descartar</button>
                   )}
                   <button onClick={() => { eliminarIcActivo(); setModalIcAbierto(false); }} style={{ padding: '6px 10px', borderRadius: '6px', border: 'none', background: 'transparent', color: '#ef4444', fontWeight: 'bold', cursor: 'pointer' }}>🗑️ Eliminar IC</button>
                 </div>
@@ -1606,21 +1672,33 @@ export default function AppDiagnostico() {
               </div>
             </div>
             <div style={{ padding: '10px 20px', flexShrink: 0 }}>
-              <VisorHUD valor={lecturaUsb.valor} unidad={lecturaUsb.unidad} conectado={usbConectado} conectarFn={conectarMultimetroUSB} desconectarFn={desconectarMultimetroUSB} vozActiva={vozActiva} toggleVozFn={toggleVoz} autoHoldActivo={autoHoldActivo} toggleAutoHoldFn={() => setAutoHoldActivo(!autoHoldActivo)} capturarFn={avanzarPinMagico} escalaActiva={escalaIc} oscilogramaActivo={mostrarOscilograma} toggleOscilogramaFn={() => setMostrarOscilograma(!mostrarOscilograma)} />
-              {mostrarOscilograma && <OscilogramaPanel valor={lecturaUsb.valor} unidad={lecturaUsb.unidad} escalaActiva={escalaIc} onClose={() => setMostrarOscilograma(false)} />}
+              <VisorHUD
+                valor={lecturaUsb.valor}
+                unidad={lecturaUsb.unidad}
+                conectado={usbConectado}
+                conectarFn={conectarMultimetroUSB}
+                desconectarFn={desconectarMultimetroUSB}
+                vozActiva={vozActiva}
+                toggleVozFn={toggleVoz}
+                autoHoldActivo={autoHoldActivo}
+                toggleAutoHoldFn={() => setAutoHoldActivo(!autoHoldActivo)}
+                capturarFn={avanzarPinMagico}
+                escalaActiva={escalaIc}
+                mostrarOscilogramaBtn={false}
+              />
             </div>
             <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '0 20px 20px 20px' }}>
-              <ICInteligente 
-                ic={icActivo} 
+              <ICInteligente
+                ic={icActivo}
                 setPines={(updater) => {
                   const arrNuevo = typeof updater === 'function' ? updater(icActivo.pines) : updater;
                   const icMod = { ...icActivo, pines: arrNuevo }; setIcActivo(icMod);
                   setModeloActivo(prev => ({ ...prev, ics: (prev.ics || []).map(i => i.id === icMod.id ? icMod : i) }));
-                }} 
-                padActivo={padActivoIc} 
-                setPadActivo={setPadActivoIc} 
-                modo={modoIc} 
-                escala={escalaIc} 
+                }}
+                padActivo={padActivoIc}
+                setPadActivo={setPadActivoIc}
+                modo={modoIc}
+                escala={escalaIc}
                 lecturaEnVivo={lecturaUsb.valor}
                 tiposCustom={tiposCustom}
                 setTiposCustom={setTiposCustom}
@@ -1649,7 +1727,7 @@ export default function AppDiagnostico() {
             const urlImg = tipoLimpio === 'placa' ? imgPlaca : imgEsquema;
             const colorBorde = tipoLimpio === 'placa' ? '#3b82f6' : '#8b5cf6';
             const tituloText = `Vista: ${tipoLimpio === 'placa' ? (esIc ? 'Ubicación IC en Placa' : 'Placa Base') : (esIc ? 'Datasheet del IC' : 'Esquemático')} (${itemActivo.nombre})`;
-            
+
             return (
               <motion.div className="no-print" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.9)', zIndex: 3000, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }} onClick={() => setImagenFpcVisible(false)}>
                 <motion.div initial={{ scale: 0.8 }} animate={{ scale: 1 }} exit={{ scale: 0.8 }} style={{ width: '95vw', maxWidth: '1000px', height: '80vh', backgroundColor: '#111827', borderRadius: '1.5rem', display: 'flex', flexDirection: 'column', overflow: 'hidden', border: `2px solid ${colorBorde}` }} onClick={(e) => e.stopPropagation()}>
@@ -1906,52 +1984,52 @@ export default function AppDiagnostico() {
                       const numComponentes = (caso.lineasAfectadas || []).reduce((acc, l) => acc + (l.componentes || []).length, 0);
                       const numImagenes = (caso.lineasAfectadas || []).reduce((acc, l) => acc + (l.imagenes || []).length, 0);
                       return (
-                      <div key={caso.id} style={{ padding: '14px', borderRadius: '12px', border: t.bordeFantasma.border, ...t.cristalBgItem }}>
-                        {/* Header row */}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px' }}>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '4px' }}>
-                              <span style={{ fontWeight: 'bold', fontSize: '0.9rem', ...t.textoPrincipal }}>{caso.marca} {caso.modelo}</span>
-                              <span style={{ fontSize: '0.6rem', color: '#6b7280', backgroundColor: '#1f2937', padding: '2px 8px', borderRadius: '10px' }}>#{caso.id.substring(0, 6).toUpperCase()}</span>
-                              <span style={{ fontSize: '0.65rem', color: t.textoSutil.color }}>{new Date(caso.fecha).toLocaleDateString()}</span>
+                        <div key={caso.id} style={{ padding: '14px', borderRadius: '12px', border: t.bordeFantasma.border, ...t.cristalBgItem }}>
+                          {/* Header row */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px' }}>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '4px' }}>
+                                <span style={{ fontWeight: 'bold', fontSize: '0.9rem', ...t.textoPrincipal }}>{caso.marca} {caso.modelo}</span>
+                                <span style={{ fontSize: '0.6rem', color: '#6b7280', backgroundColor: '#1f2937', padding: '2px 8px', borderRadius: '10px' }}>#{caso.id.substring(0, 6).toUpperCase()}</span>
+                                <span style={{ fontSize: '0.65rem', color: t.textoSutil.color }}>{new Date(caso.fecha).toLocaleDateString()}</span>
+                              </div>
+                              <p style={{ fontSize: '0.78rem', color: t.textoSutil.color, margin: '4px 0 8px 0', lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{caso.sintomas}</p>
+                              {/* Badges de campos avanzados */}
+                              <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+                                {tieneUsb && (
+                                  <span style={{ fontSize: '0.6rem', padding: '2px 7px', borderRadius: '8px', backgroundColor: 'rgba(59,130,246,0.15)', color: '#3b82f6', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                    <Usb size={10} /> USB: {caso.consumoUsb.corriente || caso.consumoUsb.voltaje || '✓'}
+                                  </span>
+                                )}
+                                {tieneFuente && (
+                                  <span style={{ fontSize: '0.6rem', padding: '2px 7px', borderRadius: '8px', backgroundColor: 'rgba(249,115,22,0.15)', color: '#f97316', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                    <Zap size={10} /> Fuente: {caso.consumoFuente.inicial || caso.consumoFuente.postPower || '✓'}
+                                  </span>
+                                )}
+                                {numLineas > 0 && (
+                                  <span style={{ fontSize: '0.6rem', padding: '2px 7px', borderRadius: '8px', backgroundColor: 'rgba(16,185,129,0.15)', color: '#10b981', fontWeight: 'bold' }}>
+                                    ⚡ {numLineas} línea{numLineas !== 1 ? 's' : ''}
+                                  </span>
+                                )}
+                                {numComponentes > 0 && (
+                                  <span style={{ fontSize: '0.6rem', padding: '2px 7px', borderRadius: '8px', backgroundColor: 'rgba(139,92,246,0.15)', color: '#8b5cf6', fontWeight: 'bold' }}>
+                                    🔧 {numComponentes} comp.
+                                  </span>
+                                )}
+                                {numImagenes > 0 && (
+                                  <span style={{ fontSize: '0.6rem', padding: '2px 7px', borderRadius: '8px', backgroundColor: 'rgba(236,72,153,0.15)', color: '#ec4899', fontWeight: 'bold' }}>
+                                    📸 {numImagenes} img.
+                                  </span>
+                                )}
+                              </div>
                             </div>
-                            <p style={{ fontSize: '0.78rem', color: t.textoSutil.color, margin: '4px 0 8px 0', lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{caso.sintomas}</p>
-                            {/* Badges de campos avanzados */}
-                            <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
-                              {tieneUsb && (
-                                <span style={{ fontSize: '0.6rem', padding: '2px 7px', borderRadius: '8px', backgroundColor: 'rgba(59,130,246,0.15)', color: '#3b82f6', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                                  <Usb size={10} /> USB: {caso.consumoUsb.corriente || caso.consumoUsb.voltaje || '✓'}
-                                </span>
-                              )}
-                              {tieneFuente && (
-                                <span style={{ fontSize: '0.6rem', padding: '2px 7px', borderRadius: '8px', backgroundColor: 'rgba(249,115,22,0.15)', color: '#f97316', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                                  <Zap size={10} /> Fuente: {caso.consumoFuente.inicial || caso.consumoFuente.postPower || '✓'}
-                                </span>
-                              )}
-                              {numLineas > 0 && (
-                                <span style={{ fontSize: '0.6rem', padding: '2px 7px', borderRadius: '8px', backgroundColor: 'rgba(16,185,129,0.15)', color: '#10b981', fontWeight: 'bold' }}>
-                                  ⚡ {numLineas} línea{numLineas !== 1 ? 's' : ''}
-                                </span>
-                              )}
-                              {numComponentes > 0 && (
-                                <span style={{ fontSize: '0.6rem', padding: '2px 7px', borderRadius: '8px', backgroundColor: 'rgba(139,92,246,0.15)', color: '#8b5cf6', fontWeight: 'bold' }}>
-                                  🔧 {numComponentes} comp.
-                                </span>
-                              )}
-                              {numImagenes > 0 && (
-                                <span style={{ fontSize: '0.6rem', padding: '2px 7px', borderRadius: '8px', backgroundColor: 'rgba(236,72,153,0.15)', color: '#ec4899', fontWeight: 'bold' }}>
-                                  📸 {numImagenes} img.
-                                </span>
-                              )}
+                            <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                              <button onClick={() => { setFormCaso({ marca: caso.marca, modelo: caso.modelo, tecnico: caso.tecnico || 'Marshall Cell', sintomas: caso.sintomas, protocolo: caso.protocolo || '', solucionEmpleada: caso.solucionEmpleada || '', imgUrl: caso.imgUrl || '', estadoReparacion: caso.estadoReparacion || 'Pendiente', hardware: caso.hardware || { cpu: '', memoria: '', pmic: '' }, consumoUsb: caso.consumoUsb || { voltaje: '', corriente: '', comportamiento: '', conBateria: '', sinBateria: '' }, consumoFuente: caso.consumoFuente || { inicial: '', postPower: '', comportamiento: '' }, lineasAfectadas: caso.lineasAfectadas || [] }); setCasoEditando(caso.id); setHistorialCasosVisible(false); setBitacoraVisible(true); }} style={{ background: 'rgba(234, 179, 8, 0.1)', border: '1px solid rgba(234, 179, 8, 0.3)', color: '#eab308', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center' }} title="Editar"><Edit size={14} /></button>
+                              <button onClick={() => abrirReporte(caso)} style={{ background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.3)', color: '#3b82f6', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center' }} title="Ver reporte"><FileText size={14} /></button>
+                              <button onClick={() => eliminarCaso(caso.id)} style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#ef4444', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center' }} title="Eliminar"><Trash2 size={14} /></button>
                             </div>
-                          </div>
-                          <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-                            <button onClick={() => { setFormCaso({ marca: caso.marca, modelo: caso.modelo, tecnico: caso.tecnico || 'Marshall Cell', sintomas: caso.sintomas, protocolo: caso.protocolo || '', solucionEmpleada: caso.solucionEmpleada || '', imgUrl: caso.imgUrl || '', estadoReparacion: caso.estadoReparacion || 'Pendiente', hardware: caso.hardware || { cpu: '', memoria: '', pmic: '' }, consumoUsb: caso.consumoUsb || { voltaje: '', corriente: '', comportamiento: '', conBateria: '', sinBateria: '' }, consumoFuente: caso.consumoFuente || { inicial: '', postPower: '', comportamiento: '' }, lineasAfectadas: caso.lineasAfectadas || [] }); setCasoEditando(caso.id); setHistorialCasosVisible(false); setBitacoraVisible(true); }} style={{ background: 'rgba(234, 179, 8, 0.1)', border: '1px solid rgba(234, 179, 8, 0.3)', color: '#eab308', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center' }} title="Editar"><Edit size={14} /></button>
-                            <button onClick={() => abrirReporte(caso)} style={{ background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.3)', color: '#3b82f6', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center' }} title="Ver reporte"><FileText size={14} /></button>
-                            <button onClick={() => eliminarCaso(caso.id)} style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#ef4444', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center' }} title="Eliminar"><Trash2 size={14} /></button>
                           </div>
                         </div>
-                      </div>
                       );
                     })}
                   </div>
