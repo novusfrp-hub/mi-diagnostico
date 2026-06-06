@@ -551,15 +551,28 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     chunksRef.current = [];
-    const stream = canvas.captureStream(30); // 30 FPS
+    
+    // Capturar a 20 FPS (más liviano y previene bloqueos de GPU)
+    const stream = canvas.captureStream(20); 
 
-    let options = { mimeType: 'video/webm;codecs=vp9' };
-    if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-      options = { mimeType: 'video/webm;codecs=vp8' };
+    // Selección robusta de Códecs (VP8 y H.264 prioritarios sobre VP9 para evitar caídas de GPU en Windows)
+    let options = {};
+    const candidateMimeTypes = [
+      'video/webm;codecs=vp8',
+      'video/webm;codecs=h264',
+      'video/webm',
+      'video/mp4;codecs=h264',
+      'video/mp4'
+    ];
+    
+    let selectedMimeType = 'video/webm';
+    for (const mime of candidateMimeTypes) {
+      if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(mime)) {
+        selectedMimeType = mime;
+        break;
+      }
     }
-    if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-      options = { mimeType: 'video/webm' };
-    }
+    options.mimeType = selectedMimeType;
 
     try {
       const recorder = new MediaRecorder(stream, options);
@@ -569,17 +582,20 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
         }
       };
       recorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: 'video/webm' });
+        const ext = selectedMimeType.includes('mp4') ? 'mp4' : 'webm';
+        const blob = new Blob(chunksRef.current, { type: selectedMimeType });
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
-        link.download = `Oscilograma_Marshall_${new Date().toISOString().slice(0, 19).replace(/[:]/g, "-")}.webm`;
+        link.download = `Oscilograma_Marshall_${new Date().toISOString().slice(0, 19).replace(/[:]/g, "-")}.${ext}`;
         link.href = url;
         link.click();
         chunksRef.current = [];
       };
 
       mediaRecorderRef.current = recorder;
-      recorder.start();
+      
+      // Iniciar con timeslices de 1000ms para vaciar el búfer de GPU a RAM y prevenir caídas
+      recorder.start(1000);
       setGrabando(true);
     } catch (err) {
       alert("Error al iniciar la grabación: " + err.message);
