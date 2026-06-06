@@ -128,14 +128,21 @@ const VisorHUD = ({ valor, unidad, conectado, conectarFn, desconectarFn, vozActi
   );
 };
 
-const OscilogramaPanel = ({ valor, unidad, escalaActiva, onClose }) => {
+const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
   const [pausado, setPausado] = useState(false);
   const [maxPuntos, setMaxPuntos] = useState(150);
+  const [grabando, setGrabando] = useState(false);
+
   const canvasRef = useRef(null);
   const puntosRef = useRef([]);
+  const mousePosRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const chunksRef = useRef([]);
+  const animFrameIdRef = useRef(null);
+
+  // States to reflect in HTML backup below
   const [minVal, setMinVal] = useState(null);
   const [maxVal, setMaxVal] = useState(null);
-  const [mousePos, setMousePos] = useState(null);
 
   useEffect(() => {
     puntosRef.current = [];
@@ -148,83 +155,105 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, onClose }) => {
     if (puntos.length > maxPuntos) {
       puntosRef.current = puntos.slice(puntos.length - maxPuntos);
     }
-    dibujarGrafico();
   }, [maxPuntos]);
 
-  useEffect(() => {
-    if (pausado || valor === '----' || valor === '---' || valor === undefined || valor === null || valor === '' || valor === 'OL') return;
-
-    let valNum = parseFloat(valor);
-    if (isNaN(valNum)) return;
-
-    const puntos = puntosRef.current;
-    puntos.push(valNum);
-    if (puntos.length > maxPuntos) {
-      puntos.shift();
-    }
-
-    let currentMin = puntos[0];
-    let currentMax = puntos[0];
-    for (let i = 1; i < puntos.length; i++) {
-      if (puntos[i] < currentMin) currentMin = puntos[i];
-      if (puntos[i] > currentMax) currentMax = puntos[i];
-    }
-    setMinVal(currentMin);
-    setMaxVal(currentMax);
-
-    dibujarGrafico();
-  }, [valor, pausado, maxPuntos]);
+  const valorRef = useRef(valor);
+  const unidadRef = useRef(unidad);
 
   useEffect(() => {
-    dibujarGrafico();
-  }, [pausado, mousePos]);
+    valorRef.current = valor;
+    unidadRef.current = unidad;
+  }, [valor, unidad]);
+
+  useEffect(() => {
+    if (pausado) return;
+
+    const intervalId = setInterval(() => {
+      let valStr = valorRef.current;
+      let valNum = 0.0;
+
+      if (valStr === '----' || valStr === '---' || valStr === undefined || valStr === null || valStr === '' || valStr === 'OL') {
+        valNum = 0.0;
+      } else {
+        valNum = parseFloat(valStr);
+        if (isNaN(valNum)) valNum = 0.0;
+      }
+
+      const puntos = puntosRef.current;
+      puntos.push(valNum);
+      if (puntos.length > maxPuntos) {
+        puntos.shift();
+      }
+
+      if (puntos.length > 0) {
+        let currentMin = puntos[0];
+        let currentMax = puntos[0];
+        for (let i = 1; i < puntos.length; i++) {
+          if (puntos[i] < currentMin) currentMin = puntos[i];
+          if (puntos[i] > currentMax) currentMax = puntos[i];
+        }
+        setMinVal(currentMin);
+        setMaxVal(currentMax);
+      }
+    }, 100);
+
+    return () => clearInterval(intervalId);
+  }, [pausado, maxPuntos]);
 
   const dibujarGrafico = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
 
-    const rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width;
-    canvas.height = rect.height;
+    const W = 1280;
+    const H = 720;
+    canvas.width = W;
+    canvas.height = H;
 
-    const W = canvas.width;
-    const H = canvas.height;
-
-    ctx.fillStyle = "#111827";
+    // Background
+    ctx.fillStyle = "#0d1117";
     ctx.fillRect(0, 0, W, H);
 
-    // Grid lines starting from X=55
-    ctx.strokeStyle = "#1f2937";
+    const graphLeft = 110;
+    const graphRight = W - 40;
+    const graphWidth = graphRight - graphLeft;
+
+    // Grid step
+    ctx.strokeStyle = "#1f293d";
     ctx.lineWidth = 1;
-    const gridSize = 25;
-    for (let x = 55; x < W; x += gridSize) {
+    const gridSize = 50;
+
+    // Draw vertical grid lines
+    for (let x = graphLeft; x <= graphRight; x += gridSize) {
       ctx.beginPath();
       ctx.moveTo(x, 0);
       ctx.lineTo(x, H);
       ctx.stroke();
     }
+
+    // Draw horizontal grid lines
     for (let y = 0; y < H; y += gridSize) {
       ctx.beginPath();
-      ctx.moveTo(55, y);
-      ctx.lineTo(W, y);
+      ctx.moveTo(graphLeft, y);
+      ctx.lineTo(graphRight, y);
       ctx.stroke();
     }
 
-    // Left vertical axis line at X=55
+    // Main vertical axis line Y
     ctx.strokeStyle = "#374151";
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(55, 0);
-    ctx.lineTo(55, H);
+    ctx.moveTo(graphLeft, 0);
+    ctx.lineTo(graphLeft, H);
     ctx.stroke();
 
     const puntos = puntosRef.current;
     if (puntos.length === 0) {
-      ctx.fillStyle = "gray";
-      ctx.font = "12px Consolas";
+      ctx.fillStyle = "#8b949e";
+      ctx.font = "bold 24px Consolas, monospace";
       ctx.textAlign = "center";
-      ctx.fillText("Esperando lecturas...", W / 2, H / 2);
+      ctx.fillText("Esperando lecturas...", W / 2 + 30, H / 2);
+      dibujarHeaderYWatermark(ctx, W, H);
       return;
     }
 
@@ -258,19 +287,19 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, onClose }) => {
       }
     }
 
+    // Plot line with Neon Glow
     ctx.strokeStyle = "#00ffff";
-    ctx.lineWidth = 2.5;
+    ctx.lineWidth = 4.5;
     ctx.shadowColor = "#00ffff";
-    ctx.shadowBlur = 8;
+    ctx.shadowBlur = 12;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
 
     ctx.beginPath();
     const len = puntos.length;
     for (let i = 0; i < len; i++) {
-      // Start plot at X=60, go to W-15 (i.e. plot width = W - 75)
-      const x = (i / (maxPuntos - 1 || 1)) * (W - 75) + 60;
-      const y = H - ((puntos[i] - min) / range) * (H - 40) - 20;
+      const x = (i / (maxPuntos - 1 || 1)) * graphWidth + graphLeft;
+      const y = H - 85 - ((puntos[i] - min) / (range || 1)) * (H - 150);
 
       if (i === 0) {
         ctx.moveTo(x, y);
@@ -280,79 +309,240 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, onClose }) => {
     }
     ctx.stroke();
 
-    ctx.shadowBlur = 0;
+    ctx.shadowBlur = 0; // reset shadow glow
 
-    // Draw Y-axis text labels on the left (X=50, textAlign="right")
-    ctx.fillStyle = "rgba(156, 163, 175, 0.8)";
-    ctx.font = "10px Consolas";
+    // Draw Y-axis text labels on the left (X=95, textAlign="right")
+    ctx.fillStyle = "#8b949e";
+    ctx.font = "bold 16px Consolas, monospace";
     ctx.textAlign = "right";
-    ctx.fillText(`${max.toFixed(3)} ${unidad}`, 50, 18);
-    ctx.fillText(`${((min + max) / 2).toFixed(3)} ${unidad}`, 50, H / 2 + 4);
-    ctx.fillText(`${min.toFixed(3)} ${unidad}`, 50, H - 10);
+    ctx.fillText(`${max.toFixed(3)} ${unidad}`, 95, 35);
+    ctx.fillText(`${((min + max) / 2).toFixed(3)} ${unidad}`, 95, H / 2 - 15);
+    ctx.fillText(`${min.toFixed(3)} ${unidad}`, 95, H - 75);
 
-    // Draw hover guide and tooltip if paused and mouse is over the graph
+    // Draw watermark and header overlays
+    dibujarHeaderYWatermark(ctx, W, H);
+
+    // Draw stats box inside canvas
+    dibujarStatsBox(ctx, W, H, min, max);
+
+    // Draw interactive hover guide and tooltip if paused and mouse is active
+    const mousePos = mousePosRef.current;
     if (pausado && mousePos) {
-      const len = puntos.length;
-      if (len > 0) {
-        const plotWidth = W - 75;
-        const relativeX = mousePos.x - 60;
-        let pct = relativeX / plotWidth;
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = W / rect.width;
+      const scaleY = H / rect.height;
+      const canvasMouseX = mousePos.x * scaleX;
+      const canvasMouseY = mousePos.y * scaleY;
+
+      if (canvasMouseX >= graphLeft && canvasMouseX <= graphRight) {
+        const relativeX = canvasMouseX - graphLeft;
+        let pct = relativeX / graphWidth;
         if (pct < 0) pct = 0;
         if (pct > 1) pct = 1;
 
         const index = Math.round(pct * (maxPuntos - 1));
         if (index >= 0 && index < len) {
           const ptVal = puntos[index];
-          const ptX = (index / (maxPuntos - 1 || 1)) * (W - 75) + 60;
-          const ptY = H - ((ptVal - min) / range) * (H - 40) - 20;
+          const ptX = (index / (maxPuntos - 1 || 1)) * graphWidth + graphLeft;
+          const ptY = H - 85 - ((ptVal - min) / (range || 1)) * (H - 150);
 
-          // Vertical guide line
-          ctx.strokeStyle = "rgba(6, 182, 212, 0.4)";
-          ctx.lineWidth = 1;
-          ctx.setLineDash([4, 4]);
+          // Vertical guide
+          ctx.strokeStyle = "rgba(6, 182, 212, 0.5)";
+          ctx.lineWidth = 1.5;
+          ctx.setLineDash([6, 6]);
           ctx.beginPath();
           ctx.moveTo(ptX, 10);
-          ctx.lineTo(ptX, H - 10);
+          ctx.lineTo(ptX, H - 70);
           ctx.stroke();
           ctx.setLineDash([]);
 
-          // Circle indicator
+          // Glowing circle indicator
           ctx.fillStyle = "#00ffff";
           ctx.beginPath();
-          ctx.arc(ptX, ptY, 5, 0, 2 * Math.PI);
+          ctx.arc(ptX, ptY, 8, 0, 2 * Math.PI);
           ctx.fill();
           ctx.strokeStyle = "#ffffff";
-          ctx.lineWidth = 1.5;
+          ctx.lineWidth = 2.5;
           ctx.stroke();
 
-          // Tooltip text & box
+          // Tooltip box and text
           const tooltipText = `${ptVal.toFixed(4)} ${unidad}`;
-          ctx.font = "bold 11px Consolas";
+          ctx.font = "bold 16px Consolas, monospace";
           const textWidth = ctx.measureText(tooltipText).width;
-          const boxWidth = textWidth + 16;
-          const boxHeight = 22;
+          const boxWidth = textWidth + 24;
+          const boxHeight = 32;
 
           let boxX = ptX - boxWidth / 2;
-          let boxY = ptY - 30;
+          let boxY = ptY - 45;
 
-          if (boxX < 60) boxX = 60;
-          if (boxX + boxWidth > W - 10) boxX = W - 10 - boxWidth;
-          if (boxY < 10) boxY = ptY + 15;
+          if (boxX < graphLeft) boxX = graphLeft;
+          if (boxX + boxWidth > graphRight) boxX = graphRight - boxWidth;
+          if (boxY < 10) boxY = ptY + 20;
 
-          ctx.fillStyle = "#000000";
+          ctx.fillStyle = "rgba(0, 0, 0, 0.95)";
           ctx.beginPath();
-          ctx.rect(boxX, boxY, boxWidth, boxHeight);
+          if (ctx.roundRect) {
+            ctx.roundRect(boxX, boxY, boxWidth, boxHeight, 6);
+          } else {
+            ctx.rect(boxX, boxY, boxWidth, boxHeight);
+          }
           ctx.fill();
           ctx.strokeStyle = "#00ffff";
-          ctx.lineWidth = 1.5;
+          ctx.lineWidth = 2;
           ctx.stroke();
 
           ctx.fillStyle = "#00ffff";
           ctx.textAlign = "center";
-          ctx.fillText(tooltipText, boxX + boxWidth / 2, boxY + 15);
+          ctx.fillText(tooltipText, boxX + boxWidth / 2, boxY + 21);
         }
       }
     }
+  };
+
+  const dibujarHeaderYWatermark = (ctx, W, H) => {
+    // 1. Branding: MARSHALL CELL - ANALYZER
+    ctx.textAlign = "right";
+    ctx.fillStyle = "#00ffff";
+    ctx.font = "bold 22px Arial, sans-serif";
+    ctx.fillText("MARSHALL CELL - ANALYZER", W - 40, 45);
+
+    // Current Date/Time dynamic
+    const now = new Date();
+    const timeStr = now.toLocaleDateString() + " " + now.toLocaleTimeString();
+    ctx.fillStyle = "#8b949e";
+    ctx.font = "16px Consolas, monospace";
+    ctx.fillText(timeStr, W - 40, 75);
+
+    // 2. REC indicator blinking
+    if (grabando) {
+      const recBlink = Math.floor(Date.now() / 500) % 2 === 0;
+      ctx.textAlign = "left";
+      if (recBlink) {
+        ctx.fillStyle = "#ff0000";
+        ctx.shadowColor = "#ff0000";
+        ctx.shadowBlur = 10;
+        ctx.beginPath();
+        ctx.arc(130, 37, 7, 0, 2 * Math.PI);
+        ctx.fill();
+
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 20px Arial, sans-serif";
+        ctx.fillText("REC", 145, 45);
+      } else {
+        ctx.fillStyle = "rgba(255, 0, 0, 0.4)";
+        ctx.beginPath();
+        ctx.arc(130, 37, 7, 0, 2 * Math.PI);
+        ctx.fill();
+
+        ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
+        ctx.font = "bold 20px Arial, sans-serif";
+        ctx.fillText("REC", 145, 45);
+      }
+    }
+  };
+
+  const dibujarStatsBox = (ctx, W, H, min, max) => {
+    const boxW = 440;
+    const boxH = 50;
+    const boxX = W / 2 - boxW / 2;
+    const boxY = H - 65;
+
+    ctx.fillStyle = "rgba(22, 27, 34, 0.85)";
+    ctx.strokeStyle = "#30363d";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    if (ctx.roundRect) {
+      ctx.roundRect(boxX, boxY, boxW, boxH, 8);
+    } else {
+      ctx.rect(boxX, boxY, boxW, boxH);
+    }
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.textAlign = "left";
+    ctx.font = "bold 16px Consolas, monospace";
+
+    // MIN text
+    ctx.fillStyle = "#8b949e";
+    ctx.fillText("MIN:", boxX + 25, boxY + 31);
+    ctx.fillStyle = "#ff5555";
+    ctx.fillText(`${min.toFixed(4)} ${unidad}`, boxX + 65, boxY + 31);
+
+    // Separator
+    ctx.strokeStyle = "#30363d";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(boxX + 220, boxY + 10);
+    ctx.lineTo(boxX + 220, boxY + 40);
+    ctx.stroke();
+
+    // MAX text
+    ctx.fillStyle = "#8b949e";
+    ctx.fillText("MAX:", boxX + 245, boxY + 31);
+    ctx.fillStyle = "#55ff55";
+    ctx.fillText(`${max.toFixed(4)} ${unidad}`, boxX + 285, boxY + 31);
+  };
+
+  // Continuous animation frame loop for smooth drawing and blinking clock
+  useEffect(() => {
+    const loop = () => {
+      dibujarGrafico();
+      animFrameIdRef.current = requestAnimationFrame(loop);
+    };
+    animFrameIdRef.current = requestAnimationFrame(loop);
+    return () => {
+      if (animFrameIdRef.current) {
+        cancelAnimationFrame(animFrameIdRef.current);
+      }
+    };
+  }, [escalaActiva, unidad, pausado, maxPuntos, grabando]);
+
+  const iniciarGrabacion = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    chunksRef.current = [];
+    const stream = canvas.captureStream(30); // 30 FPS
+
+    let options = { mimeType: 'video/webm;codecs=vp9' };
+    if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+      options = { mimeType: 'video/webm;codecs=vp8' };
+    }
+    if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+      options = { mimeType: 'video/webm' };
+    }
+
+    try {
+      const recorder = new MediaRecorder(stream, options);
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          chunksRef.current.push(e.data);
+        }
+      };
+      recorder.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: 'video/webm' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.download = `Oscilograma_Marshall_${new Date().toISOString().slice(0, 19).replace(/[:]/g, "-")}.webm`;
+        link.href = url;
+        link.click();
+        chunksRef.current = [];
+      };
+
+      mediaRecorderRef.current = recorder;
+      recorder.start();
+      setGrabando(true);
+    } catch (err) {
+      alert("Error al iniciar la grabación: " + err.message);
+    }
+  };
+
+  const detenerGrabacion = () => {
+    const recorder = mediaRecorderRef.current;
+    if (recorder && recorder.state !== "inactive") {
+      recorder.stop();
+    }
+    setGrabando(false);
   };
 
   const guardarFoto = () => {
@@ -360,10 +550,19 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, onClose }) => {
     if (!canvas) return;
     const url = canvas.toDataURL("image/png");
     const link = document.createElement("a");
-    link.download = `Oscilograma_${escalaActiva.toUpperCase()}_${new Date().toISOString().slice(0, 19).replace(/[:]/g, "-")}.png`;
+    link.download = `Oscilograma_Marshall_${escalaActiva.toUpperCase()}_${new Date().toISOString().slice(0, 19).replace(/[:]/g, "-")}.png`;
     link.href = url;
     link.click();
   };
+
+  useEffect(() => {
+    return () => {
+      const recorder = mediaRecorderRef.current;
+      if (recorder && recorder.state !== "inactive") {
+        recorder.stop();
+      }
+    };
+  }, []);
 
   return (
     <div style={{ backgroundColor: "#1a1a1a", border: "1px solid #333", borderRadius: "15px", padding: "12px", marginTop: "10px", width: "100%" }} className="no-print">
@@ -393,6 +592,27 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, onClose }) => {
           <button onClick={() => setPausado(!pausado)} style={{ background: pausado ? "#10b981" : "#d97706", border: "none", color: "white", padding: "4px 10px", borderRadius: "6px", fontSize: "0.7rem", fontWeight: "bold", cursor: "pointer" }}>
             {pausado ? "▶ REANUDAR" : "⏸ PAUSAR"}
           </button>
+          
+          <button
+            onClick={grabando ? detenerGrabacion : iniciarGrabacion}
+            style={{
+              background: grabando ? "#ef4444" : "#10b981",
+              border: "none",
+              color: "white",
+              padding: "4px 10px",
+              borderRadius: "6px",
+              fontSize: "0.7rem",
+              fontWeight: "bold",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "4px",
+              animation: grabando ? "pulse-record 1.5s infinite" : "none"
+            }}
+          >
+            {grabando ? "🔴 DETENER GRABACIÓN" : "🎥 GRABAR VIDEO"}
+          </button>
+
           <button onClick={guardarFoto} style={{ background: "#2563eb", border: "none", color: "white", padding: "4px 10px", borderRadius: "6px", fontSize: "0.7rem", fontWeight: "bold", cursor: "pointer" }}>
             📷 FOTO
           </button>
@@ -403,24 +623,47 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, onClose }) => {
           )}
         </div>
       </div>
-      <canvas
-        ref={canvasRef}
-        onMouseMove={(e) => {
-          const canvas = canvasRef.current;
-          if (!canvas) return;
-          const rect = canvas.getBoundingClientRect();
-          setMousePos({
-            x: e.clientX - rect.left,
-            y: e.clientY - rect.top
-          });
-        }}
-        onMouseLeave={() => setMousePos(null)}
-        style={{ width: "100%", height: "180px", backgroundColor: "#111827", borderRadius: "8px", border: "1px solid #222", display: "block", cursor: pausado ? "crosshair" : "default" }}
-      />
-      <div style={{ display: "flex", justifyContent: "space-between", marginTop: "6px", fontSize: "0.7rem", color: "gray" }}>
-        <span>MIN: <strong style={{ color: "#ff5555" }}>{minVal !== null ? `${minVal.toFixed(3)} ${unidad}` : "----"}</strong></span>
-        <span>MAX: <strong style={{ color: "#55ff55" }}>{maxVal !== null ? `${maxVal.toFixed(3)} ${unidad}` : "----"}</strong></span>
+
+      <div style={{ maxWidth: "664px", margin: "0 auto", width: "100%", aspectRatio: "16/9", position: "relative" }}>
+        <canvas
+          ref={canvasRef}
+          onMouseMove={(e) => {
+            const canvas = canvasRef.current;
+            if (!canvas) return;
+            const rect = canvas.getBoundingClientRect();
+            mousePosRef.current = {
+              x: e.clientX - rect.left,
+              y: e.clientY - rect.top
+            };
+          }}
+          onMouseLeave={() => {
+            mousePosRef.current = null;
+          }}
+          style={{
+            width: "100%",
+            height: "auto",
+            aspectRatio: "16/9",
+            backgroundColor: "#0d1117",
+            borderRadius: "8px",
+            border: "1px solid #222",
+            display: "block",
+            cursor: pausado ? "crosshair" : "default"
+          }}
+        />
       </div>
+
+      <div style={{ display: "flex", justifyContent: "space-between", marginTop: "6px", fontSize: "0.7rem", color: "gray", padding: "0 4px" }}>
+        <span>MIN: <strong style={{ color: "#ff5555" }}>{minVal !== null ? `${minVal.toFixed(4)} ${unidad}` : "----"}</strong></span>
+        <span>MAX: <strong style={{ color: "#55ff55" }}>{maxVal !== null ? `${maxVal.toFixed(4)} ${unidad}` : "----"}</strong></span>
+      </div>
+
+      <style dangerouslySetInnerHTML={{__html: `
+        @keyframes pulse-record {
+          0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+          70% { transform: scale(1.03); box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+          100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+      `}} />
     </div>
   );
 };
@@ -478,7 +721,7 @@ export default function AppDiagnostico() {
 
 
   // ESTADOS MULTÍMETRO
-  const [usbConectado, setUsbConectado] = useState(false); const [lecturaUsb, setLecturaUsb] = useState({ valor: '----', unidad: '---' }); const [dispositivoUsb, setDispositivoUsb] = useState(null); const ordenCamposDock = ['vbus', 'dp', 'dm', 'cc1', 'cc2']; const [campoActivoDock, setCampoActivoDock] = useState('vbus'); const [pinActivoFpc, setPinActivoFpc] = useState(1); const [modoFpc, setModoFpc] = useState('crear'); const [escalaFpc, setEscalaFpc] = useState('diodo');
+  const [usbConectado, setUsbConectado] = useState(false); const [lecturaUsb, setLecturaUsb] = useState({ valor: '----', unidad: '---', tick: 0 }); const [dispositivoUsb, setDispositivoUsb] = useState(null); const ordenCamposDock = ['vbus', 'dp', 'dm', 'cc1', 'cc2']; const [campoActivoDock, setCampoActivoDock] = useState('vbus'); const [pinActivoFpc, setPinActivoFpc] = useState(1); const [modoFpc, setModoFpc] = useState('crear'); const [escalaFpc, setEscalaFpc] = useState('diodo');
 
   // ESTADOS RFFE
   const [lecturaRffe, setLecturaRffe] = useState('0x00'); const [dispositivoSerial, setDispositivoSerial] = useState(null);
@@ -757,7 +1000,7 @@ export default function AppDiagnostico() {
         }
 
         if (parsedVal !== null && parsedUni !== null) {
-          setLecturaUsb({ valor: parsedVal, unidad: parsedUni });
+          setLecturaUsb(prev => ({ valor: parsedVal, unidad: parsedUni, tick: prev.tick + 1 }));
           if (autoHoldActivoRef.current) {
             const valNum = parseFloat(parsedVal);
             const esIncorrecta = (escalaActiva === 'diodo' && (parsedUni !== 'Diod' && parsedUni !== 'V')) ||
@@ -796,7 +1039,7 @@ export default function AppDiagnostico() {
       });
     } catch (error) { alert("Error USB."); }
   };
-  const desconectarMultimetroUSB = async () => { if (dispositivoUsb) { try { await dispositivoUsb.close(); } catch (e) { } setDispositivoUsb(null); } setUsbConectado(false); setLecturaUsb({ valor: '----', unidad: '---' }); };
+  const desconectarMultimetroUSB = async () => { if (dispositivoUsb) { try { await dispositivoUsb.close(); } catch (e) { } setDispositivoUsb(null); } setUsbConectado(false); setLecturaUsb({ valor: '----', unidad: '---', tick: 0 }); };
 
   // WEBSERIAL RFFE (RP2040)
   const conectarEscanerRFFE = async () => {
@@ -1464,6 +1707,7 @@ export default function AppDiagnostico() {
                           ? (seccionLibreria === 'ic' ? escalaIc : escalaFpc)
                           : 'amperio'
                       }
+                      tick={lecturaUsb.tick}
                       onClose={() => setMostrarOscilograma(false)}
                     />
                   )}
