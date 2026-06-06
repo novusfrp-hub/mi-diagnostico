@@ -8,6 +8,7 @@ import { Sun, Moon, ArrowLeft, RefreshCcw, Zap, Smartphone, AlertTriangle, Chevr
 
 import FPCInteligente from '../components/FPCInteligente.js';
 import ICInteligente from '../components/ICInteligente.js';
+import FPCBateria from '../components/FPCBateria.js';
 import EscanerRFFE from '../components/EscanerRFFE.js';
 import FormularioIngresoAvanzado from '../components/FormularioIngresoAvanzado.js';
 import VisorReporteAvanzado from '../components/VisorReporteAvanzado.js';
@@ -314,6 +315,23 @@ export default function AppDiagnostico() {
   const [tipoImagenViendo, setTipoImagenViendo] = useState('placa');
   const [modalFpcAbierto, setModalFpcAbierto] = useState(false);
 
+  const [tiposCustom, setTiposCustom] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('tipos_lineas_disponibles');
+      if (saved) {
+        try { return JSON.parse(saved); } catch (e) {}
+      }
+    }
+    return [];
+  });
+  useEffect(() => {
+    localStorage.setItem('tipos_lineas_disponibles', JSON.stringify(tiposCustom));
+  }, [tiposCustom]);
+
+  const [pinActivoFpcBateria, setPinActivoFpcBateria] = useState(1);
+  const [modoFpcBateria, setModoFpcBateria] = useState('crear');
+  const [escalaFpcBateria, setEscalaFpcBateria] = useState('diodo');
+
   // ESTADOS LIBRERÍA IC
   const [icActivo, setIcActivo] = useState(null);
   const [modalIcAbierto, setModalIcAbierto] = useState(false);
@@ -348,6 +366,10 @@ export default function AppDiagnostico() {
   const modoIcRef = useRef(modoIc); useEffect(() => { modoIcRef.current = modoIc; }, [modoIc]);
   const escalaIcRef = useRef(escalaIc); useEffect(() => { escalaIcRef.current = escalaIc; }, [escalaIc]);
 
+  const pinActivoFpcBateriaRef = useRef(pinActivoFpcBateria); useEffect(() => { pinActivoFpcBateriaRef.current = pinActivoFpcBateria; }, [pinActivoFpcBateria]);
+  const modoFpcBateriaRef = useRef(modoFpcBateria); useEffect(() => { modoFpcBateriaRef.current = modoFpcBateria; }, [modoFpcBateria]);
+  const escalaFpcBateriaRef = useRef(escalaFpcBateria); useEffect(() => { escalaFpcBateriaRef.current = escalaFpcBateria; }, [escalaFpcBateria]);
+
   const [autoHoldActivo, setAutoHoldActivo] = useState(false); const autoHoldActivoRef = useRef(autoHoldActivo); useEffect(() => { autoHoldActivoRef.current = autoHoldActivo; }, [autoHoldActivo]);
   const lecturaRffeRef = useRef(lecturaRffe); useEffect(() => { lecturaRffeRef.current = lecturaRffe; }, [lecturaRffe]);
   const autoHoldValueRef = useRef(null); const autoHoldStartTimeRef = useRef(0); const autoHoldTriggeredRef = useRef(false);
@@ -357,16 +379,23 @@ export default function AppDiagnostico() {
     setSeccionLibreria(nuevaSeccion);
     setPinActivoFpc(1);
     setPadActivoIc('A1');
+    setPinActivoFpcBateria(1);
     setCampoActivoDock('vbus');
     setModoFpc('crear');
     setModoIc('crear');
+    setModoFpcBateria('crear');
   };
 
   const reproducirBip = () => { try { const audioCtx = new (window.AudioContext || window.webkitAudioContext)(); const oscillator = audioCtx.createOscillator(); oscillator.type = 'sine'; oscillator.frequency.setValueAtTime(1200, audioCtx.currentTime); oscillator.connect(audioCtx.destination); oscillator.start(); oscillator.stop(audioCtx.currentTime + 0.1); } catch (e) { } };
 
   // GUARDADO UNIVERSAL
   const avanzarPinMagico = (valorForzado = null) => {
-    const escalaActiva = seccionLibreriaRef.current === 'ic' ? escalaIcRef.current : escalaFpcRef.current;
+    let escalaActiva = escalaFpcRef.current;
+    if (seccionLibreriaRef.current === 'ic') {
+      escalaActiva = escalaIcRef.current;
+    } else if (seccionLibreriaRef.current === 'fpc_bateria') {
+      escalaActiva = escalaFpcBateriaRef.current;
+    }
     const escalaMultimetro = lecturaUsbRef.current.unidad;
     const esIncorrecta = usbConectado && (
       (escalaActiva === 'diodo' && (escalaMultimetro === 'uA' || escalaMultimetro === 'mA' || escalaMultimetro === 'A')) ||
@@ -473,6 +502,39 @@ export default function AppDiagnostico() {
           }
           return nextIdx < icAct.pines.length ? icAct.pines[nextIdx].id : prev;
         });
+      } else if (seccion === 'fpc_bateria' && modeloActualizado.fpcBateria) {
+        const bateriaAct = modeloActualizado.fpcBateria;
+        const escala = escalaFpcBateriaRef.current;
+        const mBateria = modoFpcBateriaRef.current;
+        const pinAct = pinActivoFpcBateriaRef.current;
+        const nuevosPines = bateriaAct.pines.map(p => {
+          if (p.id === pinAct) {
+            return {
+              ...p,
+              valorSanoDiodo: (mBateria === 'crear' && escala === 'diodo' ? valVivo : (p.valorSanoDiodo ?? '---')),
+              valorSanoUa: (mBateria === 'crear' && escala === 'ua' ? valVivo : (p.valorSanoUa ?? '---')),
+              valorSanoOhmio: (mBateria === 'crear' && escala === 'ohmio' ? valVivo : (p.valorSanoOhmio ?? '---')),
+              valorSano: (mBateria === 'crear' ? valVivo : (p.valorSano ?? '---')),
+              valorActual: (mBateria !== 'crear' ? valVivo : (p.valorActual ?? '---')),
+              valorActualDiodo: (mBateria !== 'crear' && escala === 'diodo' ? valVivo : (p.valorActualDiodo ?? '---')),
+              valorActualUa: (mBateria !== 'crear' && escala === 'ua' ? valVivo : (p.valorActualUa ?? '---')),
+              valorActualOhmio: (mBateria !== 'crear' && escala === 'ohmio' ? valVivo : (p.valorActualOhmio ?? '---'))
+            };
+          }
+          return p;
+        });
+        const bateriaMod = { ...bateriaAct, pines: nuevosPines };
+        modeloActualizado.fpcBateria = bateriaMod;
+        setModeloActivo(modeloActualizado);
+        setCambiosPendientesFpcBateria(true);
+        setPinActivoFpcBateria(prev => {
+          let nextPin = prev + 1;
+          while (nextPin <= bateriaAct.pines.length) {
+            const pinInfo = bateriaAct.pines.find(p => p.id === nextPin);
+            if (pinInfo && (pinInfo.tipo === 'GND' || pinInfo.tipo === 'NC')) { nextPin++; } else { break; }
+          }
+          return nextPin <= bateriaAct.pines.length ? nextPin : prev;
+        });
       }
     }
   };
@@ -487,7 +549,12 @@ export default function AppDiagnostico() {
         const text = new TextDecoder("latin1").decode(event.data);
         let parsedVal = null;
         let parsedUni = null;
-        const escalaActiva = seccionLibreriaRef.current === 'ic' ? escalaIcRef.current : escalaFpcRef.current;
+        let escalaActiva = escalaFpcRef.current;
+        if (seccionLibreriaRef.current === 'ic') {
+          escalaActiva = escalaIcRef.current;
+        } else if (seccionLibreriaRef.current === 'fpc_bateria') {
+          escalaActiva = escalaFpcBateriaRef.current;
+        }
         
         if (text.includes("OL") || text.includes("?0")) {
           parsedVal = "OL";
@@ -691,6 +758,7 @@ export default function AppDiagnostico() {
       docktestOhmio: { vbus: '---', dp: '---', dm: '---', cc1: '---', cc2: '---' },
       docktestAmperio: { vbus: '---', dp: '---', dm: '---', cc1: '---', cc2: '---' }
     };
+    nuevoObj.fpcBateria = inicializarFpcBateria(nuevoObj);
     try {
       await setDoc(doc(db, "hardware_db", idUnico), sanitizarObjetoParaFirestore(nuevoObj));
       setFormNuevoModelo({ marca: '', nombre: '' });
@@ -811,6 +879,58 @@ export default function AppDiagnostico() {
     } 
   };
 
+  const esIPhoneModelo = (mod) => {
+    const marca = (mod.marca || '').toLowerCase();
+    const nombre = (mod.nombre || '').toLowerCase();
+    return marca.includes('iphone') || nombre.includes('iphone');
+  };
+
+  const inicializarFpcBateria = (modelo) => {
+    const esIPhone = esIPhoneModelo(modelo);
+    const numPines = esIPhone ? 6 : 8;
+    const nombresDefecto = esIPhone 
+      ? ['PP_BATT_VCC', 'GND', 'BATT_SWI', 'BATT_NTC', 'I2C_SDA', 'I2C_SCL']
+      : ['VBAT', 'GND', 'TH', 'ID', 'VBAT', 'GND', 'NC', 'NC'];
+    const tiposDefecto = esIPhone
+      ? ['VCC', 'GND', 'DATA', 'DATA', 'DATA', 'DATA']
+      : ['VCC', 'GND', 'DATA', 'DATA', 'VCC', 'GND', 'NC', 'NC'];
+    
+    const pines = Array.from({ length: numPines }, (_, i) => ({
+      id: i + 1,
+      nombre: nombresDefecto[i],
+      tipo: tiposDefecto[i],
+      valorSanoDiodo: '---',
+      valorSanoUa: '---',
+      valorSanoOhmio: '---',
+      valorActualDiodo: '---',
+      valorActualUa: '---',
+      valorActualOhmio: '---',
+      valorSano: '---',
+      valorActual: '---'
+    }));
+
+    return {
+      id: 'bateria',
+      nombre: 'FPC Batería',
+      pines,
+      imgPlaca: '',
+      imgEsquema: '',
+      esIPhone
+    };
+  };
+
+  const editarUbicacionFpcBateria = (tipo) => {
+    if (!modeloActivo || !modeloActivo.fpcBateria) return;
+    const bat = modeloActivo.fpcBateria;
+    const actual = tipo === 'placa' ? bat.imgPlaca : bat.imgEsquema;
+    const nuevaUrl = window.prompt(`Ingresa el enlace de la imagen (${tipo}):`, actual || "");
+    if (nuevaUrl !== null) {
+      const bateriaMod = { ...bat, [tipo === 'placa' ? 'imgPlaca' : 'imgEsquema']: nuevaUrl };
+      setModeloActivo(prev => ({ ...prev, fpcBateria: bateriaMod }));
+      setCambiosPendientesFpcBateria(true);
+    }
+  };
+
   // AUTO-SAVE HÍBRIDO (localStorage + Firebase) - AHORA DESPUÉS DE guardarModeloActualDB
   const {
     cambiosPendientes: cambiosPendientesFpc,
@@ -833,6 +953,18 @@ export default function AppDiagnostico() {
   } = useAutoSave(
     icActivo ? `ic_borrador_${modeloActivo?.id}_${icActivo.id}` : null,
     icActivo,
+    guardarModeloActualDB
+  );
+
+  const {
+    cambiosPendientes: cambiosPendientesFpcBateria,
+    guardando: guardandoFpcBateria,
+    ultimaSincronizacion: ultimaSincFpcBateria,
+    sincronizarAhora: sincronizarFpcBateriaAhora,
+    descartarCambios: descartarCambiosFpcBateria
+  } = useAutoSave(
+    modeloActivo ? `fpc_bateria_borrador_${modeloActivo.id}` : null,
+    modeloActivo?.fpcBateria || null,
     guardarModeloActualDB
   );
 
@@ -957,6 +1089,37 @@ export default function AppDiagnostico() {
     );
   };
 
+  const BotonesImagenFpcBateria = ({ compacto = false }) => {
+    if (!modeloActivo || !modeloActivo.fpcBateria) return null;
+    const bat = modeloActivo.fpcBateria;
+    return (
+      <div style={{ display: 'flex', gap: '5px' }}>
+        {bat.imgPlaca ? (
+          <button onClick={() => { setTipoImagenViendo('placa_bateria'); setImagenFpcVisible(true); }} 
+            style={{ padding: compacto ? '4px 8px' : '6px 10px', borderRadius: '6px', border: 'none', background: '#3b82f6', color: 'white', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', fontSize: compacto ? '0.65rem' : '0.75rem' }}>
+            <ImageIcon size={compacto ? 12 : 14} /> {compacto ? '' : 'Placa'}
+          </button>
+        ) : (
+          <button onClick={() => editarUbicacionFpcBateria('placa')} 
+            style={{ padding: compacto ? '4px 8px' : '6px 10px', borderRadius: '6px', border: '1px dashed #4b5563', background: 'transparent', color: '#9ca3af', fontWeight: 'bold', cursor: 'pointer', fontSize: compacto ? '0.6rem' : '0.7rem' }}>
+            + Placa
+          </button>
+        )}
+        {bat.imgEsquema ? (
+          <button onClick={() => { setTipoImagenViendo('esquema_bateria'); setImagenFpcVisible(true); }} 
+            style={{ padding: compacto ? '4px 8px' : '6px 10px', borderRadius: '6px', border: 'none', background: '#8b5cf6', color: 'white', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', fontSize: compacto ? '0.65rem' : '0.75rem' }}>
+            <Map size={compacto ? 12 : 14} /> {compacto ? '' : 'Esquema'}
+          </button>
+        ) : (
+          <button onClick={() => editarUbicacionFpcBateria('esquema')} 
+            style={{ padding: compacto ? '4px 8px' : '6px 10px', borderRadius: '6px', border: '1px dashed #4b5563', background: 'transparent', color: '#9ca3af', fontWeight: 'bold', cursor: 'pointer', fontSize: compacto ? '0.6rem' : '0.7rem' }}>
+            + Esquema
+          </button>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div style={{ ...estilos.contenedor, ...t.fondoPrincipal }}>
       <style>{`
@@ -1047,7 +1210,17 @@ export default function AppDiagnostico() {
                 </div>
                 <div style={{ flex: 1, overflowY: 'auto', padding: '10px' }}>
                   {modelosLibreria.map(mod => (
-                    <button key={mod.id} onClick={() => { setModeloActivo(mod); setFpcActivo(mod.fpcs?.[0] || null); setIcActivo(mod.ics?.[0] || null); setCambiosPendientesDocktest(false); }} style={{ width: '100%', padding: '12px', textAlign: 'left', backgroundColor: modeloActivo?.id === mod.id ? '#1f2937' : 'transparent', border: 'none', color: modeloActivo?.id === mod.id ? '#00ffff' : '#9ca3af', borderLeft: modeloActivo?.id === mod.id ? '4px solid #00ffff' : '4px solid transparent', cursor: 'pointer', borderRadius: '0 8px 8px 0', marginBottom: '5px', fontWeight: 'bold' }}>
+                    <button key={mod.id} onClick={() => {
+                      let modConBateria = { ...mod };
+                      if (!modConBateria.fpcBateria) {
+                        modConBateria.fpcBateria = inicializarFpcBateria(modConBateria);
+                      }
+                      setModeloActivo(modConBateria);
+                      setFpcActivo(modConBateria.fpcs?.[0] || null);
+                      setIcActivo(modConBateria.ics?.[0] || null);
+                      setPinActivoFpcBateria(1);
+                      setCambiosPendientesDocktest(false);
+                    }} style={{ width: '100%', padding: '12px', textAlign: 'left', backgroundColor: modeloActivo?.id === mod.id ? '#1f2937' : 'transparent', border: 'none', color: modeloActivo?.id === mod.id ? '#00ffff' : '#9ca3af', borderLeft: modeloActivo?.id === mod.id ? '4px solid #00ffff' : '4px solid transparent', cursor: 'pointer', borderRadius: '0 8px 8px 0', marginBottom: '5px', fontWeight: 'bold' }}>
                       {mod.marca} {mod.nombre}
                     </button>
                   ))}
@@ -1062,13 +1235,17 @@ export default function AppDiagnostico() {
                         onClick={
                           seccionLibreria === 'ic' 
                             ? sincronizarIcAhora 
-                            : (seccionLibreria === 'docktest' ? guardarDocktestAhora : sincronizarFpcAhora)
+                            : seccionLibreria === 'fpc_bateria'
+                              ? sincronizarFpcBateriaAhora
+                              : (seccionLibreria === 'docktest' ? guardarDocktestAhora : sincronizarFpcAhora)
                         } 
                         style={{ 
                           background: (
                             seccionLibreria === 'ic' 
                               ? cambiosPendientesIc 
-                              : (seccionLibreria === 'docktest' ? cambiosPendientesDocktest : cambiosPendientesFpc)
+                              : seccionLibreria === 'fpc_bateria'
+                                ? cambiosPendientesFpcBateria
+                                : (seccionLibreria === 'docktest' ? cambiosPendientesDocktest : cambiosPendientesFpc)
                           ) ? '#f59e0b' : '#10b981', 
                           color: 'white', 
                           border: 'none', 
@@ -1086,9 +1263,11 @@ export default function AppDiagnostico() {
                           ? (guardandoIc ? 'Guardando...' : 'Guardar IC') 
                           : seccionLibreria === 'fpc'
                             ? (guardandoFpc ? 'Guardando...' : 'Guardar FPC')
-                            : seccionLibreria === 'docktest'
-                              ? (guardandoDocktest ? 'Guardando...' : 'Guardar Docktest')
-                              : (guardandoFpc ? 'Guardando...' : 'Guardar RFFE')
+                            : seccionLibreria === 'fpc_bateria'
+                              ? (guardandoFpcBateria ? 'Guardando...' : 'Guardar Batería')
+                              : seccionLibreria === 'docktest'
+                                ? (guardandoDocktest ? 'Guardando...' : 'Guardar Docktest')
+                                : (guardandoFpc ? 'Guardando...' : 'Guardar RFFE')
                         }
                       </button>
                     )}
@@ -1100,10 +1279,11 @@ export default function AppDiagnostico() {
                     <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
                       <button onClick={() => cambiarSeccionLibreria('docktest')} style={{ padding: '10px 15px', borderRadius: '8px', border: 'none', background: seccionLibreria === 'docktest' ? '#3b82f6' : '#1f2937', color: 'white', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>Docktest</button>
                       <button onClick={() => cambiarSeccionLibreria('fpc')} style={{ padding: '10px 15px', borderRadius: '8px', border: 'none', background: seccionLibreria === 'fpc' ? '#8b5cf6' : '#1f2937', color: 'white', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>Planos FPC</button>
+                      <button onClick={() => cambiarSeccionLibreria('fpc_bateria')} style={{ padding: '10px 15px', borderRadius: '8px', border: 'none', background: seccionLibreria === 'fpc_bateria' ? '#f59e0b' : '#1f2937', color: 'white', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>FPC Batería</button>
                       <button onClick={() => cambiarSeccionLibreria('ic')} style={{ padding: '10px 15px', borderRadius: '8px', border: 'none', background: seccionLibreria === 'ic' ? '#ec4899' : '#1f2937', color: 'white', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>Planos IC / BGA</button>
                       <button onClick={() => cambiarSeccionLibreria('rffe')} style={{ padding: '10px 15px', borderRadius: '8px', border: 'none', background: seccionLibreria === 'rffe' ? '#10b981' : '#1f2937', color: 'white', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>Módulo RFFE</button>
                     </div>
-                    <VisorHUD valor={lecturaUsb.valor} unidad={lecturaUsb.unidad} conectado={usbConectado} conectarFn={conectarMultimetroUSB} desconectarFn={desconectarMultimetroUSB} vozActiva={vozActiva} toggleVozFn={toggleVoz} autoHoldActivo={autoHoldActivo} toggleAutoHoldFn={() => setAutoHoldActivo(!autoHoldActivo)} capturarFn={avanzarPinMagico} escalaActiva={seccionLibreria === 'ic' ? escalaIc : escalaFpc} oscilogramaActivo={mostrarOscilograma} toggleOscilogramaFn={() => setMostrarOscilograma(!mostrarOscilograma)} />
+                    <VisorHUD valor={lecturaUsb.valor} unidad={lecturaUsb.unidad} conectado={usbConectado} conectarFn={conectarMultimetroUSB} desconectarFn={desconectarMultimetroUSB} vozActiva={vozActiva} toggleVozFn={toggleVoz} autoHoldActivo={autoHoldActivo} toggleAutoHoldFn={() => setAutoHoldActivo(!autoHoldActivo)} capturarFn={avanzarPinMagico} escalaActiva={seccionLibreria === 'ic' ? escalaIc : (seccionLibreria === 'fpc_bateria' ? escalaFpcBateria : escalaFpc)} oscilogramaActivo={mostrarOscilograma} toggleOscilogramaFn={() => setMostrarOscilograma(!mostrarOscilograma)} />
 
                     {seccionLibreria === 'docktest' && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -1163,6 +1343,44 @@ export default function AppDiagnostico() {
                             </div>
                           </div>
                         ) : (<div style={{ textAlign: 'center', padding: '50px', color: 'gray' }}><Map size={48} style={{ opacity: 0.3, marginBottom: '10px' }} /><p>Crea un FPC arriba para empezar a mapear.</p></div>)}
+                      </div>
+                    )}
+
+                    {seccionLibreria === 'fpc_bateria' && modeloActivo.fpcBateria && (
+                      <div>
+                        <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', alignItems: 'center', flexWrap: 'wrap' }}>
+                          <BotonesImagenFpcBateria />
+                          <div style={{ display: 'flex', gap: '5px', backgroundColor: '#1a1a1a', padding: '4px', borderRadius: '8px', flexWrap: 'wrap' }}>
+                            <button onClick={() => setEscalaFpcBateria('diodo')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: escalaFpcBateria === 'diodo' ? '#f59e0b' : 'transparent', color: escalaFpcBateria === 'diodo' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}>Diodo</button>
+                            <button onClick={() => setEscalaFpcBateria('ua')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: escalaFpcBateria === 'ua' ? '#10b981' : 'transparent', color: escalaFpcBateria === 'ua' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}>uA</button>
+                            <button onClick={() => setEscalaFpcBateria('ohmio')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: escalaFpcBateria === 'ohmio' ? '#a855f7' : 'transparent', color: escalaFpcBateria === 'ohmio' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}>Ohmios</button>
+                          </div>
+                          <div style={{ display: 'flex', gap: '5px', backgroundColor: '#1a1a1a', padding: '4px', borderRadius: '8px' }}>
+                            <button onClick={() => setModoFpcBateria('crear')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: modoFpcBateria === 'crear' ? '#f59e0b' : 'transparent', color: modoFpcBateria === 'crear' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}>Grabar</button>
+                            <button onClick={() => setModoFpcBateria('diagnostico')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: modoFpcBateria === 'diagnostico' ? '#ef4444' : 'transparent', color: modoFpcBateria === 'diagnostico' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}>Diagnóstico</button>
+                          </div>
+                        </div>
+
+                        <FPCBateria
+                          pines={modeloActivo.fpcBateria.pines}
+                          setPines={(updater) => {
+                            const arrNuevo = typeof updater === 'function' ? updater(modeloActivo.fpcBateria.pines) : updater;
+                            const bateriaMod = { ...modeloActivo.fpcBateria, pines: arrNuevo };
+                            setModeloActivo(prev => ({ ...prev, fpcBateria: bateriaMod }));
+                          }}
+                          pinActivo={pinActivoFpcBateria}
+                          setPinActivo={setPinActivoFpcBateria}
+                          modo={modoFpcBateria}
+                          escala={escalaFpcBateria}
+                          lecturaEnVivo={lecturaUsb.valor}
+                          tiposCustom={tiposCustom}
+                          setTiposCustom={setTiposCustom}
+                          onGuardar={sincronizarFpcBateriaAhora}
+                          cambiosPendientes={cambiosPendientesFpcBateria}
+                          guardando={guardandoFpcBateria}
+                          ultimaSincronizacion={ultimaSincFpcBateria}
+                          esIPhone={modeloActivo.fpcBateria.esIPhone}
+                        />
                       </div>
                     )}
 
@@ -1312,6 +1530,8 @@ export default function AppDiagnostico() {
                 modo={modoFpc} 
                 escala={escalaFpc} 
                 lecturaEnVivo={lecturaUsb.valor}
+                tiposCustom={tiposCustom}
+                setTiposCustom={setTiposCustom}
                 onGuardar={sincronizarFpcAhora}
                 cambiosPendientes={cambiosPendientesFpc}
                 guardando={guardandoFpc}
@@ -1397,6 +1617,8 @@ export default function AppDiagnostico() {
                 modo={modoIc} 
                 escala={escalaIc} 
                 lecturaEnVivo={lecturaUsb.valor}
+                tiposCustom={tiposCustom}
+                setTiposCustom={setTiposCustom}
                 onGuardar={sincronizarIcAhora}
                 cambiosPendientes={cambiosPendientesIc}
                 guardando={guardandoIc}
@@ -1409,12 +1631,13 @@ export default function AppDiagnostico() {
 
       {/* --- VISUALIZADOR DE IMAGENES (PLACA O ESQUEMA) --- */}
       <AnimatePresence>
-        {imagenFpcVisible && (fpcActivo || icActivo) && (
+        {imagenFpcVisible && (fpcActivo || icActivo || (modeloActivo && modeloActivo.fpcBateria)) && (
           (() => {
             const esIc = tipoImagenViendo.endsWith('_ic');
-            const itemActivo = esIc ? icActivo : fpcActivo;
+            const esBateria = tipoImagenViendo.endsWith('_bateria');
+            const itemActivo = esIc ? icActivo : (esBateria ? modeloActivo.fpcBateria : fpcActivo);
             if (!itemActivo) return null;
-            const tipoLimpio = esIc ? tipoImagenViendo.replace('_ic', '') : tipoImagenViendo;
+            const tipoLimpio = esIc ? tipoImagenViendo.replace('_ic', '') : (esBateria ? tipoImagenViendo.replace('_bateria', '') : tipoImagenViendo);
             const imgPlaca = itemActivo.imgPlaca || '';
             const imgEsquema = itemActivo.imgEsquema || '';
             const urlImg = tipoLimpio === 'placa' ? imgPlaca : imgEsquema;
@@ -1432,11 +1655,11 @@ export default function AppDiagnostico() {
                     <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
                       {imgPlaca && imgEsquema && (
                         <div style={{ display: 'flex', gap: '5px', backgroundColor: '#1a1a1a', padding: '4px', borderRadius: '8px' }}>
-                          <button onClick={() => setTipoImagenViendo(esIc ? 'placa_ic' : 'placa')} style={{ padding: '6px 10px', borderRadius: '6px', border: 'none', background: tipoLimpio === 'placa' ? '#3b82f6' : 'transparent', color: tipoLimpio === 'placa' ? 'white' : '#9ca3af', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}><ImageIcon size={14} /> Placa</button>
-                          <button onClick={() => setTipoImagenViendo(esIc ? 'esquema_ic' : 'esquema')} style={{ padding: '6px 10px', borderRadius: '6px', border: 'none', background: tipoLimpio === 'esquema' ? '#8b5cf6' : 'transparent', color: tipoLimpio === 'esquema' ? 'white' : '#9ca3af', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}><Map size={14} /> Datasheet</button>
+                          <button onClick={() => setTipoImagenViendo(esIc ? 'placa_ic' : (esBateria ? 'placa_bateria' : 'placa'))} style={{ padding: '6px 10px', borderRadius: '6px', border: 'none', background: tipoLimpio === 'placa' ? '#3b82f6' : 'transparent', color: tipoLimpio === 'placa' ? 'white' : '#9ca3af', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}><ImageIcon size={14} /> Placa</button>
+                          <button onClick={() => setTipoImagenViendo(esIc ? 'esquema_ic' : (esBateria ? 'esquema_bateria' : 'esquema'))} style={{ padding: '6px 10px', borderRadius: '6px', border: 'none', background: tipoLimpio === 'esquema' ? '#8b5cf6' : 'transparent', color: tipoLimpio === 'esquema' ? 'white' : '#9ca3af', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}><Map size={14} /> {esIc ? 'Datasheet' : 'Esquema'}</button>
                         </div>
                       )}
-                      <button onClick={() => { setImagenFpcVisible(false); setTimeout(() => { if (esIc) { editarUbicacionIc(tipoLimpio); } else { editarUbicacionFpc(tipoLimpio); } }, 300); }} style={{ background: 'transparent', border: 'none', color: '#eab308', cursor: 'pointer', fontWeight: 'bold' }}>Cambiar Foto</button>
+                      <button onClick={() => { setImagenFpcVisible(false); setTimeout(() => { if (esIc) { editarUbicacionIc(tipoLimpio); } else if (esBateria) { editarUbicacionFpcBateria(tipoLimpio); } else { editarUbicacionFpc(tipoLimpio); } }, 300); }} style={{ background: 'transparent', border: 'none', color: '#eab308', cursor: 'pointer', fontWeight: 'bold' }}>Cambiar Foto</button>
                       <button onClick={() => setImagenFpcVisible(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={24} color="white" /></button>
                     </div>
                   </div>

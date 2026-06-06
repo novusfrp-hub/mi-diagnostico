@@ -1,11 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Save, Cloud, CloudOff, Check, AlertCircle } from 'lucide-react';
 
-export default function FPCInteligente({ pines, setPines, pinActivo, setPinActivo, modo = 'diagnostico', escala = 'diodo', lecturaEnVivo, tiposDisponibles: tiposProp = ['DATA', 'VCC', 'GND', 'NC'], setTiposDisponibles, onGuardar, cambiosPendientes = false, guardando = false, ultimaSincronizacion = null }) {
-  const [tiposInternos, setTiposInternos] = useState(tiposProp);
-  const tipos = setTiposDisponibles ? tiposProp : tiposInternos;
-  const setTipos = setTiposDisponibles || setTiposInternos;
-
+export default function FPCInteligente({ pines, setPines, pinActivo, setPinActivo, modo = 'diagnostico', escala = 'diodo', lecturaEnVivo, tiposCustom = [], setTiposCustom, onGuardar, cambiosPendientes = false, guardando = false, ultimaSincronizacion = null }) {
   const mitad = Math.ceil(pines.length / 2);
   const filaSup = pines.slice(0, mitad);
   const filaInf = pines.slice(mitad);
@@ -14,13 +10,15 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
     const nuevoTipo = window.prompt('Ingrese el nombre del nuevo tipo de línea (Ej: I2C, SPI):', '');
     if (nuevoTipo && nuevoTipo.trim() !== '') {
       const tipoLimpio = nuevoTipo.trim().toUpperCase().replace(/\s+/g, '_');
-      if (!tipos.includes(tipoLimpio)) {
-        setTipos([...tipos, tipoLimpio]);
+      if (['DATA', 'VCC', 'GND', 'NC', 'VBAT', 'VBUS', 'PP_BATT', 'I2C', 'SPI', 'RFFE', 'SWI', 'UART', 'SDA', 'SCL', 'CLK', 'RESET', 'ENABLE', 'INT', 'NTC', 'ID'].includes(tipoLimpio) || tiposCustom.includes(tipoLimpio)) {
+        alert('Este tipo ya existe en la lista.');
+        return;
+      }
+      if (setTiposCustom) {
+        setTiposCustom([...tiposCustom, tipoLimpio]);
         setPines(prev => prev.map(p =>
           p.id === pinActivo ? { ...p, tipo: tipoLimpio, nombre: tipoLimpio } : p
         ));
-      } else {
-        alert('Este tipo ya existe en la lista.');
       }
     }
   };
@@ -347,23 +345,75 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
                         p.id === pinActivo ? {
                           ...p,
                           tipo: val,
-                          nombre: val
+                          nombre: val === 'GND' || val === 'NC' ? val : p.nombre
                         } : p
                       )
                     );
                   }}
                   style={{ background: '#1f2937', color: 'white', border: '1px solid #333', padding: '6px 10px', borderRadius: '5px', outline: 'none', fontSize: '0.85rem', cursor: 'pointer' }}
                 >
-                  {tipos.map(tipo => (
-                    <option key={tipo} value={tipo}>{tipo}</option>
-                  ))}
+                  <optgroup label="Alimentación">
+                    <option value="VCC">VCC</option>
+                    <option value="VBAT">VBAT</option>
+                    <option value="VBUS">VBUS</option>
+                    <option value="PP_BATT">PP_BATT</option>
+                    <option value="GND">GND</option>
+                    <option value="NC">NC</option>
+                  </optgroup>
+                  <optgroup label="Comunicación">
+                    <option value="DATA">DATA</option>
+                    <option value="I2C">I2C</option>
+                    <option value="SPI">SPI</option>
+                    <option value="RFFE">RFFE</option>
+                    <option value="SWI">SWI</option>
+                    <option value="UART">UART</option>
+                    <option value="SDA">SDA</option>
+                    <option value="SCL">SCL</option>
+                    <option value="CLK">CLK</option>
+                    <option value="GND">GND</option>
+                    <option value="NC">NC</option>
+                  </optgroup>
+                  <optgroup label="Control y Sensores">
+                    <option value="RESET">RESET</option>
+                    <option value="ENABLE">ENABLE</option>
+                    <option value="INT">INT</option>
+                    <option value="NTC">NTC</option>
+                    <option value="ID">ID</option>
+                    <option value="GND">GND</option>
+                    <option value="NC">NC</option>
+                  </optgroup>
+                  {tiposCustom.length > 0 && (
+                    <optgroup label="Personalizados">
+                      {tiposCustom.map(t => (
+                        <option key={t} value={t}>{t}</option>
+                      ))}
+                      <option value="GND">GND</option>
+                      <option value="NC">NC</option>
+                    </optgroup>
+                  )}
                 </select>
 
                 <button
                   onClick={manejarAgregarTipo}
                   style={{ background: '#0ea5e9', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '5px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}
                 >
-                  + Añadir Tipo
+                  + Tipo
+                </button>
+
+                <button
+                  onClick={() => {
+                    setPines(prev => prev.map(p => {
+                      if (p.id === pinActivo) {
+                        const scaleKey = escala === 'diodo' ? 'valorSanoDiodo' : escala === 'ua' ? 'valorSanoUa' : escala === 'voltio' ? 'valorSanoVoltio' : escala === 'ohmio' ? 'valorSanoOhmio' : 'valorSanoAmperio';
+                        return { ...p, [scaleKey]: 'OL', valorSano: 'OL' };
+                      }
+                      return p;
+                    }));
+                  }}
+                  style={{ background: '#f59e0b', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '5px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}
+                  title="Asigna OL a esta línea"
+                >
+                  OL
                 </button>
 
                 <button
@@ -382,14 +432,29 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
                 </button>
               </div>
             ) : (
-              <div style={{ marginTop: '5px', display: 'flex', alignItems: 'center' }}>
-                <span style={{ display: 'inline-block', width: '12px', height: '12px', borderRadius: '50%', backgroundColor: pines.find(p => p.id === pinActivo)?.colorCustom || '#d4af37', marginRight: '8px' }}></span>
-                <span style={{ display: 'inline-block', color: '#fff', fontSize: '0.85rem' }}>
+              <div style={{ marginTop: '5px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ display: 'inline-block', width: '12px', height: '12px', borderRadius: '50%', backgroundColor: pines.find(p => p.id === pinActivo)?.colorCustom || '#d4af37' }}></span>
+                <span style={{ color: '#fff', fontSize: '0.85rem', fontWeight: 'bold' }}>
                   {pines.find(p => p.id === pinActivo)?.nombre || 'Línea sin nombre'}
                 </span>
-                <span style={{ marginLeft: '8px', fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', background: '#374151', color: 'white', fontWeight: 'bold' }}>
+                <span style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', background: '#374151', color: 'white', fontWeight: 'bold' }}>
                   {pines.find(p => p.id === pinActivo)?.tipo || 'DATA'}
                 </span>
+                <button
+                  onClick={() => {
+                    setPines(prev => prev.map(p => {
+                      if (p.id === pinActivo) {
+                        const scaleKey = escala === 'diodo' ? 'valorActualDiodo' : escala === 'ua' ? 'valorActualUa' : escala === 'voltio' ? 'valorActualVoltio' : escala === 'ohmio' ? 'valorActualOhmio' : 'valorActualAmperio';
+                        return { ...p, [scaleKey]: 'OL', valorActual: 'OL' };
+                      }
+                      return p;
+                    }));
+                  }}
+                  style={{ background: 'rgba(245,158,11,0.2)', border: '1px solid #f59e0b', color: '#f59e0b', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.7rem', fontWeight: 'bold' }}
+                  title="Marcar medición actual como OL"
+                >
+                  Medir OL
+                </button>
               </div>
             )}
           </div>
