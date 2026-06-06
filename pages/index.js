@@ -552,8 +552,8 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
     if (!canvas) return;
     chunksRef.current = [];
     
-    // Capturar a 20 FPS (más liviano y previene bloqueos de GPU)
-    const stream = canvas.captureStream(20); 
+    // Capturar a 12 FPS (suficiente para registrar los cambios sin saturar la RAM)
+    const stream = canvas.captureStream(12); 
 
     // Selección robusta de Códecs (VP8 y H.264 prioritarios sobre VP9 para evitar caídas de GPU en Windows)
     let options = {};
@@ -590,12 +590,17 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
         link.href = url;
         link.click();
         chunksRef.current = [];
+
+        // Liberar pistas del stream para evitar fugas de memoria
+        try {
+          stream.getTracks().forEach(track => track.stop());
+        } catch(err) {
+          console.error("Error al liberar las pistas de video:", err);
+        }
       };
 
       mediaRecorderRef.current = recorder;
-      
-      // Iniciar con timeslices de 1000ms para vaciar el búfer de GPU a RAM y prevenir caídas
-      recorder.start(1000);
+      recorder.start();
       setGrabando(true);
     } catch (err) {
       alert("Error al iniciar la grabación: " + err.message);
