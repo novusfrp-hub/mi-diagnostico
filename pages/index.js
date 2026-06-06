@@ -139,6 +139,8 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
   const animFrameIdRef = useRef(null);
+  const recordCanvasRef = useRef(null);
+  const recordIntervalRef = useRef(null);
 
   // States to reflect in HTML backup below
   const [minVal, setMinVal] = useState(null);
@@ -546,14 +548,8 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
 
   // Continuous animation frame loop for smooth drawing and blinking clock
   useEffect(() => {
-    let lastFrameTime = 0;
-    const loop = (timestamp) => {
-      const fps = grabandoRef.current ? 15 : 60;
-      const interval = 1000 / fps;
-      if (timestamp - lastFrameTime >= interval) {
-        lastFrameTime = timestamp;
-        dibujarGrafico();
-      }
+    const loop = () => {
+      dibujarGrafico();
       animFrameIdRef.current = requestAnimationFrame(loop);
     };
     animFrameIdRef.current = requestAnimationFrame(loop);
@@ -565,14 +561,47 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
   }, []);
 
   const iniciarGrabacion = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    const canvasPrincipal = canvasRef.current;
+    if (!canvasPrincipal) {
+      console.error("[Recorder] Canvas principal no encontrado.");
+      return;
+    }
+    console.log("[Recorder] Iniciando grabación. Resolviendo códecs...");
+    
     chunksRef.current = [];
     
-    // Capturar a 10 FPS (óptimo para registrar cambios sin saturar RAM/V8 en Windows)
-    const stream = canvas.captureStream(10); 
+    // 1. Crear canvas offscreen para grabación (resolución reducida 640x360 para evitar sobrecarga de GPU y RAM)
+    const recordCanvas = document.createElement("canvas");
+    recordCanvas.width = 640;
+    recordCanvas.height = 360;
+    recordCanvasRef.current = recordCanvas;
+    
+    const recordCtx = recordCanvas.getContext("2d");
+    if (!recordCtx) {
+      console.error("[Recorder] No se pudo obtener el contexto 2D del canvas de grabación.");
+      return;
+    }
 
-    // Selección robusta de Códecs (VP8 y H.264 prioritarios sobre VP9 para evitar caídas de GPU en Windows)
+    // Dibujar el primer frame inmediatamente
+    recordCtx.drawImage(canvasPrincipal, 0, 0, 640, 360);
+
+    // 2. Intervalo de copia: copia el canvas principal al offscreen 10 veces por segundo (100ms)
+    // Esto es UNA SOLA operación drawImage por frame, en lugar de 60+ operaciones vectoriales individuales interceptadas
+    const recordInterval = setInterval(() => {
+      if (canvasRef.current && recordCanvasRef.current) {
+        const ctx2d = recordCanvasRef.current.getContext("2d");
+        if (ctx2d) {
+          ctx2d.drawImage(canvasRef.current, 0, 0, 640, 360);
+        }
+      }
+    }, 100);
+    recordIntervalRef.current = recordInterval;
+
+    // 3. Capturar stream del canvas offscreen
+    const stream = recordCanvas.captureStream(10); // 10 FPS estables y fijos
+    console.log("[Recorder] Stream del canvas offscreen capturado a 10 FPS:", stream);
+
+    // Selección robusta de Códecs
     let options = {};
     const candidateMimeTypes = [
       'video/webm;codecs=vp8',
@@ -590,17 +619,34 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
       }
     }
     options.mimeType = selectedMimeType;
+    console.log("[Recorder] MimeType seleccionado para la grabación:", selectedMimeType);
 
     try {
       const recorder = new MediaRecorder(stream, options);
+      
       recorder.ondataavailable = (e) => {
         if (e.data && e.data.size > 0) {
+          console.log(`[Recorder] Chunk de video disponible. Tamaño: ${e.data.size} bytes.`);
           chunksRef.current.push(e.data);
         }
       };
+
+      recorder.onerror = (err) => {
+        console.error("[Recorder] Error en MediaRecorder:", err);
+      };
+
       recorder.onstop = () => {
+        console.log("[Recorder] Grabación detenida. Generando descarga...");
         const ext = selectedMimeType.includes('mp4') ? 'mp4' : 'webm';
+        
+        if (chunksRef.current.length === 0) {
+          console.warn("[Recorder] No se capturaron chunks de video.");
+          return;
+        }
+
         const blob = new Blob(chunksRef.current, { type: selectedMimeType });
+        console.log(`[Recorder] Blob final creado. Tamaño total: ${blob.size} bytes.`);
+        
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.download = `Oscilograma_Marshall_${new Date().toISOString().slice(0, 19).replace(/[:]/g, "-")}.${ext}`;
@@ -610,6 +656,7 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
         // Liberar URL del blob en diferido para evitar fugas de memoria
         setTimeout(() => {
           URL.revokeObjectURL(url);
+          console.log("[Recorder] Blob URL temporal liberada.");
         }, 5000);
 
         chunksRef.current = [];
@@ -617,25 +664,40 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
         // Liberar pistas del stream para evitar fugas de memoria
         try {
           stream.getTracks().forEach(track => track.stop());
+          console.log("[Recorder] Pistas de video del stream detenidas correctamente.");
         } catch(err) {
-          console.error("Error al liberar las pistas de video:", err);
+          console.error("[Recorder] Error al liberar las pistas de video:", err);
         }
       };
 
       mediaRecorderRef.current = recorder;
-      recorder.start(2000); // Enviar datos cada 2 segundos para evitar llenado de buffer RAM
+      recorder.start(2000); // Guardar datos cada 2 segundos en el buffer
       setGrabando(true);
+      console.log("[Recorder] MediaRecorder iniciado correctamente (timeslice=2000ms).");
     } catch (err) {
+      console.error("[Recorder] Excepción al iniciar el grabador:", err);
       alert("Error al iniciar la grabación: " + err.message);
     }
   };
 
   const detenerGrabacion = () => {
+    console.log("[Recorder] Deteniendo grabación...");
+    
+    // Detener intervalo de copia de frames
+    if (recordIntervalRef.current) {
+      clearInterval(recordIntervalRef.current);
+      recordIntervalRef.current = null;
+      console.log("[Recorder] Intervalo de copia de frames detenido.");
+    }
+
     const recorder = mediaRecorderRef.current;
     if (recorder && recorder.state !== "inactive") {
       recorder.stop();
     }
     setGrabando(false);
+    
+    // Limpiar canvas de grabación
+    recordCanvasRef.current = null;
   };
 
   const guardarFoto = () => {
@@ -650,6 +712,9 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
 
   useEffect(() => {
     return () => {
+      if (recordIntervalRef.current) {
+        clearInterval(recordIntervalRef.current);
+      }
       const recorder = mediaRecorderRef.current;
       if (recorder && recorder.state !== "inactive") {
         recorder.stop();
