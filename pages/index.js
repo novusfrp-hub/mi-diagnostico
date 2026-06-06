@@ -546,8 +546,14 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
 
   // Continuous animation frame loop for smooth drawing and blinking clock
   useEffect(() => {
-    const loop = () => {
-      dibujarGrafico();
+    let lastFrameTime = 0;
+    const loop = (timestamp) => {
+      const fps = grabandoRef.current ? 15 : 60;
+      const interval = 1000 / fps;
+      if (timestamp - lastFrameTime >= interval) {
+        lastFrameTime = timestamp;
+        dibujarGrafico();
+      }
       animFrameIdRef.current = requestAnimationFrame(loop);
     };
     animFrameIdRef.current = requestAnimationFrame(loop);
@@ -563,8 +569,8 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
     if (!canvas) return;
     chunksRef.current = [];
     
-    // Capturar a 12 FPS (suficiente para registrar los cambios sin saturar la RAM)
-    const stream = canvas.captureStream(12); 
+    // Capturar a 10 FPS (óptimo para registrar cambios sin saturar RAM/V8 en Windows)
+    const stream = canvas.captureStream(10); 
 
     // Selección robusta de Códecs (VP8 y H.264 prioritarios sobre VP9 para evitar caídas de GPU en Windows)
     let options = {};
@@ -600,6 +606,12 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
         link.download = `Oscilograma_Marshall_${new Date().toISOString().slice(0, 19).replace(/[:]/g, "-")}.${ext}`;
         link.href = url;
         link.click();
+        
+        // Liberar URL del blob en diferido para evitar fugas de memoria
+        setTimeout(() => {
+          URL.revokeObjectURL(url);
+        }, 5000);
+
         chunksRef.current = [];
 
         // Liberar pistas del stream para evitar fugas de memoria
@@ -611,7 +623,7 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
       };
 
       mediaRecorderRef.current = recorder;
-      recorder.start();
+      recorder.start(2000); // Enviar datos cada 2 segundos para evitar llenado de buffer RAM
       setGrabando(true);
     } catch (err) {
       alert("Error al iniciar la grabación: " + err.message);
