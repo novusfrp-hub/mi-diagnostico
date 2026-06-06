@@ -135,6 +135,7 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, onClose }) => {
   const puntosRef = useRef([]);
   const [minVal, setMinVal] = useState(null);
   const [maxVal, setMaxVal] = useState(null);
+  const [mousePos, setMousePos] = useState(null);
 
   useEffect(() => {
     puntosRef.current = [];
@@ -151,7 +152,7 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, onClose }) => {
   }, [maxPuntos]);
 
   useEffect(() => {
-    if (pausado || valor === '----' || valor === '---' || !valor || valor === 'OL') return;
+    if (pausado || valor === '----' || valor === '---' || valor === undefined || valor === null || valor === '' || valor === 'OL') return;
 
     let valNum = parseFloat(valor);
     if (isNaN(valNum)) return;
@@ -176,7 +177,7 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, onClose }) => {
 
   useEffect(() => {
     dibujarGrafico();
-  }, [pausado]);
+  }, [pausado, mousePos]);
 
   const dibujarGrafico = () => {
     const canvas = canvasRef.current;
@@ -235,14 +236,26 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, onClose }) => {
     }
 
     let range = max - min;
-    if (range < 0.1) {
-      min -= 0.5;
-      max += 0.5;
+    const esCorriente = escalaActiva === 'amperio' || escalaActiva === 'ua' || unidad === 'A' || unidad === 'uA' || unidad === 'mA';
+
+    if (esCorriente) {
+      min = 0;
+      if (max < 0.05) {
+        max = 0.05;
+      } else {
+        max = max * 1.1;
+      }
       range = max - min;
     } else {
-      min -= range * 0.1;
-      max += range * 0.1;
-      range = max - min;
+      if (range < 0.1) {
+        min -= 0.5;
+        max += 0.5;
+        range = max - min;
+      } else {
+        min -= range * 0.1;
+        max += range * 0.1;
+        range = max - min;
+      }
     }
 
     ctx.strokeStyle = "#00ffff";
@@ -276,6 +289,70 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, onClose }) => {
     ctx.fillText(`${max.toFixed(3)} ${unidad}`, 50, 18);
     ctx.fillText(`${((min + max) / 2).toFixed(3)} ${unidad}`, 50, H / 2 + 4);
     ctx.fillText(`${min.toFixed(3)} ${unidad}`, 50, H - 10);
+
+    // Draw hover guide and tooltip if paused and mouse is over the graph
+    if (pausado && mousePos) {
+      const len = puntos.length;
+      if (len > 0) {
+        const plotWidth = W - 75;
+        const relativeX = mousePos.x - 60;
+        let pct = relativeX / plotWidth;
+        if (pct < 0) pct = 0;
+        if (pct > 1) pct = 1;
+
+        const index = Math.round(pct * (maxPuntos - 1));
+        if (index >= 0 && index < len) {
+          const ptVal = puntos[index];
+          const ptX = (index / (maxPuntos - 1 || 1)) * (W - 75) + 60;
+          const ptY = H - ((ptVal - min) / range) * (H - 40) - 20;
+
+          // Vertical guide line
+          ctx.strokeStyle = "rgba(6, 182, 212, 0.4)";
+          ctx.lineWidth = 1;
+          ctx.setLineDash([4, 4]);
+          ctx.beginPath();
+          ctx.moveTo(ptX, 10);
+          ctx.lineTo(ptX, H - 10);
+          ctx.stroke();
+          ctx.setLineDash([]);
+
+          // Circle indicator
+          ctx.fillStyle = "#00ffff";
+          ctx.beginPath();
+          ctx.arc(ptX, ptY, 5, 0, 2 * Math.PI);
+          ctx.fill();
+          ctx.strokeStyle = "#ffffff";
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+
+          // Tooltip text & box
+          const tooltipText = `${ptVal.toFixed(4)} ${unidad}`;
+          ctx.font = "bold 11px Consolas";
+          const textWidth = ctx.measureText(tooltipText).width;
+          const boxWidth = textWidth + 16;
+          const boxHeight = 22;
+
+          let boxX = ptX - boxWidth / 2;
+          let boxY = ptY - 30;
+
+          if (boxX < 60) boxX = 60;
+          if (boxX + boxWidth > W - 10) boxX = W - 10 - boxWidth;
+          if (boxY < 10) boxY = ptY + 15;
+
+          ctx.fillStyle = "#000000";
+          ctx.beginPath();
+          ctx.rect(boxX, boxY, boxWidth, boxHeight);
+          ctx.fill();
+          ctx.strokeStyle = "#00ffff";
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+
+          ctx.fillStyle = "#00ffff";
+          ctx.textAlign = "center";
+          ctx.fillText(tooltipText, boxX + boxWidth / 2, boxY + 15);
+        }
+      }
+    }
   };
 
   const guardarFoto = () => {
@@ -326,7 +403,20 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, onClose }) => {
           )}
         </div>
       </div>
-      <canvas ref={canvasRef} style={{ width: "100%", height: "180px", backgroundColor: "#111827", borderRadius: "8px", border: "1px solid #222", display: "block" }} />
+      <canvas
+        ref={canvasRef}
+        onMouseMove={(e) => {
+          const canvas = canvasRef.current;
+          if (!canvas) return;
+          const rect = canvas.getBoundingClientRect();
+          setMousePos({
+            x: e.clientX - rect.left,
+            y: e.clientY - rect.top
+          });
+        }}
+        onMouseLeave={() => setMousePos(null)}
+        style={{ width: "100%", height: "180px", backgroundColor: "#111827", borderRadius: "8px", border: "1px solid #222", display: "block", cursor: pausado ? "crosshair" : "default" }}
+      />
       <div style={{ display: "flex", justifyContent: "space-between", marginTop: "6px", fontSize: "0.7rem", color: "gray" }}>
         <span>MIN: <strong style={{ color: "#ff5555" }}>{minVal !== null ? `${minVal.toFixed(3)} ${unidad}` : "----"}</strong></span>
         <span>MAX: <strong style={{ color: "#55ff55" }}>{maxVal !== null ? `${maxVal.toFixed(3)} ${unidad}` : "----"}</strong></span>
