@@ -130,6 +130,7 @@ const VisorHUD = ({ valor, unidad, conectado, conectarFn, desconectarFn, vozActi
 
 const OscilogramaPanel = ({ valor, unidad, escalaActiva, onClose }) => {
   const [pausado, setPausado] = useState(false);
+  const [maxPuntos, setMaxPuntos] = useState(150);
   const canvasRef = useRef(null);
   const puntosRef = useRef([]);
   const [minVal, setMinVal] = useState(null);
@@ -142,6 +143,14 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, onClose }) => {
   }, [escalaActiva]);
 
   useEffect(() => {
+    let puntos = puntosRef.current;
+    if (puntos.length > maxPuntos) {
+      puntosRef.current = puntos.slice(puntos.length - maxPuntos);
+    }
+    dibujarGrafico();
+  }, [maxPuntos]);
+
+  useEffect(() => {
     if (pausado || valor === '----' || valor === '---' || !valor || valor === 'OL') return;
 
     let valNum = parseFloat(valor);
@@ -149,7 +158,7 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, onClose }) => {
 
     const puntos = puntosRef.current;
     puntos.push(valNum);
-    if (puntos.length > 150) {
+    if (puntos.length > maxPuntos) {
       puntos.shift();
     }
 
@@ -163,7 +172,7 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, onClose }) => {
     setMaxVal(currentMax);
 
     dibujarGrafico();
-  }, [valor, pausado]);
+  }, [valor, pausado, maxPuntos]);
 
   useEffect(() => {
     dibujarGrafico();
@@ -184,10 +193,11 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, onClose }) => {
     ctx.fillStyle = "#111827";
     ctx.fillRect(0, 0, W, H);
 
+    // Grid lines starting from X=55
     ctx.strokeStyle = "#1f2937";
     ctx.lineWidth = 1;
     const gridSize = 25;
-    for (let x = 0; x < W; x += gridSize) {
+    for (let x = 55; x < W; x += gridSize) {
       ctx.beginPath();
       ctx.moveTo(x, 0);
       ctx.lineTo(x, H);
@@ -195,10 +205,18 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, onClose }) => {
     }
     for (let y = 0; y < H; y += gridSize) {
       ctx.beginPath();
-      ctx.moveTo(0, y);
+      ctx.moveTo(55, y);
       ctx.lineTo(W, y);
       ctx.stroke();
     }
+
+    // Left vertical axis line at X=55
+    ctx.strokeStyle = "#374151";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(55, 0);
+    ctx.lineTo(55, H);
+    ctx.stroke();
 
     const puntos = puntosRef.current;
     if (puntos.length === 0) {
@@ -237,7 +255,8 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, onClose }) => {
     ctx.beginPath();
     const len = puntos.length;
     for (let i = 0; i < len; i++) {
-      const x = (i / 150) * (W - 80) + 15;
+      // Start plot at X=60, go to W-15 (i.e. plot width = W - 75)
+      const x = (i / (maxPuntos - 1 || 1)) * (W - 75) + 60;
       const y = H - ((puntos[i] - min) / range) * (H - 40) - 20;
 
       if (i === 0) {
@@ -250,12 +269,13 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, onClose }) => {
 
     ctx.shadowBlur = 0;
 
+    // Draw Y-axis text labels on the left (X=50, textAlign="right")
     ctx.fillStyle = "rgba(156, 163, 175, 0.8)";
     ctx.font = "10px Consolas";
     ctx.textAlign = "right";
-    ctx.fillText(`${max.toFixed(3)} ${unidad}`, W - 10, 20);
-    ctx.fillText(`${((min + max) / 2).toFixed(3)} ${unidad}`, W - 10, H / 2);
-    ctx.fillText(`${min.toFixed(3)} ${unidad}`, W - 10, H - 10);
+    ctx.fillText(`${max.toFixed(3)} ${unidad}`, 50, 18);
+    ctx.fillText(`${((min + max) / 2).toFixed(3)} ${unidad}`, 50, H / 2 + 4);
+    ctx.fillText(`${min.toFixed(3)} ${unidad}`, 50, H - 10);
   };
 
   const guardarFoto = () => {
@@ -272,7 +292,27 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, onClose }) => {
     <div style={{ backgroundColor: "#1a1a1a", border: "1px solid #333", borderRadius: "15px", padding: "12px", marginTop: "10px", width: "100%" }} className="no-print">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
         <span style={{ fontSize: "0.75rem", fontWeight: "bold", color: "#00ffff" }}>📈 OSCILOGRAMA DE CONSUMO ({escalaActiva.toUpperCase()})</span>
-        <div style={{ display: "flex", gap: "6px" }}>
+        <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+          <select
+            value={maxPuntos}
+            onChange={(e) => setMaxPuntos(Number(e.target.value))}
+            style={{
+              background: "#1f2937",
+              border: "1px solid #374151",
+              color: "white",
+              fontSize: "0.7rem",
+              borderRadius: "6px",
+              padding: "2px 6px",
+              outline: "none",
+              cursor: "pointer"
+            }}
+          >
+            <option value={50}>50 pts</option>
+            <option value={100}>100 pts</option>
+            <option value={150}>150 pts</option>
+            <option value={300}>300 pts</option>
+            <option value={500}>500 pts</option>
+          </select>
           <button onClick={() => setPausado(!pausado)} style={{ background: pausado ? "#10b981" : "#d97706", border: "none", color: "white", padding: "4px 10px", borderRadius: "6px", fontSize: "0.7rem", fontWeight: "bold", cursor: "pointer" }}>
             {pausado ? "▶ REANUDAR" : "⏸ PAUSAR"}
           </button>
@@ -286,7 +326,7 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, onClose }) => {
           )}
         </div>
       </div>
-      <canvas ref={canvasRef} style={{ width: "100%", height: "110px", backgroundColor: "#111827", borderRadius: "8px", border: "1px solid #222", display: "block" }} />
+      <canvas ref={canvasRef} style={{ width: "100%", height: "180px", backgroundColor: "#111827", borderRadius: "8px", border: "1px solid #222", display: "block" }} />
       <div style={{ display: "flex", justifyContent: "space-between", marginTop: "6px", fontSize: "0.7rem", color: "gray" }}>
         <span>MIN: <strong style={{ color: "#ff5555" }}>{minVal !== null ? `${minVal.toFixed(3)} ${unidad}` : "----"}</strong></span>
         <span>MAX: <strong style={{ color: "#55ff55" }}>{maxVal !== null ? `${maxVal.toFixed(3)} ${unidad}` : "----"}</strong></span>
@@ -298,6 +338,10 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, onClose }) => {
 export default function AppDiagnostico() {
   const [pasoActual, setPasoActual] = useState(null); const [historial, setHistorial] = useState([]); const [cargando, setCargando] = useState(true); const [tema, setTema] = useState('light');
   const [mostrarOscilograma, setMostrarOscilograma] = useState(false);
+  const mostrarOscilogramaRef = useRef(mostrarOscilograma);
+  useEffect(() => {
+    mostrarOscilogramaRef.current = mostrarOscilograma;
+  }, [mostrarOscilograma]);
   const [cambiosPendientesDocktest, setCambiosPendientesDocktest] = useState(false);
   const [guardandoDocktest, setGuardandoDocktest] = useState(false);
 
@@ -559,7 +603,9 @@ export default function AppDiagnostico() {
         let parsedVal = null;
         let parsedUni = null;
         let escalaActiva = escalaFpcRef.current;
-        if (seccionLibreriaRef.current === 'ic') {
+        if (mostrarOscilogramaRef.current) {
+          escalaActiva = 'amperio';
+        } else if (seccionLibreriaRef.current === 'ic') {
           escalaActiva = escalaIcRef.current;
         } else if (seccionLibreriaRef.current === 'fpc_bateria') {
           escalaActiva = escalaFpcBateriaRef.current;
