@@ -888,12 +888,8 @@ export default function AppDiagnostico() {
   const inicializarFpcBateria = (modelo) => {
     const esIPhone = esIPhoneModelo(modelo);
     const numPines = esIPhone ? 6 : 8;
-    const nombresDefecto = esIPhone 
-      ? ['PP_BATT_VCC', 'GND', 'BATT_SWI', 'BATT_NTC', 'I2C_SDA', 'I2C_SCL']
-      : ['VBAT', 'GND', 'TH', 'ID', 'VBAT', 'GND', 'NC', 'NC'];
-    const tiposDefecto = esIPhone
-      ? ['VCC', 'GND', 'DATA', 'DATA', 'DATA', 'DATA']
-      : ['VCC', 'GND', 'DATA', 'DATA', 'VCC', 'GND', 'NC', 'NC'];
+    const nombresDefecto = Array(numPines).fill('');
+    const tiposDefecto = Array(numPines).fill('DATA');
     
     const pines = Array.from({ length: numPines }, (_, i) => ({
       id: i + 1,

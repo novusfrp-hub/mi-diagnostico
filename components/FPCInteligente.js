@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Save, Cloud, CloudOff, Check, AlertCircle } from 'lucide-react';
+import SelectorTipoLinea from './SelectorTipoLinea.js';
 
 export default function FPCInteligente({ pines, setPines, pinActivo, setPinActivo, modo = 'diagnostico', escala = 'diodo', lecturaEnVivo, tiposCustom = [], setTiposCustom, onGuardar, cambiosPendientes = false, guardando = false, ultimaSincronizacion = null }) {
   const mitad = Math.ceil(pines.length / 2);
@@ -336,10 +337,9 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
                   style={{ background: '#000', color: 'white', border: '1px solid #333', padding: '6px 10px', borderRadius: '5px', width: '140px', outline: 'none', fontSize: '0.85rem' }}
                 />
 
-                <select
-                  value={pines.find(p => p.id === pinActivo)?.tipo || 'DATA'}
-                  onChange={(e) => {
-                    const val = e.target.value;
+                <SelectorTipoLinea
+                  valor={pines.find(p => p.id === pinActivo)?.tipo || 'DATA'}
+                  onChange={(val) => {
                     setPines(prev =>
                       prev.map(p =>
                         p.id === pinActivo ? {
@@ -350,55 +350,9 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
                       )
                     );
                   }}
-                  style={{ background: '#1f2937', color: 'white', border: '1px solid #333', padding: '6px 10px', borderRadius: '5px', outline: 'none', fontSize: '0.85rem', cursor: 'pointer' }}
-                >
-                  <optgroup label="Alimentación">
-                    <option value="VCC">VCC</option>
-                    <option value="VBAT">VBAT</option>
-                    <option value="VBUS">VBUS</option>
-                    <option value="PP_BATT">PP_BATT</option>
-                    <option value="GND">GND</option>
-                    <option value="NC">NC</option>
-                  </optgroup>
-                  <optgroup label="Comunicación">
-                    <option value="DATA">DATA</option>
-                    <option value="I2C">I2C</option>
-                    <option value="SPI">SPI</option>
-                    <option value="RFFE">RFFE</option>
-                    <option value="SWI">SWI</option>
-                    <option value="UART">UART</option>
-                    <option value="SDA">SDA</option>
-                    <option value="SCL">SCL</option>
-                    <option value="CLK">CLK</option>
-                    <option value="GND">GND</option>
-                    <option value="NC">NC</option>
-                  </optgroup>
-                  <optgroup label="Control y Sensores">
-                    <option value="RESET">RESET</option>
-                    <option value="ENABLE">ENABLE</option>
-                    <option value="INT">INT</option>
-                    <option value="NTC">NTC</option>
-                    <option value="ID">ID</option>
-                    <option value="GND">GND</option>
-                    <option value="NC">NC</option>
-                  </optgroup>
-                  {tiposCustom.length > 0 && (
-                    <optgroup label="Personalizados">
-                      {tiposCustom.map(t => (
-                        <option key={t} value={t}>{t}</option>
-                      ))}
-                      <option value="GND">GND</option>
-                      <option value="NC">NC</option>
-                    </optgroup>
-                  )}
-                </select>
-
-                <button
-                  onClick={manejarAgregarTipo}
-                  style={{ background: '#0ea5e9', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '5px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}
-                >
-                  + Tipo
-                </button>
+                  tiposCustom={tiposCustom}
+                  onAgregarTipo={manejarAgregarTipo}
+                />
 
                 <button
                   onClick={() => {
