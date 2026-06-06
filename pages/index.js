@@ -144,6 +144,17 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
   const [minVal, setMinVal] = useState(null);
   const [maxVal, setMaxVal] = useState(null);
 
+  // Volatile Refs for visual loops to prevent stale closure bugs with empty dependency array []
+  const pausadoRef = useRef(pausado);
+  const grabandoRef = useRef(grabando);
+  const escalaActivaRef = useRef(escalaActiva);
+  const maxPuntosRef = useRef(maxPuntos);
+
+  useEffect(() => { pausadoRef.current = pausado; }, [pausado]);
+  useEffect(() => { grabandoRef.current = grabando; }, [grabando]);
+  useEffect(() => { escalaActivaRef.current = escalaActiva; }, [escalaActiva]);
+  useEffect(() => { maxPuntosRef.current = maxPuntos; }, [maxPuntos]);
+
   useEffect(() => {
     puntosRef.current = [];
     setMinVal(null);
@@ -264,7 +275,7 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
 
     let range = max - min;
     const currentUni = unidadRef.current ?? "---";
-    const esCorriente = escalaActiva === 'amperio' || escalaActiva === 'ua' || currentUni === 'A' || currentUni === 'uA' || currentUni === 'mA';
+    const esCorriente = escalaActivaRef.current === 'amperio' || escalaActivaRef.current === 'ua' || currentUni === 'A' || currentUni === 'uA' || currentUni === 'mA';
 
     if (esCorriente) {
       min = 0;
@@ -295,7 +306,7 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
     ctx.lineJoin = "round";
     ctx.beginPath();
     for (let i = 0; i < len; i++) {
-      const x = (i / (maxPuntos - 1 || 1)) * graphWidth + graphLeft;
+      const x = (i / (maxPuntosRef.current - 1 || 1)) * graphWidth + graphLeft;
       const y = H - 85 - ((puntos[i] - min) / (range || 1)) * (H - 150);
 
       if (i === 0) {
@@ -311,7 +322,7 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
     ctx.lineWidth = 3.5;
     ctx.beginPath();
     for (let i = 0; i < len; i++) {
-      const x = (i / (maxPuntos - 1 || 1)) * graphWidth + graphLeft;
+      const x = (i / (maxPuntosRef.current - 1 || 1)) * graphWidth + graphLeft;
       const y = H - 85 - ((puntos[i] - min) / (range || 1)) * (H - 150);
 
       if (i === 0) {
@@ -341,7 +352,7 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
 
     // Draw interactive hover guide and tooltip if paused and mouse is active
     const mousePos = mousePosRef.current;
-    if (pausado && mousePos) {
+    if (pausadoRef.current && mousePos) {
       const rect = canvas.getBoundingClientRect();
       const scaleX = W / rect.width;
       const scaleY = H / rect.height;
@@ -354,10 +365,10 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
         if (pct < 0) pct = 0;
         if (pct > 1) pct = 1;
 
-        const index = Math.round(pct * (maxPuntos - 1));
+        const index = Math.round(pct * (maxPuntosRef.current - 1));
         if (index >= 0 && index < len) {
           const ptVal = puntos[index];
-          const ptX = (index / (maxPuntos - 1 || 1)) * graphWidth + graphLeft;
+          const ptX = (index / (maxPuntosRef.current - 1 || 1)) * graphWidth + graphLeft;
           const ptY = H - 85 - ((ptVal - min) / (range || 1)) * (H - 150);
 
           // Vertical guide
@@ -428,7 +439,7 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
     ctx.fillText(timeStr, W - 40, 75);
 
     // 2. REC indicator blinking (No shadowBlur/shadowColor to prevent browser crashes)
-    if (grabando) {
+    if (grabandoRef.current) {
       const recBlink = Math.floor(Date.now() / 500) % 2 === 0;
       ctx.textAlign = "left";
       if (recBlink) {
@@ -545,7 +556,7 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
         cancelAnimationFrame(animFrameIdRef.current);
       }
     };
-  }, [escalaActiva, unidad, pausado, maxPuntos, grabando]);
+  }, []);
 
   const iniciarGrabacion = () => {
     const canvas = canvasRef.current;
