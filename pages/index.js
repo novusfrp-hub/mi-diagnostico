@@ -263,7 +263,8 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
     }
 
     let range = max - min;
-    const esCorriente = escalaActiva === 'amperio' || escalaActiva === 'ua' || unidad === 'A' || unidad === 'uA' || unidad === 'mA';
+    const currentUni = unidadRef.current ?? "---";
+    const esCorriente = escalaActiva === 'amperio' || escalaActiva === 'ua' || currentUni === 'A' || currentUni === 'uA' || currentUni === 'mA';
 
     if (esCorriente) {
       min = 0;
@@ -285,16 +286,14 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
       }
     }
 
-    // Plot line with Neon Glow
-    ctx.strokeStyle = "#00ffff";
-    ctx.lineWidth = 4.5;
-    ctx.shadowColor = "#00ffff";
-    ctx.shadowBlur = 12;
+    const len = puntos.length;
+
+    // 1. Draw glowing background line (thicker, transparent)
+    ctx.strokeStyle = "rgba(0, 255, 255, 0.25)";
+    ctx.lineWidth = 10;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
-
     ctx.beginPath();
-    const len = puntos.length;
     for (let i = 0; i < len; i++) {
       const x = (i / (maxPuntos - 1 || 1)) * graphWidth + graphLeft;
       const y = H - 85 - ((puntos[i] - min) / (range || 1)) * (H - 150);
@@ -307,15 +306,29 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
     }
     ctx.stroke();
 
-    ctx.shadowBlur = 0; // reset shadow glow
+    // 2. Draw sharp foreground line (thinner, solid neon)
+    ctx.strokeStyle = "#00ffff";
+    ctx.lineWidth = 3.5;
+    ctx.beginPath();
+    for (let i = 0; i < len; i++) {
+      const x = (i / (maxPuntos - 1 || 1)) * graphWidth + graphLeft;
+      const y = H - 85 - ((puntos[i] - min) / (range || 1)) * (H - 150);
+
+      if (i === 0) {
+        ctx.moveTo(x, y);
+      } else {
+        ctx.lineTo(x, y);
+      }
+    }
+    ctx.stroke();
 
     // Draw Y-axis text labels on the left (X=95, textAlign="right")
     ctx.fillStyle = "#8b949e";
     ctx.font = "bold 16px Consolas, monospace";
     ctx.textAlign = "right";
-    ctx.fillText(`${max.toFixed(3)} ${unidad}`, 95, 35);
-    ctx.fillText(`${((min + max) / 2).toFixed(3)} ${unidad}`, 95, H / 2 - 15);
-    ctx.fillText(`${min.toFixed(3)} ${unidad}`, 95, H - 75);
+    ctx.fillText(`${max.toFixed(3)} ${currentUni}`, 95, 35);
+    ctx.fillText(`${((min + max) / 2).toFixed(3)} ${currentUni}`, 95, H / 2 - 15);
+    ctx.fillText(`${min.toFixed(3)} ${currentUni}`, 95, H - 75);
 
     // Draw watermark and header overlays
     dibujarHeaderYWatermark(ctx, W, H);
@@ -414,24 +427,29 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
     ctx.font = "16px Consolas, monospace";
     ctx.fillText(timeStr, W - 40, 75);
 
-    // 2. REC indicator blinking
+    // 2. REC indicator blinking (No shadowBlur/shadowColor to prevent browser crashes)
     if (grabando) {
       const recBlink = Math.floor(Date.now() / 500) % 2 === 0;
       ctx.textAlign = "left";
       if (recBlink) {
+        // Glowing red dot background circle
+        ctx.fillStyle = "rgba(255, 0, 0, 0.4)";
+        ctx.beginPath();
+        ctx.arc(130, 37, 12, 0, 2 * Math.PI);
+        ctx.fill();
+
+        // Solid red dot foreground
         ctx.fillStyle = "#ff0000";
-        ctx.shadowColor = "#ff0000";
-        ctx.shadowBlur = 10;
         ctx.beginPath();
         ctx.arc(130, 37, 7, 0, 2 * Math.PI);
         ctx.fill();
 
-        ctx.shadowBlur = 0;
         ctx.fillStyle = "#ffffff";
         ctx.font = "bold 20px Arial, sans-serif";
         ctx.fillText("REC", 145, 45);
       } else {
-        ctx.fillStyle = "rgba(255, 0, 0, 0.4)";
+        // Blinking dim dot
+        ctx.fillStyle = "rgba(255, 0, 0, 0.2)";
         ctx.beginPath();
         ctx.arc(130, 37, 7, 0, 2 * Math.PI);
         ctx.fill();
@@ -464,11 +482,12 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
     ctx.textAlign = "left";
     ctx.font = "bold 16px Consolas, monospace";
 
+    const currentUni = unidadRef.current ?? "---";
     // MIN text
     ctx.fillStyle = "#8b949e";
     ctx.fillText("MIN:", boxX + 25, boxY + 31);
     ctx.fillStyle = "#ff5555";
-    ctx.fillText(`${min.toFixed(4)} ${unidad}`, boxX + 65, boxY + 31);
+    ctx.fillText(`${min.toFixed(4)} ${currentUni}`, boxX + 65, boxY + 31);
 
     // Separator
     ctx.strokeStyle = "#30363d";
@@ -482,7 +501,7 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
     ctx.fillStyle = "#8b949e";
     ctx.fillText("MAX:", boxX + 245, boxY + 31);
     ctx.fillStyle = "#55ff55";
-    ctx.fillText(`${max.toFixed(4)} ${unidad}`, boxX + 285, boxY + 31);
+    ctx.fillText(`${max.toFixed(4)} ${currentUni}`, boxX + 285, boxY + 31);
   };
 
   const dibujarValorActual = (ctx, W, H) => {
@@ -506,12 +525,12 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
     ctx.textAlign = "left";
     ctx.font = "bold 44px Consolas, monospace";
     ctx.fillStyle = "#00ffff";
-    ctx.shadowColor = "#00ffff";
-    ctx.shadowBlur = 8;
     
-    const texto = `${valor} ${unidad}`;
+    // Read from refs to avoid stale closures (always displays correct real-time data)
+    const currentVal = valorRef.current ?? "----";
+    const currentUni = unidadRef.current ?? "---";
+    const texto = `${currentVal} ${currentUni}`;
     ctx.fillText(texto, boxX + 20, boxY + 52);
-    ctx.shadowBlur = 0;
   };
 
   // Continuous animation frame loop for smooth drawing and blinking clock
