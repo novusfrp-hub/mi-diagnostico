@@ -128,126 +128,6 @@ const VisorHUD = ({ valor, unidad, conectado, conectarFn, desconectarFn, vozActi
   );
 };
 
-// =====================================================
-// WhammyEncoder - Encoder WebM puro en JavaScript
-// Genera video WebM a partir de frames WebP del canvas
-// Sin captureStream, sin MediaRecorder (evita crash STATUS_BREAKPOINT en Chrome 149+)
-// Basado en Whammy.js de antimatter15 (MIT License)
-// =====================================================
-const WhammyEncoder = (() => {
-  function toWebM(frames) {
-    const info = checkFrames(frames);
-    if (!info) return null;
-    const EBML = [
-      { id: 0x1a45dfa3, data: [
-        { data: 1, id: 0x4286 }, { data: 1, id: 0x42f7 }, { data: 4, id: 0x42f2 },
-        { data: 8, id: 0x42f3 }, { data: "webm", id: 0x4282 }, { data: 2, id: 0x4287 }, { data: 2, id: 0x4285 }
-      ]},
-      { id: 0x18538067, data: [
-        { id: 0x1549a966, data: [
-          { data: 1e6, id: 0x2ad7b1 }, { data: "whammyjs", id: 0x4d80 },
-          { data: "whammyjs", id: 0x5741 }, { data: doubleToString(info.duration), id: 0x4489 }
-        ]},
-        { id: 0x1654ae6b, data: [
-          { id: 0xae, data: [
-            { data: 1, id: 0xd7 }, { data: 1, id: 0x73c5 }, { data: 0, id: 0x9c },
-            { data: "V_VP8", id: 0x86 }, { data: 1, id: 0x83 },
-            { id: 0xe0, data: [{ data: info.width, id: 0xb0 }, { data: info.height, id: 0xba }] }
-          ]}
-        ]},
-        { id: 0x1f43b675, data: [{ data: 0, id: 0xe7 }].concat(
-          frames.map((f) => ({
-            data: makeSimpleBlock({ discardable: 0, frame: f.data, invisible: 0, keyframe: 1, lacing: 0, trackNum: 1, timecode: Math.round(f.timestamp) }),
-            id: 0xa3
-          }))
-        )}
-      ]}
-    ];
-    return generateEBML(EBML, false);
-  }
-  function checkFrames(frames) {
-    if (!frames || frames.length === 0) return null;
-    let duration = 0;
-    frames.forEach(f => { duration += f.duration; });
-    return { duration, width: frames[0].width, height: frames[0].height };
-  }
-  function numToBuffer(num) {
-    const parts = [];
-    while (num > 0) { parts.push(num & 0xff); num >>= 8; }
-    return new Uint8Array(parts.reverse());
-  }
-  function strToBuffer(str) {
-    const arr = new Uint8Array(str.length);
-    for (let i = 0; i < str.length; i++) arr[i] = str.charCodeAt(i);
-    return arr;
-  }
-  function bitsToBuffer(bits) {
-    const data = [];
-    const pad = (bits.length % 8) ? (new Array(1 + 8 - (bits.length % 8))).join('0') : '';
-    bits = pad + bits;
-    for (let i = 0; i < bits.length; i += 8) data.push(parseInt(bits.substr(i, 8), 2));
-    return new Uint8Array(data);
-  }
-  function doubleToString(num) {
-    return [].slice.call(new Uint8Array(new Float64Array([num]).buffer), 0).map(e => String.fromCharCode(e)).reverse().join('');
-  }
-  function makeSimpleBlock(data) {
-    let flags = 0;
-    if (data.keyframe) flags |= 128;
-    if (data.invisible) flags |= 8;
-    if (data.lacing) flags |= (data.lacing << 1);
-    if (data.discardable) flags |= 1;
-    return [data.trackNum | 0x80, data.timecode >> 8, data.timecode & 0xff, flags].map(e => String.fromCharCode(e)).join('') + data.frame;
-  }
-  function generateEBML(json, outputAsArray) {
-    const ebml = [];
-    for (const item of json) {
-      if (!('id' in item)) continue;
-      let data;
-      if (typeof item.data === 'string') data = strToBuffer(item.data);
-      else if (typeof item.data === 'number') data = bitsToBuffer(item.data.toString(2));
-      else if (item.data instanceof Uint8Array) data = item.data;
-      else if (Array.isArray(item.data)) data = generateEBML(item.data, true);
-      if (!data) continue;
-      const idBuf = numToBuffer(item.id);
-      const sizeBuf = (data.length < 127)
-        ? bitsToBuffer('0' + data.length.toString(2).padStart(7, '0'))
-        : bitsToBuffer('00' + data.length.toString(2).padStart(14, '0'));
-      ebml.push(idBuf, sizeBuf, data);
-    }
-    if (outputAsArray) {
-      const totalLen = ebml.reduce((acc, b) => acc + b.length, 0);
-      const merged = new Uint8Array(totalLen);
-      let offset = 0;
-      for (const buf of ebml) { merged.set(buf, offset); offset += buf.length; }
-      return merged;
-    }
-    return new Blob(ebml, { type: "video/webm" });
-  }
-  function parseWebP(riff) {
-    const offset = riff.indexOf("VP8 ");
-    if (offset === -1) throw "Invalid WebP: VP8 chunk not found";
-    const len = new DataView(new Uint8Array(riff.split('').map(c => c.charCodeAt(0))).buffer).getUint32(offset + 4, true);
-    return riff.substr(offset + 8, len);
-  }
-  function parseRIFF(data) {
-    return data;
-  }
-  function Encoder(fps) {
-    this.frames = [];
-    this.fps = fps || 10;
-    this.quality = 0.7;
-  }
-  Encoder.prototype.addFrame = function(canvas) {
-    const dataUrl = (canvas instanceof HTMLCanvasElement) ? canvas.toDataURL('image/webp', this.quality) : canvas;
-    const data = atob(dataUrl.slice(dataUrl.indexOf(',') + 1));
-    const frame = parseWebP(parseRIFF(data));
-    this.frames.push({ data: frame, width: canvas.width || 640, height: canvas.height || 360, duration: 1000 / this.fps, timestamp: this.frames.length * (1000 / this.fps) });
-  };
-  Encoder.prototype.compile = function() { return toWebM(this.frames); };
-  return { Encoder };
-})();
-
 const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
   const [pausado, setPausado] = useState(false);
   const [maxPuntos, setMaxPuntos] = useState(150);
@@ -256,24 +136,13 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
   const canvasRef = useRef(null);
   const puntosRef = useRef([]);
   const mousePosRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const chunksRef = useRef([]);
   const animFrameIdRef = useRef(null);
-  const encoderRef = useRef(null);
-  const recordIntervalRef = useRef(null);
 
   // States to reflect in HTML backup below
   const [minVal, setMinVal] = useState(null);
   const [maxVal, setMaxVal] = useState(null);
-
-  // Volatile Refs for visual loops to prevent stale closure bugs with empty dependency array []
-  const pausadoRef = useRef(pausado);
-  const grabandoRef = useRef(grabando);
-  const escalaActivaRef = useRef(escalaActiva);
-  const maxPuntosRef = useRef(maxPuntos);
-
-  useEffect(() => { pausadoRef.current = pausado; }, [pausado]);
-  useEffect(() => { grabandoRef.current = grabando; }, [grabando]);
-  useEffect(() => { escalaActivaRef.current = escalaActiva; }, [escalaActiva]);
-  useEffect(() => { maxPuntosRef.current = maxPuntos; }, [maxPuntos]);
 
   useEffect(() => {
     puntosRef.current = [];
@@ -395,7 +264,7 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
 
     let range = max - min;
     const currentUni = unidadRef.current ?? "---";
-    const esCorriente = escalaActivaRef.current === 'amperio' || escalaActivaRef.current === 'ua' || currentUni === 'A' || currentUni === 'uA' || currentUni === 'mA';
+    const esCorriente = escalaActiva === 'amperio' || escalaActiva === 'ua' || currentUni === 'A' || currentUni === 'uA' || currentUni === 'mA';
 
     if (esCorriente) {
       min = 0;
@@ -426,7 +295,7 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
     ctx.lineJoin = "round";
     ctx.beginPath();
     for (let i = 0; i < len; i++) {
-      const x = (i / (maxPuntosRef.current - 1 || 1)) * graphWidth + graphLeft;
+      const x = (i / (maxPuntos - 1 || 1)) * graphWidth + graphLeft;
       const y = H - 85 - ((puntos[i] - min) / (range || 1)) * (H - 150);
 
       if (i === 0) {
@@ -442,7 +311,7 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
     ctx.lineWidth = 3.5;
     ctx.beginPath();
     for (let i = 0; i < len; i++) {
-      const x = (i / (maxPuntosRef.current - 1 || 1)) * graphWidth + graphLeft;
+      const x = (i / (maxPuntos - 1 || 1)) * graphWidth + graphLeft;
       const y = H - 85 - ((puntos[i] - min) / (range || 1)) * (H - 150);
 
       if (i === 0) {
@@ -472,7 +341,7 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
 
     // Draw interactive hover guide and tooltip if paused and mouse is active
     const mousePos = mousePosRef.current;
-    if (pausadoRef.current && mousePos) {
+    if (pausado && mousePos) {
       const rect = canvas.getBoundingClientRect();
       const scaleX = W / rect.width;
       const scaleY = H / rect.height;
@@ -485,10 +354,10 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
         if (pct < 0) pct = 0;
         if (pct > 1) pct = 1;
 
-        const index = Math.round(pct * (maxPuntosRef.current - 1));
+        const index = Math.round(pct * (maxPuntos - 1));
         if (index >= 0 && index < len) {
           const ptVal = puntos[index];
-          const ptX = (index / (maxPuntosRef.current - 1 || 1)) * graphWidth + graphLeft;
+          const ptX = (index / (maxPuntos - 1 || 1)) * graphWidth + graphLeft;
           const ptY = H - 85 - ((ptVal - min) / (range || 1)) * (H - 150);
 
           // Vertical guide
@@ -559,7 +428,7 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
     ctx.fillText(timeStr, W - 40, 75);
 
     // 2. REC indicator blinking (No shadowBlur/shadowColor to prevent browser crashes)
-    if (grabandoRef.current) {
+    if (grabando) {
       const recBlink = Math.floor(Date.now() / 500) % 2 === 0;
       ctx.textAlign = "left";
       if (recBlink) {
@@ -656,7 +525,7 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
     ctx.textAlign = "left";
     ctx.font = "bold 44px Consolas, monospace";
     ctx.fillStyle = "#00ffff";
-
+    
     // Read from refs to avoid stale closures (always displays correct real-time data)
     const currentVal = valorRef.current ?? "----";
     const currentUni = unidadRef.current ?? "---";
@@ -676,90 +545,53 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
         cancelAnimationFrame(animFrameIdRef.current);
       }
     };
-  }, []);
+  }, [escalaActiva, unidad, pausado, maxPuntos, grabando]);
 
   const iniciarGrabacion = () => {
     const canvas = canvasRef.current;
-    if (!canvas) {
-      console.error("[Recorder] Canvas principal no encontrado.");
-      return;
+    if (!canvas) return;
+    chunksRef.current = [];
+    const stream = canvas.captureStream(30); // 30 FPS
+
+    let options = { mimeType: 'video/webm;codecs=vp9' };
+    if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+      options = { mimeType: 'video/webm;codecs=vp8' };
+    }
+    if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+      options = { mimeType: 'video/webm' };
     }
 
-    console.log("[Recorder] Iniciando grabación frame-by-frame (sin captureStream)...");
-
-    // Crear encoder WebM a 10 FPS
-    const encoder = new WhammyEncoder.Encoder(10);
-    encoderRef.current = encoder;
-
-    // Capturar un frame cada 100ms (10 FPS) usando toDataURL('image/webp')
-    let framesCaptured = 0;
-    const captureInterval = setInterval(() => {
-      try {
-        if (canvasRef.current && encoderRef.current) {
-          encoderRef.current.addFrame(canvasRef.current);
-          framesCaptured++;
-          if (framesCaptured % 50 === 0) {
-            console.log(`[Recorder] ${framesCaptured} frames capturados (${(framesCaptured / 10).toFixed(0)}s)`);
-          }
+    try {
+      const recorder = new MediaRecorder(stream, options);
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          chunksRef.current.push(e.data);
         }
-      } catch (e) {
-        console.error("[Recorder] Error capturando frame:", e);
-      }
-    }, 100);
-    recordIntervalRef.current = captureInterval;
+      };
+      recorder.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: 'video/webm' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.download = `Oscilograma_Marshall_${new Date().toISOString().slice(0, 19).replace(/[:]/g, "-")}.webm`;
+        link.href = url;
+        link.click();
+        chunksRef.current = [];
+      };
 
-    setGrabando(true);
-    console.log("[Recorder] Grabación iniciada correctamente. Capturando 10 FPS con WebP encoder.");
+      mediaRecorderRef.current = recorder;
+      recorder.start();
+      setGrabando(true);
+    } catch (err) {
+      alert("Error al iniciar la grabación: " + err.message);
+    }
   };
 
   const detenerGrabacion = () => {
-    console.log("[Recorder] Deteniendo grabación...");
-
-    // Detener captura de frames
-    if (recordIntervalRef.current) {
-      clearInterval(recordIntervalRef.current);
-      recordIntervalRef.current = null;
+    const recorder = mediaRecorderRef.current;
+    if (recorder && recorder.state !== "inactive") {
+      recorder.stop();
     }
-
     setGrabando(false);
-
-    // Compilar video WebM
-    const encoder = encoderRef.current;
-    if (!encoder || encoder.frames.length === 0) {
-      console.warn("[Recorder] No se capturaron frames.");
-      encoderRef.current = null;
-      return;
-    }
-
-    console.log(`[Recorder] Compilando ${encoder.frames.length} frames en video WebM...`);
-
-    try {
-      const blob = encoder.compile();
-      if (!blob || blob.size === 0) {
-        console.error("[Recorder] Error: Video generado vacío.");
-        encoderRef.current = null;
-        return;
-      }
-
-      console.log(`[Recorder] Video WebM generado: ${(blob.size / 1024).toFixed(1)} KB`);
-
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.download = `Oscilograma_Marshall_${new Date().toISOString().slice(0, 19).replace(/[:]/g, "-")}.webm`;
-      link.href = url;
-      link.click();
-
-      setTimeout(() => {
-        URL.revokeObjectURL(url);
-        console.log("[Recorder] Blob URL liberada.");
-      }, 5000);
-
-      console.log("[Recorder] ¡Descarga del video iniciada!");
-    } catch (err) {
-      console.error("[Recorder] Error compilando video:", err);
-    }
-
-    encoderRef.current = null;
   };
 
   const guardarFoto = () => {
@@ -774,8 +606,9 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
 
   useEffect(() => {
     return () => {
-      if (recordIntervalRef.current) {
-        clearInterval(recordIntervalRef.current);
+      const recorder = mediaRecorderRef.current;
+      if (recorder && recorder.state !== "inactive") {
+        recorder.stop();
       }
     };
   }, []);
@@ -808,7 +641,7 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
           <button onClick={() => setPausado(!pausado)} style={{ background: pausado ? "#10b981" : "#d97706", border: "none", color: "white", padding: "4px 10px", borderRadius: "6px", fontSize: "0.7rem", fontWeight: "bold", cursor: "pointer" }}>
             {pausado ? "▶ REANUDAR" : "⏸ PAUSAR"}
           </button>
-
+          
           <button
             onClick={grabando ? detenerGrabacion : iniciarGrabacion}
             style={{
@@ -875,8 +708,7 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
         <span>MAX: <strong style={{ color: "#55ff55" }}>{maxVal !== null ? `${maxVal.toFixed(4)} ${unidad}` : "----"}</strong></span>
       </div>
 
-      <style dangerouslySetInnerHTML={{
-        __html: `
+      <style dangerouslySetInnerHTML={{__html: `
         @keyframes pulse-record {
           0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
           70% { transform: scale(1.03); box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
@@ -1877,7 +1709,7 @@ export default function AppDiagnostico() {
                     <button onClick={() => setLibreriaVisible(false)} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', cursor: 'pointer', padding: '8px', borderRadius: '8px' }}><X size={16} /></button>
                   </div>
                 </div>
-
+                
                 <div style={{ padding: '15px 20px', borderBottom: '1px solid #374151', flexShrink: 0 }}>
                   <VisorHUD
                     valor={lecturaUsb.valor}
@@ -1893,10 +1725,10 @@ export default function AppDiagnostico() {
                     escalaActiva={
                       modeloActivo
                         ? (seccionLibreria === 'ic'
-                          ? escalaIc
-                          : (seccionLibreria === 'fpc_bateria'
-                            ? escalaFpcBateria
-                            : escalaFpc))
+                            ? escalaIc
+                            : (seccionLibreria === 'fpc_bateria'
+                                ? escalaFpcBateria
+                                : escalaFpc))
                         : 'amperio'
                     }
                     oscilogramaActivo={mostrarOscilograma}
