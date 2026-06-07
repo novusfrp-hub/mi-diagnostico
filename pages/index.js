@@ -132,30 +132,35 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
   const [pausado, setPausado] = useState(false);
   const [maxPuntos, setMaxPuntos] = useState(150);
   const [grabando, setGrabando] = useState(false);
+  const [calidadVideo, setCalidadVideo] = useState('720p30');
+  const [scrollIndex, setScrollIndex] = useState(0);
 
   const canvasRef = useRef(null);
   const puntosRef = useRef([]);
+  const historialCompletoRef = useRef([]);
   const mousePosRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
   const animFrameIdRef = useRef(null);
 
-  // States to reflect in HTML backup below
+  // States to reflect in HTML backup below (for legacy support if needed)
   const [minVal, setMinVal] = useState(null);
   const [maxVal, setMaxVal] = useState(null);
 
   useEffect(() => {
     puntosRef.current = [];
+    historialCompletoRef.current = [];
     setMinVal(null);
     setMaxVal(null);
+    setScrollIndex(0);
   }, [escalaActiva]);
 
+  // Al pausar o cambiar maxPuntos, alineamos el scrollIndex al final del historial
   useEffect(() => {
-    let puntos = puntosRef.current;
-    if (puntos.length > maxPuntos) {
-      puntosRef.current = puntos.slice(puntos.length - maxPuntos);
+    if (pausado) {
+      setScrollIndex(Math.max(0, historialCompletoRef.current.length - maxPuntos));
     }
-  }, [maxPuntos]);
+  }, [pausado, maxPuntos]);
 
   const valorRef = useRef(valor);
   const unidadRef = useRef(unidad);
@@ -179,18 +184,22 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
         if (isNaN(valNum)) valNum = 0.0;
       }
 
-      const puntos = puntosRef.current;
-      puntos.push(valNum);
-      if (puntos.length > maxPuntos) {
-        puntos.shift();
+      // Añadir al historial completo (límite de 3000 puntos = 5 minutos)
+      const hist = historialCompletoRef.current;
+      hist.push(valNum);
+      if (hist.length > 3000) {
+        hist.shift();
       }
 
-      if (puntos.length > 0) {
-        let currentMin = puntos[0];
-        let currentMax = puntos[0];
-        for (let i = 1; i < puntos.length; i++) {
-          if (puntos[i] < currentMin) currentMin = puntos[i];
-          if (puntos[i] > currentMax) currentMax = puntos[i];
+      // Sincronizar puntosRef.current con los últimos maxPuntos
+      puntosRef.current = hist.slice(-maxPuntos);
+
+      if (puntosRef.current.length > 0) {
+        let currentMin = puntosRef.current[0];
+        let currentMax = puntosRef.current[0];
+        for (let i = 1; i < puntosRef.current.length; i++) {
+          if (puntosRef.current[i] < currentMin) currentMin = puntosRef.current[i];
+          if (puntosRef.current[i] > currentMax) currentMax = puntosRef.current[i];
         }
         setMinVal(currentMin);
         setMaxVal(currentMax);
@@ -200,13 +209,26 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
     return () => clearInterval(intervalId);
   }, [pausado, maxPuntos]);
 
+  const W = calidadVideo.includes('1080p') ? 1920 : 1280;
+  const H = calidadVideo.includes('1080p') ? 1080 : 720;
+
+  const obtenerPuntosAMostrar = () => {
+    const hist = historialCompletoRef.current;
+    if (hist.length === 0) return [];
+    if (!pausado) {
+      return hist.slice(-maxPuntos);
+    } else {
+      return hist.slice(scrollIndex, scrollIndex + maxPuntos);
+    }
+  };
+
   const dibujarGrafico = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
 
-    const W = 1280;
-    const H = 720;
+    const W = canvas.width;
+    const H = canvas.height;
 
     // Background
     ctx.fillStyle = "#0d1117";
@@ -245,7 +267,7 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
     ctx.lineTo(graphLeft, H);
     ctx.stroke();
 
-    const puntos = puntosRef.current;
+    const puntos = obtenerPuntosAMostrar();
     if (puntos.length === 0) {
       ctx.fillStyle = "#8b949e";
       ctx.font = "bold 24px Consolas, monospace";
@@ -334,7 +356,7 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
     dibujarHeaderYWatermark(ctx, W, H);
 
     // Draw large numeric display overlay
-    dibujarValorActual(ctx, W, H);
+    dibujarValorActual(ctx, W, H, puntos);
 
     // Draw stats box inside canvas
     dibujarStatsBox(ctx, W, H, min, max);
@@ -427,18 +449,16 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
     ctx.font = "16px Consolas, monospace";
     ctx.fillText(timeStr, W - 40, 75);
 
-    // 2. REC indicator blinking (No shadowBlur/shadowColor to prevent browser crashes)
+    // 2. REC indicator blinking
     if (grabando) {
       const recBlink = Math.floor(Date.now() / 500) % 2 === 0;
       ctx.textAlign = "left";
       if (recBlink) {
-        // Glowing red dot background circle
         ctx.fillStyle = "rgba(255, 0, 0, 0.4)";
         ctx.beginPath();
         ctx.arc(130, 37, 12, 0, 2 * Math.PI);
         ctx.fill();
 
-        // Solid red dot foreground
         ctx.fillStyle = "#ff0000";
         ctx.beginPath();
         ctx.arc(130, 37, 7, 0, 2 * Math.PI);
@@ -448,7 +468,6 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
         ctx.font = "bold 20px Arial, sans-serif";
         ctx.fillText("REC", 145, 45);
       } else {
-        // Blinking dim dot
         ctx.fillStyle = "rgba(255, 0, 0, 0.2)";
         ctx.beginPath();
         ctx.arc(130, 37, 7, 0, 2 * Math.PI);
@@ -483,13 +502,11 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
     ctx.font = "bold 16px Consolas, monospace";
 
     const currentUni = unidadRef.current ?? "---";
-    // MIN text
     ctx.fillStyle = "#8b949e";
     ctx.fillText("MIN:", boxX + 25, boxY + 31);
     ctx.fillStyle = "#ff5555";
     ctx.fillText(`${min.toFixed(4)} ${currentUni}`, boxX + 65, boxY + 31);
 
-    // Separator
     ctx.strokeStyle = "#30363d";
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -497,14 +514,13 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
     ctx.lineTo(boxX + 220, boxY + 40);
     ctx.stroke();
 
-    // MAX text
     ctx.fillStyle = "#8b949e";
     ctx.fillText("MAX:", boxX + 245, boxY + 31);
     ctx.fillStyle = "#55ff55";
     ctx.fillText(`${max.toFixed(4)} ${currentUni}`, boxX + 285, boxY + 31);
   };
 
-  const dibujarValorActual = (ctx, W, H) => {
+  const dibujarValorActual = (ctx, W, H, puntos) => {
     const boxW = 340;
     const boxH = 75;
     const boxX = 130;
@@ -525,9 +541,11 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
     ctx.textAlign = "left";
     ctx.font = "bold 44px Consolas, monospace";
     ctx.fillStyle = "#00ffff";
-    
-    // Read from refs to avoid stale closures (always displays correct real-time data)
-    const currentVal = valorRef.current ?? "----";
+
+    // Si está pausado, muestra el valor del último punto visible en pantalla
+    const currentVal = pausado 
+      ? (puntos && puntos.length > 0 ? puntos[puntos.length - 1].toFixed(4) : "----")
+      : (valorRef.current ?? "----");
     const currentUni = unidadRef.current ?? "---";
     const texto = `${currentVal} ${currentUni}`;
     ctx.fillText(texto, boxX + 20, boxY + 52);
@@ -545,13 +563,15 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
         cancelAnimationFrame(animFrameIdRef.current);
       }
     };
-  }, [escalaActiva, unidad, pausado, maxPuntos, grabando]);
+  }, [escalaActiva, unidad, pausado, maxPuntos, grabando, scrollIndex, calidadVideo]);
 
   const iniciarGrabacion = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     chunksRef.current = [];
-    const stream = canvas.captureStream(30); // 30 FPS
+    
+    const fps = calidadVideo.endsWith('60') ? 60 : 30;
+    const stream = canvas.captureStream(fps);
 
     let options = { mimeType: 'video/webm;codecs=vp9' };
     if (!MediaRecorder.isTypeSupported(options.mimeType)) {
@@ -613,6 +633,18 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
     };
   }, []);
 
+  const puntosVisibles = obtenerPuntosAMostrar();
+  let minVis = null;
+  let maxVis = null;
+  if (puntosVisibles.length > 0) {
+    minVis = puntosVisibles[0];
+    maxVis = puntosVisibles[0];
+    for (let i = 1; i < puntosVisibles.length; i++) {
+      if (puntosVisibles[i] < minVis) minVis = puntosVisibles[i];
+      if (puntosVisibles[i] > maxVis) maxVis = puntosVisibles[i];
+    }
+  }
+
   return (
     <div style={{ backgroundColor: "#1a1a1a", border: "1px solid #333", borderRadius: "15px", padding: "12px", marginTop: "10px", width: "100%" }} className="no-print">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
@@ -638,10 +670,31 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
             <option value={300}>300 pts</option>
             <option value={500}>500 pts</option>
           </select>
+
+          <select
+            value={calidadVideo}
+            onChange={(e) => setCalidadVideo(e.target.value)}
+            disabled={grabando}
+            style={{
+              background: "#1f2937",
+              border: "1px solid #374151",
+              color: "white",
+              fontSize: "0.7rem",
+              borderRadius: "6px",
+              padding: "2px 6px",
+              outline: "none",
+              cursor: grabando ? "not-allowed" : "pointer"
+            }}
+          >
+            <option value="720p30">720p @ 30 FPS</option>
+            <option value="720p60">720p @ 60 FPS</option>
+            <option value="1080p60">1080p @ 60 FPS</option>
+          </select>
+
           <button onClick={() => setPausado(!pausado)} style={{ background: pausado ? "#10b981" : "#d97706", border: "none", color: "white", padding: "4px 10px", borderRadius: "6px", fontSize: "0.7rem", fontWeight: "bold", cursor: "pointer" }}>
             {pausado ? "▶ REANUDAR" : "⏸ PAUSAR"}
           </button>
-          
+
           <button
             onClick={grabando ? detenerGrabacion : iniciarGrabacion}
             style={{
@@ -676,8 +729,8 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
       <div style={{ maxWidth: "664px", margin: "0 auto", width: "100%", aspectRatio: "16/9", position: "relative" }}>
         <canvas
           ref={canvasRef}
-          width={1280}
-          height={720}
+          width={W}
+          height={H}
           onMouseMove={(e) => {
             const canvas = canvasRef.current;
             if (!canvas) return;
@@ -703,12 +756,58 @@ const OscilogramaPanel = ({ valor, unidad, escalaActiva, tick, onClose }) => {
         />
       </div>
 
+      {pausado && (
+        <div style={{ 
+          maxWidth: "664px", 
+          margin: "8px auto 4px auto", 
+          display: "flex", 
+          flexDirection: "column", 
+          gap: "4px",
+          background: "rgba(31, 41, 55, 0.4)",
+          padding: "8px 12px",
+          borderRadius: "8px",
+          border: "1px solid #2d3748"
+        }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "0.65rem", color: "#00ffff", fontWeight: "bold", display: "flex", alignItems: "center", gap: "4px" }}>
+              <History size={12} /> LÍNEA DE TIEMPO (HISTORIAL)
+            </span>
+            <span style={{ fontSize: "0.65rem", color: "#a0aec0", fontFamily: "Consolas, monospace" }}>
+              Punto: {scrollIndex} a {Math.min(historialCompletoRef.current.length, scrollIndex + maxPuntos)} de {historialCompletoRef.current.length}
+            </span>
+          </div>
+          <input
+            type="range"
+            min={0}
+            max={Math.max(0, historialCompletoRef.current.length - maxPuntos)}
+            value={scrollIndex}
+            onChange={(e) => setScrollIndex(Number(e.target.value))}
+            style={{
+              width: "100%",
+              height: "6px",
+              background: "#1a202c",
+              borderRadius: "4px",
+              outline: "none",
+              cursor: "ew-resize",
+              accentColor: "#00ffff",
+              WebkitAppearance: "none",
+              margin: "6px 0"
+            }}
+          />
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.6rem", color: "#718096" }}>
+            <span>◀ Hace {((historialCompletoRef.current.length - scrollIndex) / 10).toFixed(1)}s</span>
+            <span>Hace {((historialCompletoRef.current.length - (scrollIndex + maxPuntos)) / 10).toFixed(1)}s (Fin de ventana) ▶</span>
+          </div>
+        </div>
+      )}
+
       <div style={{ display: "flex", justifyContent: "space-between", marginTop: "6px", fontSize: "0.7rem", color: "gray", padding: "0 4px" }}>
-        <span>MIN: <strong style={{ color: "#ff5555" }}>{minVal !== null ? `${minVal.toFixed(4)} ${unidad}` : "----"}</strong></span>
-        <span>MAX: <strong style={{ color: "#55ff55" }}>{maxVal !== null ? `${maxVal.toFixed(4)} ${unidad}` : "----"}</strong></span>
+        <span>MIN: <strong style={{ color: "#ff5555" }}>{minVis !== null ? `${minVis.toFixed(4)} ${unidad}` : "----"}</strong></span>
+        <span>MAX: <strong style={{ color: "#55ff55" }}>{maxVis !== null ? `${maxVis.toFixed(4)} ${unidad}` : "----"}</strong></span>
       </div>
 
-      <style dangerouslySetInnerHTML={{__html: `
+      <style dangerouslySetInnerHTML={{
+        __html: `
         @keyframes pulse-record {
           0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
           70% { transform: scale(1.03); box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
@@ -1709,7 +1808,7 @@ export default function AppDiagnostico() {
                     <button onClick={() => setLibreriaVisible(false)} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', cursor: 'pointer', padding: '8px', borderRadius: '8px' }}><X size={16} /></button>
                   </div>
                 </div>
-                
+
                 <div style={{ padding: '15px 20px', borderBottom: '1px solid #374151', flexShrink: 0 }}>
                   <VisorHUD
                     valor={lecturaUsb.valor}
@@ -1725,10 +1824,10 @@ export default function AppDiagnostico() {
                     escalaActiva={
                       modeloActivo
                         ? (seccionLibreria === 'ic'
-                            ? escalaIc
-                            : (seccionLibreria === 'fpc_bateria'
-                                ? escalaFpcBateria
-                                : escalaFpc))
+                          ? escalaIc
+                          : (seccionLibreria === 'fpc_bateria'
+                            ? escalaFpcBateria
+                            : escalaFpc))
                         : 'amperio'
                     }
                     oscilogramaActivo={mostrarOscilograma}
