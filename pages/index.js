@@ -12,6 +12,7 @@ import FPCBateria from '../components/FPCBateria.js';
 import EscanerRFFE from '../components/EscanerRFFE.js';
 import FormularioIngresoAvanzado from '../components/FormularioIngresoAvanzado.js';
 import VisorReporteAvanzado from '../components/VisorReporteAvanzado.js';
+import VisorMapeoPCB from '../components/VisorMapeoPCB.js';
 import { toPng } from 'html-to-image';
 import useAutoSave from '../hooks/useAutoSave';
 
@@ -1871,6 +1872,7 @@ export default function AppDiagnostico() {
                       <button onClick={() => cambiarSeccionLibreria('fpc_bateria')} style={{ padding: '10px 15px', borderRadius: '8px', border: 'none', background: seccionLibreria === 'fpc_bateria' ? '#f59e0b' : '#1f2937', color: 'white', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>FPC Batería</button>
                       <button onClick={() => cambiarSeccionLibreria('ic')} style={{ padding: '10px 15px', borderRadius: '8px', border: 'none', background: seccionLibreria === 'ic' ? '#ec4899' : '#1f2937', color: 'white', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>Planos IC / BGA</button>
                       <button onClick={() => cambiarSeccionLibreria('rffe')} style={{ padding: '10px 15px', borderRadius: '8px', border: 'none', background: seccionLibreria === 'rffe' ? '#10b981' : '#1f2937', color: 'white', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>Módulo RFFE</button>
+                      <button onClick={() => cambiarSeccionLibreria('boardview')} style={{ padding: '10px 15px', borderRadius: '8px', border: 'none', background: seccionLibreria === 'boardview' ? '#00ffff' : '#1f2937', color: seccionLibreria === 'boardview' ? 'black' : 'white', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>Boardview PCB</button>
                     </div>
 
                     {seccionLibreria === 'docktest' && (
@@ -2031,6 +2033,20 @@ export default function AppDiagnostico() {
                           setModeloActivo={setModeloActivo}
                           modo={'crear'}
                           lecturaRffe={lecturaRffe}
+                        />
+                      </div>
+                    )}
+
+                    {seccionLibreria === 'boardview' && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                        <VisorMapeoPCB
+                          lecturaEnVivo={lecturaUsb.valor}
+                          escala={escalaIc}
+                          onGuardar={(nuevosComp) => {
+                            console.log('Guardando componentes en Firebase:', nuevosComp);
+                            setModeloActivo(prev => ({ ...prev, boardviewComponentes: nuevosComp }));
+                            alert('Componentes de Boardview guardados localmente.');
+                          }}
                         />
                       </div>
                     )}
