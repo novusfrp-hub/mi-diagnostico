@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   Save, Trash2, Plus, Move, ZoomIn, ZoomOut, Layers, Maximize2, 
   Settings, Edit, Play, HelpCircle, Activity, Check, AlertTriangle, 
-  Map, Eye, EyeOff, Clipboard, RefreshCw, ChevronRight, CheckCircle2 
+  Map, Eye, EyeOff, Clipboard, RefreshCw, ChevronRight, CheckCircle2,
+  Image as ImageIcon, Upload, RotateCcw, X, Link
 } from 'lucide-react';
 
 const TIPOS_COMPONENTE = ['Capacitor', 'Resistencia', 'Diodo'];
@@ -21,17 +22,11 @@ const NET_NAMES_SUGERIDOS = [
   'PMIC_TO_CPU_RESET', 'VREG_L6A_0P6', 'USB_HS_DP', 'USB_HS_DN', 'NC'
 ];
 
-export default function VisorMapeoPCB({
-  lecturaEnVivo = '----',
-  escala = 'diodo', // 'diodo' | 'voltio' | 'ua' | 'ohmio'
-  onGuardar,
-  cambiosPendientes = false,
-  guardando = false,
-  ultimaSincronizacion = null
-}) {
-  // --- Estados locales del Boardview ---
-  const [componentes, setComponentes] = useState([
-    {
+const IMAGEN_PREDETERMINADA = '/pcb_motherboard_bg.png';
+
+// Componentes de ejemplo (solo se usan si no se pasa una lista inicial)
+const COMPONENTES_DEFECTO = [
+  {
       id: 'smd_1',
       nombre: 'C1401',
       tipo: 'Capacitor',
@@ -61,10 +56,31 @@ export default function VisorMapeoPCB({
         { id: '2', netName: 'GND', tipo: 'GND', x_rel: 5, y_rel: 65, w: 50, h: 30, valorSanoDiodo: '0.000', valorSanoVoltio: '0.000', valorSanoUa: '0', valorSanoOhmio: '0', valorActualDiodo: '0.000', valorActualVoltio: '0.000', valorActualUa: '0', valorActualOhmio: '0' }
       ]
     }
-  ]);
+];
+
+export default function VisorMapeoPCB({
+  lecturaEnVivo = '----',
+  escala = 'diodo', // 'diodo' | 'voltio' | 'ua' | 'ohmio'
+  onGuardar,
+  cambiosPendientes = false,
+  guardando = false,
+  ultimaSincronizacion = null,
+  componentesIniciales = null, // lista previa de componentes (persistencia)
+  onCambios = null,            // callback ligero al cambiar componentes (auto-persistencia)
+  fullscreen = false,          // modo pantalla completa
+  onCerrar = null              // botón de cierre en modo fullscreen
+}) {
+  // --- Estados locales del Boardview ---
+  const [componentes, setComponentes] = useState(() => {
+    if (Array.isArray(componentesIniciales)) return componentesIniciales;
+    return COMPONENTES_DEFECTO;
+  });
 
   const [activeScale, setActiveScale] = useState(escala); // diodo, voltio, ua, ohmio
-  const [selectedCompId, setSelectedCompId] = useState('smd_1');
+  const [selectedCompId, setSelectedCompId] = useState(() => {
+    const base = Array.isArray(componentesIniciales) ? componentesIniciales : COMPONENTES_DEFECTO;
+    return base[0]?.id ?? null;
+  });
   const [selectedPadId, setSelectedPadId] = useState('1'); // '1' | '2'
 
   // Configuración de visualización y capas (Layers)
@@ -72,17 +88,24 @@ export default function VisorMapeoPCB({
   const [bgOpacity, setBgOpacity] = useState(0.65);
   const [showHitbox, setShowHitbox] = useState(true);
   const [showComponentNames, setShowComponentNames] = useState(true);
-  const [bgImageUrl, setBgImageUrl] = useState('/pcb_motherboard_bg.png');
+  const [bgImageUrl, setBgImageUrl] = useState(IMAGEN_PREDETERMINADA);
+
+  // Dimensiones naturales de la imagen de fondo (para dibujarla 1:1 y proporcionada)
+  const [bgImageSize, setBgImageSize] = useState({ w: 1024, h: 1024 });
 
   // Herramientas: 'select' | 'pan' | 'drawSMD'
   const [tool, setTool] = useState('select');
   const [tipoDrawing, setTipoDrawing] = useState('Capacitor');
 
-  // Navegación (Zoom & Pan)
-  const [zoom, setZoom] = useState(1.1);
-  const [posicion, setPosicion] = useState({ x: 30, y: 30 });
+  // Navegación (Zoom & Pan) — refs espejo para evitar closures obsoletos
+  const [zoom, setZoom] = useState(1);
+  const [posicion, setPosicion] = useState({ x: 0, y: 0 });
+  const zoomRef = useRef(zoom);
+  const posicionRef = useRef(posicion);
+  const bgImageSizeRef = useRef(bgImageSize);
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+  const fileInputRef = useRef(null);
 
   // Lógica de dibujo (Pad Espejo)
   const [drawingStep, setDrawingStep] = useState(0); // 0: libre, 1: arrastrando pad 1, 2: posicionando pad 2
@@ -112,16 +135,74 @@ export default function VisorMapeoPCB({
     setActiveScale(escala);
   }, [escala]);
 
-  // --- Manejo de Zoom con Rueda ---
+  // Mantener refs espejo siempre actualizadas
+  useEffect(() => { zoomRef.current = zoom; }, [zoom]);
+  useEffect(() => { posicionRef.current = posicion; }, [posicion]);
+  useEffect(() => { bgImageSizeRef.current = bgImageSize; }, [bgImageSize]);
+
+  // --- Auto-persistencia ligera de componentes (sin alertas) ---
+  const onCambiosRef = useRef(onCambios);
+  useEffect(() => { onCambiosRef.current = onCambios; }, [onCambios]);
+  useEffect(() => {
+    if (!onCambiosRef.current) return;
+    const t = setTimeout(() => onCambiosRef.current(componentes), 400);
+    return () => clearTimeout(t);
+  }, [componentes]);
+
+  // --- Ajustar imagen centrada y proporcionada a la vista (Fit to View) ---
+  const fitToView = useCallback(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const rect = svg.getBoundingClientRect();
+    const cw = rect.width || 800;
+    const ch = rect.height || 600;
+    const pad = 50; // margen alrededor de la imagen
+    const iw = bgImageSizeRef.current.w || 1024;
+    const ih = bgImageSizeRef.current.h || 1024;
+    const scale = Math.min((cw - pad) / iw, (ch - pad) / ih);
+    const z = Math.max(0.15, Math.min(4, scale));
+    setZoom(z);
+    setPosicion({ x: (cw - iw * z) / 2, y: (ch - ih * z) / 2 });
+  }, []);
+
+  // --- Cargar dimensiones naturales de la imagen y ajustar la vista ---
+  useEffect(() => {
+    if (!bgImageUrl) return;
+    const img = new Image();
+    img.onload = () => {
+      const w = img.naturalWidth || img.width || 1024;
+      const h = img.naturalHeight || img.height || 1024;
+      setBgImageSize({ w, h });
+      requestAnimationFrame(() => fitToView());
+    };
+    img.onerror = () => {
+      setBgImageSize({ w: 1024, h: 1024 });
+    };
+    img.src = bgImageUrl;
+  }, [bgImageUrl, fitToView]);
+
+  // --- Zoom hacia el cursor con la rueda (proporcional a la rotación) ---
   useEffect(() => {
     const handleWheel = (e) => {
-      if (e.target.closest('#svg-boardview')) {
-        e.preventDefault();
-        const zoomFactor = 1.1;
-        let newZoom = e.deltaY < 0 ? zoom * zoomFactor : zoom / zoomFactor;
-        newZoom = Math.max(0.15, Math.min(8, newZoom));
-        setZoom(newZoom);
-      }
+      if (!e.target.closest('#svg-boardview')) return;
+      e.preventDefault();
+      const svg = svgRef.current;
+      if (!svg) return;
+      const rect = svg.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
+      const oldZoom = zoomRef.current;
+      // Factor exponencial: sensible a la magnitud del scroll, no al número de eventos
+      const factor = Math.exp(-e.deltaY * 0.0015);
+      const newZoom = Math.max(0.15, Math.min(10, oldZoom * factor));
+
+      // Mantener fijo el punto que está bajo el cursor
+      const pX = (mouseX - posicionRef.current.x) / oldZoom;
+      const pY = (mouseY - posicionRef.current.y) / oldZoom;
+
+      setZoom(newZoom);
+      setPosicion({ x: mouseX - pX * newZoom, y: mouseY - pY * newZoom });
     };
 
     const container = svgContainerRef.current;
@@ -133,7 +214,39 @@ export default function VisorMapeoPCB({
         container.removeEventListener('wheel', handleWheel);
       }
     };
-  }, [zoom]);
+  }, []);
+
+  // --- Zoom desde el centro de la vista (botones + / -) ---
+  const zoomCentro = (factor) => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const rect = svg.getBoundingClientRect();
+    const mouseX = rect.width / 2;
+    const mouseY = rect.height / 2;
+    const oldZoom = zoomRef.current;
+    const newZoom = Math.max(0.15, Math.min(10, oldZoom * factor));
+    const pX = (mouseX - posicionRef.current.x) / oldZoom;
+    const pY = (mouseY - posicionRef.current.y) / oldZoom;
+    setZoom(newZoom);
+    setPosicion({ x: mouseX - pX * newZoom, y: mouseY - pY * newZoom });
+  };
+
+  // --- Carga de imagen de referencia (archivo local → base64) ---
+  const manejarArchivoImagen = (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setBgImageUrl(reader.result);
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const pedirUrlImagen = () => {
+    const nuevaUrl = window.prompt('Ingresa el enlace (URL) de la imagen de la placa:', bgImageUrl === IMAGEN_PREDETERMINADA ? '' : bgImageUrl || '');
+    if (nuevaUrl !== null && nuevaUrl.trim()) {
+      setBgImageUrl(nuevaUrl.trim());
+    }
+  };
 
   // Convertir coordenadas cliente a coordenadas locales del lienzo SVG
   const getCanvasCoords = (e) => {
@@ -142,10 +255,10 @@ export default function VisorMapeoPCB({
     const rect = svg.getBoundingClientRect();
     const clientX = e.clientX - rect.left;
     const clientY = e.clientY - rect.top;
-    
-    // Deshacer el efecto de zoom y paneo
-    const x = (clientX - posicion.x) / zoom;
-    const y = (clientY - posicion.y) / zoom;
+
+    // Deshacer el efecto de zoom y paneo (usando refs siempre actuales)
+    const x = (clientX - posicionRef.current.x) / zoomRef.current;
+    const y = (clientY - posicionRef.current.y) / zoomRef.current;
     return { x, y };
   };
 
@@ -160,7 +273,7 @@ export default function VisorMapeoPCB({
     if (tool === 'pan' || e.button === 1 || e.button === 2) {
       e.preventDefault();
       setIsPanning(true);
-      setPanStart({ x: e.clientX - posicion.x, y: e.clientY - posicion.y });
+      setPanStart({ x: e.clientX - posicionRef.current.x, y: e.clientY - posicionRef.current.y });
       return;
     }
 
@@ -615,7 +728,7 @@ export default function VisorMapeoPCB({
   };
 
   return (
-    <div style={styles.container}>
+    <div style={{ ...styles.container, ...(fullscreen ? { borderRadius: 0, border: 'none' } : {}) }}>
       {/* 1. BARRA DE HERRAMIENTAS SUPERIOR */}
       <div style={styles.header}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
@@ -686,6 +799,15 @@ export default function VisorMapeoPCB({
               }}
             >
               {guardando ? 'Guardando...' : 'Guardar en Nube'}
+            </button>
+          )}
+          {onCerrar && (
+            <button
+              onClick={onCerrar}
+              style={styles.closeFullscreenBtn}
+              title="Cerrar pantalla completa"
+            >
+              <X size={18} />
             </button>
           )}
         </div>
@@ -781,15 +903,44 @@ export default function VisorMapeoPCB({
           </div>
         </div>
 
-        {/* Input de Imagen de Fondo */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '0.7rem', color: '#9ca3af' }}>Ruta/URL Fondo:</span>
-          <input 
-            type="text" 
-            value={bgImageUrl} 
-            onChange={(e) => setBgImageUrl(e.target.value)}
-            style={{ ...styles.inputDark, width: '180px', padding: '3px 8px', fontSize: '0.75rem' }} 
-            placeholder="URL de imagen..."
+        {/* Imagen de Referencia (Placa) — carga funcional */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span style={{ fontSize: '0.7rem', color: '#9ca3af', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <ImageIcon size={13} /> Placa:
+          </span>
+          <button 
+            onClick={() => fileInputRef.current && fileInputRef.current.click()}
+            style={styles.imgBtn}
+            title="Subir imagen de la placa desde tu dispositivo"
+          >
+            <Upload size={13} /> Subir
+          </button>
+          <button 
+            onClick={pedirUrlImagen}
+            style={styles.imgBtn}
+            title="Ingresar URL de la imagen de la placa"
+          >
+            <Link size={13} /> URL
+          </button>
+          <button 
+            onClick={() => setBgImageUrl(IMAGEN_PREDETERMINADA)}
+            style={styles.imgBtn}
+            title="Restaurar la imagen predeterminada de referencia"
+          >
+            <RotateCcw size={13} /> Predet.
+          </button>
+          {bgImageSize.w && (
+            <span style={{ fontSize: '0.6rem', color: '#4b5563' }}>
+              {bgImageSize.w}×{bgImageSize.h}px
+            </span>
+          )}
+          {/* Input de archivo oculto */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            style={{ display: 'none' }}
+            onChange={manejarArchivoImagen}
           />
         </div>
       </div>
@@ -841,9 +992,9 @@ export default function VisorMapeoPCB({
 
           {/* Zoom Controls Overlay */}
           <div style={styles.zoomControls}>
-            <button onClick={() => setZoom(prev => Math.min(8, prev + 0.15))} style={styles.zoomBtn}><ZoomIn size={16} /></button>
-            <button onClick={() => setZoom(prev => Math.max(0.15, prev - 0.15))} style={styles.zoomBtn}><ZoomOut size={16} /></button>
-            <button onClick={() => { setZoom(1.1); setPosicion({ x: 30, y: 30 }); }} style={styles.zoomBtn} title="Reajustar vista"><Maximize2 size={15} /></button>
+            <button onClick={() => zoomCentro(1.25)} style={styles.zoomBtn} title="Acercar"><ZoomIn size={16} /></button>
+            <button onClick={() => zoomCentro(1 / 1.25)} style={styles.zoomBtn} title="Alejar"><ZoomOut size={16} /></button>
+            <button onClick={() => fitToView()} style={styles.zoomBtn} title="Ajustar imagen a la vista (centrada y proporcionada)"><Maximize2 size={15} /></button>
           </div>
 
           <svg
@@ -864,17 +1015,32 @@ export default function VisorMapeoPCB({
             {/* Grupo con Transformaciones de Zoom y Paneo */}
             <g transform={`translate(${posicion.x}, ${posicion.y}) scale(${zoom})`}>
               
-              {/* IMAGEN DE PCB DE FONDO */}
+              {/* IMAGEN DE PCB DE FONDO (1:1 proporcional, tamaño natural) */}
               {showBgImage && bgImageUrl && (
-                <image
-                  href={bgImageUrl}
-                  x="0"
-                  y="0"
-                  width="1000"
-                  height="700"
-                  opacity={bgOpacity}
-                  style={{ pointerEvents: 'none' }}
-                />
+                <g>
+                  {/* Límite del área de la imagen (guía visual) */}
+                  <rect
+                    x="0"
+                    y="0"
+                    width={bgImageSize.w}
+                    height={bgImageSize.h}
+                    fill="none"
+                    stroke="#4b5563"
+                    strokeWidth="1"
+                    strokeDasharray="8, 6"
+                    opacity="0.6"
+                    style={{ pointerEvents: 'none' }}
+                  />
+                  <image
+                    href={bgImageUrl}
+                    x="0"
+                    y="0"
+                    width={bgImageSize.w}
+                    height={bgImageSize.h}
+                    opacity={bgOpacity}
+                    style={{ pointerEvents: 'none', userSelect: 'none' }}
+                  />
+                </g>
               )}
 
               {/* RENDERIZADO DE COMPONENTES SMD REALES */}
@@ -1548,10 +1714,40 @@ const styles = {
   canvasContainer: {
     position: 'relative',
     flex: 1,
-    height: '600px',
+    height: '100%',
+    minHeight: '500px',
     backgroundColor: '#0a0d16',
     overflow: 'hidden',
     userSelect: 'none'
+  },
+  imgBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px',
+    padding: '4px 8px',
+    borderRadius: '6px',
+    border: '1px solid #374151',
+    backgroundColor: '#1f2937',
+    color: '#e5e7eb',
+    cursor: 'pointer',
+    fontSize: '0.7rem',
+    fontWeight: 'bold',
+    transition: 'all 0.15s',
+    outline: 'none'
+  },
+  closeFullscreenBtn: {
+    width: '34px',
+    height: '34px',
+    borderRadius: '6px',
+    border: '1px solid #374151',
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    color: '#f87171',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'background-color 0.2s',
+    outline: 'none'
   },
   zoomControls: {
     position: 'absolute',

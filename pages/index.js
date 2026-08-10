@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { doc, setDoc, addDoc, collection, getDocs, deleteDoc, updateDoc } from 'firebase/firestore';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { db, auth } from '../firebase';
-import { Sun, Moon, ArrowLeft, RefreshCcw, Zap, Smartphone, AlertTriangle, ChevronRight, Home, ShieldCheck, Camera, CheckCircle2, XCircle, Settings, Plus, Save, X, Trash2, Edit, ChevronDown, CornerDownRight, LogOut, Lightbulb, Usb, Map, Play, Flame, ClipboardList, History, Printer, FileText, MessageCircle, Link, Monitor, Mic, MicOff, Cpu, Image as ImageIcon } from 'lucide-react';
+import { Sun, Moon, ArrowLeft, RefreshCcw, Zap, Smartphone, AlertTriangle, ChevronRight, Home, ShieldCheck, Camera, CheckCircle2, XCircle, Settings, Plus, Save, X, Trash2, Edit, ChevronDown, CornerDownRight, LogOut, Lightbulb, Usb, Map, Play, Flame, ClipboardList, History, Printer, FileText, MessageCircle, Link, Monitor, Mic, MicOff, Cpu, Image as ImageIcon, Maximize2 } from 'lucide-react';
 
 import FPCInteligente from '../components/FPCInteligente.js';
 import ICInteligente from '../components/ICInteligente.js';
@@ -865,6 +865,7 @@ export default function AppDiagnostico() {
   // ESTADOS LIBRERÍA IC
   const [icActivo, setIcActivo] = useState(null);
   const [modalIcAbierto, setModalIcAbierto] = useState(false);
+  const [modalBoardviewAbierto, setModalBoardviewAbierto] = useState(false);
   const [formNuevoIc, setFormNuevoIc] = useState({ nombre: '', filas: 5, columnas: 5, esquinaGuia: 'top-left' });
   const [padActivoIc, setPadActivoIc] = useState('A1');
   const [modoIc, setModoIc] = useState('crear');
@@ -1872,7 +1873,7 @@ export default function AppDiagnostico() {
                       <button onClick={() => cambiarSeccionLibreria('fpc_bateria')} style={{ padding: '10px 15px', borderRadius: '8px', border: 'none', background: seccionLibreria === 'fpc_bateria' ? '#f59e0b' : '#1f2937', color: 'white', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>FPC Batería</button>
                       <button onClick={() => cambiarSeccionLibreria('ic')} style={{ padding: '10px 15px', borderRadius: '8px', border: 'none', background: seccionLibreria === 'ic' ? '#ec4899' : '#1f2937', color: 'white', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>Planos IC / BGA</button>
                       <button onClick={() => cambiarSeccionLibreria('rffe')} style={{ padding: '10px 15px', borderRadius: '8px', border: 'none', background: seccionLibreria === 'rffe' ? '#10b981' : '#1f2937', color: 'white', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>Módulo RFFE</button>
-                      <button onClick={() => cambiarSeccionLibreria('boardview')} style={{ padding: '10px 15px', borderRadius: '8px', border: 'none', background: seccionLibreria === 'boardview' ? '#00ffff' : '#1f2937', color: seccionLibreria === 'boardview' ? 'black' : 'white', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>Boardview PCB</button>
+                      <button onClick={() => { cambiarSeccionLibreria('boardview'); setModalBoardviewAbierto(true); }} style={{ padding: '10px 15px', borderRadius: '8px', border: 'none', background: seccionLibreria === 'boardview' ? '#00ffff' : '#1f2937', color: seccionLibreria === 'boardview' ? 'black' : 'white', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>Boardview PCB</button>
                     </div>
 
                     {seccionLibreria === 'docktest' && (
@@ -2039,15 +2040,16 @@ export default function AppDiagnostico() {
 
                     {seccionLibreria === 'boardview' && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                        <VisorMapeoPCB
-                          lecturaEnVivo={lecturaUsb.valor}
-                          escala={escalaIc}
-                          onGuardar={(nuevosComp) => {
-                            console.log('Guardando componentes en Firebase:', nuevosComp);
-                            setModeloActivo(prev => ({ ...prev, boardviewComponentes: nuevosComp }));
-                            alert('Componentes de Boardview guardados localmente.');
-                          }}
-                        />
+                        <div style={{ backgroundColor: '#111827', border: '1px solid #374151', borderRadius: '12px', padding: '35px 20px', textAlign: 'center' }}>
+                          <Map size={44} color="#00ffff" style={{ opacity: 0.7, marginBottom: '12px' }} />
+                          <h3 style={{ color: '#fff', margin: '0 0 6px 0' }}>BOARDVIEW PRO</h3>
+                          <p style={{ color: '#9ca3af', fontSize: '0.85rem', margin: '0 auto 20px auto', maxWidth: '440px', lineHeight: '1.5' }}>
+                            Mapa interactivo de la placa base para calcado y trazado de componentes SMD sobre la imagen de referencia (zoom, paneo y dibujo incluidos).
+                          </p>
+                          <button onClick={() => setModalBoardviewAbierto(true)} style={{ padding: '12px 22px', borderRadius: '10px', border: 'none', background: '#00ffff', color: 'black', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.9rem', display: 'inline-flex', alignItems: 'center', gap: '8px', boxShadow: '0 0 15px rgba(0,255,255,0.3)' }}>
+                            <Maximize2 size={16} /> Abrir en Pantalla Completa
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -2253,6 +2255,42 @@ export default function AppDiagnostico() {
                 guardando={guardandoIc}
                 ultimaSincronizacion={ultimaSincIc}
                 onRegistrarOL={() => avanzarPinMagico('OL')}
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* --- MODAL FULLSCREEN: BOARDVIEW PRO (MAPEO SMD / CALCADO) --- */}
+      <AnimatePresence>
+        {modalBoardviewAbierto && modeloActivo && (
+          <motion.div className="no-print" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#0a0b0f', zIndex: 2500, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div style={{ padding: '10px 20px', borderBottom: '1px solid #374151', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#111827', flexShrink: 0, flexWrap: 'wrap', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <Map size={20} color="#00ffff" />
+                <span style={{ color: 'white', fontWeight: 'bold', fontSize: '1.1rem' }}>BOARDVIEW PRO</span>
+                <span style={{ fontSize: '0.7rem', padding: '3px 8px', borderRadius: '12px', background: '#1f2937', color: '#9ca3af', fontWeight: 'bold' }}>MAPEO SMD / CALCADO</span>
+              </div>
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <span className="hide-on-mobile" style={{ fontSize: '0.7rem', color: '#6b7280' }}>
+                  Rueda: zoom al cursor · Mover: paneo · + Dibujar SMD: trazar componente
+                </span>
+                <button onClick={() => setModalBoardviewAbierto(false)} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', cursor: 'pointer', padding: '8px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}><X size={20} /></button>
+              </div>
+            </div>
+            <div style={{ flex: 1, overflow: 'hidden', padding: '10px' }}>
+              <VisorMapeoPCB
+                fullscreen
+                onCerrar={() => setModalBoardviewAbierto(false)}
+                componentesIniciales={modeloActivo.boardviewComponentes}
+                onCambios={(nuevosComp) => setModeloActivo(prev => ({ ...prev, boardviewComponentes: nuevosComp }))}
+                lecturaEnVivo={lecturaUsb.valor}
+                escala={escalaIc}
+                onGuardar={(nuevosComp) => {
+                  console.log('Guardando componentes en Firebase:', nuevosComp);
+                  setModeloActivo(prev => ({ ...prev, boardviewComponentes: nuevosComp }));
+                  alert('Componentes de Boardview guardados localmente.');
+                }}
               />
             </div>
           </motion.div>
