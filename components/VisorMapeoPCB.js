@@ -3,7 +3,7 @@ import {
   Save, Trash2, Plus, Move, ZoomIn, ZoomOut, Layers, Maximize2, 
   Settings, Edit, Play, HelpCircle, Activity, Check, AlertTriangle, 
   Map, Eye, EyeOff, Clipboard, RefreshCw, ChevronRight, CheckCircle2,
-  Image as ImageIcon, Upload, RotateCcw, X, Link, Search, RotateCw, Lock
+  Image as ImageIcon, Upload, RotateCcw, X, Link, Search, RotateCw, Lock, Zap, ArrowLeftRight
 } from 'lucide-react';
 
 const TIPOS_COMPONENTE = ['Capacitor', 'Resistencia', 'Diodo', 'Bobina'];
@@ -106,6 +106,12 @@ export default function VisorMapeoPCB({
   const [esquemaOpacity, setEsquemaOpacity] = useState(0.70);
   const [placaSize, setPlacaSize] = useState({ w: 1024, h: 1024 });
   const [esquemaSize, setEsquemaSize] = useState({ w: 1024, h: 1024 });
+
+  // --- Sistema de AutoHold Inteligente ---
+  const [autoHoldActivo, setAutoHoldActivo] = useState(false);
+  const autoHoldValueRef = useRef(null);
+  const autoHoldStartTimeRef = useRef(0);
+  const autoHoldTriggeredRef = useRef(false);
 
   // Sincronizar props de imágenes si cambian desde el modelo
   useEffect(() => {
@@ -217,6 +223,25 @@ export default function VisorMapeoPCB({
     }, 400);
     return () => clearTimeout(t);
   }, [componentes, imgPlacaUrl, imgEsquemaUrl]);
+
+  // --- Sonido Beep Sintetizado de Confirmación (Web Audio API) ---
+  const playBeep = useCallback(() => {
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContext) return;
+      const ctx = new AudioContext();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, ctx.currentTime); // La5
+      gain.gain.setValueAtTime(0.12, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.12);
+    } catch (e) {}
+  }, []);
 
   // --- Ajustar imagen centrada y proporcionada a la vista (Fit to View) ---
   const fitToView = useCallback(() => {
@@ -365,6 +390,49 @@ export default function VisorMapeoPCB({
     return { x, y };
   };
 
+  // --- Invertir Pines (Pin 1 ↔ Pin 2) del Componente ---
+  const invertirPinesComponente = (compId) => {
+    setComponentes(prev => prev.map(comp => {
+      if (comp.id !== compId) return comp;
+      const pad1 = comp.pads.find(p => p.id === '1');
+      const pad2 = comp.pads.find(p => p.id === '2');
+      if (!pad1 || !pad2) return comp;
+
+      const nuevoPad1 = {
+        ...pad1,
+        netName: pad2.netName,
+        tipo: pad2.tipo,
+        valorSanoDiodo: pad2.valorSanoDiodo,
+        valorSanoVoltio: pad2.valorSanoVoltio,
+        valorSanoUa: pad2.valorSanoUa,
+        valorSanoOhmio: pad2.valorSanoOhmio,
+        valorActualDiodo: pad2.valorActualDiodo,
+        valorActualVoltio: pad2.valorActualVoltio,
+        valorActualUa: pad2.valorActualUa,
+        valorActualOhmio: pad2.valorActualOhmio
+      };
+
+      const nuevoPad2 = {
+        ...pad2,
+        netName: pad1.netName,
+        tipo: pad1.tipo,
+        valorSanoDiodo: pad1.valorSanoDiodo,
+        valorSanoVoltio: pad1.valorSanoVoltio,
+        valorSanoUa: pad1.valorSanoUa,
+        valorSanoOhmio: pad1.valorSanoOhmio,
+        valorActualDiodo: pad1.valorActualDiodo,
+        valorActualVoltio: pad1.valorActualVoltio,
+        valorActualUa: pad1.valorActualUa,
+        valorActualOhmio: pad1.valorActualOhmio
+      };
+
+      return {
+        ...comp,
+        pads: [nuevoPad1, nuevoPad2]
+      };
+    }));
+  };
+
   // --- Rotación de Componente (90°) ---
   const rotarComponente = (id) => {
     setComponentes(prev => prev.map(comp => {
@@ -412,7 +480,7 @@ export default function VisorMapeoPCB({
     if (e.target.closest('.interactive-handle')) return;
     const coords = getCanvasCoords(e);
 
-    // Herramienta de Paneo (o clic central / secundario)
+    // Paneo
     if (tool === 'pan' || e.button === 1 || e.button === 2) {
       e.preventDefault();
       setIsPanning(true);
@@ -420,7 +488,7 @@ export default function VisorMapeoPCB({
       return;
     }
 
-    // Herramienta de Dibujo SMD
+    // Dibujo SMD
     if (tool === 'drawSMD') {
       e.preventDefault();
       if (drawingStep === 0) {
@@ -437,7 +505,6 @@ export default function VisorMapeoPCB({
   const handleMouseMove = (e) => {
     const coords = getCanvasCoords(e);
 
-    // Paneo
     if (isPanning) {
       setPosicion({
         x: e.clientX - panStart.x,
@@ -446,7 +513,6 @@ export default function VisorMapeoPCB({
       return;
     }
 
-    // Arrastrar Componente en modo Selección
     if (isDraggingComp && dragCompId) {
       const newX = Math.round(coords.x - dragOffset.x);
       const newY = Math.round(coords.y - dragOffset.y);
@@ -454,7 +520,6 @@ export default function VisorMapeoPCB({
       return;
     }
 
-    // Dibujar Pad 1 (Arrastrando)
     if (tool === 'drawSMD' && drawingStep === 1) {
       const w = Math.abs(coords.x - startPoint.x);
       const h = Math.abs(coords.y - startPoint.y);
@@ -464,7 +529,6 @@ export default function VisorMapeoPCB({
       return;
     }
 
-    // Posicionar Pad 2 (Modo Espejo + Bloqueo Ortogonal con Shift/Ctrl)
     if (tool === 'drawSMD' && drawingStep === 2 && pad1Temp) {
       const p1CenterX = pad1Temp.x + pad1Temp.w / 2;
       const p1CenterY = pad1Temp.y + pad1Temp.h / 2;
@@ -475,7 +539,6 @@ export default function VisorMapeoPCB({
       const dx = coords.x - p1CenterX;
       const dy = coords.y - p1CenterY;
 
-      // Bloqueo ortogonal si Shift o Ctrl están presionados
       const shouldLock = e.shiftKey || e.ctrlKey || isShiftDown;
       let lockedAxis = null;
 
@@ -495,7 +558,6 @@ export default function VisorMapeoPCB({
       return;
     }
 
-    // Arrastrar Nodo de Matriz
     if (isMatrixDragging && selectedCompId) {
       const compPiloto = componentes.find(c => c.id === selectedCompId);
       if (!compPiloto) return;
@@ -709,8 +771,8 @@ export default function VisorMapeoPCB({
     return '#f97316';
   };
 
-  // Guardar medición en pad activo y auto-avanzar ("Pin Mágico")
-  const grabarMedicionActual = (valorEntrada) => {
+  // Guardar medición en pad activo y auto-avanzar ("Pin Mágico" que omite GND)
+  const grabarMedicionActual = useCallback((valorEntrada) => {
     if (!selectedCompId || !selectedPadId) return;
 
     setComponentes(prev => prev.map(comp => {
@@ -729,20 +791,112 @@ export default function VisorMapeoPCB({
       };
     }));
 
-    avanzarSiguientePad();
-  };
+    playBeep();
+    avanzarSiguientePadMedicion();
+  }, [selectedCompId, selectedPadId, activeScale, playBeep]);
 
-  const avanzarSiguientePad = () => {
-    if (!selectedCompId) return;
+  // --- Auto-avance Inteligente en Orden de Creación (Omitiendo GND) ---
+  const avanzarSiguientePadMedicion = useCallback(() => {
+    if (!selectedCompId || componentes.length === 0) return;
     const indexComp = componentes.findIndex(c => c.id === selectedCompId);
     if (indexComp === -1) return;
 
-    if (selectedPadId === '1') {
+    const compActual = componentes[indexComp];
+    const pad1 = compActual.pads.find(p => p.id === '1');
+    const pad2 = compActual.pads.find(p => p.id === '2');
+
+    // Si estamos en Pin 1 y Pin 2 NO es GND, pasar a Pin 2 de este mismo componente
+    if (selectedPadId === '1' && pad2 && pad2.tipo !== 'GND') {
       setSelectedPadId('2');
+      return;
+    }
+
+    // Si estamos en Pin 2 (o Pin 2 es GND), avanzar secuencialmente al siguiente componente
+    for (let i = 1; i <= componentes.length; i++) {
+      const nextIndex = (indexComp + i) % componentes.length;
+      const nextComp = componentes[nextIndex];
+      const nextP1 = nextComp.pads.find(p => p.id === '1');
+      const nextP2 = nextComp.pads.find(p => p.id === '2');
+
+      if (nextP1 && nextP1.tipo !== 'GND') {
+        setSelectedCompId(nextComp.id);
+        setSelectedPadId('1');
+        return;
+      } else if (nextP2 && nextP2.tipo !== 'GND') {
+        setSelectedCompId(nextComp.id);
+        setSelectedPadId('2');
+        return;
+      }
+    }
+  }, [selectedCompId, selectedPadId, componentes]);
+
+  // --- Detección y Disparo Automático de AutoHold ---
+  useEffect(() => {
+    if (!autoHoldActivo || !lecturaEnVivo || lecturaEnVivo === '----' || lecturaEnVivo === 'OL') {
+      autoHoldValueRef.current = null;
+      autoHoldTriggeredRef.current = false;
+      return;
+    }
+
+    const valNum = parseFloat(lecturaEnVivo);
+    if (isNaN(valNum)) {
+      autoHoldValueRef.current = null;
+      autoHoldTriggeredRef.current = false;
+      return;
+    }
+
+    let esInactivo = valNum < 0.040;
+    let tol = 0.004;
+
+    if (activeScale === 'ua') {
+      tol = 1.5;
+      esInactivo = valNum < 1.0;
+    } else if (activeScale === 'voltio') {
+      tol = 0.05;
+      esInactivo = valNum < 0.1;
+    } else if (activeScale === 'ohmio') {
+      tol = 5.0;
+      esInactivo = valNum < 1.0;
+    }
+
+    if (esInactivo) {
+      autoHoldValueRef.current = null;
+      autoHoldTriggeredRef.current = false;
+      return;
+    }
+
+    if (autoHoldValueRef.current !== null && Math.abs(valNum - autoHoldValueRef.current) <= tol) {
+      if (!autoHoldTriggeredRef.current && Date.now() - autoHoldStartTimeRef.current >= 1200) {
+        autoHoldTriggeredRef.current = true;
+        grabarMedicionActual(lecturaEnVivo);
+      }
     } else {
-      const nextIndex = (indexComp + 1) % componentes.length;
-      setSelectedCompId(componentes[nextIndex].id);
-      setSelectedPadId('1');
+      autoHoldValueRef.current = valNum;
+      autoHoldStartTimeRef.current = Date.now();
+      autoHoldTriggeredRef.current = false;
+    }
+  }, [lecturaEnVivo, autoHoldActivo, activeScale, grabarMedicionActual]);
+
+  // Iniciar Flujo de Medición Guiada desde el primer componente
+  const iniciarMedicionGuiada = () => {
+    if (componentes.length === 0) return;
+    for (let i = 0; i < componentes.length; i++) {
+      const comp = componentes[i];
+      const p1 = comp.pads.find(p => p.id === '1');
+      const p2 = comp.pads.find(p => p.id === '2');
+      if (p1 && p1.tipo !== 'GND') {
+        setSelectedCompId(comp.id);
+        setSelectedPadId('1');
+        setAutoHoldActivo(true);
+        centrarEnComponente(comp);
+        return;
+      } else if (p2 && p2.tipo !== 'GND') {
+        setSelectedCompId(comp.id);
+        setSelectedPadId('2');
+        setAutoHoldActivo(true);
+        centrarEnComponente(comp);
+        return;
+      }
     }
   };
 
@@ -842,7 +996,7 @@ export default function VisorMapeoPCB({
     <div style={{ ...styles.container, ...(fullscreen ? { borderRadius: 0, border: 'none' } : {}) }}>
       {/* 1. BARRA SUPERIOR DE HERRAMIENTAS Y BÚSQUEDA */}
       <div style={styles.header}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
           <span style={{ fontSize: '0.95rem', fontWeight: 'bold', color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Map size={18} /> BOARDVIEW PRO
           </span>
@@ -892,7 +1046,37 @@ export default function VisorMapeoPCB({
 
           <div style={styles.divider} />
 
-          {/* Buscador Rápido de Componentes y Líneas */}
+          {/* Botón de AutoHold */}
+          <button 
+            onClick={() => setAutoHoldActivo(!autoHoldActivo)} 
+            style={{ 
+              ...styles.btn, 
+              backgroundColor: autoHoldActivo ? 'rgba(16, 185, 129, 0.2)' : '#1f2937', 
+              color: autoHoldActivo ? '#10b981' : '#9ca3af',
+              border: autoHoldActivo ? '1px solid #10b981' : '1px solid #374151',
+              boxShadow: autoHoldActivo ? '0 0 10px rgba(16,185,129,0.4)' : 'none'
+            }}
+            title="Captura automática de multímetro al estabilizar y auto-avance"
+          >
+            <Zap size={14} /> {autoHoldActivo ? 'HOLD ON' : 'HOLD'}
+          </button>
+
+          {/* Botón de Iniciar Flujo de Medición Guiada */}
+          <button 
+            onClick={iniciarMedicionGuiada}
+            style={{ 
+              ...styles.btn, 
+              backgroundColor: '#3b82f6', 
+              color: '#ffffff'
+            }}
+            title="Recorrer componentes en el orden creado para medir"
+          >
+            <Play size={13} /> Medir en Orden
+          </button>
+
+          <div style={styles.divider} />
+
+          {/* Buscador Rápido */}
           <div style={{ position: 'relative' }}>
             <div style={{ display: 'flex', alignItems: 'center', backgroundColor: '#111827', border: '1px solid #374151', borderRadius: '6px', padding: '2px 8px' }}>
               <Search size={14} color="#9ca3af" />
@@ -1170,8 +1354,13 @@ export default function VisorMapeoPCB({
         >
           {/* HUD de Medición del Multímetro */}
           <div style={styles.hudContainer}>
-            <div style={{ fontSize: '0.65rem', color: '#6b7280', fontWeight: 'bold', textTransform: 'uppercase' }}>
-              Multímetro USB ({activeScale})
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ fontSize: '0.65rem', color: '#6b7280', fontWeight: 'bold', textTransform: 'uppercase' }}>
+                Multímetro USB ({activeScale})
+              </div>
+              <span style={{ fontSize: '0.65rem', fontWeight: 'bold', color: autoHoldActivo ? '#10b981' : '#6b7280' }}>
+                {autoHoldActivo ? '● AUTO-HOLD ON' : '○ HOLD OFF'}
+              </span>
             </div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginTop: '2px' }}>
               <span 
@@ -1211,11 +1400,21 @@ export default function VisorMapeoPCB({
             height="100%"
             style={{ display: 'block', backgroundColor: '#0a0d16' }}
           >
-            {/* Patrón de Cuadrícula */}
             <defs>
               <pattern id="gridPattern" width="30" height="30" patternUnits="userSpaceOnUse">
                 <path d="M 30 0 L 0 0 0 30" fill="none" stroke="#1f2937" strokeWidth="0.5" />
               </pattern>
+              {/* Animación de pulso para el pad activo a medir */}
+              <style>{`
+                @keyframes pulseGlow {
+                  0% { stroke-opacity: 1; stroke-width: 2.5px; }
+                  50% { stroke-opacity: 0.3; stroke-width: 4.5px; }
+                  100% { stroke-opacity: 1; stroke-width: 2.5px; }
+                }
+                .active-measuring-pad {
+                  animation: pulseGlow 1.2s infinite ease-in-out;
+                }
+              `}</style>
             </defs>
             <rect width="100%" height="100%" fill="url(#gridPattern)" />
 
@@ -1316,8 +1515,6 @@ export default function VisorMapeoPCB({
                       const padX = comp.x + pad.x_rel;
                       const padY = comp.y + pad.y_rel;
                       const isPadSelected = selectedCompId === comp.id && selectedPadId === pad.id;
-                      
-                      // Resaltado si comparte la misma red (Net Name)
                       const isNetMatch = activeNetName && pad.netName === activeNetName;
 
                       return (
@@ -1335,6 +1532,24 @@ export default function VisorMapeoPCB({
                               stroke="#00ffff"
                               strokeWidth="2"
                               strokeDasharray="2, 2"
+                              vectorEffect="non-scaling-stroke"
+                              style={{ pointerEvents: 'none' }}
+                            />
+                          )}
+
+                          {/* Anillo de enfoque de pad activo en medición */}
+                          {isPadSelected && (
+                            <rect
+                              className="active-measuring-pad"
+                              x={padX - 3}
+                              y={padY - 3}
+                              width={pad.w + 6}
+                              height={pad.h + 6}
+                              rx="4"
+                              ry="4"
+                              fill="none"
+                              stroke="#00ffff"
+                              strokeWidth="2.5"
                               vectorEffect="non-scaling-stroke"
                               style={{ pointerEvents: 'none' }}
                             />
@@ -1551,19 +1766,28 @@ export default function VisorMapeoPCB({
           )}
         </div>
 
-        {/* SIDEBAR DERECHO: DETALLES, EDICIÓN Y ROTACIÓN */}
+        {/* SIDEBAR DERECHO: DETALLES, EDICIÓN, INVERSIÓN Y ROTACIÓN */}
         <div style={styles.sidebar}>
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #374151', paddingBottom: '6px', marginBottom: '10px' }}>
               <h3 style={styles.sidebarTitle}>Detalles de Selección</h3>
               {compActivo && (
-                <button 
-                  onClick={() => rotarComponente(compActivo.id)}
-                  style={styles.rotateBtn}
-                  title="Rotar componente 90° (Tecla R)"
-                >
-                  <RotateCw size={13} /> Rotar 90°
-                </button>
+                <div style={{ display: 'flex', gap: '4px' }}>
+                  <button 
+                    onClick={() => invertirPinesComponente(compActivo.id)}
+                    style={styles.actionSmallBtn}
+                    title="Invertir Pin 1 y Pin 2 (GND ↔ DATA)"
+                  >
+                    <ArrowLeftRight size={12} /> Invertir (1↔2)
+                  </button>
+                  <button 
+                    onClick={() => rotarComponente(compActivo.id)}
+                    style={styles.actionSmallBtn}
+                    title="Rotar componente 90° (Tecla R)"
+                  >
+                    <RotateCw size={12} /> Rotar 90°
+                  </button>
+                </div>
               )}
             </div>
             
@@ -1581,6 +1805,7 @@ export default function VisorMapeoPCB({
                         setComponentes(prev => prev.map(c => c.id === compActivo.id ? { ...c, nombre: val } : c));
                       }}
                       style={{ ...styles.inputDark, width: '120px', fontWeight: 'bold', fontSize: '0.9rem', color: '#00ffff' }}
+                      title="Editar nombre/número del componente"
                     />
                     <select
                       value={compActivo.tipo}
@@ -1589,6 +1814,7 @@ export default function VisorMapeoPCB({
                         setComponentes(prev => prev.map(c => c.id === compActivo.id ? { ...c, tipo: val } : c));
                       }}
                       style={styles.selectDark}
+                      title="Cambiar tipo de componente"
                     >
                       {TIPOS_COMPONENTE.map(t => <option key={t} value={t}>{t}</option>)}
                     </select>
@@ -1614,13 +1840,13 @@ export default function VisorMapeoPCB({
                         onClick={() => setSelectedPadId('1')} 
                         style={{ ...styles.padSelectorBtn, ...(selectedPadId === '1' && styles.padSelectorBtnActive) }}
                       >
-                        Pin 1
+                        Pin 1 ({compActivo.pads.find(p => p.id === '1')?.tipo})
                       </button>
                       <button 
                         onClick={() => setSelectedPadId('2')} 
                         style={{ ...styles.padSelectorBtn, ...(selectedPadId === '2' && styles.padSelectorBtnActive) }}
                       >
-                        Pin 2
+                        Pin 2 ({compActivo.pads.find(p => p.id === '2')?.tipo})
                       </button>
                     </div>
                   </div>
@@ -1658,8 +1884,25 @@ export default function VisorMapeoPCB({
 
                   {/* Medición en vivo HUD Panel */}
                   <div style={styles.liveRecordBox}>
-                    <div style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#60a5fa', marginBottom: '8px' }}>
-                      Captura del Multímetro
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#60a5fa' }}>
+                        Captura del Multímetro
+                      </span>
+                      <button 
+                        onClick={() => setAutoHoldActivo(!autoHoldActivo)}
+                        style={{ 
+                          fontSize: '0.65rem', 
+                          fontWeight: 'bold', 
+                          padding: '2px 6px', 
+                          borderRadius: '4px',
+                          border: 'none',
+                          backgroundColor: autoHoldActivo ? '#10b981' : '#374151',
+                          color: '#fff',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {autoHoldActivo ? 'HOLD ACTIVO' : 'ACTIVAR HOLD'}
+                      </button>
                     </div>
                     
                     <div style={{ display: 'flex', gap: '8px' }}>
@@ -1680,7 +1923,7 @@ export default function VisorMapeoPCB({
                       </button>
                     </div>
                     <div style={{ fontSize: '0.6rem', color: '#9ca3af', marginTop: '6px', textAlign: 'center' }}>
-                      * Al grabar, avanza automáticamente al siguiente pad.
+                      * Al grabar (o con AutoHold), avanza automáticamente al siguiente componente (saltando pines GND).
                     </div>
                   </div>
 
@@ -1769,11 +2012,14 @@ export default function VisorMapeoPCB({
             )}
           </div>
 
-          {/* Lista Resumen de Componentes */}
+          {/* Lista Resumen de Componentes en Orden de Creación */}
           <div style={{ marginTop: 'auto', borderTop: '1px solid #374151', paddingTop: '12px' }}>
-            <h4 style={{ ...styles.sectionTitle, marginBottom: '6px' }}>Componentes ({componentes.length})</h4>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+              <h4 style={{ ...styles.sectionTitle }}>Componentes ({componentes.length})</h4>
+              <span style={{ fontSize: '0.65rem', color: '#9ca3af' }}>Orden Creación</span>
+            </div>
             <div style={styles.compListContainer}>
-              {componentes.map(c => (
+              {componentes.map((c, idx) => (
                 <div 
                   key={c.id} 
                   onClick={() => { setSelectedCompId(c.id); setSelectedPadId('1'); }}
@@ -1783,7 +2029,7 @@ export default function VisorMapeoPCB({
                     color: selectedCompId === c.id ? '#fff' : '#d1d5db'
                   }}
                 >
-                  <span>{c.nombre}</span>
+                  <span>#{idx + 1} {c.nombre}</span>
                   <span style={{ fontSize: '0.65rem', opacity: 0.7 }}>{c.tipo}</span>
                 </div>
               ))}
@@ -1919,7 +2165,7 @@ const styles = {
     padding: '4px 6px',
     fontSize: '0.75rem',
     outline: 'none',
-    width: '160px'
+    width: '150px'
   },
   searchResultsDropdown: {
     position: 'absolute',
@@ -1965,17 +2211,17 @@ const styles = {
     transition: 'all 0.15s',
     outline: 'none'
   },
-  rotateBtn: {
+  actionSmallBtn: {
     display: 'flex',
     alignItems: 'center',
-    gap: '4px',
-    padding: '3px 8px',
+    gap: '3px',
+    padding: '3px 6px',
     borderRadius: '4px',
     border: '1px solid #4b5563',
     backgroundColor: '#374151',
     color: '#00ffff',
     cursor: 'pointer',
-    fontSize: '0.7rem',
+    fontSize: '0.65rem',
     fontWeight: 'bold',
     transition: 'all 0.15s',
     outline: 'none'
@@ -2042,7 +2288,7 @@ const styles = {
     border: '2px solid #374151',
     boxShadow: '0 10px 15px -3px rgba(0,0,0,0.5)',
     zIndex: 10,
-    minWidth: '180px',
+    minWidth: '190px',
     pointerEvents: 'none'
   },
   drawingBanner: {
@@ -2079,8 +2325,8 @@ const styles = {
     lineHeight: '1.4'
   },
   sidebar: {
-    width: '310px',
-    minWidth: '310px',
+    width: '320px',
+    minWidth: '320px',
     borderLeft: '2px solid #374151',
     backgroundColor: '#1f2937',
     padding: '12px',
