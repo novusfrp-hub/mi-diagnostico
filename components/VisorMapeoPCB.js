@@ -6,13 +6,14 @@ import {
   Image as ImageIcon, Upload, RotateCcw, X, Link
 } from 'lucide-react';
 
-const TIPOS_COMPONENTE = ['Capacitor', 'Resistencia', 'Diodo'];
+const TIPOS_COMPONENTE = ['Capacitor', 'Resistencia', 'Diodo', 'Bobina'];
 const TIPOS_LINEA = ['DATA', 'GND', 'VCC', 'NC'];
 
 const TIPO_ABREVIATURAS = {
   Capacitor: 'C',
   Resistencia: 'R',
-  Diodo: 'D'
+  Diodo: 'D',
+  Bobina: 'L'
 };
 
 // Sugerencias comunes de Net Names
@@ -435,6 +436,7 @@ export default function VisorMapeoPCB({
     const pad2RelX = pad2Temp.x - minX;
     const pad2RelY = pad2Temp.y - minY;
 
+    const isGndDefault = tipoDrawing === 'Capacitor';
     const nuevoComp = {
       id: `smd_${Date.now()}`,
       nombre: nombreSugerido,
@@ -452,10 +454,10 @@ export default function VisorMapeoPCB({
           y_rel: pad1RelY,
           w: pad1Temp.w,
           h: pad1Temp.h,
-          valorSanoDiodo: '0.350',
+          valorSanoDiodo: tipoDrawing === 'Bobina' ? '0.400' : '0.350',
           valorSanoVoltio: '1.800',
-          valorSanoUa: '180',
-          valorSanoOhmio: '10000',
+          valorSanoUa: tipoDrawing === 'Bobina' ? '100' : '180',
+          valorSanoOhmio: tipoDrawing === 'Bobina' ? '0.5' : (tipoDrawing === 'Resistencia' ? '1000' : '10000'),
           valorActualDiodo: '---',
           valorActualVoltio: '---',
           valorActualUa: '---',
@@ -463,20 +465,20 @@ export default function VisorMapeoPCB({
         },
         {
           id: '2',
-          netName: 'GND',
-          tipo: 'GND',
+          netName: isGndDefault ? 'GND' : `${nombreSugerido}_P2`,
+          tipo: isGndDefault ? 'GND' : 'DATA',
           x_rel: pad2RelX,
           y_rel: pad2RelY,
           w: pad2Temp.w,
           h: pad2Temp.h,
-          valorSanoDiodo: '0.000',
-          valorSanoVoltio: '0.000',
-          valorSanoUa: '0',
-          valorSanoOhmio: '0',
-          valorActualDiodo: '0.000',
-          valorActualVoltio: '0.000',
-          valorActualUa: '0',
-          valorActualOhmio: '0'
+          valorSanoDiodo: isGndDefault ? '0.000' : (tipoDrawing === 'Bobina' ? '0.400' : '0.350'),
+          valorSanoVoltio: isGndDefault ? '0.000' : '1.800',
+          valorSanoUa: isGndDefault ? '0' : (tipoDrawing === 'Bobina' ? '100' : '180'),
+          valorSanoOhmio: isGndDefault ? '0' : (tipoDrawing === 'Bobina' ? '0.5' : (tipoDrawing === 'Resistencia' ? '1000' : '10000')),
+          valorActualDiodo: isGndDefault ? '0.000' : '---',
+          valorActualVoltio: isGndDefault ? '0.000' : '---',
+          valorActualUa: isGndDefault ? '0' : '---',
+          valorActualOhmio: isGndDefault ? '0' : '---'
         }
       ]
     };
@@ -691,9 +693,15 @@ export default function VisorMapeoPCB({
     const xCenter = comp.x + comp.w / 2;
     const yCenter = comp.y + comp.h / 2;
 
+    // Calcular tamaño de fuente adaptativo para que se ajuste a las dimensiones reales del componente
+    const minDim = Math.min(comp.w, comp.h);
+    const maxDim = Math.max(comp.w, comp.h);
+    const fontSizeComp = Math.max(3.5, Math.min(9, Math.round(minDim * 0.28)));
+    const fontSizePad = Math.max(3, Math.min(8, Math.round(fontSizeComp * 0.85)));
+
     const monoStyle = {
       fontFamily: 'Consolas, monospace',
-      fontSize: '9px',
+      fontSize: `${fontSizeComp}px`,
       fontWeight: 'bold',
       fill: '#ffffff',
       userSelect: 'none',
@@ -705,11 +713,11 @@ export default function VisorMapeoPCB({
       return (
         <g opacity={showComponentNames ? 1 : 0} style={{ transition: 'opacity 0.2s' }}>
           {/* Pin 1 arriba */}
-          <text x={xCenter} y={comp.y + pad1.y_rel + pad1.h / 2 + 3} textAnchor="middle" style={{ ...monoStyle, fill: '#aaaaaa' }}>1</text>
+          <text x={xCenter} y={comp.y + pad1.y_rel + pad1.h / 2 + fontSizePad / 3} textAnchor="middle" style={{ ...monoStyle, fontSize: `${fontSizePad}px`, fill: '#aaaaaa' }}>1</text>
           {/* Nombre en el centro */}
-          <text x={xCenter} y={yCenter + 3} textAnchor="middle" style={{ ...monoStyle, fill: '#ffffff', fontSize: '9px' }}>{comp.nombre}</text>
+          <text x={xCenter} y={yCenter + fontSizeComp / 3} textAnchor="middle" style={{ ...monoStyle, fill: '#ffffff', fontSize: `${fontSizeComp}px` }}>{comp.nombre}</text>
           {/* Pin 2 abajo */}
-          <text x={xCenter} y={comp.y + pad2.y_rel + pad2.h / 2 + 3} textAnchor="middle" style={{ ...monoStyle, fill: '#aaaaaa' }}>2</text>
+          <text x={xCenter} y={comp.y + pad2.y_rel + pad2.h / 2 + fontSizePad / 3} textAnchor="middle" style={{ ...monoStyle, fontSize: `${fontSizePad}px`, fill: '#aaaaaa' }}>2</text>
         </g>
       );
     }
@@ -718,11 +726,11 @@ export default function VisorMapeoPCB({
     return (
       <g opacity={showComponentNames ? 1 : 0} style={{ transition: 'opacity 0.2s' }}>
         {/* Pin 1 izquierda */}
-        <text x={comp.x + pad1.x_rel + pad1.w / 2} y={yCenter + 3} textAnchor="middle" style={{ ...monoStyle, fill: '#aaaaaa' }}>1</text>
+        <text x={comp.x + pad1.x_rel + pad1.w / 2} y={yCenter + fontSizePad / 3} textAnchor="middle" style={{ ...monoStyle, fontSize: `${fontSizePad}px`, fill: '#aaaaaa' }}>1</text>
         {/* Nombre en el centro */}
-        <text x={xCenter} y={yCenter + 3} textAnchor="middle" style={monoStyle}>{comp.nombre}</text>
+        <text x={xCenter} y={yCenter + fontSizeComp / 3} textAnchor="middle" style={{ ...monoStyle, fontSize: `${fontSizeComp}px` }}>{comp.nombre}</text>
         {/* Pin 2 derecha */}
-        <text x={comp.x + pad2.x_rel + pad2.w / 2} y={yCenter + 3} textAnchor="middle" style={{ ...monoStyle, fill: '#aaaaaa' }}>2</text>
+        <text x={comp.x + pad2.x_rel + pad2.w / 2} y={yCenter + fontSizePad / 3} textAnchor="middle" style={{ ...monoStyle, fontSize: `${fontSizePad}px`, fill: '#aaaaaa' }}>2</text>
       </g>
     );
   };
@@ -1028,6 +1036,7 @@ export default function VisorMapeoPCB({
                     stroke="#4b5563"
                     strokeWidth="1"
                     strokeDasharray="8, 6"
+                    vectorEffect="non-scaling-stroke"
                     opacity="0.6"
                     style={{ pointerEvents: 'none' }}
                   />
@@ -1061,8 +1070,9 @@ export default function VisorMapeoPCB({
                         height={comp.h}
                         fill="transparent"
                         stroke={isSelected ? '#00ffff' : '#ffffff'}
-                        strokeWidth={isSelected ? '2' : '1.5'}
+                        strokeWidth={isSelected ? '2' : '1.2'}
                         strokeDasharray={isSelected ? '3, 3' : 'none'}
+                        vectorEffect="non-scaling-stroke"
                         style={{ cursor: tool === 'select' ? 'pointer' : 'default' }}
                         onClick={() => {
                           if (tool === 'select') {
@@ -1090,7 +1100,8 @@ export default function VisorMapeoPCB({
                           ry="2"
                           fill={obtenerColorDePad(pad, comp.id)}
                           stroke={isPadSelected ? '#ffffff' : '#000000'}
-                          strokeWidth={isPadSelected ? '1.5' : '0.5'}
+                          strokeWidth={isPadSelected ? '2' : '1'}
+                          vectorEffect="non-scaling-stroke"
                           style={{ cursor: 'pointer', transition: 'fill 0.2s' }}
                           onClick={(e) => {
                             e.stopPropagation();
@@ -1119,6 +1130,7 @@ export default function VisorMapeoPCB({
                         fill="#00ffff"
                         stroke="#ffffff"
                         strokeWidth="1.5"
+                        vectorEffect="non-scaling-stroke"
                         style={{ cursor: 'ew-resize' }}
                         onMouseDown={(e) => {
                           e.stopPropagation();
@@ -1145,6 +1157,7 @@ export default function VisorMapeoPCB({
                     stroke="#00ffff"
                     strokeWidth="1"
                     strokeDasharray="4, 4"
+                    vectorEffect="non-scaling-stroke"
                   />
                   {/* Pads del clon */}
                   {clone.pads.map((pad) => (
@@ -1159,6 +1172,7 @@ export default function VisorMapeoPCB({
                       fill={pad.tipo === 'GND' ? '#4b5563' : '#d4af37'}
                       stroke="#000"
                       strokeWidth="0.5"
+                      vectorEffect="non-scaling-stroke"
                     />
                   ))}
                   {/* Nombre temporal */}
@@ -1185,8 +1199,9 @@ export default function VisorMapeoPCB({
                       height={pad1Temp.h}
                       fill="rgba(212, 175, 55, 0.4)"
                       stroke="#d4af37"
-                      strokeWidth="1"
+                      strokeWidth="1.5"
                       strokeDasharray="2, 2"
+                      vectorEffect="non-scaling-stroke"
                     />
                   )}
                   {/* Pad 2 Temporal (Espejo locked sizes) */}
@@ -1198,8 +1213,9 @@ export default function VisorMapeoPCB({
                       height={pad2Temp.h}
                       fill="rgba(212, 175, 55, 0.4)"
                       stroke="#00ffff"
-                      strokeWidth="1.2"
+                      strokeWidth="1.5"
                       strokeDasharray="2, 2"
+                      vectorEffect="non-scaling-stroke"
                     />
                   )}
                   {/* Caja delimitadora (Hitbox blanco proyectado) */}
@@ -1213,6 +1229,7 @@ export default function VisorMapeoPCB({
                       stroke="#ffffff"
                       strokeWidth="1"
                       strokeDasharray="4, 4"
+                      vectorEffect="non-scaling-stroke"
                     />
                   )}
                 </g>
