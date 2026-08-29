@@ -2283,13 +2283,27 @@ export default function AppDiagnostico() {
                 fullscreen
                 onCerrar={() => setModalBoardviewAbierto(false)}
                 componentesIniciales={modeloActivo.boardviewComponentes}
-                onCambios={(nuevosComp) => setModeloActivo(prev => ({ ...prev, boardviewComponentes: nuevosComp }))}
+                imagenPlacaInicial={modeloActivo.boardviewImagenPlaca || modeloActivo.imgPlaca}
+                imagenEsquemaInicial={modeloActivo.boardviewImagenEsquema || modeloActivo.imgEsquema}
+                onCambios={(nuevosComp, nuevaPlaca, nuevoEsquema) => {
+                  setModeloActivo(prev => ({
+                    ...prev,
+                    boardviewComponentes: nuevosComp,
+                    ...(nuevaPlaca !== undefined ? { boardviewImagenPlaca: nuevaPlaca } : {}),
+                    ...(nuevoEsquema !== undefined ? { boardviewImagenEsquema: nuevoEsquema } : {})
+                  }));
+                }}
                 lecturaEnVivo={lecturaUsb.valor}
                 escala={escalaIc}
-                onGuardar={(nuevosComp) => {
-                  console.log('Guardando componentes en Firebase:', nuevosComp);
-                  setModeloActivo(prev => ({ ...prev, boardviewComponentes: nuevosComp }));
-                  alert('Componentes de Boardview guardados localmente.');
+                onGuardar={(nuevosComp, nuevaPlaca, nuevoEsquema) => {
+                  console.log('Guardando boardview en Firebase:', { nuevosComp, nuevaPlaca, nuevoEsquema });
+                  setModeloActivo(prev => ({
+                    ...prev,
+                    boardviewComponentes: nuevosComp,
+                    boardviewImagenPlaca: nuevaPlaca || prev.boardviewImagenPlaca || '',
+                    boardviewImagenEsquema: nuevoEsquema || prev.boardviewImagenEsquema || ''
+                  }));
+                  alert('Boardview (componentes e imágenes) guardado exitosamente.');
                 }}
               />
             </div>

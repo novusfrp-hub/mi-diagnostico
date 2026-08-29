@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { 
   Save, Trash2, Plus, Move, ZoomIn, ZoomOut, Layers, Maximize2, 
   Settings, Edit, Play, HelpCircle, Activity, Check, AlertTriangle, 
   Map, Eye, EyeOff, Clipboard, RefreshCw, ChevronRight, CheckCircle2,
-  Image as ImageIcon, Upload, RotateCcw, X, Link
+  Image as ImageIcon, Upload, RotateCcw, X, Link, Search, RotateCw, Lock
 } from 'lucide-react';
 
 const TIPOS_COMPONENTE = ['Capacitor', 'Resistencia', 'Diodo', 'Bobina'];
@@ -25,38 +25,48 @@ const NET_NAMES_SUGERIDOS = [
 
 const IMAGEN_PREDETERMINADA = '/pcb_motherboard_bg.png';
 
-// Componentes de ejemplo (solo se usan si no se pasa una lista inicial)
+// Componentes de ejemplo
 const COMPONENTES_DEFECTO = [
   {
-      id: 'smd_1',
-      nombre: 'C1401',
-      tipo: 'Capacitor',
-      x: 180, y: 120, w: 50, h: 90,
-      pads: [
-        { id: '1', netName: 'PP_VDD_MAIN', tipo: 'DATA', x_rel: 5, y_rel: 5, w: 40, h: 25, valorSanoDiodo: '0.450', valorSanoVoltio: '4.200', valorSanoUa: '120', valorSanoOhmio: '15000', valorActualDiodo: '---', valorActualVoltio: '---', valorActualUa: '---', valorActualOhmio: '---' },
-        { id: '2', netName: 'GND', tipo: 'GND', x_rel: 5, y_rel: 60, w: 40, h: 25, valorSanoDiodo: '0.000', valorSanoVoltio: '0.000', valorSanoUa: '0', valorSanoOhmio: '0', valorActualDiodo: '0.000', valorActualVoltio: '0.000', valorActualUa: '0', valorActualOhmio: '0' }
-      ]
-    },
-    {
-      id: 'smd_2',
-      nombre: 'R1402',
-      tipo: 'Resistencia',
-      x: 320, y: 150, w: 90, h: 50,
-      pads: [
-        { id: '1', netName: 'AP_TO_I2C_SDA', tipo: 'DATA', x_rel: 5, y_rel: 5, w: 25, h: 40, valorSanoDiodo: '0.520', valorSanoVoltio: '1.800', valorSanoUa: '80', valorSanoOhmio: '2200', valorActualDiodo: '---', valorActualVoltio: '---', valorActualUa: '---', valorActualOhmio: '---' },
-        { id: '2', netName: 'PP1V8_S2', tipo: 'DATA', x_rel: 60, y_rel: 5, w: 25, h: 40, valorSanoDiodo: '0.522', valorSanoVoltio: '1.800', valorSanoUa: '82', valorSanoOhmio: '2200', valorActualDiodo: '---', valorActualVoltio: '---', valorActualUa: '---', valorActualOhmio: '---' }
-      ]
-    },
-    {
-      id: 'smd_3',
-      nombre: 'D1403',
-      tipo: 'Diodo',
-      x: 480, y: 200, w: 60, h: 100,
-      pads: [
-        { id: '1', netName: 'VREG_L6A_0P6', tipo: 'DATA', x_rel: 5, y_rel: 5, w: 50, h: 30, valorSanoDiodo: '0.155', valorSanoVoltio: '0.600', valorSanoUa: '450', valorSanoOhmio: '45000', valorActualDiodo: '---', valorActualVoltio: '---', valorActualUa: '---', valorActualOhmio: '---' },
-        { id: '2', netName: 'GND', tipo: 'GND', x_rel: 5, y_rel: 65, w: 50, h: 30, valorSanoDiodo: '0.000', valorSanoVoltio: '0.000', valorSanoUa: '0', valorSanoOhmio: '0', valorActualDiodo: '0.000', valorActualVoltio: '0.000', valorActualUa: '0', valorActualOhmio: '0' }
-      ]
-    }
+    id: 'smd_1',
+    nombre: 'C1401',
+    tipo: 'Capacitor',
+    x: 180, y: 120, w: 50, h: 90,
+    pads: [
+      { id: '1', netName: 'PP_VDD_MAIN', tipo: 'DATA', x_rel: 5, y_rel: 5, w: 40, h: 25, valorSanoDiodo: '0.450', valorSanoVoltio: '4.200', valorSanoUa: '120', valorSanoOhmio: '15000', valorActualDiodo: '---', valorActualVoltio: '---', valorActualUa: '---', valorActualOhmio: '---' },
+      { id: '2', netName: 'GND', tipo: 'GND', x_rel: 5, y_rel: 60, w: 40, h: 25, valorSanoDiodo: '0.000', valorSanoVoltio: '0.000', valorSanoUa: '0', valorSanoOhmio: '0', valorActualDiodo: '0.000', valorActualVoltio: '0.000', valorActualUa: '0', valorActualOhmio: '0' }
+    ]
+  },
+  {
+    id: 'smd_2',
+    nombre: 'R1402',
+    tipo: 'Resistencia',
+    x: 320, y: 150, w: 90, h: 50,
+    pads: [
+      { id: '1', netName: 'AP_TO_I2C_SDA', tipo: 'DATA', x_rel: 5, y_rel: 5, w: 25, h: 40, valorSanoDiodo: '0.520', valorSanoVoltio: '1.800', valorSanoUa: '80', valorSanoOhmio: '2200', valorActualDiodo: '---', valorActualVoltio: '---', valorActualUa: '---', valorActualOhmio: '---' },
+      { id: '2', netName: 'PP1V8_S2', tipo: 'DATA', x_rel: 60, y_rel: 5, w: 25, h: 40, valorSanoDiodo: '0.522', valorSanoVoltio: '1.800', valorSanoUa: '82', valorSanoOhmio: '2200', valorActualDiodo: '---', valorActualVoltio: '---', valorActualUa: '---', valorActualOhmio: '---' }
+    ]
+  },
+  {
+    id: 'smd_3',
+    nombre: 'D1403',
+    tipo: 'Diodo',
+    x: 480, y: 200, w: 60, h: 100,
+    pads: [
+      { id: '1', netName: 'VREG_L6A_0P6', tipo: 'DATA', x_rel: 5, y_rel: 5, w: 50, h: 30, valorSanoDiodo: '0.155', valorSanoVoltio: '0.600', valorSanoUa: '450', valorSanoOhmio: '45000', valorActualDiodo: '---', valorActualVoltio: '---', valorActualUa: '---', valorActualOhmio: '---' },
+      { id: '2', netName: 'GND', tipo: 'GND', x_rel: 5, y_rel: 65, w: 50, h: 30, valorSanoDiodo: '0.000', valorSanoVoltio: '0.000', valorSanoUa: '0', valorSanoOhmio: '0', valorActualDiodo: '0.000', valorActualVoltio: '0.000', valorActualUa: '0', valorActualOhmio: '0' }
+    ]
+  },
+  {
+    id: 'smd_4',
+    nombre: 'L1404',
+    tipo: 'Bobina',
+    x: 620, y: 140, w: 80, h: 80,
+    pads: [
+      { id: '1', netName: 'PP_VDD_MAIN', tipo: 'DATA', x_rel: 8, y_rel: 8, w: 64, h: 28, valorSanoDiodo: '0.450', valorSanoVoltio: '4.200', valorSanoUa: '120', valorSanoOhmio: '0.5', valorActualDiodo: '---', valorActualVoltio: '---', valorActualUa: '---', valorActualOhmio: '---' },
+      { id: '2', netName: 'PP_VDD_MAIN_SW', tipo: 'DATA', x_rel: 8, y_rel: 44, w: 64, h: 28, valorSanoDiodo: '0.450', valorSanoVoltio: '4.200', valorSanoUa: '120', valorSanoOhmio: '0.5', valorActualDiodo: '---', valorActualVoltio: '---', valorActualUa: '---', valorActualOhmio: '---' }
+    ]
+  }
 ];
 
 export default function VisorMapeoPCB({
@@ -66,55 +76,78 @@ export default function VisorMapeoPCB({
   cambiosPendientes = false,
   guardando = false,
   ultimaSincronizacion = null,
-  componentesIniciales = null, // lista previa de componentes (persistencia)
-  onCambios = null,            // callback ligero al cambiar componentes (auto-persistencia)
-  fullscreen = false,          // modo pantalla completa
-  onCerrar = null              // botón de cierre en modo fullscreen
+  componentesIniciales = null,       // lista previa de componentes (persistencia)
+  imagenPlacaInicial = null,          // URL foto de placa (persistencia)
+  imagenEsquemaInicial = null,        // URL diagrama esquemático (persistencia)
+  onCambios = null,                  // callback ({ componentes, imagenPlaca, imagenEsquema })
+  fullscreen = false,                // modo pantalla completa
+  onCerrar = null                    // botón de cierre en modo fullscreen
 }) {
   // --- Estados locales del Boardview ---
   const [componentes, setComponentes] = useState(() => {
-    if (Array.isArray(componentesIniciales)) return componentesIniciales;
+    if (Array.isArray(componentesIniciales) && componentesIniciales.length > 0) return componentesIniciales;
     return COMPONENTES_DEFECTO;
   });
 
-  const [activeScale, setActiveScale] = useState(escala); // diodo, voltio, ua, ohmio
+  const [activeScale, setActiveScale] = useState(escala);
   const [selectedCompId, setSelectedCompId] = useState(() => {
-    const base = Array.isArray(componentesIniciales) ? componentesIniciales : COMPONENTES_DEFECTO;
+    const base = Array.isArray(componentesIniciales) && componentesIniciales.length > 0 ? componentesIniciales : COMPONENTES_DEFECTO;
     return base[0]?.id ?? null;
   });
   const [selectedPadId, setSelectedPadId] = useState('1'); // '1' | '2'
 
-  // Configuración de visualización y capas (Layers)
-  const [showBgImage, setShowBgImage] = useState(true);
-  const [bgOpacity, setBgOpacity] = useState(0.65);
+  // --- Capas de Imágenes de Fondo (Placa + Esquemático) ---
+  const [capaActiva, setCapaActiva] = useState('placa'); // 'placa' | 'esquema'
+  const [imgPlacaUrl, setImgPlacaUrl] = useState(imagenPlacaInicial || IMAGEN_PREDETERMINADA);
+  const [imgEsquemaUrl, setImgEsquemaUrl] = useState(imagenEsquemaInicial || '');
+  const [showPlaca, setShowPlaca] = useState(true);
+  const [showEsquema, setShowEsquema] = useState(false);
+  const [placaOpacity, setPlacaOpacity] = useState(0.85);
+  const [esquemaOpacity, setEsquemaOpacity] = useState(0.70);
+  const [placaSize, setPlacaSize] = useState({ w: 1024, h: 1024 });
+  const [esquemaSize, setEsquemaSize] = useState({ w: 1024, h: 1024 });
+
+  // Sincronizar props de imágenes si cambian desde el modelo
+  useEffect(() => {
+    if (imagenPlacaInicial) setImgPlacaUrl(imagenPlacaInicial);
+  }, [imagenPlacaInicial]);
+  useEffect(() => {
+    if (imagenEsquemaInicial) setImgEsquemaUrl(imagenEsquemaInicial);
+  }, [imagenEsquemaInicial]);
+
+  // Configuración de visualización de vectores
   const [showHitbox, setShowHitbox] = useState(true);
   const [showComponentNames, setShowComponentNames] = useState(true);
-  const [bgImageUrl, setBgImageUrl] = useState(IMAGEN_PREDETERMINADA);
-
-  // Dimensiones naturales de la imagen de fondo (para dibujarla 1:1 y proporcionada)
-  const [bgImageSize, setBgImageSize] = useState({ w: 1024, h: 1024 });
 
   // Herramientas: 'select' | 'pan' | 'drawSMD'
   const [tool, setTool] = useState('select');
   const [tipoDrawing, setTipoDrawing] = useState('Capacitor');
 
-  // Navegación (Zoom & Pan) — refs espejo para evitar closures obsoletos
+  // Navegación (Zoom & Pan) — refs espejo
   const [zoom, setZoom] = useState(1);
   const [posicion, setPosicion] = useState({ x: 0, y: 0 });
   const zoomRef = useRef(zoom);
   const posicionRef = useRef(posicion);
-  const bgImageSizeRef = useRef(bgImageSize);
+  const placaSizeRef = useRef(placaSize);
+  const esquemaSizeRef = useRef(esquemaSize);
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
-  const fileInputRef = useRef(null);
+  const fileInputPlacaRef = useRef(null);
+  const fileInputEsquemaRef = useRef(null);
 
-  // Lógica de dibujo (Pad Espejo)
+  // Lógica de dibujo (Pad Espejo + Bloqueo Ortogonal)
   const [drawingStep, setDrawingStep] = useState(0); // 0: libre, 1: arrastrando pad 1, 2: posicionando pad 2
   const [pad1Temp, setPad1Temp] = useState(null); // { x, y, w, h }
-  const [pad2Temp, setPad2Temp] = useState(null); // { x, y, w, h } (w y h bloqueados de pad1)
+  const [pad2Temp, setPad2Temp] = useState(null); // { x, y, w, h, lockedAxis }
   const [startPoint, setStartPoint] = useState({ x: 0, y: 0 });
+  const [isShiftDown, setIsShiftDown] = useState(false);
 
-  // Lógica de matriz
+  // Lógica de Arrastre de Componente en Modo Selección
+  const [isDraggingComp, setIsDraggingComp] = useState(false);
+  const [dragCompId, setDragCompId] = useState(null);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+
+  // Lógica de matriz de clonación
   const [matrizActiva, setMatrizActiva] = useState(false);
   const [matrizRows, setMatrizRows] = useState(1);
   const [matrizCols, setMatrizCols] = useState(5);
@@ -122,12 +155,15 @@ export default function VisorMapeoPCB({
   const [matrixStartPos, setMatrixStartPos] = useState({ x: 0, y: 0 });
   const [matrixClonesPreview, setMatrixClonesPreview] = useState([]);
 
-  // Modales y Tooltips
+  // Búsqueda rápida de componentes y líneas
+  const [busqueda, setBusqueda] = useState('');
+  const [mostrarResultadosBusqueda, setMostrarResultadosBusqueda] = useState(false);
+
+  // Tooltips en hover
   const [hoveredComp, setHoveredComp] = useState(null);
   const [hoveredCoords, setHoveredCoords] = useState({ x: 0, y: 0 });
-  const [editingComp, setEditingComp] = useState(null); // componente en edición (para modal de doble click)
 
-  // Referencia al contenedor SVG
+  // Referencias al SVG y contenedor
   const svgRef = useRef(null);
   const svgContainerRef = useRef(null);
 
@@ -139,16 +175,48 @@ export default function VisorMapeoPCB({
   // Mantener refs espejo siempre actualizadas
   useEffect(() => { zoomRef.current = zoom; }, [zoom]);
   useEffect(() => { posicionRef.current = posicion; }, [posicion]);
-  useEffect(() => { bgImageSizeRef.current = bgImageSize; }, [bgImageSize]);
+  useEffect(() => { placaSizeRef.current = placaSize; }, [placaSize]);
+  useEffect(() => { esquemaSizeRef.current = esquemaSize; }, [esquemaSize]);
 
-  // --- Auto-persistencia ligera de componentes (sin alertas) ---
+  // Listener para tecla Shift / Ctrl y atajos (R = rotar, Escape = reset)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Shift' || e.key === 'Control') {
+        setIsShiftDown(true);
+      }
+      if ((e.key === 'r' || e.key === 'R') && selectedCompId && document.activeElement.tagName !== 'INPUT') {
+        rotarComponente(selectedCompId);
+      }
+      if (e.key === 'Escape') {
+        setDrawingStep(0);
+        setPad1Temp(null);
+        setPad2Temp(null);
+      }
+    };
+    const handleKeyUp = (e) => {
+      if (e.key === 'Shift' || e.key === 'Control') {
+        setIsShiftDown(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [selectedCompId]);
+
+  // --- Auto-persistencia de componentes e imágenes hacia el modelo ---
   const onCambiosRef = useRef(onCambios);
   useEffect(() => { onCambiosRef.current = onCambios; }, [onCambios]);
   useEffect(() => {
     if (!onCambiosRef.current) return;
-    const t = setTimeout(() => onCambiosRef.current(componentes), 400);
+    const t = setTimeout(() => {
+      onCambiosRef.current(componentes, imgPlacaUrl, imgEsquemaUrl);
+    }, 400);
     return () => clearTimeout(t);
-  }, [componentes]);
+  }, [componentes, imgPlacaUrl, imgEsquemaUrl]);
 
   // --- Ajustar imagen centrada y proporcionada a la vista (Fit to View) ---
   const fitToView = useCallback(() => {
@@ -157,32 +225,46 @@ export default function VisorMapeoPCB({
     const rect = svg.getBoundingClientRect();
     const cw = rect.width || 800;
     const ch = rect.height || 600;
-    const pad = 50; // margen alrededor de la imagen
-    const iw = bgImageSizeRef.current.w || 1024;
-    const ih = bgImageSizeRef.current.h || 1024;
-    const scale = Math.min((cw - pad) / iw, (ch - pad) / ih);
+    const pad = 50;
+
+    const baseW = capaActiva === 'esquema' ? (esquemaSizeRef.current.w || 1024) : (placaSizeRef.current.w || 1024);
+    const baseH = capaActiva === 'esquema' ? (esquemaSizeRef.current.h || 1024) : (placaSizeRef.current.h || 1024);
+
+    const scale = Math.min((cw - pad) / baseW, (ch - pad) / baseH);
     const z = Math.max(0.15, Math.min(4, scale));
     setZoom(z);
-    setPosicion({ x: (cw - iw * z) / 2, y: (ch - ih * z) / 2 });
-  }, []);
+    setPosicion({ x: (cw - baseW * z) / 2, y: (ch - baseH * z) / 2 });
+  }, [capaActiva]);
 
-  // --- Cargar dimensiones naturales de la imagen y ajustar la vista ---
+  // Cargar dimensiones de la imagen de Placa
   useEffect(() => {
-    if (!bgImageUrl) return;
+    if (!imgPlacaUrl) return;
     const img = new Image();
     img.onload = () => {
       const w = img.naturalWidth || img.width || 1024;
       const h = img.naturalHeight || img.height || 1024;
-      setBgImageSize({ w, h });
-      requestAnimationFrame(() => fitToView());
+      setPlacaSize({ w, h });
+      if (capaActiva === 'placa') requestAnimationFrame(() => fitToView());
     };
-    img.onerror = () => {
-      setBgImageSize({ w: 1024, h: 1024 });
-    };
-    img.src = bgImageUrl;
-  }, [bgImageUrl, fitToView]);
+    img.onerror = () => setPlacaSize({ w: 1024, h: 1024 });
+    img.src = imgPlacaUrl;
+  }, [imgPlacaUrl, fitToView, capaActiva]);
 
-  // --- Zoom hacia el cursor con la rueda (proporcional a la rotación) ---
+  // Cargar dimensiones de la imagen de Esquemático
+  useEffect(() => {
+    if (!imgEsquemaUrl) return;
+    const img = new Image();
+    img.onload = () => {
+      const w = img.naturalWidth || img.width || 1024;
+      const h = img.naturalHeight || img.height || 1024;
+      setEsquemaSize({ w, h });
+      if (capaActiva === 'esquema') requestAnimationFrame(() => fitToView());
+    };
+    img.onerror = () => setEsquemaSize({ w: 1024, h: 1024 });
+    img.src = imgEsquemaUrl;
+  }, [imgEsquemaUrl, fitToView, capaActiva]);
+
+  // --- Zoom al Cursor con la Rueda del Mouse ---
   useEffect(() => {
     const handleWheel = (e) => {
       if (!e.target.closest('#svg-boardview')) return;
@@ -194,11 +276,9 @@ export default function VisorMapeoPCB({
       const mouseY = e.clientY - rect.top;
 
       const oldZoom = zoomRef.current;
-      // Factor exponencial: sensible a la magnitud del scroll, no al número de eventos
       const factor = Math.exp(-e.deltaY * 0.0015);
       const newZoom = Math.max(0.15, Math.min(10, oldZoom * factor));
 
-      // Mantener fijo el punto que está bajo el cursor
       const pX = (mouseX - posicionRef.current.x) / oldZoom;
       const pY = (mouseY - posicionRef.current.y) / oldZoom;
 
@@ -211,13 +291,11 @@ export default function VisorMapeoPCB({
       container.addEventListener('wheel', handleWheel, { passive: false });
     }
     return () => {
-      if (container) {
-        container.removeEventListener('wheel', handleWheel);
-      }
+      if (container) container.removeEventListener('wheel', handleWheel);
     };
   }, []);
 
-  // --- Zoom desde el centro de la vista (botones + / -) ---
+  // Zoom desde el centro
   const zoomCentro = (factor) => {
     const svg = svgRef.current;
     if (!svg) return;
@@ -232,24 +310,49 @@ export default function VisorMapeoPCB({
     setPosicion({ x: mouseX - pX * newZoom, y: mouseY - pY * newZoom });
   };
 
-  // --- Carga de imagen de referencia (archivo local → base64) ---
-  const manejarArchivoImagen = (e) => {
+  // --- Subida y enlace de imágenes (Placa / Esquema) ---
+  const manejarArchivoImagenPlaca = (e) => {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => setBgImageUrl(reader.result);
+    reader.onload = () => {
+      setImgPlacaUrl(reader.result);
+      setShowPlaca(true);
+    };
     reader.readAsDataURL(file);
     e.target.value = '';
   };
 
-  const pedirUrlImagen = () => {
-    const nuevaUrl = window.prompt('Ingresa el enlace (URL) de la imagen de la placa:', bgImageUrl === IMAGEN_PREDETERMINADA ? '' : bgImageUrl || '');
-    if (nuevaUrl !== null && nuevaUrl.trim()) {
-      setBgImageUrl(nuevaUrl.trim());
+  const manejarArchivoImagenEsquema = (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      setImgEsquemaUrl(reader.result);
+      setShowEsquema(true);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const pedirUrlPlaca = () => {
+    const actual = imgPlacaUrl === IMAGEN_PREDETERMINADA ? '' : imgPlacaUrl;
+    const nueva = window.prompt('Ingresa el enlace directo (URL) de la imagen de la placa (ej: PostImages):', actual);
+    if (nueva !== null && nueva.trim()) {
+      setImgPlacaUrl(nueva.trim());
+      setShowPlaca(true);
     }
   };
 
-  // Convertir coordenadas cliente a coordenadas locales del lienzo SVG
+  const pedirUrlEsquema = () => {
+    const nueva = window.prompt('Ingresa el enlace directo (URL) del diagrama esquemático (ej: PostImages):', imgEsquemaUrl || '');
+    if (nueva !== null && nueva.trim()) {
+      setImgEsquemaUrl(nueva.trim());
+      setShowEsquema(true);
+    }
+  };
+
+  // Convertir coordenadas del cliente a coordenadas SVG del lienzo
   const getCanvasCoords = (e) => {
     const svg = svgRef.current;
     if (!svg) return { x: 0, y: 0 };
@@ -257,20 +360,59 @@ export default function VisorMapeoPCB({
     const clientX = e.clientX - rect.left;
     const clientY = e.clientY - rect.top;
 
-    // Deshacer el efecto de zoom y paneo (usando refs siempre actuales)
     const x = (clientX - posicionRef.current.x) / zoomRef.current;
     const y = (clientY - posicionRef.current.y) / zoomRef.current;
     return { x, y };
   };
 
-  // --- Lógica de Eventos de Ratón (Lienzo SVG) ---
-  const handleMouseDown = (e) => {
-    // Evitar disparar si se hace clic en botones interactivos dentro del SVG
-    if (e.target.closest('.interactive-handle')) return;
+  // --- Rotación de Componente (90°) ---
+  const rotarComponente = (id) => {
+    setComponentes(prev => prev.map(comp => {
+      if (comp.id !== id) return comp;
+      const newW = comp.h;
+      const newH = comp.w;
+      const newPads = comp.pads.map(p => ({
+        ...p,
+        x_rel: p.y_rel,
+        y_rel: p.x_rel,
+        w: p.h,
+        h: p.w
+      }));
+      return {
+        ...comp,
+        w: newW,
+        h: newH,
+        pads: newPads
+      };
+    }));
+  };
 
+  // --- Centrar Cámara en Componente Buscado ---
+  const centrarEnComponente = (comp) => {
+    setSelectedCompId(comp.id);
+    setSelectedPadId('1');
+    setMostrarResultadosBusqueda(false);
+    setBusqueda('');
+
+    const svg = svgRef.current;
+    if (!svg) return;
+    const rect = svg.getBoundingClientRect();
+    const cw = rect.width || 800;
+    const ch = rect.height || 600;
+    const targetZoom = Math.max(1.8, zoomRef.current);
+    setZoom(targetZoom);
+    setPosicion({
+      x: cw / 2 - (comp.x + comp.w / 2) * targetZoom,
+      y: ch / 2 - (comp.y + comp.h / 2) * targetZoom
+    });
+  };
+
+  // --- Manejo de Eventos del Mouse ---
+  const handleMouseDown = (e) => {
+    if (e.target.closest('.interactive-handle')) return;
     const coords = getCanvasCoords(e);
 
-    // Herramienta de Paneo (o clic central / clic derecho)
+    // Herramienta de Paneo (o clic central / secundario)
     if (tool === 'pan' || e.button === 1 || e.button === 2) {
       e.preventDefault();
       setIsPanning(true);
@@ -282,12 +424,10 @@ export default function VisorMapeoPCB({
     if (tool === 'drawSMD') {
       e.preventDefault();
       if (drawingStep === 0) {
-        // Iniciar dibujo de Pad 1
         setDrawingStep(1);
         setStartPoint({ x: coords.x, y: coords.y });
         setPad1Temp({ x: coords.x, y: coords.y, w: 0, h: 0 });
       } else if (drawingStep === 2) {
-        // Confirmar posicionamiento de Pad 2
         confirmComponentCreation();
       }
       return;
@@ -297,7 +437,7 @@ export default function VisorMapeoPCB({
   const handleMouseMove = (e) => {
     const coords = getCanvasCoords(e);
 
-    // Acción: Paneo
+    // Paneo
     if (isPanning) {
       setPosicion({
         x: e.clientX - panStart.x,
@@ -306,7 +446,15 @@ export default function VisorMapeoPCB({
       return;
     }
 
-    // Acción: Dibujar Pad 1 (Arrastrando)
+    // Arrastrar Componente en modo Selección
+    if (isDraggingComp && dragCompId) {
+      const newX = Math.round(coords.x - dragOffset.x);
+      const newY = Math.round(coords.y - dragOffset.y);
+      setComponentes(prev => prev.map(c => c.id === dragCompId ? { ...c, x: newX, y: newY } : c));
+      return;
+    }
+
+    // Dibujar Pad 1 (Arrastrando)
     if (tool === 'drawSMD' && drawingStep === 1) {
       const w = Math.abs(coords.x - startPoint.x);
       const h = Math.abs(coords.y - startPoint.y);
@@ -316,16 +464,38 @@ export default function VisorMapeoPCB({
       return;
     }
 
-    // Acción: Previsualizar Pad 2 (Espejo locked dimensions)
+    // Posicionar Pad 2 (Modo Espejo + Bloqueo Ortogonal con Shift/Ctrl)
     if (tool === 'drawSMD' && drawingStep === 2 && pad1Temp) {
-      // Pad 2 centrado en cursor, manteniendo w y h del Pad 1
-      const x = coords.x - pad1Temp.w / 2;
-      const y = coords.y - pad1Temp.h / 2;
-      setPad2Temp({ x, y, w: pad1Temp.w, h: pad1Temp.h });
+      const p1CenterX = pad1Temp.x + pad1Temp.w / 2;
+      const p1CenterY = pad1Temp.y + pad1Temp.h / 2;
+
+      let targetCenterX = coords.x;
+      let targetCenterY = coords.y;
+
+      const dx = coords.x - p1CenterX;
+      const dy = coords.y - p1CenterY;
+
+      // Bloqueo ortogonal si Shift o Ctrl están presionados
+      const shouldLock = e.shiftKey || e.ctrlKey || isShiftDown;
+      let lockedAxis = null;
+
+      if (shouldLock) {
+        if (Math.abs(dx) >= Math.abs(dy)) {
+          targetCenterY = p1CenterY;
+          lockedAxis = 'H';
+        } else {
+          targetCenterX = p1CenterX;
+          lockedAxis = 'V';
+        }
+      }
+
+      const x = targetCenterX - pad1Temp.w / 2;
+      const y = targetCenterY - pad1Temp.h / 2;
+      setPad2Temp({ x, y, w: pad1Temp.w, h: pad1Temp.h, lockedAxis });
       return;
     }
 
-    // Acción: Arrastrar Nodo de Matriz
+    // Arrastrar Nodo de Matriz
     if (isMatrixDragging && selectedCompId) {
       const compPiloto = componentes.find(c => c.id === selectedCompId);
       if (!compPiloto) return;
@@ -333,20 +503,18 @@ export default function VisorMapeoPCB({
       const deltaX = coords.x - matrixStartPos.x;
       const deltaY = coords.y - matrixStartPos.y;
 
-      // Bloqueo de Ejes inteligente
       let lockedDeltaX = deltaX;
       let lockedDeltaY = deltaY;
 
       if (Math.abs(deltaX) > Math.abs(deltaY) * 1.3) {
-        lockedDeltaY = 0; // Congelar eje Y (Movimiento horizontal)
+        lockedDeltaY = 0;
       } else if (Math.abs(deltaY) > Math.abs(deltaX) * 1.3) {
-        lockedDeltaX = 0; // Congelar eje X (Movimiento vertical)
+        lockedDeltaX = 0;
       }
 
       const rows = parseInt(matrizRows) || 1;
       const cols = parseInt(matrizCols) || 1;
 
-      // Calcular equidistancia
       const stepX = cols > 1 ? lockedDeltaX / (cols - 1) : 0;
       const stepY = rows > 1 ? lockedDeltaY / (rows - 1) : 0;
 
@@ -355,23 +523,16 @@ export default function VisorMapeoPCB({
 
       for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
-          if (r === 0 && c === 0) continue; // Saltar el piloto
-
-          const offsetX = c * stepX;
-          const offsetY = r * stepY;
-
+          if (r === 0 && c === 0) continue;
           previews.push({
             id: `clone_temp_${r}_${c}`,
             nombre: `${compPiloto.nombre}_M${cloneIndex++}`,
             tipo: compPiloto.tipo,
-            x: compPiloto.x + offsetX,
-            y: compPiloto.y + offsetY,
+            x: compPiloto.x + c * stepX,
+            y: compPiloto.y + r * stepY,
             w: compPiloto.w,
             h: compPiloto.h,
-            pads: compPiloto.pads.map(p => ({
-              ...p,
-              // Mantener las coordenadas relativas intactas
-            }))
+            pads: compPiloto.pads.map(p => ({ ...p }))
           });
         }
       }
@@ -379,16 +540,20 @@ export default function VisorMapeoPCB({
     }
   };
 
-  const handleMouseUp = (e) => {
+  const handleMouseUp = () => {
     if (isPanning) {
       setIsPanning(false);
       return;
     }
 
-    // Terminar definición de Pad 1 y pasar a ubicar Pad 2
+    if (isDraggingComp) {
+      setIsDraggingComp(false);
+      setDragCompId(null);
+      return;
+    }
+
     if (tool === 'drawSMD' && drawingStep === 1 && pad1Temp) {
       if (pad1Temp.w < 3 || pad1Temp.h < 3) {
-        // Evitar clics accidentales pequeños
         setDrawingStep(0);
         setPad1Temp(null);
       } else {
@@ -397,11 +562,9 @@ export default function VisorMapeoPCB({
       return;
     }
 
-    // Terminar arrastre de matriz y consolidar los clones
     if (isMatrixDragging) {
       setIsMatrixDragging(false);
       if (matrixClonesPreview.length > 0) {
-        // Consolidar en estado real de componentes
         const consolidados = matrixClonesPreview.map(clone => ({
           ...clone,
           id: `smd_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`
@@ -412,11 +575,10 @@ export default function VisorMapeoPCB({
     }
   };
 
-  // --- Confirmación y Unificación de Componente SMD ---
+  // --- Confirmación de Componente SMD ---
   const confirmComponentCreation = () => {
     if (!pad1Temp || !pad2Temp) return;
 
-    // Calcular límites exteriores combinados para el Hitbox Blanco
     const minX = Math.min(pad1Temp.x, pad2Temp.x);
     const minY = Math.min(pad1Temp.y, pad2Temp.y);
     const maxX = Math.max(pad1Temp.x + pad1Temp.w, pad2Temp.x + pad2Temp.w);
@@ -425,18 +587,12 @@ export default function VisorMapeoPCB({
     const compW = maxX - minX;
     const compH = maxY - minY;
 
-    // Abreviatura según tipo
     const prefix = TIPO_ABREVIATURAS[tipoDrawing] || 'C';
     const numComp = componentes.filter(c => c.tipo === tipoDrawing).length + 1401;
     const nombreSugerido = `${prefix}${numComp}`;
 
-    // Pads relativos
-    const pad1RelX = pad1Temp.x - minX;
-    const pad1RelY = pad1Temp.y - minY;
-    const pad2RelX = pad2Temp.x - minX;
-    const pad2RelY = pad2Temp.y - minY;
-
     const isGndDefault = tipoDrawing === 'Capacitor';
+
     const nuevoComp = {
       id: `smd_${Date.now()}`,
       nombre: nombreSugerido,
@@ -450,8 +606,8 @@ export default function VisorMapeoPCB({
           id: '1',
           netName: `${nombreSugerido}_P1`,
           tipo: 'DATA',
-          x_rel: pad1RelX,
-          y_rel: pad1RelY,
+          x_rel: pad1Temp.x - minX,
+          y_rel: pad1Temp.y - minY,
           w: pad1Temp.w,
           h: pad1Temp.h,
           valorSanoDiodo: tipoDrawing === 'Bobina' ? '0.400' : '0.350',
@@ -467,8 +623,8 @@ export default function VisorMapeoPCB({
           id: '2',
           netName: isGndDefault ? 'GND' : `${nombreSugerido}_P2`,
           tipo: isGndDefault ? 'GND' : 'DATA',
-          x_rel: pad2RelX,
-          y_rel: pad2RelY,
+          x_rel: pad2Temp.x - minX,
+          y_rel: pad2Temp.y - minY,
           w: pad2Temp.w,
           h: pad2Temp.h,
           valorSanoDiodo: isGndDefault ? '0.000' : (tipoDrawing === 'Bobina' ? '0.400' : '0.350'),
@@ -487,30 +643,30 @@ export default function VisorMapeoPCB({
     setSelectedCompId(nuevoComp.id);
     setSelectedPadId('1');
 
-    // Limpiar dibujo temporal
     setPad1Temp(null);
     setPad2Temp(null);
     setDrawingStep(0);
-    setTool('select'); // volver a puntero
+    setTool('select');
   };
 
-  // --- Lógica del Multímetro, Grabado e Inteligencia en Vivo ---
+  // --- Lógica del Multímetro y Resaltado de Net Name ---
   const compActivo = componentes.find(c => c.id === selectedCompId);
   const padActivo = compActivo?.pads.find(p => p.id === selectedPadId);
 
-  // Evaluar color de un pad específico según mediciones
+  // Net Name activo para iluminar todas las pistas conectadas (Estilo ZXW)
+  const activeNetName = (padActivo && padActivo.netName && padActivo.netName !== 'NC') ? padActivo.netName : null;
+
+  // Evaluar color de un pad
   const obtenerColorDePad = (pad, compId) => {
-    // Si es el pad seleccionado actualmente y estamos dibujando/creando
     if (selectedCompId === compId && selectedPadId === pad.id) {
-      return '#00ffff'; // Cyan brillante indicador de selección
+      return '#00ffff';
     }
 
-    if (pad.tipo === 'GND') return '#4b5563'; // Gris GND
-    if (pad.tipo === 'NC') return '#1e3a8a'; // Azul NC
+    if (pad.tipo === 'GND') return '#4b5563';
+    if (pad.tipo === 'NC') return '#1e3a8a';
 
-    const colorBase = '#d4af37'; // Dorado base DATA
+    const colorBase = '#d4af37';
 
-    // Obtener valores según escala
     let valAct = '---';
     let valSano = '---';
 
@@ -529,17 +685,16 @@ export default function VisorMapeoPCB({
     }
 
     if (!valAct || valAct === '---') return colorBase;
-    if (valAct === 'OL' && valSano !== 'OL') return '#f97316'; // Naranja (Abierto)
+    if (valAct === 'OL' && valSano !== 'OL') return '#f97316';
 
     const vAct = parseFloat(valAct);
     const vSano = parseFloat(valSano);
 
     if (isNaN(vAct) || isNaN(vSano)) return colorBase;
 
-    // Lógica milimétrica de rangos (replicado de FPC/IC)
     if (activeScale === 'diodo') {
-      if (vAct < 0.050) return '#ef4444'; // Rojo (Corto)
-      if (Math.abs(vAct - vSano) <= 0.040) return '#10b981'; // Verde (Sano)
+      if (vAct < 0.050) return '#ef4444';
+      if (Math.abs(vAct - vSano) <= 0.040) return '#10b981';
     } else if (activeScale === 'ua') {
       if (vAct > 2000) return '#ef4444';
       if (Math.abs(vAct - vSano) <= 50) return '#10b981';
@@ -551,10 +706,10 @@ export default function VisorMapeoPCB({
       if (Math.abs(vAct - vSano) <= 5.0 || Math.abs(vAct - vSano) / vSano <= 0.1) return '#10b981';
     }
 
-    return '#f97316'; // Naranja (Alterado)
+    return '#f97316';
   };
 
-  // Guardar medición en el pad activo
+  // Guardar medición en pad activo y auto-avanzar ("Pin Mágico")
   const grabarMedicionActual = (valorEntrada) => {
     if (!selectedCompId || !selectedPadId) return;
 
@@ -564,20 +719,16 @@ export default function VisorMapeoPCB({
         ...comp,
         pads: comp.pads.map(pad => {
           if (pad.id !== selectedPadId) return pad;
-          
-          // Grabar la lectura actual en la escala correspondiente
           const actualizaciones = {};
           if (activeScale === 'diodo') actualizaciones.valorActualDiodo = valorEntrada;
           if (activeScale === 'voltio') actualizaciones.valorActualVoltio = valorEntrada;
           if (activeScale === 'ua') actualizaciones.valorActualUa = valorEntrada;
           if (activeScale === 'ohmio') actualizaciones.valorActualOhmio = valorEntrada;
-
           return { ...pad, ...actualizaciones };
         })
       };
     }));
 
-    // Auto-avanzar al siguiente pad ("Pin Mágico")
     avanzarSiguientePad();
   };
 
@@ -589,14 +740,13 @@ export default function VisorMapeoPCB({
     if (selectedPadId === '1') {
       setSelectedPadId('2');
     } else {
-      // Avanzar al primer pad del siguiente componente
       const nextIndex = (indexComp + 1) % componentes.length;
       setSelectedCompId(componentes[nextIndex].id);
       setSelectedPadId('1');
     }
   };
 
-  // Asignación rápida de Net Name o Tipo de pad
+  // Actualizar propiedad del pad
   const actualizarPropiedadPad = (padId, prop, valor) => {
     setComponentes(prev => prev.map(comp => {
       if (comp.id !== selectedCompId) return comp;
@@ -604,9 +754,7 @@ export default function VisorMapeoPCB({
         ...comp,
         pads: comp.pads.map(p => {
           if (p.id !== padId) return p;
-          
           let actualizacion = { [prop]: valor };
-          // Si cambiamos tipo a GND, reiniciamos valores a 0 automáticamente
           if (prop === 'tipo' && valor === 'GND') {
             actualizacion = {
               ...actualizacion,
@@ -627,44 +775,7 @@ export default function VisorMapeoPCB({
     }));
   };
 
-  // --- Lógica del Tooltip en Hover ---
-  const handlePadMouseEnter = (e, comp, pad) => {
-    if (tool !== 'select') return;
-    setHoveredComp({ comp, pad });
-    
-    // Obtener coordenadas de cliente para el tooltip
-    const rect = svgContainerRef.current.getBoundingClientRect();
-    setHoveredCoords({
-      x: e.clientX - rect.left + 15,
-      y: e.clientY - rect.top + 15
-    });
-  };
-
-  const handlePadMouseMove = (e) => {
-    if (!hoveredComp) return;
-    const rect = svgContainerRef.current.getBoundingClientRect();
-    setHoveredCoords({
-      x: e.clientX - rect.left + 15,
-      y: e.clientY - rect.top + 15
-    });
-  };
-
-  const handlePadMouseLeave = () => {
-    setHoveredComp(null);
-  };
-
-  // --- Edición Detallada por Doble Clic ---
-  const handleComponentDoubleClick = (comp) => {
-    setEditingComp(JSON.parse(JSON.stringify(comp))); // clonar objeto para edición local
-  };
-
-  const guardarEdicionModal = () => {
-    if (!editingComp) return;
-    setComponentes(prev => prev.map(c => c.id === editingComp.id ? editingComp : c));
-    setEditingComp(null);
-  };
-
-  // --- Eliminación de Componente ---
+  // Eliminación de componente
   const borrarComponente = (id) => {
     if (window.confirm('¿Seguro que deseas eliminar este componente SMD del Boardview?')) {
       setComponentes(prev => prev.filter(c => c.id !== id));
@@ -675,16 +786,18 @@ export default function VisorMapeoPCB({
     }
   };
 
-  // Formato para unidades en HUD
-  const getSimboloUnidad = () => {
-    if (activeScale === 'diodo') return 'V';
-    if (activeScale === 'voltio') return 'V';
-    if (activeScale === 'ua') return 'uA';
-    if (activeScale === 'ohmio') return 'Ω';
-    return '';
-  };
+  // Resultados de Búsqueda
+  const resultadosBusqueda = useMemo(() => {
+    if (!busqueda.trim()) return [];
+    const q = busqueda.trim().toLowerCase();
+    return componentes.filter(c => 
+      c.nombre.toLowerCase().includes(q) || 
+      c.tipo.toLowerCase().includes(q) ||
+      c.pads.some(p => p.netName.toLowerCase().includes(q))
+    ).slice(0, 8);
+  }, [componentes, busqueda]);
 
-  // --- Renderizado Inteligente de Textos SVG ---
+  // Renderizado Inteligente de Textos
   const renderTextosInteligentes = (comp) => {
     const pad1 = comp.pads.find(p => p.id === '1');
     const pad2 = comp.pads.find(p => p.id === '2');
@@ -693,9 +806,7 @@ export default function VisorMapeoPCB({
     const xCenter = comp.x + comp.w / 2;
     const yCenter = comp.y + comp.h / 2;
 
-    // Calcular tamaño de fuente adaptativo para que se ajuste a las dimensiones reales del componente
     const minDim = Math.min(comp.w, comp.h);
-    const maxDim = Math.max(comp.w, comp.h);
     const fontSizeComp = Math.max(3.5, Math.min(9, Math.round(minDim * 0.28)));
     const fontSizePad = Math.max(3, Math.min(8, Math.round(fontSizeComp * 0.85)));
 
@@ -708,28 +819,20 @@ export default function VisorMapeoPCB({
       pointerEvents: 'none'
     };
 
-    // Caso A: Alto > Ancho (Componente Vertical) -> APILACIÓN VERTICAL, caracteres horizontales
     if (comp.h > comp.w) {
       return (
         <g opacity={showComponentNames ? 1 : 0} style={{ transition: 'opacity 0.2s' }}>
-          {/* Pin 1 arriba */}
           <text x={xCenter} y={comp.y + pad1.y_rel + pad1.h / 2 + fontSizePad / 3} textAnchor="middle" style={{ ...monoStyle, fontSize: `${fontSizePad}px`, fill: '#aaaaaa' }}>1</text>
-          {/* Nombre en el centro */}
           <text x={xCenter} y={yCenter + fontSizeComp / 3} textAnchor="middle" style={{ ...monoStyle, fill: '#ffffff', fontSize: `${fontSizeComp}px` }}>{comp.nombre}</text>
-          {/* Pin 2 abajo */}
           <text x={xCenter} y={comp.y + pad2.y_rel + pad2.h / 2 + fontSizePad / 3} textAnchor="middle" style={{ ...monoStyle, fontSize: `${fontSizePad}px`, fill: '#aaaaaa' }}>2</text>
         </g>
       );
     }
 
-    // Caso B: Ancho >= Alto (Componente Horizontal o Cuadrado) -> ALINEADO HORIZONTAL
     return (
       <g opacity={showComponentNames ? 1 : 0} style={{ transition: 'opacity 0.2s' }}>
-        {/* Pin 1 izquierda */}
         <text x={comp.x + pad1.x_rel + pad1.w / 2} y={yCenter + fontSizePad / 3} textAnchor="middle" style={{ ...monoStyle, fontSize: `${fontSizePad}px`, fill: '#aaaaaa' }}>1</text>
-        {/* Nombre en el centro */}
         <text x={xCenter} y={yCenter + fontSizeComp / 3} textAnchor="middle" style={{ ...monoStyle, fontSize: `${fontSizeComp}px` }}>{comp.nombre}</text>
-        {/* Pin 2 derecha */}
         <text x={comp.x + pad2.x_rel + pad2.w / 2} y={yCenter + fontSizePad / 3} textAnchor="middle" style={{ ...monoStyle, fontSize: `${fontSizePad}px`, fill: '#aaaaaa' }}>2</text>
       </g>
     );
@@ -737,28 +840,28 @@ export default function VisorMapeoPCB({
 
   return (
     <div style={{ ...styles.container, ...(fullscreen ? { borderRadius: 0, border: 'none' } : {}) }}>
-      {/* 1. BARRA DE HERRAMIENTAS SUPERIOR */}
+      {/* 1. BARRA SUPERIOR DE HERRAMIENTAS Y BÚSQUEDA */}
       <div style={styles.header}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
           <span style={{ fontSize: '0.95rem', fontWeight: 'bold', color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Map size={18} /> BOARDVIEW PRO (ZXW-STYLE)
+            <Map size={18} /> BOARDVIEW PRO
           </span>
 
           <div style={styles.divider} />
 
-          {/* Botones de Herramientas */}
+          {/* Selector de Herramientas */}
           <div style={{ display: 'flex', background: '#111827', padding: '3px', borderRadius: '8px', border: '1px solid #374151' }}>
             <button 
               onClick={() => { setTool('select'); setDrawingStep(0); }} 
               style={{ ...styles.toolBtn, ...(tool === 'select' && styles.toolBtnActive) }}
-              title="Puntero de selección"
+              title="Puntero de selección y arrastre"
             >
               Puntero
             </button>
             <button 
               onClick={() => { setTool('drawSMD'); setDrawingStep(0); }} 
               style={{ ...styles.toolBtn, ...(tool === 'drawSMD' && styles.toolBtnActive) }}
-              title="Dibujar Componente SMD"
+              title="Dibujar Componente SMD (Shift para alinear recto)"
             >
               + Dibujar SMD
             </button>
@@ -773,8 +876,8 @@ export default function VisorMapeoPCB({
 
           {/* Selector de Tipo a Dibujar */}
           {tool === 'drawSMD' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', animation: 'fadeIn 0.3s' }}>
-              <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Componente:</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', animation: 'fadeIn 0.3s' }}>
+              <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Tipo:</span>
               <select 
                 value={tipoDrawing} 
                 onChange={(e) => setTipoDrawing(e.target.value)}
@@ -786,9 +889,51 @@ export default function VisorMapeoPCB({
               </select>
             </div>
           )}
+
+          <div style={styles.divider} />
+
+          {/* Buscador Rápido de Componentes y Líneas */}
+          <div style={{ position: 'relative' }}>
+            <div style={{ display: 'flex', alignItems: 'center', backgroundColor: '#111827', border: '1px solid #374151', borderRadius: '6px', padding: '2px 8px' }}>
+              <Search size={14} color="#9ca3af" />
+              <input 
+                type="text" 
+                placeholder="Buscar componente o net..." 
+                value={busqueda}
+                onChange={(e) => { setBusqueda(e.target.value); setMostrarResultadosBusqueda(true); }}
+                onFocus={() => setMostrarResultadosBusqueda(true)}
+                style={styles.searchInput}
+              />
+              {busqueda && (
+                <button onClick={() => { setBusqueda(''); setMostrarResultadosBusqueda(false); }} style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', padding: 0 }}>
+                  <X size={13} />
+                </button>
+              )}
+            </div>
+
+            {mostrarResultadosBusqueda && resultadosBusqueda.length > 0 && (
+              <div style={styles.searchResultsDropdown}>
+                {resultadosBusqueda.map(c => (
+                  <div 
+                    key={c.id} 
+                    onClick={() => centrarEnComponente(c)}
+                    style={styles.searchResultItem}
+                  >
+                    <div>
+                      <strong style={{ color: '#00ffff' }}>{c.nombre}</strong>
+                      <span style={{ fontSize: '0.7rem', color: '#9ca3af', marginLeft: '6px' }}>({c.tipo})</span>
+                    </div>
+                    <div style={{ fontSize: '0.65rem', color: '#6b7280' }}>
+                      {c.pads.map(p => p.netName).join(' · ')}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Guardado en Firebase y Sincronización */}
+        {/* Acciones de Guardado y Cierre */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           {ultimaSincronizacion && (
             <span style={{ fontSize: '0.7rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -797,7 +942,7 @@ export default function VisorMapeoPCB({
           )}
           {onGuardar && (
             <button 
-              onClick={() => onGuardar(componentes)} 
+              onClick={() => onGuardar(componentes, imgPlacaUrl, imgEsquemaUrl)} 
               disabled={guardando}
               style={{
                 ...styles.btn, 
@@ -806,7 +951,8 @@ export default function VisorMapeoPCB({
                 boxShadow: cambiosPendientes ? '0 0 10px rgba(217,119,6,0.3)' : 'none'
               }}
             >
-              {guardando ? 'Guardando...' : 'Guardar en Nube'}
+              <Save size={14} />
+              {guardando ? 'Guardando...' : 'Guardar Boardview'}
             </button>
           )}
           {onCerrar && (
@@ -821,45 +967,129 @@ export default function VisorMapeoPCB({
         </div>
       </div>
 
-      {/* 2. BARRA DE CAPAS Y MATRIZ */}
+      {/* 2. BARRA DE CAPAS DE IMAGEN (PLACA / ESQUEMA) Y MATRIZ */}
       <div style={styles.layerBar}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
           
-          {/* Control Capas */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-            <label style={styles.checkboxLabel} title="Ver u ocultar la imagen de PCB de fondo">
-              <input 
-                type="checkbox" 
-                checked={showBgImage} 
-                onChange={(e) => setShowBgImage(e.target.checked)} 
-              />
-              Fondo
-            </label>
+          {/* Selector de Capa Activa */}
+          <div style={{ display: 'flex', background: '#111827', padding: '2px', borderRadius: '6px', border: '1px solid #374151' }}>
+            <button 
+              onClick={() => setCapaActiva('placa')} 
+              style={{ ...styles.capaBtn, ...(capaActiva === 'placa' && styles.capaBtnActive) }}
+            >
+              📸 Capa Placa
+            </button>
+            <button 
+              onClick={() => setCapaActiva('esquema')} 
+              style={{ ...styles.capaBtn, ...(capaActiva === 'esquema' && styles.capaBtnActive) }}
+            >
+              🗺️ Capa Esquema
+            </button>
+          </div>
 
-            {showBgImage && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ fontSize: '0.65rem', color: '#9ca3af' }}>Opacidad:</span>
+          {/* Configuración de la Capa de Placa */}
+          {capaActiva === 'placa' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <label style={styles.checkboxLabel}>
                 <input 
-                  type="range" 
-                  min="0.1" 
-                  max="1.0" 
-                  step="0.05"
-                  value={bgOpacity} 
-                  onChange={(e) => setBgOpacity(parseFloat(e.target.value))}
-                  style={{ width: '60px', accentColor: '#3b82f6' }}
+                  type="checkbox" 
+                  checked={showPlaca} 
+                  onChange={(e) => setShowPlaca(e.target.checked)} 
                 />
-              </div>
-            )}
+                Ver Placa
+              </label>
 
+              {showPlaca && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ fontSize: '0.65rem', color: '#9ca3af' }}>Opacidad:</span>
+                  <input 
+                    type="range" 
+                    min="0.1" 
+                    max="1.0" 
+                    step="0.05"
+                    value={placaOpacity} 
+                    onChange={(e) => setPlacaOpacity(parseFloat(e.target.value))}
+                    style={{ width: '55px', accentColor: '#3b82f6' }}
+                  />
+                </div>
+              )}
+
+              <button onClick={() => fileInputPlacaRef.current && fileInputPlacaRef.current.click()} style={styles.imgBtn} title="Subir foto de placa desde PC">
+                <Upload size={12} /> Subir
+              </button>
+              <button onClick={pedirUrlPlaca} style={styles.imgBtn} title="Pegar URL de PostImages / postimg.cc">
+                <Link size={12} /> URL
+              </button>
+              <button onClick={() => setImgPlacaUrl(IMAGEN_PREDETERMINADA)} style={styles.imgBtn} title="Restaurar imagen predeterminada">
+                <RotateCcw size={12} /> Predet.
+              </button>
+
+              <input
+                ref={fileInputPlacaRef}
+                type="file"
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={manejarArchivoImagenPlaca}
+              />
+            </div>
+          )}
+
+          {/* Configuración de la Capa de Esquemático */}
+          {capaActiva === 'esquema' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <label style={styles.checkboxLabel}>
+                <input 
+                  type="checkbox" 
+                  checked={showEsquema} 
+                  onChange={(e) => setShowEsquema(e.target.checked)} 
+                />
+                Ver Esquema
+              </label>
+
+              {showEsquema && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ fontSize: '0.65rem', color: '#9ca3af' }}>Opacidad:</span>
+                  <input 
+                    type="range" 
+                    min="0.1" 
+                    max="1.0" 
+                    step="0.05"
+                    value={esquemaOpacity} 
+                    onChange={(e) => setEsquemaOpacity(parseFloat(e.target.value))}
+                    style={{ width: '55px', accentColor: '#8b5cf6' }}
+                  />
+                </div>
+              )}
+
+              <button onClick={() => fileInputEsquemaRef.current && fileInputEsquemaRef.current.click()} style={styles.imgBtn} title="Subir esquema desde PC">
+                <Upload size={12} /> Subir
+              </button>
+              <button onClick={pedirUrlEsquema} style={styles.imgBtn} title="Pegar URL de esquema (PostImages)">
+                <Link size={12} /> URL
+              </button>
+
+              <input
+                ref={fileInputEsquemaRef}
+                type="file"
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={manejarArchivoImagenEsquema}
+              />
+            </div>
+          )}
+
+          <div style={styles.divider} />
+
+          {/* Filtros de Capas Vectoriales */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <label style={styles.checkboxLabel}>
               <input 
                 type="checkbox" 
                 checked={showHitbox} 
                 onChange={(e) => setShowHitbox(e.target.checked)} 
               />
-              Hitbox (Líneas)
+              Hitbox
             </label>
-
             <label style={styles.checkboxLabel}>
               <input 
                 type="checkbox" 
@@ -872,19 +1102,19 @@ export default function VisorMapeoPCB({
 
           <div style={styles.divider} />
 
-          {/* Panel Matriz Flotante */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <label style={styles.checkboxLabel} title="Habilita el nodo cyan para clonar componentes en cuadrícula">
+          {/* Panel Matriz */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <label style={styles.checkboxLabel} title="Clonar componentes en matriz (arrastrar el nodo cyan)">
               <input 
                 type="checkbox" 
                 checked={matrizActiva} 
                 onChange={(e) => setMatrizActiva(e.target.checked)} 
               />
-              <span style={{ color: matrizActiva ? '#00ffff' : '#aaa', fontWeight: 'bold' }}>Clonar en Matriz</span>
+              <span style={{ color: matrizActiva ? '#00ffff' : '#aaa', fontWeight: 'bold' }}>Matriz</span>
             </label>
 
             {matrizActiva && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', animation: 'fadeIn 0.3s' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', animation: 'fadeIn 0.3s' }}>
                 <input 
                   type="number" 
                   min="1" 
@@ -911,65 +1141,34 @@ export default function VisorMapeoPCB({
           </div>
         </div>
 
-        {/* Imagen de Referencia (Placa) — carga funcional */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span style={{ fontSize: '0.7rem', color: '#9ca3af', display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <ImageIcon size={13} /> Placa:
-          </span>
-          <button 
-            onClick={() => fileInputRef.current && fileInputRef.current.click()}
-            style={styles.imgBtn}
-            title="Subir imagen de la placa desde tu dispositivo"
-          >
-            <Upload size={13} /> Subir
-          </button>
-          <button 
-            onClick={pedirUrlImagen}
-            style={styles.imgBtn}
-            title="Ingresar URL de la imagen de la placa"
-          >
-            <Link size={13} /> URL
-          </button>
-          <button 
-            onClick={() => setBgImageUrl(IMAGEN_PREDETERMINADA)}
-            style={styles.imgBtn}
-            title="Restaurar la imagen predeterminada de referencia"
-          >
-            <RotateCcw size={13} /> Predet.
-          </button>
-          {bgImageSize.w && (
-            <span style={{ fontSize: '0.6rem', color: '#4b5563' }}>
-              {bgImageSize.w}×{bgImageSize.h}px
-            </span>
-          )}
-          {/* Input de archivo oculto */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            style={{ display: 'none' }}
-            onChange={manejarArchivoImagen}
-          />
-        </div>
+        {/* Indicador de Línea Activa */}
+        {activeNetName && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: '#00ffff' }}>
+            <span>Línea Activa:</span>
+            <strong style={{ background: 'rgba(0,255,255,0.15)', padding: '2px 8px', borderRadius: '4px', border: '1px solid rgba(0,255,255,0.3)' }}>
+              {activeNetName}
+            </strong>
+          </div>
+        )}
       </div>
 
-      {/* 3. AREA CENTRAL: LIENZO SVG + SIDEBAR DETALLES */}
-      <div style={{ display: 'flex', flex: 1, position: 'relative', minHeight: '500px' }}>
+      {/* 3. AREA CENTRAL: LIENZO SVG + PANEL LATERAL */}
+      <div style={{ display: 'flex', flex: 1, position: 'relative', minHeight: '500px', overflow: 'hidden' }}>
         
         {/* LIENZO SVG */}
         <div 
           ref={svgContainerRef}
           style={{ 
             ...styles.canvasContainer, 
-            cursor: tool === 'pan' ? (isPanning ? 'grabbing' : 'grab') : 'default' 
+            cursor: tool === 'pan' ? (isPanning ? 'grabbing' : 'grab') : (isDraggingComp ? 'move' : 'default') 
           }}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
-          onMouseLeave={() => { setIsPanning(false); handlePadMouseLeave(); }}
-          onContextMenu={(e) => e.preventDefault()} // deshabilitar menu contextual
+          onMouseLeave={() => { setIsPanning(false); setIsDraggingComp(false); setHoveredComp(null); }}
+          onContextMenu={(e) => e.preventDefault()}
         >
-          {/* HUD de Medición del Multímetro en el Canvas */}
+          {/* HUD de Medición del Multímetro */}
           <div style={styles.hudContainer}>
             <div style={{ fontSize: '0.65rem', color: '#6b7280', fontWeight: 'bold', textTransform: 'uppercase' }}>
               Multímetro USB ({activeScale})
@@ -988,12 +1187,12 @@ export default function VisorMapeoPCB({
                 {lecturaEnVivo}
               </span>
               <span style={{ fontSize: '0.9rem', color: '#4b5563', fontWeight: 'bold' }}>
-                {getSimboloUnidad()}
+                {activeScale === 'diodo' || activeScale === 'voltio' ? 'V' : (activeScale === 'ua' ? 'uA' : 'Ω')}
               </span>
             </div>
             {padActivo && (
               <div style={{ fontSize: '0.7rem', color: '#aaa', marginTop: '4px' }}>
-                Pad Objetivo: <strong style={{ color: '#00ffff' }}>{compActivo?.nombre} / Pin {padActivo.id}</strong>
+                Pad: <strong style={{ color: '#00ffff' }}>{compActivo?.nombre} / Pin {padActivo.id}</strong> ({padActivo.netName})
               </div>
             )}
           </div>
@@ -1002,7 +1201,7 @@ export default function VisorMapeoPCB({
           <div style={styles.zoomControls}>
             <button onClick={() => zoomCentro(1.25)} style={styles.zoomBtn} title="Acercar"><ZoomIn size={16} /></button>
             <button onClick={() => zoomCentro(1 / 1.25)} style={styles.zoomBtn} title="Alejar"><ZoomOut size={16} /></button>
-            <button onClick={() => fitToView()} style={styles.zoomBtn} title="Ajustar imagen a la vista (centrada y proporcionada)"><Maximize2 size={15} /></button>
+            <button onClick={() => fitToView()} style={styles.zoomBtn} title="Ajustar imagen a la vista"><Maximize2 size={15} /></button>
           </div>
 
           <svg
@@ -1010,9 +1209,9 @@ export default function VisorMapeoPCB({
             ref={svgRef}
             width="100%"
             height="100%"
-            style={{ display: 'block', backgroundColor: '#0d1117' }}
+            style={{ display: 'block', backgroundColor: '#0a0d16' }}
           >
-            {/* Patrón de Cuadrícula de Fondo */}
+            {/* Patrón de Cuadrícula */}
             <defs>
               <pattern id="gridPattern" width="30" height="30" patternUnits="userSpaceOnUse">
                 <path d="M 30 0 L 0 0 0 30" fill="none" stroke="#1f2937" strokeWidth="0.5" />
@@ -1020,66 +1219,95 @@ export default function VisorMapeoPCB({
             </defs>
             <rect width="100%" height="100%" fill="url(#gridPattern)" />
 
-            {/* Grupo con Transformaciones de Zoom y Paneo */}
+            {/* Grupo Transformado con Zoom y Paneo */}
             <g transform={`translate(${posicion.x}, ${posicion.y}) scale(${zoom})`}>
               
-              {/* IMAGEN DE PCB DE FONDO (1:1 proporcional, tamaño natural) */}
-              {showBgImage && bgImageUrl && (
+              {/* CAPA 1: IMAGEN DE PLACA */}
+              {showPlaca && imgPlacaUrl && (
                 <g>
-                  {/* Límite del área de la imagen (guía visual) */}
                   <rect
                     x="0"
                     y="0"
-                    width={bgImageSize.w}
-                    height={bgImageSize.h}
+                    width={placaSize.w}
+                    height={placaSize.h}
                     fill="none"
-                    stroke="#4b5563"
+                    stroke="#3b82f6"
                     strokeWidth="1"
                     strokeDasharray="8, 6"
                     vectorEffect="non-scaling-stroke"
-                    opacity="0.6"
+                    opacity="0.4"
                     style={{ pointerEvents: 'none' }}
                   />
                   <image
-                    href={bgImageUrl}
+                    href={imgPlacaUrl}
                     x="0"
                     y="0"
-                    width={bgImageSize.w}
-                    height={bgImageSize.h}
-                    opacity={bgOpacity}
+                    width={placaSize.w}
+                    height={placaSize.h}
+                    opacity={placaOpacity}
                     style={{ pointerEvents: 'none', userSelect: 'none' }}
                   />
                 </g>
               )}
 
-              {/* RENDERIZADO DE COMPONENTES SMD REALES */}
+              {/* CAPA 2: IMAGEN DE ESQUEMÁTICO */}
+              {showEsquema && imgEsquemaUrl && (
+                <g>
+                  <rect
+                    x="0"
+                    y="0"
+                    width={esquemaSize.w}
+                    height={esquemaSize.h}
+                    fill="none"
+                    stroke="#8b5cf6"
+                    strokeWidth="1"
+                    strokeDasharray="8, 6"
+                    vectorEffect="non-scaling-stroke"
+                    opacity="0.4"
+                    style={{ pointerEvents: 'none' }}
+                  />
+                  <image
+                    href={imgEsquemaUrl}
+                    x="0"
+                    y="0"
+                    width={esquemaSize.w}
+                    height={esquemaSize.h}
+                    opacity={esquemaOpacity}
+                    style={{ pointerEvents: 'none', userSelect: 'none' }}
+                  />
+                </g>
+              )}
+
+              {/* RENDERIZADO DE COMPONENTES SMD */}
               {componentes.map((comp) => {
                 const isSelected = selectedCompId === comp.id;
                 
                 return (
                   <g 
                     key={comp.id}
-                    onDoubleClick={() => handleComponentDoubleClick(comp)}
+                    onMouseDown={(e) => {
+                      if (tool === 'select') {
+                        setSelectedCompId(comp.id);
+                        setIsDraggingComp(true);
+                        setDragCompId(comp.id);
+                        const coords = getCanvasCoords(e);
+                        setDragOffset({ x: coords.x - comp.x, y: coords.y - comp.y });
+                      }
+                    }}
                   >
-                    {/* Hitbox / Rectángulo exterior blanco */}
+                    {/* Hitbox Exterior Blanco / Cyan */}
                     {showHitbox && (
                       <rect
                         x={comp.x}
                         y={comp.y}
                         width={comp.w}
                         height={comp.h}
-                        fill="transparent"
+                        fill={isSelected ? 'rgba(0, 255, 255, 0.05)' : 'transparent'}
                         stroke={isSelected ? '#00ffff' : '#ffffff'}
                         strokeWidth={isSelected ? '2' : '1.2'}
                         strokeDasharray={isSelected ? '3, 3' : 'none'}
                         vectorEffect="non-scaling-stroke"
-                        style={{ cursor: tool === 'select' ? 'pointer' : 'default' }}
-                        onClick={() => {
-                          if (tool === 'select') {
-                            setSelectedCompId(comp.id);
-                            setSelectedPadId('1'); // seleccionar pin 1 por defecto
-                          }
-                        }}
+                        style={{ cursor: tool === 'select' ? 'move' : 'default' }}
                       />
                     )}
 
@@ -1089,38 +1317,69 @@ export default function VisorMapeoPCB({
                       const padY = comp.y + pad.y_rel;
                       const isPadSelected = selectedCompId === comp.id && selectedPadId === pad.id;
                       
+                      // Resaltado si comparte la misma red (Net Name)
+                      const isNetMatch = activeNetName && pad.netName === activeNetName;
+
                       return (
-                        <rect
-                          key={pad.id}
-                          x={padX}
-                          y={padY}
-                          width={pad.w}
-                          height={pad.h}
-                          rx="2"
-                          ry="2"
-                          fill={obtenerColorDePad(pad, comp.id)}
-                          stroke={isPadSelected ? '#ffffff' : '#000000'}
-                          strokeWidth={isPadSelected ? '2' : '1'}
-                          vectorEffect="non-scaling-stroke"
-                          style={{ cursor: 'pointer', transition: 'fill 0.2s' }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (tool === 'select') {
-                              setSelectedCompId(comp.id);
-                              setSelectedPadId(pad.id);
-                            }
-                          }}
-                          onMouseEnter={(e) => handlePadMouseEnter(e, comp, pad)}
-                          onMouseMove={handlePadMouseMove}
-                          onMouseLeave={handlePadMouseLeave}
-                        />
+                        <g key={pad.id}>
+                          {/* Anillo de resalte de Net compartida (ZXW Style) */}
+                          {isNetMatch && !isPadSelected && (
+                            <rect
+                              x={padX - 2}
+                              y={padY - 2}
+                              width={pad.w + 4}
+                              height={pad.h + 4}
+                              rx="3"
+                              ry="3"
+                              fill="none"
+                              stroke="#00ffff"
+                              strokeWidth="2"
+                              strokeDasharray="2, 2"
+                              vectorEffect="non-scaling-stroke"
+                              style={{ pointerEvents: 'none' }}
+                            />
+                          )}
+
+                          <rect
+                            x={padX}
+                            y={padY}
+                            width={pad.w}
+                            height={pad.h}
+                            rx="2"
+                            ry="2"
+                            fill={obtenerColorDePad(pad, comp.id)}
+                            stroke={isPadSelected ? '#ffffff' : (isNetMatch ? '#00ffff' : '#000000')}
+                            strokeWidth={isPadSelected ? '2.5' : (isNetMatch ? '1.5' : '1')}
+                            vectorEffect="non-scaling-stroke"
+                            style={{ cursor: 'pointer', transition: 'fill 0.2s' }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (tool === 'select') {
+                                setSelectedCompId(comp.id);
+                                setSelectedPadId(pad.id);
+                              }
+                            }}
+                            onMouseEnter={(e) => {
+                              if (tool !== 'select') return;
+                              setHoveredComp({ comp, pad });
+                              const rect = svgContainerRef.current.getBoundingClientRect();
+                              setHoveredCoords({ x: e.clientX - rect.left + 15, y: e.clientY - rect.top + 15 });
+                            }}
+                            onMouseMove={(e) => {
+                              if (!hoveredComp) return;
+                              const rect = svgContainerRef.current.getBoundingClientRect();
+                              setHoveredCoords({ x: e.clientX - rect.left + 15, y: e.clientY - rect.top + 15 });
+                            }}
+                            onMouseLeave={() => setHoveredComp(null)}
+                          />
+                        </g>
                       );
                     })}
 
-                    {/* Textos del Componente (Smart Alignment) */}
+                    {/* Textos Inteligentes */}
                     {renderTextosInteligentes(comp)}
 
-                    {/* NODO DE EXTENSIÓN PARA CLONACIÓN EN MATRIZ (Sólo si está seleccionado y modo Matriz activo) */}
+                    {/* NODO DE EXTENSIÓN PARA MATRIZ */}
                     {isSelected && matrizActiva && (
                       <circle
                         className="interactive-handle"
@@ -1144,10 +1403,9 @@ export default function VisorMapeoPCB({
                 );
               })}
 
-              {/* RENDERIZADO DE PREVISUALIZACIONES DE CLONES TEMPORALES (Matriz arrastrando) */}
+              {/* CLONES TEMPORALES DE MATRIZ */}
               {isMatrixDragging && matrixClonesPreview.map((clone) => (
                 <g key={clone.id} opacity="0.5" style={{ pointerEvents: 'none' }}>
-                  {/* Contorno del clon */}
                   <rect
                     x={clone.x}
                     y={clone.y}
@@ -1159,7 +1417,6 @@ export default function VisorMapeoPCB({
                     strokeDasharray="4, 4"
                     vectorEffect="non-scaling-stroke"
                   />
-                  {/* Pads del clon */}
                   {clone.pads.map((pad) => (
                     <rect
                       key={pad.id}
@@ -1175,7 +1432,6 @@ export default function VisorMapeoPCB({
                       vectorEffect="non-scaling-stroke"
                     />
                   ))}
-                  {/* Nombre temporal */}
                   <text 
                     x={clone.x + clone.w / 2} 
                     y={clone.y + clone.h / 2 + 3} 
@@ -1187,10 +1443,9 @@ export default function VisorMapeoPCB({
                 </g>
               ))}
 
-              {/* DIBUJO TEMPORAL (Durante herramienta de dibujo de componentes) */}
+              {/* DIBUJO TEMPORAL (Pad 1 + Pad 2 con Bloqueo de Eje y Guía Visual) */}
               {tool === 'drawSMD' && (
                 <g style={{ pointerEvents: 'none' }}>
-                  {/* Pad 1 Temporal */}
                   {pad1Temp && (
                     <rect
                       x={pad1Temp.x}
@@ -1204,7 +1459,21 @@ export default function VisorMapeoPCB({
                       vectorEffect="non-scaling-stroke"
                     />
                   )}
-                  {/* Pad 2 Temporal (Espejo locked sizes) */}
+
+                  {/* Línea Guía de Alineación Recta entre Pad 1 y Pad 2 */}
+                  {pad1Temp && pad2Temp && (
+                    <line
+                      x1={pad1Temp.x + pad1Temp.w / 2}
+                      y1={pad1Temp.y + pad1Temp.h / 2}
+                      x2={pad2Temp.x + pad2Temp.w / 2}
+                      y2={pad2Temp.y + pad2Temp.h / 2}
+                      stroke={pad2Temp.lockedAxis ? '#00ffff' : '#f59e0b'}
+                      strokeWidth="1.5"
+                      strokeDasharray="3, 3"
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  )}
+
                   {pad2Temp && (
                     <rect
                       x={pad2Temp.x}
@@ -1212,13 +1481,13 @@ export default function VisorMapeoPCB({
                       width={pad2Temp.w}
                       height={pad2Temp.h}
                       fill="rgba(212, 175, 55, 0.4)"
-                      stroke="#00ffff"
+                      stroke={pad2Temp.lockedAxis ? '#00ffff' : '#d4af37'}
                       strokeWidth="1.5"
                       strokeDasharray="2, 2"
                       vectorEffect="non-scaling-stroke"
                     />
                   )}
-                  {/* Caja delimitadora (Hitbox blanco proyectado) */}
+
                   {pad1Temp && pad2Temp && (
                     <rect
                       x={Math.min(pad1Temp.x, pad2Temp.x)}
@@ -1238,7 +1507,7 @@ export default function VisorMapeoPCB({
             </g>
           </svg>
 
-          {/* 4. TOOLTIP FLOTANTE (HOVER DE PADS) */}
+          {/* TOOLTIP EN HOVER DE PADS */}
           {hoveredComp && (
             <div 
               style={{ 
@@ -1253,7 +1522,7 @@ export default function VisorMapeoPCB({
               <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                 <div><strong>Pin:</strong> {hoveredComp.pad.id} ({hoveredComp.pad.tipo})</div>
                 <div><strong>Net Name:</strong> <span style={{ color: '#00ffff' }}>{hoveredComp.pad.netName}</span></div>
-                <div><strong>Footprint:</strong> {hoveredComp.pad.w}x{hoveredComp.pad.h} SMD</div>
+                <div><strong>Footprint:</strong> {hoveredComp.pad.w}x{hoveredComp.pad.h} px</div>
                 <div style={{ marginTop: '4px', borderTop: '1px dashed #374151', paddingTop: '4px', color: '#9ca3af' }}>Valores Referencia:</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px' }}>
                   <span>Diodo:</span> <strong style={{ color: '#10b981' }}>{hoveredComp.pad.valorSanoDiodo} V</strong>
@@ -1265,20 +1534,38 @@ export default function VisorMapeoPCB({
             </div>
           )}
 
-          {/* Indicaciones para Dibujo */}
+          {/* Banner de Indicaciones de Dibujo con Bloqueo Shift */}
           {tool === 'drawSMD' && (
             <div style={styles.drawingBanner}>
               {drawingStep === 0 && '⚡ PASO 1: Mantén presionado y arrastra para dibujar el PAD 1'}
               {drawingStep === 1 && '📏 Ajustando dimensiones del Pad 1...'}
-              {drawingStep === 2 && '📍 PASO 2: Mueve el mouse y haz clic para posicionar el PAD 2 (Espejo)'}
+              {drawingStep === 2 && (
+                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>📍 PASO 2: Clic para fijar el PAD 2</span>
+                  <span style={{ background: isShiftDown ? '#10b981' : 'rgba(0,0,0,0.3)', padding: '2px 8px', borderRadius: '12px', fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Lock size={12} /> {isShiftDown ? '🔒 Eje Bloqueado (Recto)' : 'Mantén Shift para alinear recto'}
+                  </span>
+                </span>
+              )}
             </div>
           )}
         </div>
 
-        {/* SIDEBAR DERECHO DE DETALLES Y EDICIÓN */}
+        {/* SIDEBAR DERECHO: DETALLES, EDICIÓN Y ROTACIÓN */}
         <div style={styles.sidebar}>
           <div>
-            <h3 style={styles.sidebarTitle}>Detalles de Selección</h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #374151', paddingBottom: '6px', marginBottom: '10px' }}>
+              <h3 style={styles.sidebarTitle}>Detalles de Selección</h3>
+              {compActivo && (
+                <button 
+                  onClick={() => rotarComponente(compActivo.id)}
+                  style={styles.rotateBtn}
+                  title="Rotar componente 90° (Tecla R)"
+                >
+                  <RotateCw size={13} /> Rotar 90°
+                </button>
+              )}
+            </div>
             
             {compActivo && padActivo ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -1286,35 +1573,69 @@ export default function VisorMapeoPCB({
                 {/* Info General Componente */}
                 <div style={styles.infoCard}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '1rem', fontWeight: 'bold', color: '#fff' }}>{compActivo.nombre}</span>
-                    <span style={styles.badge}>{compActivo.tipo}</span>
+                    <input 
+                      type="text" 
+                      value={compActivo.nombre}
+                      onChange={(e) => {
+                        const val = e.target.value.trim();
+                        setComponentes(prev => prev.map(c => c.id === compActivo.id ? { ...c, nombre: val } : c));
+                      }}
+                      style={{ ...styles.inputDark, width: '120px', fontWeight: 'bold', fontSize: '0.9rem', color: '#00ffff' }}
+                    />
+                    <select
+                      value={compActivo.tipo}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setComponentes(prev => prev.map(c => c.id === compActivo.id ? { ...c, tipo: val } : c));
+                      }}
+                      style={styles.selectDark}
+                    >
+                      {TIPOS_COMPONENTE.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
                   </div>
-                  <div style={{ fontSize: '0.7rem', color: '#9ca3af', marginTop: '4px' }}>
-                    Dimensiones: {compActivo.w}x{compActivo.h} px
+                  <div style={{ fontSize: '0.7rem', color: '#9ca3af', marginTop: '6px', display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Posición: ({compActivo.x}, {compActivo.y})</span>
+                    <span>Tamaño: {compActivo.w}×{compActivo.h}px</span>
                   </div>
                   <button 
                     onClick={() => borrarComponente(compActivo.id)} 
                     style={{ ...styles.btn, backgroundColor: 'rgba(239, 68, 68, 0.15)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.3)', marginTop: '8px', width: '100%', justifyContent: 'center' }}
                   >
-                    <Trash2 size={14} /> Eliminar Componente
+                    <Trash2 size={13} /> Eliminar Componente
                   </button>
                 </div>
 
                 {/* Info del Pad Seleccionado */}
                 <div style={styles.editSection}>
-                  <h4 style={styles.sectionTitle}>Edición de Pin / Pad {padActivo.id}</h4>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <h4 style={styles.sectionTitle}>Edición de Pin / Pad {padActivo.id}</h4>
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      <button 
+                        onClick={() => setSelectedPadId('1')} 
+                        style={{ ...styles.padSelectorBtn, ...(selectedPadId === '1' && styles.padSelectorBtnActive) }}
+                      >
+                        Pin 1
+                      </button>
+                      <button 
+                        onClick={() => setSelectedPadId('2')} 
+                        style={{ ...styles.padSelectorBtn, ...(selectedPadId === '2' && styles.padSelectorBtnActive) }}
+                      >
+                        Pin 2
+                      </button>
+                    </div>
+                  </div>
 
-                  {/* Asignación de Net Name (Línea) */}
+                  {/* Net Name */}
                   <div style={styles.formGroup}>
                     <label style={styles.label}>Net Name (Línea)</label>
                     <input 
                       type="text" 
-                      list="netname-sugerencias"
+                      list="netname-sugerencias-main"
                       value={padActivo.netName} 
                       onChange={(e) => actualizarPropiedadPad(padActivo.id, 'netName', e.target.value)}
                       style={styles.inputDark}
                     />
-                    <datalist id="netname-sugerencias">
+                    <datalist id="netname-sugerencias-main">
                       {NET_NAMES_SUGERIDOS.map(n => <option key={n} value={n} />)}
                     </datalist>
                   </div>
@@ -1363,8 +1684,8 @@ export default function VisorMapeoPCB({
                     </div>
                   </div>
 
-                  {/* Edición de Valores Sanos (Referencia) */}
-                  <div style={{ marginTop: '10px' }}>
+                  {/* Edición de Valores Sanos */}
+                  <div style={{ marginTop: '6px' }}>
                     <div style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#fff', marginBottom: '6px' }}>
                       Valores de Referencia Sanos
                     </div>
@@ -1409,7 +1730,7 @@ export default function VisorMapeoPCB({
                     </div>
                   </div>
 
-                  {/* Visualización de Medición Registrada */}
+                  {/* Visualización de Mediciones Registradas */}
                   <div style={styles.registrosContainer}>
                     <div style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#fff', marginBottom: '6px' }}>
                       Mediciones Registradas
@@ -1443,14 +1764,14 @@ export default function VisorMapeoPCB({
             ) : (
               <div style={{ color: '#9ca3af', fontSize: '0.8rem', textAlign: 'center', marginTop: '40px' }}>
                 <HelpCircle size={32} style={{ color: '#4b5563', margin: '0 auto 10px auto', display: 'block' }} />
-                Haz clic en un componente o pad para ver y editar sus propiedades de ingeniería inversa.
+                Haz clic en un componente o pad para ver y editar sus propiedades.
               </div>
             )}
           </div>
 
-          {/* Tabla Resumen de Componentes */}
-          <div style={{ marginTop: 'auto', borderTop: '1px solid #374151', paddingTop: '15px' }}>
-            <h4 style={{ ...styles.sectionTitle, marginBottom: '8px' }}>Lista de Componentes ({componentes.length})</h4>
+          {/* Lista Resumen de Componentes */}
+          <div style={{ marginTop: 'auto', borderTop: '1px solid #374151', paddingTop: '12px' }}>
+            <h4 style={{ ...styles.sectionTitle, marginBottom: '6px' }}>Componentes ({componentes.length})</h4>
             <div style={styles.compListContainer}>
               {componentes.map(c => (
                 <div 
@@ -1471,163 +1792,11 @@ export default function VisorMapeoPCB({
         </div>
 
       </div>
-
-      {/* MODAL SOBREPUESTO PARA DOBLE CLIC (EDICIÓN AVANZADA) */}
-      {editingComp && (
-        <div style={styles.modalOverlay}>
-          <div style={styles.modalContent}>
-            <div style={styles.modalHeader}>
-              <h3 style={{ margin: 0, color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Edit size={18} color="#60a5fa" /> Editar Componente SMD Avanzado
-              </h3>
-              <button onClick={() => setEditingComp(null)} style={styles.closeBtn}>✕</button>
-            </div>
-            
-            <div style={styles.modalBody}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '15px' }}>
-                <div>
-                  <label style={styles.label}>Nombre</label>
-                  <input 
-                    type="text" 
-                    value={editingComp.nombre}
-                    onChange={(e) => setEditingComp({ ...editingComp, nombre: e.target.value.trim() })}
-                    style={styles.inputDark}
-                  />
-                </div>
-                <div>
-                  <label style={styles.label}>Tipo de SMD</label>
-                  <select 
-                    value={editingComp.tipo}
-                    onChange={(e) => setEditingComp({ ...editingComp, tipo: e.target.value })}
-                    style={styles.selectDark}
-                  >
-                    {TIPOS_COMPONENTE.map(t => (
-                      <option key={t} value={t}>{t}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Editar Pads */}
-              {editingComp.pads.map((pad, idx) => (
-                <div key={pad.id} style={styles.modalPadRow}>
-                  <div style={{ fontWeight: 'bold', color: '#60a5fa', marginBottom: '8px', fontSize: '0.8rem', borderBottom: '1px solid #2d3748', paddingBottom: '4px' }}>
-                    PIN / PAD {pad.id} ({pad.tipo})
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '8px' }}>
-                    <div>
-                      <label style={styles.subLabel}>Net Name</label>
-                      <input 
-                        type="text" 
-                        value={pad.netName}
-                        onChange={(e) => {
-                          const newPads = [...editingComp.pads];
-                          newPads[idx].netName = e.target.value;
-                          setEditingComp({ ...editingComp, pads: newPads });
-                        }}
-                        style={styles.inputDark}
-                      />
-                    </div>
-                    <div>
-                      <label style={styles.subLabel}>Tipo de Pad</label>
-                      <select 
-                        value={pad.tipo}
-                        onChange={(e) => {
-                          const newPads = [...editingComp.pads];
-                          newPads[idx].tipo = e.target.value;
-                          if (e.target.value === 'GND') {
-                            newPads[idx].netName = 'GND';
-                            newPads[idx].valorSanoDiodo = '0.000';
-                            newPads[idx].valorSanoVoltio = '0.000';
-                            newPads[idx].valorSanoUa = '0';
-                            newPads[idx].valorSanoOhmio = '0';
-                          }
-                          setEditingComp({ ...editingComp, pads: newPads });
-                        }}
-                        style={styles.selectDark}
-                      >
-                        {TIPOS_LINEA.map(t => (
-                          <option key={t} value={t}>{t}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
-                    <div>
-                      <label style={styles.subLabel}>Sano Diodo</label>
-                      <input 
-                        type="text" 
-                        value={pad.valorSanoDiodo}
-                        onChange={(e) => {
-                          const newPads = [...editingComp.pads];
-                          newPads[idx].valorSanoDiodo = e.target.value;
-                          setEditingComp({ ...editingComp, pads: newPads });
-                        }}
-                        style={styles.smallInput}
-                      />
-                    </div>
-                    <div>
-                      <label style={styles.subLabel}>Sano Volts</label>
-                      <input 
-                        type="text" 
-                        value={pad.valorSanoVoltio}
-                        onChange={(e) => {
-                          const newPads = [...editingComp.pads];
-                          newPads[idx].valorSanoVoltio = e.target.value;
-                          setEditingComp({ ...editingComp, pads: newPads });
-                        }}
-                        style={styles.smallInput}
-                      />
-                    </div>
-                    <div>
-                      <label style={styles.subLabel}>Sano uA</label>
-                      <input 
-                        type="text" 
-                        value={pad.valorSanoUa}
-                        onChange={(e) => {
-                          const newPads = [...editingComp.pads];
-                          newPads[idx].valorSanoUa = e.target.value;
-                          setEditingComp({ ...editingComp, pads: newPads });
-                        }}
-                        style={styles.smallInput}
-                      />
-                    </div>
-                    <div>
-                      <label style={styles.subLabel}>Sano Ohm</label>
-                      <input 
-                        type="text" 
-                        value={pad.valorSanoOhmio}
-                        onChange={(e) => {
-                          const newPads = [...editingComp.pads];
-                          newPads[idx].valorSanoOhmio = e.target.value;
-                          setEditingComp({ ...editingComp, pads: newPads });
-                        }}
-                        style={styles.smallInput}
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div style={styles.modalFooter}>
-              <button onClick={() => setEditingComp(null)} style={{ ...styles.btn, backgroundColor: '#374151', color: '#fff' }}>
-                Cancelar
-              </button>
-              <button onClick={guardarEdicionModal} style={{ ...styles.btn, backgroundColor: '#10b981', color: '#fff' }}>
-                Guardar Cambios
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
 
-// --- ESTILOS EN JAVASCRIPT INLINE (Fondo Oscuro y Premium) ---
+// --- ESTILOS EN JAVASCRIPT INLINE (Dark High-Tech UI) ---
 const styles = {
   container: {
     backgroundColor: '#111827',
@@ -1647,7 +1816,7 @@ const styles = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: '10px 15px',
+    padding: '8px 15px',
     backgroundColor: '#1f2937',
     borderBottom: '2px solid #374151',
     flexWrap: 'wrap',
@@ -1657,7 +1826,7 @@ const styles = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: '8px 15px',
+    padding: '6px 15px',
     backgroundColor: '#111827',
     borderBottom: '1.5px solid #1f2937',
     flexWrap: 'wrap',
@@ -1665,7 +1834,7 @@ const styles = {
   },
   divider: {
     width: '1px',
-    height: '24px',
+    height: '22px',
     backgroundColor: '#374151',
     alignSelf: 'center'
   },
@@ -1698,6 +1867,21 @@ const styles = {
     backgroundColor: '#1f2937',
     boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.5)'
   },
+  capaBtn: {
+    padding: '4px 8px',
+    borderRadius: '4px',
+    border: 'none',
+    color: '#9ca3af',
+    background: 'transparent',
+    cursor: 'pointer',
+    fontWeight: 'bold',
+    fontSize: '0.7rem',
+    transition: 'all 0.15s'
+  },
+  capaBtnActive: {
+    color: '#ffffff',
+    backgroundColor: '#374151'
+  },
   selectDark: {
     backgroundColor: '#111827',
     border: '1px solid #374151',
@@ -1714,7 +1898,7 @@ const styles = {
     color: '#00ffff',
     borderRadius: '6px',
     padding: '4px',
-    width: '40px',
+    width: '36px',
     textAlign: 'center',
     fontSize: '0.75rem',
     outline: 'none'
@@ -1722,11 +1906,40 @@ const styles = {
   checkboxLabel: {
     display: 'flex',
     alignItems: 'center',
-    gap: '6px',
+    gap: '5px',
     fontSize: '0.75rem',
     color: '#d1d5db',
     cursor: 'pointer',
     userSelect: 'none'
+  },
+  searchInput: {
+    backgroundColor: 'transparent',
+    border: 'none',
+    color: 'white',
+    padding: '4px 6px',
+    fontSize: '0.75rem',
+    outline: 'none',
+    width: '160px'
+  },
+  searchResultsDropdown: {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    marginTop: '4px',
+    width: '240px',
+    backgroundColor: '#1f2937',
+    border: '1.5px solid #374151',
+    borderRadius: '6px',
+    boxShadow: '0 10px 15px -3px rgba(0,0,0,0.6)',
+    zIndex: 9999,
+    maxHeight: '200px',
+    overflowY: 'auto'
+  },
+  searchResultItem: {
+    padding: '6px 10px',
+    cursor: 'pointer',
+    borderBottom: '1px solid #374151',
+    transition: 'background-color 0.15s'
   },
   canvasContainer: {
     position: 'relative',
@@ -1741,20 +1954,50 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '4px',
-    padding: '4px 8px',
-    borderRadius: '6px',
+    padding: '3px 7px',
+    borderRadius: '4px',
     border: '1px solid #374151',
     backgroundColor: '#1f2937',
     color: '#e5e7eb',
+    cursor: 'pointer',
+    fontSize: '0.65rem',
+    fontWeight: 'bold',
+    transition: 'all 0.15s',
+    outline: 'none'
+  },
+  rotateBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px',
+    padding: '3px 8px',
+    borderRadius: '4px',
+    border: '1px solid #4b5563',
+    backgroundColor: '#374151',
+    color: '#00ffff',
     cursor: 'pointer',
     fontSize: '0.7rem',
     fontWeight: 'bold',
     transition: 'all 0.15s',
     outline: 'none'
   },
+  padSelectorBtn: {
+    padding: '2px 8px',
+    borderRadius: '4px',
+    border: '1px solid #374151',
+    backgroundColor: '#1f2937',
+    color: '#9ca3af',
+    cursor: 'pointer',
+    fontSize: '0.65rem',
+    fontWeight: 'bold'
+  },
+  padSelectorBtnActive: {
+    backgroundColor: '#3b82f6',
+    color: 'white',
+    borderColor: '#60a5fa'
+  },
   closeFullscreenBtn: {
-    width: '34px',
-    height: '34px',
+    width: '32px',
+    height: '32px',
     borderRadius: '6px',
     border: '1px solid #374151',
     backgroundColor: 'rgba(239, 68, 68, 0.15)',
@@ -1793,7 +2036,7 @@ const styles = {
     position: 'absolute',
     top: '15px',
     left: '15px',
-    padding: '12px 16px',
+    padding: '10px 14px',
     borderRadius: '8px',
     backgroundColor: 'rgba(17, 24, 39, 0.9)',
     border: '2px solid #374151',
@@ -1816,7 +2059,10 @@ const styles = {
     boxShadow: '0 4px 6px -1px rgba(0,0,0,0.5)',
     zIndex: 10,
     pointerEvents: 'none',
-    border: '1px solid #f59e0b'
+    border: '1px solid #f59e0b',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px'
   },
   tooltip: {
     position: 'absolute',
@@ -1833,15 +2079,15 @@ const styles = {
     lineHeight: '1.4'
   },
   sidebar: {
-    width: '300px',
-    minWidth: '300px',
+    width: '310px',
+    minWidth: '310px',
     borderLeft: '2px solid #374151',
     backgroundColor: '#1f2937',
-    padding: '15px',
+    padding: '12px',
     overflowY: 'auto',
     display: 'flex',
     flexDirection: 'column',
-    gap: '15px',
+    gap: '12px',
     boxSizing: 'border-box'
   },
   sidebarTitle: {
@@ -1850,43 +2096,33 @@ const styles = {
     color: '#9ca3af',
     textTransform: 'uppercase',
     letterSpacing: '0.05em',
-    margin: '0 0 10px 0',
-    borderBottom: '1px solid #374151',
-    paddingBottom: '5px'
+    margin: 0
   },
   infoCard: {
     backgroundColor: '#111827',
-    padding: '10px 12px',
+    padding: '10px',
     borderRadius: '8px',
     border: '1.5px solid #374151'
   },
-  badge: {
-    fontSize: '0.65rem',
-    fontWeight: 'bold',
-    backgroundColor: '#1e3a8a',
-    color: '#60a5fa',
-    padding: '2px 6px',
-    borderRadius: '4px'
-  },
   editSection: {
     backgroundColor: '#111827',
-    padding: '12px',
+    padding: '10px',
     borderRadius: '8px',
     border: '1.5px solid #374151',
     display: 'flex',
     flexDirection: 'column',
-    gap: '10px'
+    gap: '8px'
   },
   sectionTitle: {
     fontSize: '0.8rem',
     fontWeight: 'bold',
     color: '#60a5fa',
-    margin: '0 0 4px 0'
+    margin: 0
   },
   formGroup: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '4px'
+    gap: '3px'
   },
   label: {
     fontSize: '0.7rem',
@@ -1904,9 +2140,9 @@ const styles = {
     border: '1px solid #374151',
     color: 'white',
     borderRadius: '6px',
-    padding: '6px 10px',
+    padding: '5px 8px',
     outline: 'none',
-    fontSize: '0.8rem',
+    fontSize: '0.75rem',
     width: '100%',
     boxSizing: 'border-box'
   },
@@ -1924,7 +2160,7 @@ const styles = {
   },
   liveRecordBox: {
     backgroundColor: '#1f2937',
-    padding: '10px',
+    padding: '8px',
     borderRadius: '6px',
     border: '1px dashed #4b5563'
   },
@@ -1935,22 +2171,22 @@ const styles = {
     marginTop: '4px'
   },
   registrosContainer: {
-    marginTop: '10px',
+    marginTop: '6px',
     borderTop: '1px dashed #374151',
-    paddingTop: '10px'
+    paddingTop: '6px'
   },
   gridRegistros: {
     display: 'grid',
     gridTemplateColumns: '1fr auto',
-    rowGap: '4px',
+    rowGap: '3px',
     fontSize: '0.75rem',
     color: '#9ca3af'
   },
   compListContainer: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '4px',
-    maxHeight: '180px',
+    gap: '3px',
+    maxHeight: '160px',
     overflowY: 'auto',
     border: '1px solid #374151',
     borderRadius: '6px',
@@ -1959,75 +2195,10 @@ const styles = {
   compListItem: {
     display: 'flex',
     justifyContent: 'space-between',
-    padding: '6px 10px',
+    padding: '5px 8px',
     borderRadius: '4px',
     cursor: 'pointer',
     fontSize: '0.75rem',
     transition: 'all 0.1s'
-  },
-  // Modal doble clic
-  modalOverlay: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.85)',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 9999
-  },
-  modalContent: {
-    backgroundColor: '#1f2937',
-    border: '2px solid #4b5563',
-    borderRadius: '12px',
-    width: '480px',
-    maxWidth: '90%',
-    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.6)',
-    display: 'flex',
-    flexDirection: 'column',
-    overflow: 'hidden'
-  },
-  modalHeader: {
-    padding: '12px 15px',
-    backgroundColor: '#111827',
-    borderBottom: '1px solid #374151',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center'
-  },
-  closeBtn: {
-    backgroundColor: 'transparent',
-    border: 'none',
-    color: '#9ca3af',
-    fontSize: '1.1rem',
-    cursor: 'pointer',
-    outline: 'none'
-  },
-  modalBody: {
-    padding: '15px',
-    overflowY: 'auto',
-    maxHeight: '400px',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '12px'
-  },
-  modalPadRow: {
-    backgroundColor: '#111827',
-    padding: '12px',
-    borderRadius: '8px',
-    border: '1.5px solid #374151',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '6px'
-  },
-  modalFooter: {
-    padding: '12px 15px',
-    backgroundColor: '#111827',
-    borderTop: '1px solid #374151',
-    display: 'flex',
-    justifyContent: 'flex-end',
-    gap: '10px'
   }
 };
