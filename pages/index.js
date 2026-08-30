@@ -8,7 +8,7 @@ import { Sun, Moon, ArrowLeft, RefreshCcw, RefreshCw, Zap, Smartphone, AlertTria
 
 import FPCInteligente from '../components/FPCInteligente.js';
 import ICInteligente from '../components/ICInteligente.js';
-import FPCBateria from '../components/FPCBateria.js';
+import FPCBateria, { PRESETS_BATERIA } from '../components/FPCBateria.js';
 import EscanerRFFE from '../components/EscanerRFFE.js';
 import FormularioIngresoAvanzado from '../components/FormularioIngresoAvanzado.js';
 import VisorReporteAvanzado from '../components/VisorReporteAvanzado.js';
@@ -2004,8 +2004,51 @@ export default function AppDiagnostico() {
                           esIPhone={modeloActivo.fpcBateria.esIPhone}
                           estiloLayout={modeloActivo.fpcBateria.estiloLayout || (modeloActivo.fpcBateria.esIPhone ? 'hibrido' : 'doble_fila')}
                           onCambiarEstiloLayout={(nuevoEstilo) => {
-                            const bateriaMod = { ...modeloActivo.fpcBateria, estiloLayout: nuevoEstilo };
-                            setModeloActivo(prev => ({ ...prev, fpcBateria: bateriaMod }));
+                            let presetDefecto = null;
+                            if (nuevoEstilo === 'hibrido') {
+                              presetDefecto = PRESETS_BATERIA.find(p => p.id === 'iphone_clasico');
+                            } else if (nuevoEstilo === 'fila_simple') {
+                              presetDefecto = PRESETS_BATERIA.find(p => p.id === 'fila_simple_4p');
+                            } else {
+                              presetDefecto = PRESETS_BATERIA.find(p => p.id === 'android_b2b_8p');
+                            }
+
+                            if (presetDefecto) {
+                              const pinesActualizados = presetDefecto.pines.map((p, idx) => {
+                                const pinExistente = modeloActivo.fpcBateria.pines?.[idx];
+                                return {
+                                  id: p.id,
+                                  nombre: p.nombre,
+                                  tipo: p.tipo,
+                                  colorCustom: p.colorCustom,
+                                  valorSanoDiodo: pinExistente?.valorSanoDiodo ?? '---',
+                                  valorSanoUa: pinExistente?.valorSanoUa ?? '---',
+                                  valorSanoOhmio: pinExistente?.valorSanoOhmio ?? '---',
+                                  valorActualDiodo: pinExistente?.valorActualDiodo ?? '---',
+                                  valorActualUa: pinExistente?.valorActualUa ?? '---',
+                                  valorActualOhmio: pinExistente?.valorActualOhmio ?? '---',
+                                  valorSano: pinExistente?.valorSano ?? '---',
+                                  valorActual: pinExistente?.valorActual ?? '---'
+                                };
+                              });
+                              const bateriaMod = {
+                                ...modeloActivo.fpcBateria,
+                                estiloLayout: nuevoEstilo,
+                                pines: pinesActualizados
+                              };
+                              setModeloActivo(prev => ({ ...prev, fpcBateria: bateriaMod }));
+                              setPinActivoFpcBateria(1);
+                              setCambiosPendientesFpcBateria(true);
+                            } else {
+                              const bateriaMod = { ...modeloActivo.fpcBateria, estiloLayout: nuevoEstilo };
+                              setModeloActivo(prev => ({ ...prev, fpcBateria: bateriaMod }));
+                              setCambiosPendientesFpcBateria(true);
+                            }
+                          }}
+                          onRestablecerOriginal={() => {
+                            const batOriginal = inicializarFpcBateria(modeloActivo);
+                            setModeloActivo(prev => ({ ...prev, fpcBateria: batOriginal }));
+                            setPinActivoFpcBateria(1);
                             setCambiosPendientesFpcBateria(true);
                           }}
                           onCambiarNumPines={(nuevoNum) => {

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Save, Cloud, CloudOff, Check, AlertCircle, Zap, Sliders, Plus, Minus, Layers, Sparkles, CheckCircle2 } from 'lucide-react';
+import { Save, Cloud, CloudOff, Check, AlertCircle, Zap, Sliders, Plus, Minus, Layers, Sparkles, CheckCircle2, RotateCcw } from 'lucide-react';
 import SelectorTipoLinea from './SelectorTipoLinea.js';
 
 export const PRESETS_BATERIA = [
@@ -121,6 +121,7 @@ export default function FPCBateria({
   onCambiarEstiloLayout,
   onCambiarNumPines,
   onAplicarPreset,
+  onRestablecerOriginal,
   onRegistrarOL
 }) {
   const [modalPresetsAbierto, setModalPresetsAbierto] = useState(false);
@@ -653,29 +654,54 @@ export default function FPCBateria({
           </span>
         </div>
 
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
           {modo === 'crear' && (
-            <button
-              onClick={() => setModalPresetsAbierto(true)}
-              style={{
-                background: 'linear-gradient(135deg, #8b5cf6, #ec4899)',
-                color: 'white',
-                border: 'none',
-                padding: '6px 12px',
-                borderRadius: '8px',
-                fontWeight: 'bold',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                fontSize: '0.75rem',
-                boxShadow: '0 0 10px rgba(139, 92, 246, 0.3)'
-              }}
-              title="Cargar plantilla o preset de pines para batería"
-            >
-              <Sparkles size={14} />
-              Presets Rápidos
-            </button>
+            <>
+              <button
+                onClick={() => setModalPresetsAbierto(true)}
+                style={{
+                  background: 'linear-gradient(135deg, #8b5cf6, #ec4899)',
+                  color: 'white',
+                  border: 'none',
+                  padding: '6px 12px',
+                  borderRadius: '8px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontSize: '0.75rem',
+                  boxShadow: '0 0 10px rgba(139, 92, 246, 0.3)'
+                }}
+                title="Cargar plantilla o preset de pines para batería"
+              >
+                <Sparkles size={14} />
+                Presets Rápidos
+              </button>
+
+              {onRestablecerOriginal && (
+                <button
+                  onClick={onRestablecerOriginal}
+                  style={{
+                    background: '#1f2937',
+                    color: '#9ca3af',
+                    border: '1px solid #374151',
+                    padding: '6px 10px',
+                    borderRadius: '8px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    fontSize: '0.72rem'
+                  }}
+                  title="Restablecer el conector al formato original por defecto de este modelo"
+                >
+                  <RotateCcw size={13} />
+                  Restablecer
+                </button>
+              )}
+            </>
           )}
 
           {onGuardar && (
@@ -755,9 +781,9 @@ export default function FPCBateria({
                   cursor: 'pointer',
                   fontSize: '0.72rem'
                 }}
-                title="Brackets laterales de potencia + señales centrales (iPhone clásico / Fast-Charge)"
+                title="Brackets laterales de potencia + señales centrales (6P por defecto)"
               >
-                🔲 Híbrido Lugs
+                🔲 Híbrido Lugs (6P)
               </button>
               <button
                 onClick={() => manejarCambiarEstilo('doble_fila')}
@@ -771,9 +797,9 @@ export default function FPCBateria({
                   cursor: 'pointer',
                   fontSize: '0.72rem'
                 }}
-                title="Doble fila Mezzanine estándar (Android y iPhone 12+)"
+                title="Doble fila Mezzanine estándar (8P por defecto)"
               >
-                📶 Doble Fila B2B
+                📶 Doble Fila B2B (8P)
               </button>
               <button
                 onClick={() => manejarCambiarEstilo('fila_simple')}
@@ -787,9 +813,9 @@ export default function FPCBateria({
                   cursor: 'pointer',
                   fontSize: '0.72rem'
                 }}
-                title="Láminas / Espadines / Contactos lineales"
+                title="Láminas / Espadines / Contactos lineales (4P por defecto)"
               >
-                ➖ Fila Simple
+                ➖ Fila Simple (4P)
               </button>
             </div>
           </div>
