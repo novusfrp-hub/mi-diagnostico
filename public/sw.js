@@ -1,87 +1,55 @@
-const CACHE_NAME = 'mi-diagnostico-v2';
-const STATIC_ASSETS = [
-  '/',
-  '/manifest.json',
-  '/icon-192.png',
-  '/icon-512.png'
-];
+const CACHE_NAME = 'mi-diagnostico-v3';
 
-// Instalación: Cacheamos activos básicos y forzamos activación inmediata
 self.addEventListener('install', (event) => {
   self.skipWaiting();
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS);
-    })
-  );
 });
 
-// Activación: Limpiamos caches viejos y tomamos control de todos los clientes
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
-            console.log('[SW] Eliminando cache obsoleta:', cacheName);
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    }).then(() => self.clients.claim())
+    caches.keys().then((keys) => Promise.all(keys.map(k => caches.delete(k))))
+      .then(() => self.clients.claim())
   );
 });
 
-// Mensajes directos desde la aplicación (ej: Forzar actualización)
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
   }
-  if (event.data && event.data.type === 'CLEAR_CACHE') {
-    caches.keys().then((names) => {
-      names.forEach((name) => caches.delete(name));
-    });
-  }
 });
 
-// Interceptación de peticiones: ESTRATEGIA NETWORK-FIRST
-// Siempre busca la versión más reciente en Vercel cuando hay internet.
-// Si está sin conexión, recurre a la caché local.
+// Network-First seguro: no interfiere con Firebase ni WebSockets
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET') return;
 
   const url = new URL(request.url);
-
-  // Ignorar extensiones de Chrome o llamadas de esquemas no HTTP
   if (!url.protocol.startsWith('http')) return;
+
+  // Dejar que Firebase, Google APIs y llamadas API pasen directamente
+  if (
+    url.hostname.includes('firebase') || 
+    url.hostname.includes('googleapis') || 
+    url.pathname.startsWith('/api/')
+  ) {
+    return;
+  }
 
   event.respondWith(
     fetch(request)
-      .then((networkResponse) => {
-        // Guardamos copia fresca en cache si la respuesta es válida
-        if (networkResponse && networkResponse.status === 200) {
-          const responseToCache = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(request, responseToCache);
-          });
+      .then((response) => {
+        if (response && response.status === 200 && response.type === 'basic') {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone)).catch(() => {});
         }
-        return networkResponse;
+        return response;
       })
       .catch(() => {
-        // Fallback a caché si la red falla (offline)
-        return caches.match(request).then((cachedResponse) => {
-          if (cachedResponse) {
-            return cachedResponse;
-          }
+        return caches.match(request).then((cached) => {
+          if (cached) return cached;
           if (request.mode === 'navigate') {
             return caches.match('/');
           }
-          return new Response('Sin conexión a internet', {
-            status: 503,
-            statusText: 'Service Unavailable',
-            headers: new Headers({ 'Content-Type': 'text/plain' })
-          });
+          return Promise.reject('offline');
         });
       })
   );
