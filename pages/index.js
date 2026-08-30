@@ -1705,6 +1705,18 @@ export default function AppDiagnostico() {
             <button onClick={abrirLibreria} style={{ ...estilos.btnHeader, backgroundColor: '#8b5cf6', color: 'white', border: 'none' }}><Cpu size={16} /> <span style={{ fontSize: '0.7rem', fontWeight: 'bold' }}>LIBRERÍA MODELOS</span></button>
             <button onClick={abrirHistorial} style={{ ...estilos.btnHeader, backgroundColor: t.cristalBgItem.backgroundColor, color: t.textoPrincipal.color, border: t.bordeFantasma.border }}><History size={16} /> <span style={{ fontSize: '0.7rem', fontWeight: 'bold' }}>HISTORIAL</span></button>
             <button onClick={prepararNuevoCaso} style={{ ...estilos.btnHeader, backgroundColor: '#10b981', color: 'white', border: 'none' }}><ClipboardList size={16} /> <span style={{ fontSize: '0.7rem', fontWeight: 'bold' }}>INGRESO</span></button>
+            <button 
+              onClick={() => {
+                if ('caches' in window) {
+                  caches.keys().then(names => names.forEach(n => caches.delete(n)));
+                }
+                window.location.reload(true);
+              }} 
+              style={{ ...estilos.btnHeader, backgroundColor: '#1e293b', color: '#94a3b8', border: '1px solid #334155' }}
+              title="Recargar y sincronizar con el último commit de Vercel (Ctrl+F5)"
+            >
+              <RefreshCw size={14} /> <span style={{ fontSize: '0.7rem', fontWeight: 'bold' }} className="hide-on-mobile">ACTUALIZAR</span>
+            </button>
             <button onClick={toggleTema} style={{ ...estilos.btnTema, ...t.textoSutil, marginLeft: '5px' }}>{tema === 'light' ? <Moon size={20} /> : <Sun size={20} />}</button>
           </div>
         </div>
