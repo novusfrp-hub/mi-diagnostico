@@ -915,6 +915,9 @@ export default function AppDiagnostico() {
     setModoFpc('crear');
     setModoIc('crear');
     setModoFpcBateria('crear');
+    if (nuevaSeccion === 'docktest' && escalaFpc === 'amperio') {
+      setEscalaFpc('diodo');
+    }
   };
 
   const seleccionarModeloLibreria = (mod) => {
@@ -1452,6 +1455,7 @@ export default function AppDiagnostico() {
 
   const inicializarFpcBateria = (modelo) => {
     const esIPhone = esIPhoneModelo(modelo);
+    const estiloLayout = esIPhone ? 'hibrido' : 'doble_fila';
     const numPines = esIPhone ? 6 : 8;
     const nombresDefecto = Array(numPines).fill('');
     const tiposDefecto = Array(numPines).fill('DATA');
@@ -1473,6 +1477,7 @@ export default function AppDiagnostico() {
     return {
       id: 'bateria',
       nombre: 'FPC Batería',
+      estiloLayout,
       pines,
       imgPlaca: '',
       imgEsquema: '',
@@ -1911,7 +1916,6 @@ export default function AppDiagnostico() {
                             <div style={{ display: 'flex', gap: '5px', backgroundColor: '#1a1a1a', padding: '4px', borderRadius: '8px', flexWrap: 'wrap' }}>
                               <button onClick={() => setEscalaFpc('diodo')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: escalaFpc === 'diodo' ? '#3b82f6' : 'transparent', color: escalaFpc === 'diodo' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}>Diodo</button>
                               <button onClick={() => setEscalaFpc('ua')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: escalaFpc === 'ua' ? '#10b981' : 'transparent', color: escalaFpc === 'ua' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}>uA</button>
-                              <button onClick={() => setEscalaFpc('amperio')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: escalaFpc === 'amperio' ? '#f59e0b' : 'transparent', color: escalaFpc === 'amperio' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}>Amperios</button>
                               <button onClick={() => setEscalaFpc('voltio')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: escalaFpc === 'voltio' ? '#ef4444' : 'transparent', color: escalaFpc === 'voltio' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}>Voltios</button>
                               <button onClick={() => setEscalaFpc('ohmio')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: escalaFpc === 'ohmio' ? '#a855f7' : 'transparent', color: escalaFpc === 'ohmio' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}>Ohmios</button>
                             </div>
@@ -1984,6 +1988,7 @@ export default function AppDiagnostico() {
                             const arrNuevo = typeof updater === 'function' ? updater(modeloActivo.fpcBateria.pines) : updater;
                             const bateriaMod = { ...modeloActivo.fpcBateria, pines: arrNuevo };
                             setModeloActivo(prev => ({ ...prev, fpcBateria: bateriaMod }));
+                            setCambiosPendientesFpcBateria(true);
                           }}
                           pinActivo={pinActivoFpcBateria}
                           setPinActivo={setPinActivoFpcBateria}
@@ -1997,6 +2002,68 @@ export default function AppDiagnostico() {
                           guardando={guardandoFpcBateria}
                           ultimaSincronizacion={ultimaSincFpcBateria}
                           esIPhone={modeloActivo.fpcBateria.esIPhone}
+                          estiloLayout={modeloActivo.fpcBateria.estiloLayout || (modeloActivo.fpcBateria.esIPhone ? 'hibrido' : 'doble_fila')}
+                          onCambiarEstiloLayout={(nuevoEstilo) => {
+                            const bateriaMod = { ...modeloActivo.fpcBateria, estiloLayout: nuevoEstilo };
+                            setModeloActivo(prev => ({ ...prev, fpcBateria: bateriaMod }));
+                            setCambiosPendientesFpcBateria(true);
+                          }}
+                          onCambiarNumPines={(nuevoNum) => {
+                            const cantActual = modeloActivo.fpcBateria.pines?.length || 0;
+                            let nuevosPines = [...(modeloActivo.fpcBateria.pines || [])];
+                            if (nuevoNum > cantActual) {
+                              for (let i = cantActual + 1; i <= nuevoNum; i++) {
+                                nuevosPines.push({
+                                  id: i,
+                                  nombre: '',
+                                  tipo: 'DATA',
+                                  valorSanoDiodo: '---',
+                                  valorSanoUa: '---',
+                                  valorSanoOhmio: '---',
+                                  valorActualDiodo: '---',
+                                  valorActualUa: '---',
+                                  valorActualOhmio: '---',
+                                  valorSano: '---',
+                                  valorActual: '---'
+                                });
+                              }
+                            } else if (nuevoNum < cantActual) {
+                              nuevosPines = nuevosPines.slice(0, nuevoNum);
+                              if (Number(pinActivoFpcBateria) > nuevoNum) {
+                                setPinActivoFpcBateria(1);
+                              }
+                            }
+                            const bateriaMod = { ...modeloActivo.fpcBateria, pines: nuevosPines };
+                            setModeloActivo(prev => ({ ...prev, fpcBateria: bateriaMod }));
+                            setCambiosPendientesFpcBateria(true);
+                          }}
+                          onAplicarPreset={(preset) => {
+                            const pinesActualizados = preset.pines.map((p, idx) => {
+                              const pinExistente = modeloActivo.fpcBateria.pines?.[idx];
+                              return {
+                                id: p.id,
+                                nombre: p.nombre,
+                                tipo: p.tipo,
+                                colorCustom: p.colorCustom,
+                                valorSanoDiodo: pinExistente?.valorSanoDiodo ?? '---',
+                                valorSanoUa: pinExistente?.valorSanoUa ?? '---',
+                                valorSanoOhmio: pinExistente?.valorSanoOhmio ?? '---',
+                                valorActualDiodo: pinExistente?.valorActualDiodo ?? '---',
+                                valorActualUa: pinExistente?.valorActualUa ?? '---',
+                                valorActualOhmio: pinExistente?.valorActualOhmio ?? '---',
+                                valorSano: pinExistente?.valorSano ?? '---',
+                                valorActual: pinExistente?.valorActual ?? '---'
+                              };
+                            });
+                            const bateriaMod = {
+                              ...modeloActivo.fpcBateria,
+                              estiloLayout: preset.estilo,
+                              pines: pinesActualizados
+                            };
+                            setModeloActivo(prev => ({ ...prev, fpcBateria: bateriaMod }));
+                            setPinActivoFpcBateria(1);
+                            setCambiosPendientesFpcBateria(true);
+                          }}
                           onRegistrarOL={() => avanzarPinMagico('OL')}
                         />
                       </div>
