@@ -4,13 +4,14 @@ export default function SelectorTipoLinea({
   valor = 'DATA',
   onChange,
   tiposCustom = [],
-  onAgregarTipo
+  onAgregarTipo,
+  onEliminarTipo
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('alimentacion');
   const containerRef = useRef(null);
 
-  // Close when clicking outside
+  // Cerrar al hacer clic afuera
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (containerRef.current && !containerRef.current.contains(event.target)) {
@@ -57,7 +58,7 @@ export default function SelectorTipoLinea({
     if (grupos.alimentacion.items.includes(tipo)) return '#7f1d1d';
     if (grupos.comunicacion.items.includes(tipo)) return '#854d0e';
     if (grupos.control.items.includes(tipo)) return '#065f46';
-    return '#5b21b6'; // Custom color
+    return '#5b21b6'; // Color Custom
   };
 
   return (
@@ -70,29 +71,33 @@ export default function SelectorTipoLinea({
           background: '#1f2937',
           color: 'white',
           border: '1px solid #374151',
-          padding: '8px 16px',
-          borderRadius: '8px',
+          padding: '6px 12px',
+          borderRadius: '6px',
           cursor: 'pointer',
           fontWeight: 'bold',
-          fontSize: '0.85rem',
+          fontSize: '0.8rem',
           display: 'flex',
           alignItems: 'center',
           gap: '8px',
           outline: 'none',
           boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-          transition: 'all 0.2s'
+          transition: 'all 0.2s',
+          width: '100%',
+          justifyContent: 'space-between'
         }}
       >
-        <span
-          style={{
-            display: 'inline-block',
-            width: '10px',
-            height: '10px',
-            borderRadius: '50%',
-            backgroundColor: getPillColor(valor)
-          }}
-        />
-        {valor}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span
+            style={{
+              display: 'inline-block',
+              width: '10px',
+              height: '10px',
+              borderRadius: '50%',
+              backgroundColor: getPillColor(valor)
+            }}
+          />
+          <span>{valor}</span>
+        </div>
         <span style={{ fontSize: '0.6rem', opacity: 0.6 }}>▼</span>
       </button>
 
@@ -108,8 +113,8 @@ export default function SelectorTipoLinea({
             backgroundColor: '#0f172a',
             border: '1px solid #334155',
             borderRadius: '12px',
-            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5)',
-            zIndex: 1000,
+            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.7), 0 8px 10px -6px rgba(0, 0, 0, 0.5)',
+            zIndex: 9999,
             padding: '12px',
             display: 'flex',
             flexDirection: 'column',
@@ -190,7 +195,7 @@ export default function SelectorTipoLinea({
                     transition: 'all 0.2s'
                   }}
                 >
-                  {grupos[key].lbl}
+                  {grupos[key].lbl} {key === 'custom' ? `(${tiposCustom.length})` : ''}
                 </button>
               );
             })}
@@ -199,7 +204,7 @@ export default function SelectorTipoLinea({
           {/* Rejilla de Opciones */}
           <div
             style={{
-              maxHeight: '130px',
+              maxHeight: '140px',
               overflowY: 'auto',
               display: 'grid',
               gridTemplateColumns: 'repeat(2, 1fr)',
@@ -211,34 +216,73 @@ export default function SelectorTipoLinea({
               grupos[activeTab].items.map((tipo) => {
                 const isSelected = valor === tipo;
                 return (
-                  <button
+                  <div
                     key={tipo}
-                    type="button"
-                    onClick={() => handleSelect(tipo)}
                     style={{
-                      padding: '6px 8px',
-                      background: getPillColor(tipo),
-                      color: 'white',
-                      border: isSelected ? '2px solid #fff' : '1px solid transparent',
-                      borderRadius: '6px',
-                      fontSize: '0.75rem',
-                      fontWeight: 'bold',
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '6px',
-                      boxShadow: 'inset 0 -1px 3px rgba(0,0,0,0.3)',
-                      transition: 'all 0.15s'
+                      background: getPillColor(tipo),
+                      border: isSelected ? '2px solid #fff' : '1px solid transparent',
+                      borderRadius: '6px',
+                      padding: '2px 6px',
+                      gap: '4px',
+                      overflow: 'hidden'
                     }}
-                    title={tipo}
                   >
-                    <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#fff' }} />
-                    {tipo}
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSelect(tipo)}
+                      style={{
+                        flex: 1,
+                        background: 'transparent',
+                        color: 'white',
+                        border: 'none',
+                        fontSize: '0.75rem',
+                        fontWeight: 'bold',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        padding: '4px 0'
+                      }}
+                      title={tipo}
+                    >
+                      <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#fff', flexShrink: 0 }} />
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{tipo}</span>
+                    </button>
+
+                    {/* Botón para eliminar tipo personalizado */}
+                    {activeTab === 'custom' && onEliminarTipo && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (window.confirm(`¿Eliminar el tipo "${tipo}"?`)) {
+                            onEliminarTipo(tipo);
+                          }
+                        }}
+                        style={{
+                          background: 'rgba(239, 68, 68, 0.3)',
+                          color: '#f87171',
+                          border: 'none',
+                          borderRadius: '3px',
+                          padding: '1px 5px',
+                          fontSize: '0.65rem',
+                          fontWeight: 'bold',
+                          cursor: 'pointer',
+                          marginLeft: 'auto',
+                          flexShrink: 0
+                        }}
+                        title="Eliminar este tipo personalizado"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
                 );
               })
             ) : (
@@ -248,7 +292,7 @@ export default function SelectorTipoLinea({
             )}
           </div>
 
-          {/* Botón inferior + Tipo */}
+          {/* Botón inferior + Añadir Tipo */}
           {onAgregarTipo && (
             <button
               type="button"
@@ -272,7 +316,7 @@ export default function SelectorTipoLinea({
               onMouseEnter={(e) => e.target.style.background = '#0369a1'}
               onMouseLeave={(e) => e.target.style.background = '#0284c7'}
             >
-              + Añadir Nuevo Tipo
+              + Añadir Nuevo Tipo Personalizado
             </button>
           )}
         </div>

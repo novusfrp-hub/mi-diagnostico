@@ -494,6 +494,7 @@ export default function FPCBateria({
                   }}
                   tiposCustom={tiposCustom}
                   onAgregarTipo={manejarAgregarTipo}
+                  onEliminarTipo={(tipo) => setTiposCustom && setTiposCustom(tiposCustom.filter(t => t !== tipo))}
                 />
 
                 <button

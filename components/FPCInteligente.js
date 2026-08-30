@@ -352,6 +352,7 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
                   }}
                   tiposCustom={tiposCustom}
                   onAgregarTipo={manejarAgregarTipo}
+                  onEliminarTipo={(tipo) => setTiposCustom && setTiposCustom(tiposCustom.filter(t => t !== tipo))}
                 />
 
                 <button

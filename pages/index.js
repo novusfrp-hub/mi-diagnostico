@@ -917,6 +917,31 @@ export default function AppDiagnostico() {
     setModoFpcBateria('crear');
   };
 
+  const seleccionarModeloLibreria = (mod) => {
+    if (!mod) return;
+    let modConBateria = { ...mod };
+    if (!modConBateria.fpcBateria) {
+      modConBateria.fpcBateria = inicializarFpcBateria(modConBateria);
+    }
+    setModeloActivo(modConBateria);
+    setFpcActivo(modConBateria.fpcs?.[0] || null);
+    setIcActivo(modConBateria.ics?.[0] || null);
+
+    // Reseteo total de estados y selecciones activas desde el inicio
+    setPinActivoFpc(1);
+    setPinActivoFpcBateria(1);
+    setPadActivoIc(modConBateria.ics?.[0]?.pines?.[0]?.id || 'A1');
+    setCampoActivoDock('vbus');
+    setModoFpc('diagnostico');
+    setModoIc('diagnostico');
+    setModoFpcBateria('diagnostico');
+
+    setCambiosPendientesDocktest(false);
+    setCambiosPendientesFpc(false);
+    setCambiosPendientesIc(false);
+    setCambiosPendientesFpcBateria(false);
+  };
+
   const reproducirBip = () => { try { const audioCtx = new (window.AudioContext || window.webkitAudioContext)(); const oscillator = audioCtx.createOscillator(); oscillator.type = 'sine'; oscillator.frequency.setValueAtTime(1200, audioCtx.currentTime); oscillator.connect(audioCtx.destination); oscillator.start(); oscillator.stop(audioCtx.currentTime + 0.1); } catch (e) { } };
 
   // GUARDADO UNIVERSAL
@@ -1746,17 +1771,7 @@ export default function AppDiagnostico() {
                 </div>
                 <div style={{ flex: 1, overflowY: 'auto', padding: '10px' }}>
                   {modelosLibreria.map(mod => (
-                    <button key={mod.id} onClick={() => {
-                      let modConBateria = { ...mod };
-                      if (!modConBateria.fpcBateria) {
-                        modConBateria.fpcBateria = inicializarFpcBateria(modConBateria);
-                      }
-                      setModeloActivo(modConBateria);
-                      setFpcActivo(modConBateria.fpcs?.[0] || null);
-                      setIcActivo(modConBateria.ics?.[0] || null);
-                      setPinActivoFpcBateria(1);
-                      setCambiosPendientesDocktest(false);
-                    }} style={{ width: '100%', padding: '12px', textAlign: 'left', backgroundColor: modeloActivo?.id === mod.id ? '#1f2937' : 'transparent', border: 'none', color: modeloActivo?.id === mod.id ? '#00ffff' : '#9ca3af', borderLeft: modeloActivo?.id === mod.id ? '4px solid #00ffff' : '4px solid transparent', cursor: 'pointer', borderRadius: '0 8px 8px 0', marginBottom: '5px', fontWeight: 'bold' }}>
+                    <button key={mod.id} onClick={() => seleccionarModeloLibreria(mod)} style={{ width: '100%', padding: '12px', textAlign: 'left', backgroundColor: modeloActivo?.id === mod.id ? '#1f2937' : 'transparent', border: 'none', color: modeloActivo?.id === mod.id ? '#00ffff' : '#9ca3af', borderLeft: modeloActivo?.id === mod.id ? '4px solid #00ffff' : '4px solid transparent', cursor: 'pointer', borderRadius: '0 8px 8px 0', marginBottom: '5px', fontWeight: 'bold' }}>
                       {mod.marca} {mod.nombre}
                     </button>
                   ))}
@@ -2295,6 +2310,8 @@ export default function AppDiagnostico() {
                 }}
                 lecturaEnVivo={lecturaUsb.valor}
                 escala={escalaIc}
+                tiposCustom={tiposCustom}
+                setTiposCustom={setTiposCustom}
                 onGuardar={(nuevosComp, nuevaPlaca, nuevoEsquema) => {
                   console.log('Guardando boardview en Firebase:', { nuevosComp, nuevaPlaca, nuevoEsquema });
                   setModeloActivo(prev => ({

@@ -3,11 +3,11 @@ import {
   Save, Trash2, Plus, Move, ZoomIn, ZoomOut, Layers, Maximize2, 
   Settings, Edit, Play, HelpCircle, Activity, Check, AlertTriangle, 
   Map, Eye, EyeOff, Clipboard, RefreshCw, ChevronRight, CheckCircle2,
-  Image as ImageIcon, Upload, RotateCcw, X, Link, Search, RotateCw, Lock, Zap, ArrowLeftRight
+  Image as ImageIcon, Upload, RotateCcw, X, Link, Search, RotateCw, Lock, Zap, ArrowLeftRight, Tag
 } from 'lucide-react';
+import SelectorTipoLinea from './SelectorTipoLinea';
 
 const TIPOS_COMPONENTE = ['Capacitor', 'Resistencia', 'Diodo', 'Bobina'];
-const TIPOS_LINEA = ['DATA', 'GND', 'VCC', 'NC'];
 
 const TIPO_ABREVIATURAS = {
   Capacitor: 'C',
@@ -16,8 +16,8 @@ const TIPO_ABREVIATURAS = {
   Bobina: 'L'
 };
 
-// Sugerencias comunes de Net Names
-const NET_NAMES_SUGERIDOS = [
+// Sugerencias iniciales comunes de Net Names
+const NET_NAMES_BASE = [
   'PP_VDD_MAIN', 'GND', 'PP1V8_S2', 'PP3V0_LDO', 'VBUS_USB', 'PP_BATT_VCC',
   'AP_TO_I2C_SDA', 'AP_TO_I2C_SCL', 'SPI_AP_MOSI', 'SPI_AP_MISO', 'SPI_AP_CLK',
   'PMIC_TO_CPU_RESET', 'VREG_L6A_0P6', 'USB_HS_DP', 'USB_HS_DN', 'NC'
@@ -81,7 +81,9 @@ export default function VisorMapeoPCB({
   imagenEsquemaInicial = null,        // URL diagrama esquemático (persistencia)
   onCambios = null,                  // callback ({ componentes, imagenPlaca, imagenEsquema })
   fullscreen = false,                // modo pantalla completa
-  onCerrar = null                    // botón de cierre en modo fullscreen
+  onCerrar = null,                   // botón de cierre en modo fullscreen
+  tiposCustom = [],                  // lista global de tipos de línea personalizados
+  setTiposCustom = null              // setter de tipos de línea personalizados
 }) {
   // --- Estados locales del Boardview ---
   const [componentes, setComponentes] = useState(() => {
@@ -107,18 +109,47 @@ export default function VisorMapeoPCB({
   const [placaSize, setPlacaSize] = useState({ w: 1024, h: 1024 });
   const [esquemaSize, setEsquemaSize] = useState({ w: 1024, h: 1024 });
 
+  // --- Gestor Dinámico de Net Names (Nombres de Línea) con LocalStorage ---
+  const [netNamesCustom, setNetNamesCustom] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('net_names_personalizados');
+      if (saved) {
+        try { return JSON.parse(saved); } catch (e) {}
+      }
+    }
+    return NET_NAMES_BASE;
+  });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('net_names_personalizados', JSON.stringify(netNamesCustom));
+    }
+  }, [netNamesCustom]);
+
+  const [nuevoNetInput, setNuevoNetInput] = useState('');
+  const [mostrarGestorNets, setMostrarGestorNets] = useState(false);
+
   // --- Sistema de AutoHold Inteligente ---
   const [autoHoldActivo, setAutoHoldActivo] = useState(false);
   const autoHoldValueRef = useRef(null);
   const autoHoldStartTimeRef = useRef(0);
   const autoHoldTriggeredRef = useRef(false);
 
-  // Sincronizar props de imágenes si cambian desde el modelo
+  // Sincronizar props cuando cambia el modelo activo
   useEffect(() => {
-    if (imagenPlacaInicial) setImgPlacaUrl(imagenPlacaInicial);
+    if (Array.isArray(componentesIniciales)) {
+      setComponentes(componentesIniciales.length > 0 ? componentesIniciales : COMPONENTES_DEFECTO);
+      setSelectedCompId(componentesIniciales[0]?.id || null);
+      setSelectedPadId('1');
+    }
+  }, [componentesIniciales]);
+
+  useEffect(() => {
+    setImgPlacaUrl(imagenPlacaInicial || IMAGEN_PREDETERMINADA);
   }, [imagenPlacaInicial]);
+
   useEffect(() => {
-    if (imagenEsquemaInicial) setImgEsquemaUrl(imagenEsquemaInicial);
+    setImgEsquemaUrl(imagenEsquemaInicial || '');
   }, [imagenEsquemaInicial]);
 
   // Configuración de visualización de vectores
@@ -129,7 +160,7 @@ export default function VisorMapeoPCB({
   const [tool, setTool] = useState('select');
   const [tipoDrawing, setTipoDrawing] = useState('Capacitor');
 
-  // Navegación (Zoom & Pan) — refs espejo
+  // Navegación (Zoom & Pan)
   const [zoom, setZoom] = useState(1);
   const [posicion, setPosicion] = useState({ x: 0, y: 0 });
   const zoomRef = useRef(zoom);
@@ -142,9 +173,9 @@ export default function VisorMapeoPCB({
   const fileInputEsquemaRef = useRef(null);
 
   // Lógica de dibujo (Pad Espejo + Bloqueo Ortogonal)
-  const [drawingStep, setDrawingStep] = useState(0); // 0: libre, 1: arrastrando pad 1, 2: posicionando pad 2
-  const [pad1Temp, setPad1Temp] = useState(null); // { x, y, w, h }
-  const [pad2Temp, setPad2Temp] = useState(null); // { x, y, w, h, lockedAxis }
+  const [drawingStep, setDrawingStep] = useState(0);
+  const [pad1Temp, setPad1Temp] = useState(null);
+  const [pad2Temp, setPad2Temp] = useState(null);
   const [startPoint, setStartPoint] = useState({ x: 0, y: 0 });
   const [isShiftDown, setIsShiftDown] = useState(false);
 
@@ -173,18 +204,13 @@ export default function VisorMapeoPCB({
   const svgRef = useRef(null);
   const svgContainerRef = useRef(null);
 
-  // Sincronizar escala activa con props
-  useEffect(() => {
-    setActiveScale(escala);
-  }, [escala]);
-
-  // Mantener refs espejo siempre actualizadas
+  useEffect(() => { setActiveScale(escala); }, [escala]);
   useEffect(() => { zoomRef.current = zoom; }, [zoom]);
   useEffect(() => { posicionRef.current = posicion; }, [posicion]);
   useEffect(() => { placaSizeRef.current = placaSize; }, [placaSize]);
   useEffect(() => { esquemaSizeRef.current = esquemaSize; }, [esquemaSize]);
 
-  // Listener para tecla Shift / Ctrl y atajos (R = rotar, Escape = reset)
+  // Listener para tecla Shift / Ctrl y atajos
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Shift' || e.key === 'Control') {
@@ -213,7 +239,7 @@ export default function VisorMapeoPCB({
     };
   }, [selectedCompId]);
 
-  // --- Auto-persistencia de componentes e imágenes hacia el modelo ---
+  // Auto-persistencia de componentes e imágenes hacia el modelo
   const onCambiosRef = useRef(onCambios);
   useEffect(() => { onCambiosRef.current = onCambios; }, [onCambios]);
   useEffect(() => {
@@ -224,7 +250,7 @@ export default function VisorMapeoPCB({
     return () => clearTimeout(t);
   }, [componentes, imgPlacaUrl, imgEsquemaUrl]);
 
-  // --- Sonido Beep Sintetizado de Confirmación (Web Audio API) ---
+  // Sonido Beep Sintetizado de Confirmación (Web Audio API)
   const playBeep = useCallback(() => {
     try {
       const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -233,7 +259,7 @@ export default function VisorMapeoPCB({
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(880, ctx.currentTime); // La5
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
       gain.gain.setValueAtTime(0.12, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
       osc.connect(gain);
@@ -243,7 +269,7 @@ export default function VisorMapeoPCB({
     } catch (e) {}
   }, []);
 
-  // --- Ajustar imagen centrada y proporcionada a la vista (Fit to View) ---
+  // Fit to view
   const fitToView = useCallback(() => {
     const svg = svgRef.current;
     if (!svg) return;
@@ -261,7 +287,7 @@ export default function VisorMapeoPCB({
     setPosicion({ x: (cw - baseW * z) / 2, y: (ch - baseH * z) / 2 });
   }, [capaActiva]);
 
-  // Cargar dimensiones de la imagen de Placa
+  // Cargar dimensiones de imagen Placa
   useEffect(() => {
     if (!imgPlacaUrl) return;
     const img = new Image();
@@ -275,7 +301,7 @@ export default function VisorMapeoPCB({
     img.src = imgPlacaUrl;
   }, [imgPlacaUrl, fitToView, capaActiva]);
 
-  // Cargar dimensiones de la imagen de Esquemático
+  // Cargar dimensiones de imagen Esquemático
   useEffect(() => {
     if (!imgEsquemaUrl) return;
     const img = new Image();
@@ -289,7 +315,7 @@ export default function VisorMapeoPCB({
     img.src = imgEsquemaUrl;
   }, [imgEsquemaUrl, fitToView, capaActiva]);
 
-  // --- Zoom al Cursor con la Rueda del Mouse ---
+  // Zoom al cursor
   useEffect(() => {
     const handleWheel = (e) => {
       if (!e.target.closest('#svg-boardview')) return;
@@ -320,7 +346,6 @@ export default function VisorMapeoPCB({
     };
   }, []);
 
-  // Zoom desde el centro
   const zoomCentro = (factor) => {
     const svg = svgRef.current;
     if (!svg) return;
@@ -335,7 +360,7 @@ export default function VisorMapeoPCB({
     setPosicion({ x: mouseX - pX * newZoom, y: mouseY - pY * newZoom });
   };
 
-  // --- Subida y enlace de imágenes (Placa / Esquema) ---
+  // Subida de imágenes
   const manejarArchivoImagenPlaca = (e) => {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
@@ -377,7 +402,6 @@ export default function VisorMapeoPCB({
     }
   };
 
-  // Convertir coordenadas del cliente a coordenadas SVG del lienzo
   const getCanvasCoords = (e) => {
     const svg = svgRef.current;
     if (!svg) return { x: 0, y: 0 };
@@ -390,7 +414,7 @@ export default function VisorMapeoPCB({
     return { x, y };
   };
 
-  // --- Invertir Pines (Pin 1 ↔ Pin 2) del Componente ---
+  // Invertir Pines (1 ↔ 2)
   const invertirPinesComponente = (compId) => {
     setComponentes(prev => prev.map(comp => {
       if (comp.id !== compId) return comp;
@@ -433,7 +457,7 @@ export default function VisorMapeoPCB({
     }));
   };
 
-  // --- Rotación de Componente (90°) ---
+  // Rotar Componente (90°)
   const rotarComponente = (id) => {
     setComponentes(prev => prev.map(comp => {
       if (comp.id !== id) return comp;
@@ -455,7 +479,7 @@ export default function VisorMapeoPCB({
     }));
   };
 
-  // --- Centrar Cámara en Componente Buscado ---
+  // Centrar en Componente
   const centrarEnComponente = (comp) => {
     setSelectedCompId(comp.id);
     setSelectedPadId('1');
@@ -475,12 +499,28 @@ export default function VisorMapeoPCB({
     });
   };
 
-  // --- Manejo de Eventos del Mouse ---
+  // Manejo de Net Names dinámicos
+  const agregarNetNamePersonalizado = (nuevo) => {
+    if (!nuevo || !nuevo.trim()) return;
+    const limpio = nuevo.trim().toUpperCase().replace(/\s+/g, '_');
+    if (!netNamesCustom.includes(limpio)) {
+      setNetNamesCustom(prev => [...prev, limpio]);
+    }
+    actualizarPropiedadPad(selectedPadId, 'netName', limpio);
+    setNuevoNetInput('');
+  };
+
+  const eliminarNetNamePersonalizado = (nombreABorrar) => {
+    if (window.confirm(`¿Eliminar "${nombreABorrar}" de la lista sugerida de Net Names?`)) {
+      setNetNamesCustom(prev => prev.filter(n => n !== nombreABorrar));
+    }
+  };
+
+  // Eventos del Mouse
   const handleMouseDown = (e) => {
     if (e.target.closest('.interactive-handle')) return;
     const coords = getCanvasCoords(e);
 
-    // Paneo
     if (tool === 'pan' || e.button === 1 || e.button === 2) {
       e.preventDefault();
       setIsPanning(true);
@@ -488,7 +528,6 @@ export default function VisorMapeoPCB({
       return;
     }
 
-    // Dibujo SMD
     if (tool === 'drawSMD') {
       e.preventDefault();
       if (drawingStep === 0) {
@@ -637,7 +676,7 @@ export default function VisorMapeoPCB({
     }
   };
 
-  // --- Confirmación de Componente SMD ---
+  // Creación de Componente SMD
   const confirmComponentCreation = () => {
     if (!pad1Temp || !pad2Temp) return;
 
@@ -711,14 +750,12 @@ export default function VisorMapeoPCB({
     setTool('select');
   };
 
-  // --- Lógica del Multímetro y Resaltado de Net Name ---
   const compActivo = componentes.find(c => c.id === selectedCompId);
   const padActivo = compActivo?.pads.find(p => p.id === selectedPadId);
 
-  // Net Name activo para iluminar todas las pistas conectadas (Estilo ZXW)
   const activeNetName = (padActivo && padActivo.netName && padActivo.netName !== 'NC') ? padActivo.netName : null;
 
-  // Evaluar color de un pad
+  // Evaluar color de pad
   const obtenerColorDePad = (pad, compId) => {
     if (selectedCompId === compId && selectedPadId === pad.id) {
       return '#00ffff';
@@ -771,7 +808,7 @@ export default function VisorMapeoPCB({
     return '#f97316';
   };
 
-  // Guardar medición en pad activo y auto-avanzar ("Pin Mágico" que omite GND)
+  // Guardar medición en pad activo
   const grabarMedicionActual = useCallback((valorEntrada) => {
     if (!selectedCompId || !selectedPadId) return;
 
@@ -795,7 +832,7 @@ export default function VisorMapeoPCB({
     avanzarSiguientePadMedicion();
   }, [selectedCompId, selectedPadId, activeScale, playBeep]);
 
-  // --- Auto-avance Inteligente en Orden de Creación (Omitiendo GND) ---
+  // Auto-avance inteligente en orden de creación omitiendo GND
   const avanzarSiguientePadMedicion = useCallback(() => {
     if (!selectedCompId || componentes.length === 0) return;
     const indexComp = componentes.findIndex(c => c.id === selectedCompId);
@@ -805,13 +842,11 @@ export default function VisorMapeoPCB({
     const pad1 = compActual.pads.find(p => p.id === '1');
     const pad2 = compActual.pads.find(p => p.id === '2');
 
-    // Si estamos en Pin 1 y Pin 2 NO es GND, pasar a Pin 2 de este mismo componente
     if (selectedPadId === '1' && pad2 && pad2.tipo !== 'GND') {
       setSelectedPadId('2');
       return;
     }
 
-    // Si estamos en Pin 2 (o Pin 2 es GND), avanzar secuencialmente al siguiente componente
     for (let i = 1; i <= componentes.length; i++) {
       const nextIndex = (indexComp + i) % componentes.length;
       const nextComp = componentes[nextIndex];
@@ -830,7 +865,7 @@ export default function VisorMapeoPCB({
     }
   }, [selectedCompId, selectedPadId, componentes]);
 
-  // --- Detección y Disparo Automático de AutoHold ---
+  // AutoHold
   useEffect(() => {
     if (!autoHoldActivo || !lecturaEnVivo || lecturaEnVivo === '----' || lecturaEnVivo === 'OL') {
       autoHoldValueRef.current = null;
@@ -877,7 +912,6 @@ export default function VisorMapeoPCB({
     }
   }, [lecturaEnVivo, autoHoldActivo, activeScale, grabarMedicionActual]);
 
-  // Iniciar Flujo de Medición Guiada desde el primer componente
   const iniciarMedicionGuiada = () => {
     if (componentes.length === 0) return;
     for (let i = 0; i < componentes.length; i++) {
@@ -900,7 +934,6 @@ export default function VisorMapeoPCB({
     }
   };
 
-  // Actualizar propiedad del pad
   const actualizarPropiedadPad = (padId, prop, valor) => {
     setComponentes(prev => prev.map(comp => {
       if (comp.id !== selectedCompId) return comp;
@@ -929,7 +962,6 @@ export default function VisorMapeoPCB({
     }));
   };
 
-  // Eliminación de componente
   const borrarComponente = (id) => {
     if (window.confirm('¿Seguro que deseas eliminar este componente SMD del Boardview?')) {
       setComponentes(prev => prev.filter(c => c.id !== id));
@@ -940,7 +972,6 @@ export default function VisorMapeoPCB({
     }
   };
 
-  // Resultados de Búsqueda
   const resultadosBusqueda = useMemo(() => {
     if (!busqueda.trim()) return [];
     const q = busqueda.trim().toLowerCase();
@@ -951,7 +982,6 @@ export default function VisorMapeoPCB({
     ).slice(0, 8);
   }, [componentes, busqueda]);
 
-  // Renderizado Inteligente de Textos
   const renderTextosInteligentes = (comp) => {
     const pad1 = comp.pads.find(p => p.id === '1');
     const pad2 = comp.pads.find(p => p.id === '2');
@@ -1028,7 +1058,6 @@ export default function VisorMapeoPCB({
             </button>
           </div>
 
-          {/* Selector de Tipo a Dibujar */}
           {tool === 'drawSMD' && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', animation: 'fadeIn 0.3s' }}>
               <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Tipo:</span>
@@ -1155,7 +1184,6 @@ export default function VisorMapeoPCB({
       <div style={styles.layerBar}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
           
-          {/* Selector de Capa Activa */}
           <div style={{ display: 'flex', background: '#111827', padding: '2px', borderRadius: '6px', border: '1px solid #374151' }}>
             <button 
               onClick={() => setCapaActiva('placa')} 
@@ -1171,7 +1199,6 @@ export default function VisorMapeoPCB({
             </button>
           </div>
 
-          {/* Configuración de la Capa de Placa */}
           {capaActiva === 'placa' && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               <label style={styles.checkboxLabel}>
@@ -1218,7 +1245,6 @@ export default function VisorMapeoPCB({
             </div>
           )}
 
-          {/* Configuración de la Capa de Esquemático */}
           {capaActiva === 'esquema' && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               <label style={styles.checkboxLabel}>
@@ -1404,7 +1430,6 @@ export default function VisorMapeoPCB({
               <pattern id="gridPattern" width="30" height="30" patternUnits="userSpaceOnUse">
                 <path d="M 30 0 L 0 0 0 30" fill="none" stroke="#1f2937" strokeWidth="0.5" />
               </pattern>
-              {/* Animación de pulso para el pad activo a medir */}
               <style>{`
                 @keyframes pulseGlow {
                   0% { stroke-opacity: 1; stroke-width: 2.5px; }
@@ -1418,7 +1443,6 @@ export default function VisorMapeoPCB({
             </defs>
             <rect width="100%" height="100%" fill="url(#gridPattern)" />
 
-            {/* Grupo Transformado con Zoom y Paneo */}
             <g transform={`translate(${posicion.x}, ${posicion.y}) scale(${zoom})`}>
               
               {/* CAPA 1: IMAGEN DE PLACA */}
@@ -1494,7 +1518,6 @@ export default function VisorMapeoPCB({
                       }
                     }}
                   >
-                    {/* Hitbox Exterior Blanco / Cyan */}
                     {showHitbox && (
                       <rect
                         x={comp.x}
@@ -1510,7 +1533,6 @@ export default function VisorMapeoPCB({
                       />
                     )}
 
-                    {/* Pads Internos del Componente */}
                     {comp.pads.map((pad) => {
                       const padX = comp.x + pad.x_rel;
                       const padY = comp.y + pad.y_rel;
@@ -1519,7 +1541,6 @@ export default function VisorMapeoPCB({
 
                       return (
                         <g key={pad.id}>
-                          {/* Anillo de resalte de Net compartida (ZXW Style) */}
                           {isNetMatch && !isPadSelected && (
                             <rect
                               x={padX - 2}
@@ -1537,7 +1558,6 @@ export default function VisorMapeoPCB({
                             />
                           )}
 
-                          {/* Anillo de enfoque de pad activo en medición */}
                           {isPadSelected && (
                             <rect
                               className="active-measuring-pad"
@@ -1591,10 +1611,8 @@ export default function VisorMapeoPCB({
                       );
                     })}
 
-                    {/* Textos Inteligentes */}
                     {renderTextosInteligentes(comp)}
 
-                    {/* NODO DE EXTENSIÓN PARA MATRIZ */}
                     {isSelected && matrizActiva && (
                       <circle
                         className="interactive-handle"
@@ -1658,7 +1676,7 @@ export default function VisorMapeoPCB({
                 </g>
               ))}
 
-              {/* DIBUJO TEMPORAL (Pad 1 + Pad 2 con Bloqueo de Eje y Guía Visual) */}
+              {/* DIBUJO TEMPORAL */}
               {tool === 'drawSMD' && (
                 <g style={{ pointerEvents: 'none' }}>
                   {pad1Temp && (
@@ -1675,7 +1693,6 @@ export default function VisorMapeoPCB({
                     />
                   )}
 
-                  {/* Línea Guía de Alineación Recta entre Pad 1 y Pad 2 */}
                   {pad1Temp && pad2Temp && (
                     <line
                       x1={pad1Temp.x + pad1Temp.w / 2}
@@ -1722,7 +1739,7 @@ export default function VisorMapeoPCB({
             </g>
           </svg>
 
-          {/* TOOLTIP EN HOVER DE PADS */}
+          {/* TOOLTIP EN HOVER */}
           {hoveredComp && (
             <div 
               style={{ 
@@ -1749,7 +1766,7 @@ export default function VisorMapeoPCB({
             </div>
           )}
 
-          {/* Banner de Indicaciones de Dibujo con Bloqueo Shift */}
+          {/* Banner Dibujo */}
           {tool === 'drawSMD' && (
             <div style={styles.drawingBanner}>
               {drawingStep === 0 && '⚡ PASO 1: Mantén presionado y arrastra para dibujar el PAD 1'}
@@ -1766,7 +1783,7 @@ export default function VisorMapeoPCB({
           )}
         </div>
 
-        {/* SIDEBAR DERECHO: DETALLES, EDICIÓN, INVERSIÓN Y ROTACIÓN */}
+        {/* SIDEBAR DERECHO: DETALLES, EDICIÓN, TIPO DE LÍNEA Y NET NAMES */}
         <div style={styles.sidebar}>
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #374151', paddingBottom: '6px', marginBottom: '10px' }}>
@@ -1851,33 +1868,135 @@ export default function VisorMapeoPCB({
                     </div>
                   </div>
 
-                  {/* Net Name */}
+                  {/* Selector Avanzado de Tipo de Línea */}
                   <div style={styles.formGroup}>
-                    <label style={styles.label}>Net Name (Línea)</label>
-                    <input 
-                      type="text" 
-                      list="netname-sugerencias-main"
-                      value={padActivo.netName} 
-                      onChange={(e) => actualizarPropiedadPad(padActivo.id, 'netName', e.target.value)}
-                      style={styles.inputDark}
+                    <label style={styles.label}>Tipo de Línea (Categoría)</label>
+                    <SelectorTipoLinea
+                      valor={padActivo.tipo || 'DATA'}
+                      onChange={(val) => {
+                        actualizarPropiedadPad(padActivo.id, 'tipo', val);
+                      }}
+                      tiposCustom={tiposCustom}
+                      onAgregarTipo={() => {
+                        const nuevo = window.prompt('Ingrese el nombre del nuevo tipo de línea (Ej: I2C, RFFE):', '');
+                        if (nuevo && nuevo.trim()) {
+                          const limpio = nuevo.trim().toUpperCase().replace(/\s+/g, '_');
+                          if (setTiposCustom && !tiposCustom.includes(limpio)) {
+                            setTiposCustom([...tiposCustom, limpio]);
+                          }
+                          actualizarPropiedadPad(padActivo.id, 'tipo', limpio);
+                        }
+                      }}
+                      onEliminarTipo={(tipoABorrar) => {
+                        if (setTiposCustom) {
+                          setTiposCustom(tiposCustom.filter(t => t !== tipoABorrar));
+                        }
+                      }}
                     />
-                    <datalist id="netname-sugerencias-main">
-                      {NET_NAMES_SUGERIDOS.map(n => <option key={n} value={n} />)}
-                    </datalist>
                   </div>
 
-                  {/* Tipo de Pin */}
+                  {/* Net Name (Línea Específica) + Gestor de Nombres */}
                   <div style={styles.formGroup}>
-                    <label style={styles.label}>Tipo de Línea</label>
-                    <select
-                      value={padActivo.tipo}
-                      onChange={(e) => actualizarPropiedadPad(padActivo.id, 'tipo', e.target.value)}
-                      style={styles.selectDark}
-                    >
-                      {TIPOS_LINEA.map(t => (
-                        <option key={t} value={t}>{t}</option>
-                      ))}
-                    </select>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <label style={styles.label}>Net Name (Nombre de Pista / Señal)</label>
+                      <button 
+                        type="button" 
+                        onClick={() => setMostrarGestorNets(!mostrarGestorNets)}
+                        style={{ background: 'none', border: 'none', color: '#60a5fa', fontSize: '0.65rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}
+                      >
+                        <Tag size={11} /> {mostrarGestorNets ? 'Cerrar Gestor' : 'Gestionar Nets'}
+                      </button>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      <input 
+                        type="text" 
+                        list="netname-sugerencias-main"
+                        value={padActivo.netName} 
+                        onChange={(e) => actualizarPropiedadPad(padActivo.id, 'netName', e.target.value)}
+                        placeholder="Ej: PP_VDD_MAIN"
+                        style={{ ...styles.inputDark, flex: 1, color: '#00ffff', fontWeight: 'bold' }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => agregarNetNamePersonalizado(padActivo.netName)}
+                        style={{ ...styles.btn, backgroundColor: '#374151', color: '#00ffff', padding: '4px 8px', fontSize: '0.7rem' }}
+                        title="Guardar este nombre en la lista de sugerencias de Net Names"
+                      >
+                        + Guardar Net
+                      </button>
+                    </div>
+
+                    <datalist id="netname-sugerencias-main">
+                      {netNamesCustom.map(n => <option key={n} value={n} />)}
+                    </datalist>
+
+                    {/* Popover / Desplegable del Gestor de Net Names */}
+                    {mostrarGestorNets && (
+                      <div style={styles.gestorNetsCard}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                          <span style={{ fontSize: '0.7rem', fontWeight: 'bold', color: '#60a5fa' }}>Lista de Net Names Sugeridos</span>
+                          <span style={{ fontSize: '0.65rem', color: '#9ca3af' }}>{netNamesCustom.length} nombres</span>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '4px', marginBottom: '8px' }}>
+                          <input 
+                            type="text" 
+                            placeholder="Nuevo Net Name..." 
+                            value={nuevoNetInput}
+                            onChange={(e) => setNuevoNetInput(e.target.value)}
+                            style={{ ...styles.inputDark, fontSize: '0.7rem', padding: '3px 6px' }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                agregarNetNamePersonalizado(nuevoNetInput);
+                              }
+                            }}
+                          />
+                          <button 
+                            type="button" 
+                            onClick={() => agregarNetNamePersonalizado(nuevoNetInput)}
+                            style={{ ...styles.btn, backgroundColor: '#0284c7', color: 'white', padding: '3px 8px', fontSize: '0.65rem' }}
+                          >
+                            + Añadir
+                          </button>
+                        </div>
+
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', maxHeight: '110px', overflowY: 'auto' }}>
+                          {netNamesCustom.map((net) => (
+                            <div 
+                              key={net} 
+                              style={{ 
+                                display: 'inline-flex', 
+                                alignItems: 'center', 
+                                gap: '4px', 
+                                background: padActivo.netName === net ? 'rgba(0,255,255,0.2)' : '#111827', 
+                                border: padActivo.netName === net ? '1px solid #00ffff' : '1px solid #374151',
+                                borderRadius: '4px', 
+                                padding: '2px 6px',
+                                fontSize: '0.65rem',
+                                color: '#e5e7eb'
+                              }}
+                            >
+                              <span 
+                                onClick={() => actualizarPropiedadPad(padActivo.id, 'netName', net)} 
+                                style={{ cursor: 'pointer', fontWeight: 'bold' }}
+                                title="Asignar este Net Name al pad actual"
+                              >
+                                {net}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => eliminarNetNamePersonalizado(net)}
+                                style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', padding: 0, fontSize: '0.65rem', fontWeight: 'bold' }}
+                                title="Eliminar este Net Name de la lista"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div style={styles.divider} />
@@ -2427,6 +2546,14 @@ const styles = {
     rowGap: '3px',
     fontSize: '0.75rem',
     color: '#9ca3af'
+  },
+  gestorNetsCard: {
+    backgroundColor: '#0f172a',
+    border: '1px solid #334155',
+    borderRadius: '6px',
+    padding: '8px',
+    marginTop: '4px',
+    animation: 'fadeIn 0.2s'
   },
   compListContainer: {
     display: 'flex',

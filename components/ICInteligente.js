@@ -503,6 +503,7 @@ export default function ICInteligente({
                   }}
                   tiposCustom={tiposCustom}
                   onAgregarTipo={manejarAgregarTipo}
+                  onEliminarTipo={(tipo) => setTiposCustom && setTiposCustom(tiposCustom.filter(t => t !== tipo))}
                 />
 
                 <button
