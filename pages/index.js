@@ -2309,7 +2309,9 @@ export default function AppDiagnostico() {
                   }));
                 }}
                 lecturaEnVivo={lecturaUsb.valor}
+                unidadLectura={lecturaUsb.unidad}
                 escala={escalaIc}
+                onCambiarEscala={(nuevaEscala) => setEscalaIc(nuevaEscala)}
                 tiposCustom={tiposCustom}
                 setTiposCustom={setTiposCustom}
                 onGuardar={(nuevosComp, nuevaPlaca, nuevoEsquema) => {

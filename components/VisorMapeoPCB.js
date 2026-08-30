@@ -3,7 +3,7 @@ import {
   Save, Trash2, Plus, Move, ZoomIn, ZoomOut, Layers, Maximize2, 
   Settings, Edit, Play, HelpCircle, Activity, Check, AlertTriangle, 
   Map, Eye, EyeOff, Clipboard, RefreshCw, ChevronRight, CheckCircle2,
-  Image as ImageIcon, Upload, RotateCcw, X, Link, Search, RotateCw, Lock, Zap, ArrowLeftRight, Tag
+  Image as ImageIcon, Upload, RotateCcw, X, Link, Search, RotateCw, Lock, Zap, ArrowLeftRight, Tag, Gauge
 } from 'lucide-react';
 import SelectorTipoLinea from './SelectorTipoLinea';
 
@@ -15,6 +15,13 @@ const TIPO_ABREVIATURAS = {
   Diodo: 'D',
   Bobina: 'L'
 };
+
+const ESCALAS_CONFIG = [
+  { id: 'diodo', label: '⚡ Diodo', unidad: 'V', color: '#3b82f6', border: '#60a5fa' },
+  { id: 'voltio', label: '🔌 Voltios', unidad: 'V', color: '#ef4444', border: '#f87171' },
+  { id: 'ua', label: '🔋 uA', unidad: 'uA', color: '#10b981', border: '#34d399' },
+  { id: 'ohmio', label: '🟣 Ohmios', unidad: 'Ω', color: '#a855f7', border: '#c084fc' }
+];
 
 // Sugerencias iniciales comunes de Net Names
 const NET_NAMES_BASE = [
@@ -71,7 +78,9 @@ const COMPONENTES_DEFECTO = [
 
 export default function VisorMapeoPCB({
   lecturaEnVivo = '----',
+  unidadLectura = '---',
   escala = 'diodo', // 'diodo' | 'voltio' | 'ua' | 'ohmio'
+  onCambiarEscala = null,            // callback cuando el usuario cambia la escala en el visor
   onGuardar,
   cambiosPendientes = false,
   guardando = false,
@@ -134,6 +143,11 @@ export default function VisorMapeoPCB({
   const autoHoldValueRef = useRef(null);
   const autoHoldStartTimeRef = useRef(0);
   const autoHoldTriggeredRef = useRef(false);
+
+  // Sincronizar escala si cambia externamente
+  useEffect(() => {
+    setActiveScale(escala);
+  }, [escala]);
 
   // Sincronizar props cuando cambia el modelo activo
   useEffect(() => {
@@ -204,7 +218,6 @@ export default function VisorMapeoPCB({
   const svgRef = useRef(null);
   const svgContainerRef = useRef(null);
 
-  useEffect(() => { setActiveScale(escala); }, [escala]);
   useEffect(() => { zoomRef.current = zoom; }, [zoom]);
   useEffect(() => { posicionRef.current = posicion; }, [posicion]);
   useEffect(() => { placaSizeRef.current = placaSize; }, [placaSize]);
@@ -516,6 +529,39 @@ export default function VisorMapeoPCB({
     }
   };
 
+  // Detección de coincidencia del Dial físico del Multímetro con la Escala Activa
+  const dialMismatch = useMemo(() => {
+    if (!unidadLectura || unidadLectura === '---') return null;
+    const u = unidadLectura.trim();
+    if (activeScale === 'diodo') {
+      if (u !== 'Diod' && u !== 'V') return `Dial en ${u}`;
+    } else if (activeScale === 'voltio') {
+      if (u !== 'V' && u !== 'mV') return `Dial en ${u}`;
+    } else if (activeScale === 'ua') {
+      if (u !== 'uA' && u !== 'mA' && u !== 'A') return `Dial en ${u}`;
+    } else if (activeScale === 'ohmio') {
+      if (u !== 'Ω' && u !== 'kΩ' && u !== 'MΩ' && u !== 'Ohm') return `Dial en ${u}`;
+    }
+    return null;
+  }, [activeScale, unidadLectura]);
+
+  // Escala sugerida si el dial cambió
+  const escalaDetectadaDial = useMemo(() => {
+    if (!unidadLectura || unidadLectura === '---') return null;
+    const u = unidadLectura.trim();
+    if (u === 'Ω' || u === 'kΩ' || u === 'MΩ' || u === 'Ohm') return 'ohmio';
+    if (u === 'uA' || u === 'mA' || u === 'A') return 'ua';
+    if (u === 'Diod') return 'diodo';
+    if (u === 'V' && activeScale === 'ohmio') return 'diodo';
+    return null;
+  }, [unidadLectura, activeScale]);
+
+  // Cambiar escala activa
+  const seleccionarEscala = (nuevaEscala) => {
+    setActiveScale(nuevaEscala);
+    if (onCambiarEscala) onCambiarEscala(nuevaEscala);
+  };
+
   // Eventos del Mouse
   const handleMouseDown = (e) => {
     if (e.target.closest('.interactive-handle')) return;
@@ -808,7 +854,7 @@ export default function VisorMapeoPCB({
     return '#f97316';
   };
 
-  // Guardar medición en pad activo
+  // Guardar medición en pad activo en la columna de la escala seleccionada
   const grabarMedicionActual = useCallback((valorEntrada) => {
     if (!selectedCompId || !selectedPadId) return;
 
@@ -1024,7 +1070,7 @@ export default function VisorMapeoPCB({
 
   return (
     <div style={{ ...styles.container, ...(fullscreen ? { borderRadius: 0, border: 'none' } : {}) }}>
-      {/* 1. BARRA SUPERIOR DE HERRAMIENTAS Y BÚSQUEDA */}
+      {/* 1. BARRA SUPERIOR: HERRAMIENTAS, ESCALAS, AUTOHOLD Y BÚSQUEDA */}
       <div style={styles.header}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
           <span style={{ fontSize: '0.95rem', fontWeight: 'bold', color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -1072,6 +1118,42 @@ export default function VisorMapeoPCB({
               </select>
             </div>
           )}
+
+          <div style={styles.divider} />
+
+          {/* Selector de Escalas de Medición (Diodo, Voltios, uA, Ohmios) */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#111827', padding: '3px 4px', borderRadius: '8px', border: '1px solid #374151' }}>
+            <span style={{ fontSize: '0.68rem', color: '#9ca3af', fontWeight: 'bold', marginLeft: '4px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+              <Gauge size={13} /> Escala:
+            </span>
+            {ESCALAS_CONFIG.map(esc => {
+              const isSelected = activeScale === esc.id;
+              return (
+                <button
+                  key={esc.id}
+                  onClick={() => seleccionarEscala(esc.id)}
+                  style={{
+                    padding: '4px 9px',
+                    borderRadius: '5px',
+                    border: isSelected ? `1.5px solid ${esc.border}` : '1px solid transparent',
+                    background: isSelected ? esc.color : 'transparent',
+                    color: isSelected ? '#ffffff' : '#9ca3af',
+                    fontWeight: 'bold',
+                    fontSize: '0.72rem',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s',
+                    boxShadow: isSelected ? `0 0 8px ${esc.color}66` : 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '3px'
+                  }}
+                  title={`Gira el dial del multímetro a ${esc.label} y haz clic aquí`}
+                >
+                  {esc.label}
+                </button>
+              );
+            })}
+          </div>
 
           <div style={styles.divider} />
 
@@ -1378,16 +1460,19 @@ export default function VisorMapeoPCB({
           onMouseLeave={() => { setIsPanning(false); setIsDraggingComp(false); setHoveredComp(null); }}
           onContextMenu={(e) => e.preventDefault()}
         >
-          {/* HUD de Medición del Multímetro */}
+          {/* HUD de Medición del Multímetro con Verificación de Coincidencia de Dial */}
           <div style={styles.hudContainer}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ fontSize: '0.65rem', color: '#6b7280', fontWeight: 'bold', textTransform: 'uppercase' }}>
-                Multímetro USB ({activeScale})
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
+              <div style={{ fontSize: '0.65rem', color: '#9ca3af', fontWeight: 'bold', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: ESCALAS_CONFIG.find(e => e.id === activeScale)?.color || '#3b82f6' }} />
+                Escala: {activeScale.toUpperCase()}
               </div>
               <span style={{ fontSize: '0.65rem', fontWeight: 'bold', color: autoHoldActivo ? '#10b981' : '#6b7280' }}>
-                {autoHoldActivo ? '● AUTO-HOLD ON' : '○ HOLD OFF'}
+                {autoHoldActivo ? '● AUTO-HOLD' : '○ HOLD OFF'}
               </span>
             </div>
+
+            {/* Lectura en vivo principal */}
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginTop: '2px' }}>
               <span 
                 style={{ 
@@ -1401,10 +1486,28 @@ export default function VisorMapeoPCB({
               >
                 {lecturaEnVivo}
               </span>
-              <span style={{ fontSize: '0.9rem', color: '#4b5563', fontWeight: 'bold' }}>
-                {activeScale === 'diodo' || activeScale === 'voltio' ? 'V' : (activeScale === 'ua' ? 'uA' : 'Ω')}
+              <span style={{ fontSize: '0.9rem', color: '#9ca3af', fontWeight: 'bold' }}>
+                {unidadLectura !== '---' ? unidadLectura : (activeScale === 'diodo' || activeScale === 'voltio' ? 'V' : (activeScale === 'ua' ? 'uA' : 'Ω'))}
               </span>
             </div>
+
+            {/* Alerta de Desajuste de Dial vs Escala */}
+            {dialMismatch && (
+              <div style={styles.dialMismatchAlert}>
+                <AlertTriangle size={11} color="#f59e0b" />
+                <span>{dialMismatch}</span>
+                {escalaDetectadaDial && (
+                  <button
+                    onClick={() => seleccionarEscala(escalaDetectadaDial)}
+                    style={styles.syncDialBtn}
+                    title="Sincronizar escala del visor con el dial del multímetro"
+                  >
+                    Sincronizar
+                  </button>
+                )}
+              </div>
+            )}
+
             {padActivo && (
               <div style={{ fontSize: '0.7rem', color: '#aaa', marginTop: '4px' }}>
                 Pad: <strong style={{ color: '#00ffff' }}>{compActivo?.nombre} / Pin {padActivo.id}</strong> ({padActivo.netName})
@@ -1757,10 +1860,17 @@ export default function VisorMapeoPCB({
                 <div><strong>Footprint:</strong> {hoveredComp.pad.w}x{hoveredComp.pad.h} px</div>
                 <div style={{ marginTop: '4px', borderTop: '1px dashed #374151', paddingTop: '4px', color: '#9ca3af' }}>Valores Referencia:</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px' }}>
-                  <span>Diodo:</span> <strong style={{ color: '#10b981' }}>{hoveredComp.pad.valorSanoDiodo} V</strong>
-                  <span>Voltio:</span> <strong style={{ color: '#3b82f6' }}>{hoveredComp.pad.valorSanoVoltio} V</strong>
-                  <span>Consumo:</span> <strong style={{ color: '#eab308' }}>{hoveredComp.pad.valorSanoUa} uA</strong>
-                  <span>Resist:</span> <strong style={{ color: '#a855f7' }}>{hoveredComp.pad.valorSanoOhmio} Ω</strong>
+                  <span style={{ color: activeScale === 'diodo' ? '#60a5fa' : '#9ca3af', fontWeight: activeScale === 'diodo' ? 'bold' : 'normal' }}>Diodo:</span> 
+                  <strong style={{ color: '#10b981' }}>{hoveredComp.pad.valorSanoDiodo} V</strong>
+
+                  <span style={{ color: activeScale === 'voltio' ? '#f87171' : '#9ca3af', fontWeight: activeScale === 'voltio' ? 'bold' : 'normal' }}>Voltio:</span> 
+                  <strong style={{ color: '#3b82f6' }}>{hoveredComp.pad.valorSanoVoltio} V</strong>
+
+                  <span style={{ color: activeScale === 'ua' ? '#34d399' : '#9ca3af', fontWeight: activeScale === 'ua' ? 'bold' : 'normal' }}>Consumo:</span> 
+                  <strong style={{ color: '#eab308' }}>{hoveredComp.pad.valorSanoUa} uA</strong>
+
+                  <span style={{ color: activeScale === 'ohmio' ? '#c084fc' : '#9ca3af', fontWeight: activeScale === 'ohmio' ? 'bold' : 'normal' }}>Resist:</span> 
+                  <strong style={{ color: '#a855f7' }}>{hoveredComp.pad.valorSanoOhmio} Ω</strong>
                 </div>
               </div>
             </div>
@@ -2004,8 +2114,8 @@ export default function VisorMapeoPCB({
                   {/* Medición en vivo HUD Panel */}
                   <div style={styles.liveRecordBox}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                      <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#60a5fa' }}>
-                        Captura del Multímetro
+                      <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: ESCALAS_CONFIG.find(e => e.id === activeScale)?.border || '#60a5fa' }}>
+                        Captura ({activeScale.toUpperCase()})
                       </span>
                       <button 
                         onClick={() => setAutoHoldActivo(!autoHoldActivo)}
@@ -2028,10 +2138,10 @@ export default function VisorMapeoPCB({
                       <button 
                         onClick={() => grabarMedicionActual(lecturaEnVivo)} 
                         disabled={lecturaEnVivo === '----'}
-                        style={{ ...styles.btn, flex: 1, backgroundColor: '#3b82f6', color: 'white' }}
-                        title="Registrar valor de multímetro en vivo"
+                        style={{ ...styles.btn, flex: 1, backgroundColor: ESCALAS_CONFIG.find(e => e.id === activeScale)?.color || '#3b82f6', color: 'white' }}
+                        title={`Registrar valor en escala ${activeScale.toUpperCase()}`}
                       >
-                        Grabar: {lecturaEnVivo}
+                        Grabar {activeScale.toUpperCase()}: {lecturaEnVivo}
                       </button>
                       
                       <button 
@@ -2053,8 +2163,8 @@ export default function VisorMapeoPCB({
                     </div>
                     
                     <div style={styles.gridValoresSanos}>
-                      <div>
-                        <label style={styles.subLabel}>Diodo (V)</label>
+                      <div style={{ padding: '4px', borderRadius: '6px', background: activeScale === 'diodo' ? 'rgba(59, 130, 246, 0.15)' : 'transparent', border: activeScale === 'diodo' ? '1px solid #3b82f6' : '1px solid transparent' }}>
+                        <label style={{ ...styles.subLabel, color: activeScale === 'diodo' ? '#60a5fa' : '#6b7280' }}>⚡ Diodo (V)</label>
                         <input 
                           type="text" 
                           value={padActivo.valorSanoDiodo} 
@@ -2062,8 +2172,8 @@ export default function VisorMapeoPCB({
                           style={styles.smallInput} 
                         />
                       </div>
-                      <div>
-                        <label style={styles.subLabel}>Voltios (V)</label>
+                      <div style={{ padding: '4px', borderRadius: '6px', background: activeScale === 'voltio' ? 'rgba(239, 68, 68, 0.15)' : 'transparent', border: activeScale === 'voltio' ? '1px solid #ef4444' : '1px solid transparent' }}>
+                        <label style={{ ...styles.subLabel, color: activeScale === 'voltio' ? '#f87171' : '#6b7280' }}>🔌 Voltios (V)</label>
                         <input 
                           type="text" 
                           value={padActivo.valorSanoVoltio} 
@@ -2071,8 +2181,8 @@ export default function VisorMapeoPCB({
                           style={styles.smallInput} 
                         />
                       </div>
-                      <div>
-                        <label style={styles.subLabel}>Consumo (uA)</label>
+                      <div style={{ padding: '4px', borderRadius: '6px', background: activeScale === 'ua' ? 'rgba(16, 185, 129, 0.15)' : 'transparent', border: activeScale === 'ua' ? '1px solid #10b981' : '1px solid transparent' }}>
+                        <label style={{ ...styles.subLabel, color: activeScale === 'ua' ? '#34d399' : '#6b7280' }}>🔋 Consumo (uA)</label>
                         <input 
                           type="text" 
                           value={padActivo.valorSanoUa} 
@@ -2080,8 +2190,8 @@ export default function VisorMapeoPCB({
                           style={styles.smallInput} 
                         />
                       </div>
-                      <div>
-                        <label style={styles.subLabel}>Ohmios (Ω)</label>
+                      <div style={{ padding: '4px', borderRadius: '6px', background: activeScale === 'ohmio' ? 'rgba(168, 85, 247, 0.15)' : 'transparent', border: activeScale === 'ohmio' ? '1px solid #a855f7' : '1px solid transparent' }}>
+                        <label style={{ ...styles.subLabel, color: activeScale === 'ohmio' ? '#c084fc' : '#6b7280' }}>🟣 Ohmios (Ω)</label>
                         <input 
                           type="text" 
                           value={padActivo.valorSanoOhmio} 
@@ -2098,22 +2208,22 @@ export default function VisorMapeoPCB({
                       Mediciones Registradas
                     </div>
                     <div style={styles.gridRegistros}>
-                      <span>Diodo:</span> 
+                      <span style={{ color: activeScale === 'diodo' ? '#60a5fa' : '#9ca3af', fontWeight: activeScale === 'diodo' ? 'bold' : 'normal' }}>⚡ Diodo:</span> 
                       <strong style={{ color: obtenerColorDePad({ ...padActivo, valorActualDiodo: padActivo.valorActualDiodo }, compActivo.id) }}>
                         {padActivo.valorActualDiodo || '---'} V
                       </strong>
 
-                      <span>Voltio:</span> 
+                      <span style={{ color: activeScale === 'voltio' ? '#f87171' : '#9ca3af', fontWeight: activeScale === 'voltio' ? 'bold' : 'normal' }}>🔌 Voltio:</span> 
                       <strong style={{ color: obtenerColorDePad({ ...padActivo, valorActualVoltio: padActivo.valorActualVoltio }, compActivo.id) }}>
                         {padActivo.valorActualVoltio || '---'} V
                       </strong>
 
-                      <span>uA:</span> 
+                      <span style={{ color: activeScale === 'ua' ? '#34d399' : '#9ca3af', fontWeight: activeScale === 'ua' ? 'bold' : 'normal' }}>🔋 uA:</span> 
                       <strong style={{ color: obtenerColorDePad({ ...padActivo, valorActualUa: padActivo.valorActualUa }, compActivo.id) }}>
                         {padActivo.valorActualUa || '---'}
                       </strong>
 
-                      <span>Ohmio:</span> 
+                      <span style={{ color: activeScale === 'ohmio' ? '#c084fc' : '#9ca3af', fontWeight: activeScale === 'ohmio' ? 'bold' : 'normal' }}>🟣 Ohmio:</span> 
                       <strong style={{ color: obtenerColorDePad({ ...padActivo, valorActualOhmio: padActivo.valorActualOhmio }, compActivo.id) }}>
                         {padActivo.valorActualOhmio || '---'} Ω
                       </strong>
@@ -2407,8 +2517,32 @@ const styles = {
     border: '2px solid #374151',
     boxShadow: '0 10px 15px -3px rgba(0,0,0,0.5)',
     zIndex: 10,
-    minWidth: '190px',
+    minWidth: '200px',
     pointerEvents: 'none'
+  },
+  dialMismatchAlert: {
+    marginTop: '4px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px',
+    backgroundColor: 'rgba(245, 158, 11, 0.2)',
+    border: '1px solid #f59e0b',
+    borderRadius: '4px',
+    padding: '2px 6px',
+    fontSize: '0.65rem',
+    color: '#fef08a',
+    pointerEvents: 'auto'
+  },
+  syncDialBtn: {
+    marginLeft: 'auto',
+    background: '#f59e0b',
+    color: '#000',
+    border: 'none',
+    borderRadius: '3px',
+    padding: '1px 5px',
+    fontSize: '0.6rem',
+    fontWeight: 'bold',
+    cursor: 'pointer'
   },
   drawingBanner: {
     position: 'absolute',
