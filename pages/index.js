@@ -2403,10 +2403,15 @@ export default function AppDiagnostico() {
         {modalBoardviewAbierto && modeloActivo && (
           <motion.div className="no-print" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#0a0b0f', zIndex: 2500, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <div style={{ padding: '10px 20px', borderBottom: '1px solid #374151', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#111827', flexShrink: 0, flexWrap: 'wrap', gap: '8px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <Map size={20} color="#00ffff" />
-                <span style={{ color: 'white', fontWeight: 'bold', fontSize: '1.1rem' }}>BOARDVIEW PRO</span>
-                <span style={{ fontSize: '0.7rem', padding: '3px 8px', borderRadius: '12px', background: '#1f2937', color: '#9ca3af', fontWeight: 'bold' }}>MAPEO SMD / CALCADO</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Map size={20} color="#00ffff" />
+                  <span style={{ color: 'white', fontWeight: 'bold', fontSize: '1.1rem' }}>BOARDVIEW PRO</span>
+                </div>
+                <span style={{ fontSize: '0.8rem', padding: '3px 10px', borderRadius: '8px', background: '#1f2937', color: '#00ffff', fontWeight: 'bold', border: '1px solid #374151' }}>
+                  {modeloActivo.marca?.toUpperCase()} • {modeloActivo.nombre?.toUpperCase()}
+                </span>
+                <span style={{ fontSize: '0.7rem', padding: '3px 8px', borderRadius: '12px', background: 'rgba(255,255,255,0.05)', color: '#9ca3af', fontWeight: 'bold' }}>MAPEO SMD / CALCADO</span>
               </div>
               <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
                 <span className="hide-on-mobile" style={{ fontSize: '0.7rem', color: '#6b7280' }}>
@@ -2418,6 +2423,7 @@ export default function AppDiagnostico() {
             <div style={{ flex: 1, overflow: 'hidden', padding: '10px' }}>
               <VisorMapeoPCB
                 fullscreen
+                nombreModelo={`${modeloActivo.marca || ''} ${modeloActivo.nombre || ''}`.trim()}
                 onCerrar={() => setModalBoardviewAbierto(false)}
                 componentesIniciales={modeloActivo.boardviewComponentes}
                 imagenPlacaInicial={modeloActivo.boardviewImagenPlaca || modeloActivo.imgPlaca}

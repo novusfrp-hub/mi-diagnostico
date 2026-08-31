@@ -92,20 +92,21 @@ export default function VisorMapeoPCB({
   fullscreen = false,                // modo pantalla completa
   onCerrar = null,                   // botón de cierre en modo fullscreen
   tiposCustom = [],                  // lista global de tipos de línea personalizados
-  setTiposCustom = null              // setter de tipos de línea personalizados
+  setTiposCustom = null,             // setter de tipos de línea personalizados
+  nombreModelo = ''                  // nombre del modelo activo (ej: Samsung Galaxy S22)
 }) {
   // --- Estados locales del Boardview ---
   const [componentes, setComponentes] = useState(() => {
-    if (Array.isArray(componentesIniciales) && componentesIniciales.length > 0) return componentesIniciales;
-    return COMPONENTES_DEFECTO;
+    if (Array.isArray(componentesIniciales)) return componentesIniciales;
+    return [];
   });
 
   const [activeScale, setActiveScale] = useState(escala);
   const [selectedCompId, setSelectedCompId] = useState(() => {
-    const base = Array.isArray(componentesIniciales) && componentesIniciales.length > 0 ? componentesIniciales : COMPONENTES_DEFECTO;
-    return base[0]?.id ?? null;
+    return Array.isArray(componentesIniciales) && componentesIniciales.length > 0 ? componentesIniciales[0]?.id : null;
   });
   const [selectedPadId, setSelectedPadId] = useState('1'); // '1' | '2'
+  const [mostrarTodasEscalas, setMostrarTodasEscalas] = useState(false);
 
   // --- Capas de Imágenes de Fondo (Placa + Esquemático) ---
   const [capaActiva, setCapaActiva] = useState('placa'); // 'placa' | 'esquema'
@@ -152,9 +153,12 @@ export default function VisorMapeoPCB({
   // Sincronizar props cuando cambia el modelo activo
   useEffect(() => {
     if (Array.isArray(componentesIniciales)) {
-      setComponentes(componentesIniciales.length > 0 ? componentesIniciales : COMPONENTES_DEFECTO);
+      setComponentes(componentesIniciales);
       setSelectedCompId(componentesIniciales[0]?.id || null);
       setSelectedPadId('1');
+    } else {
+      setComponentes([]);
+      setSelectedCompId(null);
     }
   }, [componentesIniciales]);
 
@@ -757,10 +761,10 @@ export default function VisorMapeoPCB({
           y_rel: pad1Temp.y - minY,
           w: pad1Temp.w,
           h: pad1Temp.h,
-          valorSanoDiodo: tipoDrawing === 'Bobina' ? '0.400' : '0.350',
-          valorSanoVoltio: '1.800',
-          valorSanoUa: tipoDrawing === 'Bobina' ? '100' : '180',
-          valorSanoOhmio: tipoDrawing === 'Bobina' ? '0.5' : (tipoDrawing === 'Resistencia' ? '1000' : '10000'),
+          valorSanoDiodo: '---',
+          valorSanoVoltio: '---',
+          valorSanoUa: '---',
+          valorSanoOhmio: '---',
           valorActualDiodo: '---',
           valorActualVoltio: '---',
           valorActualUa: '---',
@@ -774,10 +778,10 @@ export default function VisorMapeoPCB({
           y_rel: pad2Temp.y - minY,
           w: pad2Temp.w,
           h: pad2Temp.h,
-          valorSanoDiodo: isGndDefault ? '0.000' : (tipoDrawing === 'Bobina' ? '0.400' : '0.350'),
-          valorSanoVoltio: isGndDefault ? '0.000' : '1.800',
-          valorSanoUa: isGndDefault ? '0' : (tipoDrawing === 'Bobina' ? '100' : '180'),
-          valorSanoOhmio: isGndDefault ? '0' : (tipoDrawing === 'Bobina' ? '0.5' : (tipoDrawing === 'Resistencia' ? '1000' : '10000')),
+          valorSanoDiodo: isGndDefault ? '0.000' : '---',
+          valorSanoVoltio: isGndDefault ? '0.000' : '---',
+          valorSanoUa: isGndDefault ? '0' : '---',
+          valorSanoOhmio: isGndDefault ? '0' : '---',
           valorActualDiodo: isGndDefault ? '0.000' : '---',
           valorActualVoltio: isGndDefault ? '0.000' : '---',
           valorActualUa: isGndDefault ? '0' : '---',
@@ -1076,6 +1080,11 @@ export default function VisorMapeoPCB({
           <span style={{ fontSize: '0.95rem', fontWeight: 'bold', color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Map size={18} /> BOARDVIEW PRO
           </span>
+          {nombreModelo && (
+            <span style={{ fontSize: '0.75rem', padding: '3px 8px', borderRadius: '6px', background: '#111827', color: '#00ffff', fontWeight: 'bold', border: '1px solid #374151' }}>
+              {nombreModelo.toUpperCase()}
+            </span>
+          )}
 
           <div style={styles.divider} />
 
@@ -1521,6 +1530,32 @@ export default function VisorMapeoPCB({
             <button onClick={() => zoomCentro(1 / 1.25)} style={styles.zoomBtn} title="Alejar"><ZoomOut size={16} /></button>
             <button onClick={() => fitToView()} style={styles.zoomBtn} title="Ajustar imagen a la vista"><Maximize2 size={15} /></button>
           </div>
+
+          {/* Empty State Guidance Overlay */}
+          {componentes.length === 0 && (
+            <div style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              backgroundColor: 'rgba(17, 24, 39, 0.88)',
+              border: '1px dashed #374151',
+              borderRadius: '14px',
+              padding: '24px 32px',
+              textAlign: 'center',
+              pointerEvents: 'none',
+              maxWidth: '400px',
+              backdropFilter: 'blur(8px)',
+              boxShadow: '0 15px 35px rgba(0,0,0,0.6)',
+              zIndex: 10
+            }}>
+              <Map size={36} color="#00ffff" style={{ opacity: 0.85, margin: '0 auto 10px auto', display: 'block' }} />
+              <h4 style={{ color: 'white', margin: '0 0 6px 0', fontSize: '1rem', fontWeight: 'bold' }}>Placa lista para mapeo</h4>
+              <p style={{ color: '#9ca3af', fontSize: '0.8rem', margin: 0, lineHeight: 1.4 }}>
+                Usa el botón <strong style={{ color: '#00ffff' }}>+ Dibujar SMD</strong> en la barra superior para trazar y mapear tus componentes en la placa.
+              </p>
+            </div>
+          )}
 
           <svg
             id="svg-boardview"
@@ -2156,79 +2191,122 @@ export default function VisorMapeoPCB({
                     </div>
                   </div>
 
-                  {/* Edición de Valores Sanos */}
-                  <div style={{ marginTop: '6px' }}>
-                    <div style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#fff', marginBottom: '6px' }}>
-                      Valores de Referencia Sanos
-                    </div>
-                    
-                    <div style={styles.gridValoresSanos}>
-                      <div style={{ padding: '4px', borderRadius: '6px', background: activeScale === 'diodo' ? 'rgba(59, 130, 246, 0.15)' : 'transparent', border: activeScale === 'diodo' ? '1px solid #3b82f6' : '1px solid transparent' }}>
-                        <label style={{ ...styles.subLabel, color: activeScale === 'diodo' ? '#60a5fa' : '#6b7280' }}>⚡ Diodo (V)</label>
-                        <input 
-                          type="text" 
-                          value={padActivo.valorSanoDiodo} 
-                          onChange={(e) => actualizarPropiedadPad(padActivo.id, 'valorSanoDiodo', e.target.value)}
-                          style={styles.smallInput} 
-                        />
-                      </div>
-                      <div style={{ padding: '4px', borderRadius: '6px', background: activeScale === 'voltio' ? 'rgba(239, 68, 68, 0.15)' : 'transparent', border: activeScale === 'voltio' ? '1px solid #ef4444' : '1px solid transparent' }}>
-                        <label style={{ ...styles.subLabel, color: activeScale === 'voltio' ? '#f87171' : '#6b7280' }}>🔌 Voltios (V)</label>
-                        <input 
-                          type="text" 
-                          value={padActivo.valorSanoVoltio} 
-                          onChange={(e) => actualizarPropiedadPad(padActivo.id, 'valorSanoVoltio', e.target.value)}
-                          style={styles.smallInput} 
-                        />
-                      </div>
-                      <div style={{ padding: '4px', borderRadius: '6px', background: activeScale === 'ua' ? 'rgba(16, 185, 129, 0.15)' : 'transparent', border: activeScale === 'ua' ? '1px solid #10b981' : '1px solid transparent' }}>
-                        <label style={{ ...styles.subLabel, color: activeScale === 'ua' ? '#34d399' : '#6b7280' }}>🔋 Consumo (uA)</label>
-                        <input 
-                          type="text" 
-                          value={padActivo.valorSanoUa} 
-                          onChange={(e) => actualizarPropiedadPad(padActivo.id, 'valorSanoUa', e.target.value)}
-                          style={styles.smallInput} 
-                        />
-                      </div>
-                      <div style={{ padding: '4px', borderRadius: '6px', background: activeScale === 'ohmio' ? 'rgba(168, 85, 247, 0.15)' : 'transparent', border: activeScale === 'ohmio' ? '1px solid #a855f7' : '1px solid transparent' }}>
-                        <label style={{ ...styles.subLabel, color: activeScale === 'ohmio' ? '#c084fc' : '#6b7280' }}>🟣 Ohmios (Ω)</label>
-                        <input 
-                          type="text" 
-                          value={padActivo.valorSanoOhmio} 
-                          onChange={(e) => actualizarPropiedadPad(padActivo.id, 'valorSanoOhmio', e.target.value)}
-                          style={styles.smallInput} 
-                        />
-                      </div>
-                    </div>
-                  </div>
+                  {/* Panel de Valores: Enfocado en la Escala Activa */}
+                  {(() => {
+                    const cfgEscalaActiva = ESCALAS_CONFIG.find(e => e.id === activeScale) || ESCALAS_CONFIG[0];
+                    const getPropSano = (id) => id === 'diodo' ? 'valorSanoDiodo' : id === 'voltio' ? 'valorSanoVoltio' : id === 'ua' ? 'valorSanoUa' : 'valorSanoOhmio';
+                    const getPropActual = (id) => id === 'diodo' ? 'valorActualDiodo' : id === 'voltio' ? 'valorActualVoltio' : id === 'ua' ? 'valorActualUa' : 'valorActualOhmio';
+                    const propSanoActivo = getPropSano(activeScale);
+                    const propActualActivo = getPropActual(activeScale);
+                    const valActual = padActivo[propActualActivo];
+                    const valSano = padActivo[propSanoActivo];
 
-                  {/* Visualización de Mediciones Registradas */}
-                  <div style={styles.registrosContainer}>
-                    <div style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#fff', marginBottom: '6px' }}>
-                      Mediciones Registradas
-                    </div>
-                    <div style={styles.gridRegistros}>
-                      <span style={{ color: activeScale === 'diodo' ? '#60a5fa' : '#9ca3af', fontWeight: activeScale === 'diodo' ? 'bold' : 'normal' }}>⚡ Diodo:</span> 
-                      <strong style={{ color: obtenerColorDePad({ ...padActivo, valorActualDiodo: padActivo.valorActualDiodo }, compActivo.id) }}>
-                        {padActivo.valorActualDiodo || '---'} V
-                      </strong>
+                    return (
+                      <div style={{ marginTop: '10px' }}>
+                        {/* Tarjeta Principal de la Escala Seleccionada */}
+                        <div style={{
+                          backgroundColor: '#0c0f18',
+                          border: `1px solid ${cfgEscalaActiva.color}55`,
+                          borderRadius: '10px',
+                          padding: '12px',
+                          boxShadow: `0 0 15px ${cfgEscalaActiva.color}15`
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                            <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: cfgEscalaActiva.border, display: 'flex', alignItems: 'center', gap: '5px' }}>
+                              {cfgEscalaActiva.label}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setMostrarTodasEscalas(!mostrarTodasEscalas)}
+                              style={{ background: 'none', border: 'none', color: '#9ca3af', fontSize: '0.68rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}
+                              title="Ver o editar las demás escalas de este pad"
+                            >
+                              {mostrarTodasEscalas ? '▲ Ocultar otras' : '▼ Ver todas las escalas'}
+                            </button>
+                          </div>
 
-                      <span style={{ color: activeScale === 'voltio' ? '#f87171' : '#9ca3af', fontWeight: activeScale === 'voltio' ? 'bold' : 'normal' }}>🔌 Voltio:</span> 
-                      <strong style={{ color: obtenerColorDePad({ ...padActivo, valorActualVoltio: padActivo.valorActualVoltio }, compActivo.id) }}>
-                        {padActivo.valorActualVoltio || '---'} V
-                      </strong>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', alignItems: 'center' }}>
+                            {/* Valor Sano Referencia */}
+                            <div>
+                              <label style={{ fontSize: '0.68rem', color: '#9ca3af', display: 'block', marginBottom: '4px' }}>
+                                Valor Sano ({cfgEscalaActiva.unidad}):
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="---"
+                                value={valSano !== undefined && valSano !== '---' ? valSano : ''}
+                                onChange={(e) => actualizarPropiedadPad(padActivo.id, propSanoActivo, e.target.value)}
+                                style={{
+                                  width: '100%',
+                                  padding: '8px',
+                                  backgroundColor: '#111827',
+                                  border: `1px solid ${cfgEscalaActiva.border}`,
+                                  borderRadius: '6px',
+                                  color: '#fff',
+                                  fontWeight: 'bold',
+                                  fontSize: '0.95rem',
+                                  textAlign: 'center',
+                                  outline: 'none'
+                                }}
+                              />
+                            </div>
 
-                      <span style={{ color: activeScale === 'ua' ? '#34d399' : '#9ca3af', fontWeight: activeScale === 'ua' ? 'bold' : 'normal' }}>🔋 uA:</span> 
-                      <strong style={{ color: obtenerColorDePad({ ...padActivo, valorActualUa: padActivo.valorActualUa }, compActivo.id) }}>
-                        {padActivo.valorActualUa || '---'}
-                      </strong>
+                            {/* Medición Registrada Actual */}
+                            <div>
+                              <label style={{ fontSize: '0.68rem', color: '#9ca3af', display: 'block', marginBottom: '4px' }}>
+                                Medición Actual:
+                              </label>
+                              <div style={{
+                                padding: '8px',
+                                backgroundColor: '#111827',
+                                border: '1px solid #374151',
+                                borderRadius: '6px',
+                                textAlign: 'center',
+                                fontWeight: 'bold',
+                                fontSize: '0.95rem',
+                                color: obtenerColorDePad(padActivo, compActivo.id)
+                              }}>
+                                {valActual && valActual !== '---' ? `${valActual} ${cfgEscalaActiva.unidad}` : '---'}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
 
-                      <span style={{ color: activeScale === 'ohmio' ? '#c084fc' : '#9ca3af', fontWeight: activeScale === 'ohmio' ? 'bold' : 'normal' }}>🟣 Ohmio:</span> 
-                      <strong style={{ color: obtenerColorDePad({ ...padActivo, valorActualOhmio: padActivo.valorActualOhmio }, compActivo.id) }}>
-                        {padActivo.valorActualOhmio || '---'} Ω
-                      </strong>
-                    </div>
-                  </div>
+                        {/* Vista Expandible de Todas las Escalas Secundarias */}
+                        {mostrarTodasEscalas && (
+                          <div style={{ marginTop: '8px', padding: '10px', backgroundColor: '#0c0f18', borderRadius: '8px', border: '1px solid #1f2937', animation: 'fadeIn 0.2s' }}>
+                            <div style={{ fontSize: '0.68rem', color: '#9ca3af', fontWeight: 'bold', marginBottom: '6px' }}>
+                              Otras Escalas Secundarias
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
+                              {ESCALAS_CONFIG.filter(e => e.id !== activeScale).map(esc => {
+                                const propS = getPropSano(esc.id);
+                                const propA = getPropActual(esc.id);
+                                const vS = padActivo[propS];
+                                const vA = padActivo[propA];
+
+                                return (
+                                  <div key={esc.id} style={{ backgroundColor: '#111827', padding: '6px', borderRadius: '6px', border: '1px solid #27303f' }}>
+                                    <div style={{ fontSize: '0.65rem', color: esc.border, fontWeight: 'bold' }}>{esc.label}</div>
+                                    <input
+                                      type="text"
+                                      placeholder="Ref Sano"
+                                      value={vS !== undefined && vS !== '---' ? vS : ''}
+                                      onChange={(e) => actualizarPropiedadPad(padActivo.id, propS, e.target.value)}
+                                      style={{ ...styles.smallInput, width: '100%', fontSize: '0.75rem', padding: '2px 4px', margin: '3px 0', textAlign: 'center' }}
+                                    />
+                                    <div style={{ fontSize: '0.65rem', color: '#9ca3af', textAlign: 'center', marginTop: '2px' }}>
+                                      Act: <strong style={{ color: vA && vA !== '---' ? esc.color : '#6b7280' }}>{vA || '---'}</strong>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                 </div>
 
