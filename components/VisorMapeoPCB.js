@@ -76,6 +76,58 @@ const COMPONENTES_DEFECTO = [
   }
 ];
 
+// Compresión y optimización automática de imágenes mediante HTML5 Canvas
+// Reduce imágenes de 5MB-15MB a ~120KB-180KB en WebP/JPEG manteniendo resolución 1920px Full HD
+const comprimirImagen = (file, maxDim = 1920, quality = 0.82) => {
+  return new Promise((resolve) => {
+    if (!file || !file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.readAsDataURL(file);
+      return;
+    }
+
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      let w = img.naturalWidth || img.width || 1024;
+      let h = img.naturalHeight || img.height || 1024;
+
+      if (w > maxDim || h > maxDim) {
+        if (w > h) {
+          h = Math.round((h * maxDim) / w);
+          w = maxDim;
+        } else {
+          w = Math.round((w * maxDim) / h);
+          h = maxDim;
+        }
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, 0, 0, w, h);
+
+      let dataUrl = canvas.toDataURL('image/webp', quality);
+      if (!dataUrl.startsWith('data:image/webp')) {
+        dataUrl = canvas.toDataURL('image/jpeg', quality);
+      }
+      resolve(dataUrl);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.readAsDataURL(file);
+    };
+    img.src = objectUrl;
+  });
+};
+
 export default function VisorMapeoPCB({
   lecturaEnVivo = '----',
   unidadLectura = '---',
@@ -118,6 +170,8 @@ export default function VisorMapeoPCB({
   const [esquemaOpacity, setEsquemaOpacity] = useState(0.70);
   const [placaSize, setPlacaSize] = useState({ w: 1024, h: 1024 });
   const [esquemaSize, setEsquemaSize] = useState({ w: 1024, h: 1024 });
+  const [comprimiendoImagen, setComprimiendoImagen] = useState(false);
+  const [modalUrlConfig, setModalUrlConfig] = useState({ abierto: false, tipo: 'placa', urlInput: '' });
 
   // --- Gestor Dinámico de Net Names (Nombres de Línea) con LocalStorage ---
   const [netNamesCustom, setNetNamesCustom] = useState(() => {
@@ -377,46 +431,58 @@ export default function VisorMapeoPCB({
     setPosicion({ x: mouseX - pX * newZoom, y: mouseY - pY * newZoom });
   };
 
-  // Subida de imágenes
-  const manejarArchivoImagenPlaca = (e) => {
+  // Subida y compresión automática de imágenes con Canvas (resuelve límite de 1MB de Firestore)
+  const manejarArchivoImagenPlaca = async (e) => {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      setImgPlacaUrl(reader.result);
+    try {
+      setComprimiendoImagen(true);
+      const dataUrl = await comprimirImagen(file, 1920, 0.80);
+      setImgPlacaUrl(dataUrl);
       setShowPlaca(true);
-    };
-    reader.readAsDataURL(file);
-    e.target.value = '';
+    } catch (err) {
+      console.error('Error al procesar imagen de placa:', err);
+    } finally {
+      setComprimiendoImagen(false);
+      e.target.value = '';
+    }
   };
 
-  const manejarArchivoImagenEsquema = (e) => {
+  const manejarArchivoImagenEsquema = async (e) => {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      setImgEsquemaUrl(reader.result);
+    try {
+      setComprimiendoImagen(true);
+      const dataUrl = await comprimirImagen(file, 1920, 0.80);
+      setImgEsquemaUrl(dataUrl);
       setShowEsquema(true);
-    };
-    reader.readAsDataURL(file);
-    e.target.value = '';
+    } catch (err) {
+      console.error('Error al procesar esquema:', err);
+    } finally {
+      setComprimiendoImagen(false);
+      e.target.value = '';
+    }
   };
 
   const pedirUrlPlaca = () => {
     const actual = imgPlacaUrl === IMAGEN_PREDETERMINADA ? '' : imgPlacaUrl;
-    const nueva = window.prompt('Ingresa el enlace directo (URL) de la imagen de la placa (ej: PostImages):', actual);
-    if (nueva !== null && nueva.trim()) {
-      setImgPlacaUrl(nueva.trim());
-      setShowPlaca(true);
-    }
+    setModalUrlConfig({ abierto: true, tipo: 'placa', urlInput: actual || '' });
   };
 
   const pedirUrlEsquema = () => {
-    const nueva = window.prompt('Ingresa el enlace directo (URL) del diagrama esquemático (ej: PostImages):', imgEsquemaUrl || '');
-    if (nueva !== null && nueva.trim()) {
-      setImgEsquemaUrl(nueva.trim());
+    setModalUrlConfig({ abierto: true, tipo: 'esquema', urlInput: imgEsquemaUrl || '' });
+  };
+
+  const aplicarModalUrl = () => {
+    const urlLimpia = modalUrlConfig.urlInput.trim();
+    if (modalUrlConfig.tipo === 'placa') {
+      setImgPlacaUrl(urlLimpia || IMAGEN_PREDETERMINADA);
+      setShowPlaca(true);
+    } else {
+      setImgEsquemaUrl(urlLimpia);
       setShowEsquema(true);
     }
+    setModalUrlConfig({ abierto: false, tipo: 'placa', urlInput: '' });
   };
 
   const getCanvasCoords = (e) => {
@@ -514,6 +580,39 @@ export default function VisorMapeoPCB({
       x: cw / 2 - (comp.x + comp.w / 2) * targetZoom,
       y: ch / 2 - (comp.y + comp.h / 2) * targetZoom
     });
+  };
+
+  // Hover inteligente con prevención de desborde fuera del visor (Boundary Clamping)
+  const actualizarCoordenadasHover = (e, comp, pad) => {
+    if (isPanning || isDraggingComp || isMatrixDragging) {
+      if (hoveredComp) setHoveredComp(null);
+      return;
+    }
+    const container = svgContainerRef.current;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    const tooltipWidth = 275;
+    const tooltipHeight = 230;
+
+    let x = mouseX + 16;
+    let y = mouseY + 16;
+
+    if (x + tooltipWidth > rect.width - 15) {
+      x = mouseX - tooltipWidth - 16;
+    }
+    if (y + tooltipHeight > rect.height - 15) {
+      y = mouseY - tooltipHeight - 16;
+    }
+    x = Math.max(10, x);
+    y = Math.max(10, y);
+
+    setHoveredCoords({ x, y });
+    if (comp && pad) {
+      setHoveredComp({ comp, pad });
+    }
   };
 
   // Manejo de Net Names dinámicos
@@ -1569,13 +1668,28 @@ export default function VisorMapeoPCB({
                 <path d="M 30 0 L 0 0 0 30" fill="none" stroke="#1f2937" strokeWidth="0.5" />
               </pattern>
               <style>{`
-                @keyframes pulseGlow {
-                  0% { stroke-opacity: 1; stroke-width: 2.5px; }
-                  50% { stroke-opacity: 0.3; stroke-width: 4.5px; }
-                  100% { stroke-opacity: 1; stroke-width: 2.5px; }
+                @keyframes laserMarch {
+                  0% { stroke-dashoffset: 0; }
+                  100% { stroke-dashoffset: -20; }
+                }
+                @keyframes laserPulseGlow {
+                  0% { filter: drop-shadow(0 0 3px #10b981); opacity: 0.9; }
+                  50% { filter: drop-shadow(0 0 8px #00ffff); opacity: 1; }
+                  100% { filter: drop-shadow(0 0 3px #10b981); opacity: 0.9; }
+                }
+                @keyframes radarWave {
+                  0% { r: 2; opacity: 0.9; stroke-width: 2px; }
+                  100% { r: 16; opacity: 0; stroke-width: 0.5px; }
+                }
+                .laser-measuring-rect {
+                  stroke-dasharray: 6, 4;
+                  animation: laserMarch 0.65s linear infinite, laserPulseGlow 1.4s ease-in-out infinite;
+                }
+                .laser-radar-pulse {
+                  animation: radarWave 1.1s ease-out infinite;
                 }
                 .active-measuring-pad {
-                  animation: pulseGlow 1.2s infinite ease-in-out;
+                  animation: laserPulseGlow 1.2s infinite ease-in-out;
                 }
               `}</style>
             </defs>
@@ -1679,6 +1793,60 @@ export default function VisorMapeoPCB({
 
                       return (
                         <g key={pad.id}>
+                          {/* ESTADO 1: MEDICIÓN ACTIVA CON AUTOHOLD (CARRERA LÁSER PERIMETRAL + RADAR) */}
+                          {isPadSelected && autoHoldActivo && (
+                            <g style={{ pointerEvents: 'none' }}>
+                              <rect
+                                className="laser-measuring-rect"
+                                x={padX - 4}
+                                y={padY - 4}
+                                width={pad.w + 8}
+                                height={pad.h + 8}
+                                rx="5"
+                                ry="5"
+                                fill="rgba(16, 185, 129, 0.12)"
+                                stroke={autoHoldValueRef.current ? "#f59e0b" : "#10b981"}
+                                strokeWidth="2.5"
+                                vectorEffect="non-scaling-stroke"
+                              />
+                              <circle
+                                className="laser-radar-pulse"
+                                cx={padX + pad.w / 2}
+                                cy={padY + pad.h / 2}
+                                fill="none"
+                                stroke={autoHoldValueRef.current ? "#f59e0b" : "#10b981"}
+                                vectorEffect="non-scaling-stroke"
+                              />
+                              <circle
+                                cx={padX + pad.w / 2}
+                                cy={padY + pad.h / 2}
+                                r="2.5"
+                                fill="#10b981"
+                                stroke="#ffffff"
+                                strokeWidth="1"
+                                vectorEffect="non-scaling-stroke"
+                              />
+                            </g>
+                          )}
+
+                          {/* ESTADO 2: SELECCIÓN SIMPLE PARA CONSULTA / INSPECCIÓN */}
+                          {isPadSelected && !autoHoldActivo && (
+                            <rect
+                              x={padX - 3}
+                              y={padY - 3}
+                              width={pad.w + 6}
+                              height={pad.h + 6}
+                              rx="4"
+                              ry="4"
+                              fill="rgba(0, 255, 255, 0.08)"
+                              stroke="#00ffff"
+                              strokeWidth="2.5"
+                              vectorEffect="non-scaling-stroke"
+                              style={{ pointerEvents: 'none' }}
+                            />
+                          )}
+
+                          {/* ESTADO 3: COINCIDENCIA DE LÍNEA / MISMO NET EN LA PLACA */}
                           {isNetMatch && !isPadSelected && (
                             <rect
                               x={padX - 2}
@@ -1689,25 +1857,8 @@ export default function VisorMapeoPCB({
                               ry="3"
                               fill="none"
                               stroke="#00ffff"
-                              strokeWidth="2"
-                              strokeDasharray="2, 2"
-                              vectorEffect="non-scaling-stroke"
-                              style={{ pointerEvents: 'none' }}
-                            />
-                          )}
-
-                          {isPadSelected && (
-                            <rect
-                              className="active-measuring-pad"
-                              x={padX - 3}
-                              y={padY - 3}
-                              width={pad.w + 6}
-                              height={pad.h + 6}
-                              rx="4"
-                              ry="4"
-                              fill="none"
-                              stroke="#00ffff"
-                              strokeWidth="2.5"
+                              strokeWidth="1.8"
+                              strokeDasharray="3, 3"
                               vectorEffect="non-scaling-stroke"
                               style={{ pointerEvents: 'none' }}
                             />
@@ -1732,17 +1883,8 @@ export default function VisorMapeoPCB({
                                 setSelectedPadId(pad.id);
                               }
                             }}
-                            onMouseEnter={(e) => {
-                              if (tool !== 'select') return;
-                              setHoveredComp({ comp, pad });
-                              const rect = svgContainerRef.current.getBoundingClientRect();
-                              setHoveredCoords({ x: e.clientX - rect.left + 15, y: e.clientY - rect.top + 15 });
-                            }}
-                            onMouseMove={(e) => {
-                              if (!hoveredComp) return;
-                              const rect = svgContainerRef.current.getBoundingClientRect();
-                              setHoveredCoords({ x: e.clientX - rect.left + 15, y: e.clientY - rect.top + 15 });
-                            }}
+                            onMouseEnter={(e) => actualizarCoordenadasHover(e, comp, pad)}
+                            onMouseMove={(e) => actualizarCoordenadasHover(e, comp, pad)}
                             onMouseLeave={() => setHoveredComp(null)}
                           />
                         </g>
@@ -1877,39 +2019,133 @@ export default function VisorMapeoPCB({
             </g>
           </svg>
 
-          {/* TOOLTIP EN HOVER */}
-          {hoveredComp && (
-            <div 
-              style={{ 
-                ...styles.tooltip, 
-                left: `${hoveredCoords.x}px`, 
-                top: `${hoveredCoords.y}px` 
-              }}
-            >
-              <div style={{ fontWeight: 'bold', color: '#60a5fa', borderBottom: '1px solid #374151', paddingBottom: '4px', marginBottom: '6px', fontSize: '0.8rem' }}>
-                {hoveredComp.comp.nombre} ({hoveredComp.comp.tipo})
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                <div><strong>Pin:</strong> {hoveredComp.pad.id} ({hoveredComp.pad.tipo})</div>
-                <div><strong>Net Name:</strong> <span style={{ color: '#00ffff' }}>{hoveredComp.pad.netName}</span></div>
-                <div><strong>Footprint:</strong> {hoveredComp.pad.w}x{hoveredComp.pad.h} px</div>
-                <div style={{ marginTop: '4px', borderTop: '1px dashed #374151', paddingTop: '4px', color: '#9ca3af' }}>Valores Referencia:</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px' }}>
-                  <span style={{ color: activeScale === 'diodo' ? '#60a5fa' : '#9ca3af', fontWeight: activeScale === 'diodo' ? 'bold' : 'normal' }}>Diodo:</span> 
-                  <strong style={{ color: '#10b981' }}>{hoveredComp.pad.valorSanoDiodo} V</strong>
+          {/* TOOLTIP EN HOVER PRO */}
+          {hoveredComp && (() => {
+            const { comp, pad } = hoveredComp;
 
-                  <span style={{ color: activeScale === 'voltio' ? '#f87171' : '#9ca3af', fontWeight: activeScale === 'voltio' ? 'bold' : 'normal' }}>Voltio:</span> 
-                  <strong style={{ color: '#3b82f6' }}>{hoveredComp.pad.valorSanoVoltio} V</strong>
+            // Diagnóstico visual inteligente
+            let badgeInfo = { texto: 'PENDIENTE DE MEDIR', color: '#9ca3af', bg: 'rgba(156,163,175,0.15)', border: '#4b5563' };
+            if (pad.tipo === 'GND') {
+              badgeInfo = { texto: 'GND • TIERRA', color: '#9ca3af', bg: 'rgba(75,85,99,0.3)', border: '#6b7280' };
+            } else if (pad.tipo === 'NC') {
+              badgeInfo = { texto: 'NO CONECTADO (NC)', color: '#60a5fa', bg: 'rgba(37,99,235,0.2)', border: '#3b82f6' };
+            } else {
+              let valAct = '---';
+              let valSano = '---';
+              if (activeScale === 'diodo') { valAct = pad.valorActualDiodo; valSano = pad.valorSanoDiodo; }
+              else if (activeScale === 'voltio') { valAct = pad.valorActualVoltio; valSano = pad.valorSanoVoltio; }
+              else if (activeScale === 'ua') { valAct = pad.valorActualUa; valSano = pad.valorSanoUa; }
+              else if (activeScale === 'ohmio') { valAct = pad.valorActualOhmio; valSano = pad.valorSanoOhmio; }
 
-                  <span style={{ color: activeScale === 'ua' ? '#34d399' : '#9ca3af', fontWeight: activeScale === 'ua' ? 'bold' : 'normal' }}>Consumo:</span> 
-                  <strong style={{ color: '#eab308' }}>{hoveredComp.pad.valorSanoUa} uA</strong>
+              if (valAct === 'OL') {
+                badgeInfo = { texto: 'LÍNEA ABIERTA (O.L.)', color: '#f97316', bg: 'rgba(249,115,22,0.2)', border: '#f97316' };
+              } else if (valAct && valAct !== '---') {
+                const numAct = parseFloat(valAct);
+                const numSano = parseFloat(valSano);
+                if (!isNaN(numAct)) {
+                  if (activeScale === 'diodo') {
+                    if (numAct < 0.050) badgeInfo = { texto: '🔴 CORTO DETECTADO', color: '#ef4444', bg: 'rgba(239,68,68,0.2)', border: '#ef4444' };
+                    else if (!isNaN(numSano) && Math.abs(numAct - numSano) <= 0.040) badgeInfo = { texto: '🟢 VALOR SANO / NORMAL', color: '#10b981', bg: 'rgba(16,185,129,0.2)', border: '#10b981' };
+                    else badgeInfo = { texto: '🟡 VALOR ALTERADO', color: '#eab308', bg: 'rgba(234,179,8,0.2)', border: '#eab308' };
+                  } else if (activeScale === 'ua') {
+                    if (numAct > 2000) badgeInfo = { texto: '🔴 CONSUMO ALTO / FUGA', color: '#ef4444', bg: 'rgba(239,68,68,0.2)', border: '#ef4444' };
+                    else if (!isNaN(numSano) && Math.abs(numAct - numSano) <= 50) badgeInfo = { texto: '🟢 CONSUMO NORMAL', color: '#10b981', bg: 'rgba(16,185,129,0.2)', border: '#10b981' };
+                    else badgeInfo = { texto: '🟡 CONSUMO ALTERADO', color: '#eab308', bg: 'rgba(234,179,8,0.2)', border: '#eab308' };
+                  } else {
+                    badgeInfo = { texto: `MEDIDO: ${valAct}`, color: '#00ffff', bg: 'rgba(0,255,255,0.15)', border: '#00ffff' };
+                  }
+                }
+              }
+            }
 
-                  <span style={{ color: activeScale === 'ohmio' ? '#c084fc' : '#9ca3af', fontWeight: activeScale === 'ohmio' ? 'bold' : 'normal' }}>Resist:</span> 
-                  <strong style={{ color: '#a855f7' }}>{hoveredComp.pad.valorSanoOhmio} Ω</strong>
+            const totalPadsEnLinea = (pad.netName && pad.netName !== 'GND' && pad.netName !== 'NC')
+              ? componentes.flatMap(c => c.pads).filter(p => p.netName === pad.netName).length
+              : 0;
+
+            return (
+              <div 
+                style={{ 
+                  ...styles.tooltip, 
+                  left: `${hoveredCoords.x}px`, 
+                  top: `${hoveredCoords.y}px` 
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #374151', paddingBottom: '6px', marginBottom: '8px' }}>
+                  <div>
+                    <span style={{ color: '#00ffff', fontWeight: 'bold', fontSize: '0.9rem' }}>{comp.nombre}</span>
+                    <span style={{ fontSize: '0.7rem', color: '#9ca3af', marginLeft: '6px' }}>({comp.tipo})</span>
+                  </div>
+                  <span style={{ fontSize: '0.7rem', fontWeight: 'bold', background: '#1f2937', color: '#e5e7eb', padding: '2px 7px', borderRadius: '5px', border: '1px solid #374151' }}>
+                    Pin {pad.id}
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.68rem', color: '#9ca3af' }}>Pista / Net:</span>
+                    <strong style={{ fontSize: '0.72rem', color: '#00ffff', background: 'rgba(0,255,255,0.1)', padding: '1px 6px', borderRadius: '4px', border: '1px solid rgba(0,255,255,0.25)' }}>
+                      {pad.netName || 'NC'}
+                    </strong>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.68rem', color: '#9ca3af' }}>Tipo Línea:</span>
+                    <span style={{ fontSize: '0.68rem', color: '#d1d5db', fontWeight: 'bold' }}>{pad.tipo || 'DATA'}</span>
+                  </div>
+
+                  {/* Badge de Diagnóstico */}
+                  <div style={{
+                    marginTop: '2px',
+                    padding: '4px 8px',
+                    borderRadius: '6px',
+                    backgroundColor: badgeInfo.bg,
+                    border: `1px solid ${badgeInfo.border}`,
+                    color: badgeInfo.color,
+                    fontSize: '0.68rem',
+                    fontWeight: 'bold',
+                    textAlign: 'center',
+                    letterSpacing: '0.03em'
+                  }}>
+                    {badgeInfo.texto}
+                  </div>
+
+                  {/* Conectados a la misma pista */}
+                  {totalPadsEnLinea > 1 && (
+                    <div style={{ fontSize: '0.65rem', color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+                      <span>🔗 Conectado a <strong>{totalPadsEnLinea} pads</strong> en esta línea</span>
+                    </div>
+                  )}
+
+                  {/* Tabla 4 escalas */}
+                  <div style={{ marginTop: '4px', borderTop: '1px dashed #374151', paddingTop: '6px' }}>
+                    <div style={{ fontSize: '0.65rem', color: '#9ca3af', marginBottom: '4px', fontWeight: 'bold' }}>Valores Sano vs Actual:</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '4px', textAlign: 'center' }}>
+                      <div style={{ background: activeScale === 'diodo' ? 'rgba(59,130,246,0.2)' : '#111827', padding: '3px 2px', borderRadius: '4px', border: activeScale === 'diodo' ? '1px solid #3b82f6' : '1px solid #1f2937' }}>
+                        <div style={{ fontSize: '0.6rem', color: '#60a5fa', fontWeight: 'bold' }}>Diodo</div>
+                        <div style={{ fontSize: '0.68rem', color: '#10b981', fontWeight: 'bold' }}>{pad.valorSanoDiodo || '---'}</div>
+                        <div style={{ fontSize: '0.62rem', color: '#e5e7eb' }}>{pad.valorActualDiodo || '---'}</div>
+                      </div>
+                      <div style={{ background: activeScale === 'voltio' ? 'rgba(239,68,68,0.2)' : '#111827', padding: '3px 2px', borderRadius: '4px', border: activeScale === 'voltio' ? '1px solid #ef4444' : '1px solid #1f2937' }}>
+                        <div style={{ fontSize: '0.6rem', color: '#f87171', fontWeight: 'bold' }}>Voltio</div>
+                        <div style={{ fontSize: '0.68rem', color: '#3b82f6', fontWeight: 'bold' }}>{pad.valorSanoVoltio || '---'}</div>
+                        <div style={{ fontSize: '0.62rem', color: '#e5e7eb' }}>{pad.valorActualVoltio || '---'}</div>
+                      </div>
+                      <div style={{ background: activeScale === 'ua' ? 'rgba(16,185,129,0.2)' : '#111827', padding: '3px 2px', borderRadius: '4px', border: activeScale === 'ua' ? '1px solid #10b981' : '1px solid #1f2937' }}>
+                        <div style={{ fontSize: '0.6rem', color: '#34d399', fontWeight: 'bold' }}>uA</div>
+                        <div style={{ fontSize: '0.68rem', color: '#eab308', fontWeight: 'bold' }}>{pad.valorSanoUa || '---'}</div>
+                        <div style={{ fontSize: '0.62rem', color: '#e5e7eb' }}>{pad.valorActualUa || '---'}</div>
+                      </div>
+                      <div style={{ background: activeScale === 'ohmio' ? 'rgba(168,85,247,0.2)' : '#111827', padding: '3px 2px', borderRadius: '4px', border: activeScale === 'ohmio' ? '1px solid #a855f7' : '1px solid #1f2937' }}>
+                        <div style={{ fontSize: '0.6rem', color: '#c084fc', fontWeight: 'bold' }}>Ohmios</div>
+                        <div style={{ fontSize: '0.68rem', color: '#a855f7', fontWeight: 'bold' }}>{pad.valorSanoOhmio || '---'}</div>
+                        <div style={{ fontSize: '0.62rem', color: '#e5e7eb' }}>{pad.valorActualOhmio || '---'}</div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* Banner Dibujo */}
           {tool === 'drawSMD' && (
@@ -2345,6 +2581,105 @@ export default function VisorMapeoPCB({
         </div>
 
       </div>
+
+      {/* MODAL MODERNO DE ENLACES DE IMAGEN (POSTIMAGES / URL DIRECTA) */}
+      {modalUrlConfig.abierto && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.75)',
+          backdropFilter: 'blur(6px)',
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px'
+        }}>
+          <div style={{
+            backgroundColor: '#111827',
+            border: '1.5px solid #374151',
+            borderRadius: '12px',
+            padding: '20px',
+            width: '100%',
+            maxWidth: '480px',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.8)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #374151', paddingBottom: '10px' }}>
+              <span style={{ fontSize: '0.95rem', fontWeight: 'bold', color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Link size={18} /> {modalUrlConfig.tipo === 'placa' ? 'URL Imagen de Placa' : 'URL Diagrama Esquema'}
+              </span>
+              <button 
+                onClick={() => setModalUrlConfig({ abierto: false, tipo: 'placa', urlInput: '' })}
+                style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <p style={{ fontSize: '0.75rem', color: '#9ca3af', margin: 0, lineHeight: 1.4 }}>
+              Pega el enlace directo de la imagen (ej: <code style={{ color: '#00ffff' }}>https://i.postimg.cc/...</code>).
+              Al usar enlaces directos de <strong>PostImages.org</strong>, no consumes espacio en la base de datos.
+            </p>
+
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <input
+                type="text"
+                placeholder="https://i.postimg.cc/..."
+                value={modalUrlConfig.urlInput}
+                onChange={(e) => setModalUrlConfig(prev => ({ ...prev, urlInput: e.target.value }))}
+                style={{ ...styles.inputDark, flex: 1, padding: '8px 10px', fontSize: '0.8rem' }}
+                autoFocus
+              />
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    const text = await navigator.clipboard.readText();
+                    if (text) setModalUrlConfig(prev => ({ ...prev, urlInput: text.trim() }));
+                  } catch (e) {
+                    alert('No se pudo acceder al portapapeles. Pega manualmente con Ctrl + V.');
+                  }
+                }}
+                style={{ ...styles.btn, backgroundColor: '#374151', color: '#e5e7eb', whiteSpace: 'nowrap' }}
+              >
+                <Clipboard size={14} /> Pegar
+              </button>
+            </div>
+
+            {modalUrlConfig.urlInput && (
+              <div style={{ backgroundColor: '#0a0d16', borderRadius: '8px', padding: '8px', textAlign: 'center', border: '1px solid #1f2937' }}>
+                <div style={{ fontSize: '0.65rem', color: '#6b7280', marginBottom: '4px' }}>Previsualización:</div>
+                <img 
+                  src={modalUrlConfig.urlInput} 
+                  alt="Preview" 
+                  style={{ maxHeight: '140px', maxWidth: '100%', objectFit: 'contain', borderRadius: '4px' }}
+                  onError={(e) => { e.target.style.display = 'none'; }}
+                />
+              </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '6px' }}>
+              <button
+                type="button"
+                onClick={() => setModalUrlConfig({ abierto: false, tipo: 'placa', urlInput: '' })}
+                style={{ ...styles.btn, backgroundColor: '#1f2937', color: '#9ca3af' }}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={aplicarModalUrl}
+                style={{ ...styles.btn, backgroundColor: '#3b82f6', color: '#ffffff' }}
+              >
+                Aplicar Imagen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -2644,13 +2979,14 @@ const styles = {
   tooltip: {
     position: 'absolute',
     pointerEvents: 'none',
-    backgroundColor: 'rgba(17, 24, 39, 0.95)',
-    border: '1.5px solid #4b5563',
-    borderRadius: '8px',
-    padding: '10px 12px',
+    backgroundColor: 'rgba(17, 24, 39, 0.96)',
+    backdropFilter: 'blur(10px)',
+    border: '1.5px solid #374151',
+    borderRadius: '10px',
+    padding: '12px 14px',
     zIndex: 999,
-    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.5)',
-    width: '230px',
+    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.7), 0 0 15px rgba(0, 255, 255, 0.1)',
+    width: '275px',
     fontSize: '0.75rem',
     color: '#e5e7eb',
     lineHeight: '1.4'

@@ -1,5 +1,5 @@
 /* eslint-disable */
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { doc, setDoc, addDoc, collection, getDocs, deleteDoc, updateDoc } from 'firebase/firestore';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
@@ -1338,15 +1338,19 @@ export default function AppDiagnostico() {
     }
   };
 
-  const guardarModeloActualDB = async () => {
-    if (!modeloActivo) return;
+  const guardarModeloActualDB = async (modeloOverride = null, silencio = false) => {
+    const targetModelo = modeloOverride || modeloActivo;
+    if (!targetModelo || !targetModelo.id) return false;
 
     try {
-      const modeloSanitizado = sanitizarObjetoParaFirestore(modeloActivo);
-      await setDoc(doc(db, "hardware_db", modeloActivo.id), modeloSanitizado);
-      alert("¡Placa guardada en la nube de Marshall Cell!");
+      const modeloSanitizado = sanitizarObjetoParaFirestore(targetModelo);
+      await setDoc(doc(db, "hardware_db", targetModelo.id), modeloSanitizado);
+      if (!silencio) {
+        alert("¡Placa guardada en la nube de Marshall Cell!");
+      }
       setCambiosPendientesDocktest(false);
       await cargarLibreriaDB();
+      return true;
     } catch (error) {
       console.error("Error al guardar la placa en Firestore:", error);
       alert("❌ Error al guardar en la nube: " + (error.message || error));
@@ -1531,6 +1535,52 @@ export default function AppDiagnostico() {
   } = useAutoSave(
     modeloActivo ? `fpc_bateria_borrador_${modeloActivo.id}` : null,
     modeloActivo?.fpcBateria || null,
+    guardarModeloActualDB
+  );
+
+  const [guardandoBoardview, setGuardandoBoardview] = useState(false);
+
+  const guardarBoardviewDB = async (nuevosComp, nuevaPlaca, nuevoEsquema) => {
+    if (!modeloActivo) return;
+    setGuardandoBoardview(true);
+    const modeloActualizado = {
+      ...modeloActivo,
+      boardviewComponentes: nuevosComp !== undefined ? nuevosComp : (modeloActivo.boardviewComponentes || []),
+      boardviewImagenPlaca: nuevaPlaca !== undefined ? nuevaPlaca : (modeloActivo.boardviewImagenPlaca || ''),
+      boardviewImagenEsquema: nuevoEsquema !== undefined ? nuevoEsquema : (modeloActivo.boardviewImagenEsquema || '')
+    };
+    setModeloActivo(modeloActualizado);
+    try {
+      await guardarModeloActualDB(modeloActualizado, true);
+      alert("¡Boardview (componentes e imágenes) guardado en la nube de Marshall Cell exitosamente!");
+      if (sincronizarBoardviewAhora) {
+        await sincronizarBoardviewAhora();
+      }
+    } catch (err) {
+      console.error("Error al guardar Boardview en Firestore:", err);
+    } finally {
+      setGuardandoBoardview(false);
+    }
+  };
+
+  const boardviewDataParaAutoSave = useMemo(() => {
+    if (!modeloActivo) return null;
+    return {
+      componentes: modeloActivo.boardviewComponentes || [],
+      imagenPlaca: modeloActivo.boardviewImagenPlaca || '',
+      imagenEsquema: modeloActivo.boardviewImagenEsquema || ''
+    };
+  }, [modeloActivo?.id, modeloActivo?.boardviewComponentes, modeloActivo?.boardviewImagenPlaca, modeloActivo?.boardviewImagenEsquema]);
+
+  const {
+    cambiosPendientes: cambiosPendientesBoardview,
+    guardando: autoGuardandoBoardview,
+    ultimaSincronizacion: ultimaSincBoardview,
+    sincronizarAhora: sincronizarBoardviewAhora,
+    descartarCambios: descartarCambiosBoardview
+  } = useAutoSave(
+    modeloActivo ? `boardview_borrador_${modeloActivo.id}` : null,
+    boardviewDataParaAutoSave,
     guardarModeloActualDB
   );
 
@@ -2442,16 +2492,10 @@ export default function AppDiagnostico() {
                 onCambiarEscala={(nuevaEscala) => setEscalaIc(nuevaEscala)}
                 tiposCustom={tiposCustom}
                 setTiposCustom={setTiposCustom}
-                onGuardar={(nuevosComp, nuevaPlaca, nuevoEsquema) => {
-                  console.log('Guardando boardview en Firebase:', { nuevosComp, nuevaPlaca, nuevoEsquema });
-                  setModeloActivo(prev => ({
-                    ...prev,
-                    boardviewComponentes: nuevosComp,
-                    boardviewImagenPlaca: nuevaPlaca || prev.boardviewImagenPlaca || '',
-                    boardviewImagenEsquema: nuevoEsquema || prev.boardviewImagenEsquema || ''
-                  }));
-                  alert('Boardview (componentes e imágenes) guardado exitosamente.');
-                }}
+                guardando={guardandoBoardview || autoGuardandoBoardview}
+                cambiosPendientes={cambiosPendientesBoardview}
+                ultimaSincronizacion={ultimaSincBoardview}
+                onGuardar={guardarBoardviewDB}
               />
             </div>
           </motion.div>
