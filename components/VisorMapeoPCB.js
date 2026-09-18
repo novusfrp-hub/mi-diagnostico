@@ -261,8 +261,8 @@ export default function VisorMapeoPCB({
     if (imagenEsquemaInicial) setImgEsquemaUrl(imagenEsquemaInicial);
   }, [imagenEsquemaInicial]);
 
-  // Configuración de visualización de vectores
-  const [showHitbox, setShowHitbox] = useState(true);
+  // Configuración de visualización de vectores (por defecto limpio sin cajas que estorben)
+  const [showHitbox, setShowHitbox] = useState(false);
   const [showComponentNames, setShowComponentNames] = useState(true);
 
   // Herramientas: 'select' | 'pan' | 'drawSMD'
@@ -1646,13 +1646,13 @@ export default function VisorMapeoPCB({
 
           {/* Filtros de Capas Vectoriales */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <label style={styles.checkboxLabel}>
+            <label style={styles.checkboxLabel} title="Contornos perimetrales de componentes SMD (desactivado por defecto)">
               <input 
                 type="checkbox" 
                 checked={showHitbox} 
                 onChange={(e) => setShowHitbox(e.target.checked)} 
               />
-              Hitbox
+              Bordes SMD
             </label>
             <label style={styles.checkboxLabel}>
               <input 
@@ -1878,6 +1878,16 @@ export default function VisorMapeoPCB({
                   0% { r: 2; opacity: 0.9; stroke-width: 2px; }
                   100% { r: 16; opacity: 0; stroke-width: 0.5px; }
                 }
+                @keyframes pinRadarWave {
+                  0% { r: 3; opacity: 0.95; stroke-width: 2.2px; }
+                  65% { opacity: 0.45; stroke-width: 1.2px; }
+                  100% { r: 18; opacity: 0; stroke-width: 0.3px; }
+                }
+                @keyframes pinGlowBreathing {
+                  0% { filter: drop-shadow(0 0 2px #00ffff); opacity: 0.9; }
+                  50% { filter: drop-shadow(0 0 8px #00ffff); opacity: 1; }
+                  100% { filter: drop-shadow(0 0 2px #00ffff); opacity: 0.9; }
+                }
                 .laser-measuring-rect {
                   stroke-dasharray: 6, 4;
                   animation: laserMarch 0.65s linear infinite, laserPulseGlow 1.4s ease-in-out infinite;
@@ -1887,6 +1897,12 @@ export default function VisorMapeoPCB({
                 }
                 .active-measuring-pad {
                   animation: laserPulseGlow 1.2s infinite ease-in-out;
+                }
+                .pin-radar-pulse {
+                  animation: pinRadarWave 1.4s cubic-bezier(0.1, 0.7, 0.1, 1) infinite;
+                }
+                .pin-selected-glow-rect {
+                  animation: pinGlowBreathing 1.6s ease-in-out infinite;
                 }
               `}</style>
             </defs>
@@ -1967,18 +1983,34 @@ export default function VisorMapeoPCB({
                       }
                     }}
                   >
+                    {/* Contorno perimetral opcional (Solo activo si el usuario marca "Bordes SMD") */}
                     {showHitbox && (
                       <rect
                         x={comp.x}
                         y={comp.y}
                         width={comp.w}
                         height={comp.h}
-                        fill={isSelected ? 'rgba(0, 255, 255, 0.05)' : 'transparent'}
-                        stroke={isSelected ? '#00ffff' : '#ffffff'}
-                        strokeWidth={isSelected ? '2' : '1.2'}
-                        strokeDasharray={isSelected ? '3, 3' : 'none'}
+                        fill={isSelected ? 'rgba(59, 130, 246, 0.05)' : 'transparent'}
+                        stroke={isSelected ? 'rgba(96, 165, 250, 0.6)' : 'rgba(255, 255, 255, 0.15)'}
+                        strokeWidth="1"
                         vectorEffect="non-scaling-stroke"
                         style={{ cursor: tool === 'select' ? 'move' : 'default' }}
+                      />
+                    )}
+
+                    {/* Indicador visual elegante durante arrastre activo de componente */}
+                    {isDraggingComp && dragCompId === comp.id && (
+                      <rect
+                        x={comp.x - 2}
+                        y={comp.y - 2}
+                        width={comp.w + 4}
+                        height={comp.h + 4}
+                        rx="3"
+                        fill="rgba(59, 130, 246, 0.12)"
+                        stroke="#3b82f6"
+                        strokeWidth="1.5"
+                        vectorEffect="non-scaling-stroke"
+                        style={{ pointerEvents: 'none' }}
                       />
                     )}
 
@@ -2026,21 +2058,43 @@ export default function VisorMapeoPCB({
                             </g>
                           )}
 
-                          {/* ESTADO 2: SELECCIÓN SIMPLE PARA CONSULTA / INSPECCIÓN */}
+                          {/* ESTADO 2: SELECCIÓN SIMPLE PARA CONSULTA / INSPECCIÓN (ANIMACIÓN PRO ACTIVA) */}
                           {isPadSelected && !autoHoldActivo && (
-                            <rect
-                              x={padX - 3}
-                              y={padY - 3}
-                              width={pad.w + 6}
-                              height={pad.h + 6}
-                              rx="4"
-                              ry="4"
-                              fill="rgba(0, 255, 255, 0.08)"
-                              stroke="#00ffff"
-                              strokeWidth="2.5"
-                              vectorEffect="non-scaling-stroke"
-                              style={{ pointerEvents: 'none' }}
-                            />
+                            <g style={{ pointerEvents: 'none' }}>
+                              {/* Halo radar dinámico expansivo que irradia desde el pin seleccionado */}
+                              <circle
+                                className="pin-radar-pulse"
+                                cx={padX + pad.w / 2}
+                                cy={padY + pad.h / 2}
+                                fill="none"
+                                stroke="#00ffff"
+                                vectorEffect="non-scaling-stroke"
+                              />
+                              {/* Marco con respiración luminosa cian (Neon Glow) */}
+                              <rect
+                                className="pin-selected-glow-rect"
+                                x={padX - 3}
+                                y={padY - 3}
+                                width={pad.w + 6}
+                                height={pad.h + 6}
+                                rx="4"
+                                ry="4"
+                                fill="rgba(0, 255, 255, 0.12)"
+                                stroke="#00ffff"
+                                strokeWidth="2"
+                                vectorEffect="non-scaling-stroke"
+                              />
+                              {/* Retícula diana central de precisión para punta de prueba */}
+                              <circle
+                                cx={padX + pad.w / 2}
+                                cy={padY + pad.h / 2}
+                                r="2"
+                                fill="#00ffff"
+                                stroke="#ffffff"
+                                strokeWidth="0.8"
+                                vectorEffect="non-scaling-stroke"
+                              />
+                            </g>
                           )}
 
                           {/* ESTADO 3: COINCIDENCIA DE LÍNEA / MISMO NET EN LA PLACA */}
@@ -2052,12 +2106,11 @@ export default function VisorMapeoPCB({
                               height={pad.h + 4}
                               rx="3"
                               ry="3"
-                              fill="none"
-                              stroke="#00ffff"
-                              strokeWidth="1.8"
-                              strokeDasharray="3, 3"
+                              fill="rgba(0, 255, 255, 0.08)"
+                              stroke="#00e5ff"
+                              strokeWidth="1.5"
                               vectorEffect="non-scaling-stroke"
-                              style={{ pointerEvents: 'none' }}
+                              style={{ pointerEvents: 'none', filter: 'drop-shadow(0 0 3px rgba(0,255,255,0.4))' }}
                             />
                           )}
 
@@ -2170,18 +2223,54 @@ export default function VisorMapeoPCB({
                     />
                   )}
 
-                  {pad1Temp && pad2Temp && (
-                    <line
-                      x1={pad1Temp.x + pad1Temp.w / 2}
-                      y1={pad1Temp.y + pad1Temp.h / 2}
-                      x2={pad2Temp.x + pad2Temp.w / 2}
-                      y2={pad2Temp.y + pad2Temp.h / 2}
-                      stroke={pad2Temp.lockedAxis ? '#00ffff' : '#f59e0b'}
-                      strokeWidth="1.5"
-                      strokeDasharray="3, 3"
-                      vectorEffect="non-scaling-stroke"
-                    />
-                  )}
+                  {pad1Temp && pad2Temp && (() => {
+                    const p1x = pad1Temp.x + pad1Temp.w / 2;
+                    const p1y = pad1Temp.y + pad1Temp.h / 2;
+                    const p2x = pad2Temp.x + pad2Temp.w / 2;
+                    const p2y = pad2Temp.y + pad2Temp.h / 2;
+                    const midX = (p1x + p2x) / 2;
+                    const midY = (p1y + p2y) / 2;
+                    const dist = Math.round(Math.hypot(p2x - p1x, p2y - p1y));
+
+                    return (
+                      <g>
+                        {/* Línea guía temporal de medición entre pines (desaparece al confirmar) */}
+                        <line
+                          x1={p1x}
+                          y1={p1y}
+                          x2={p2x}
+                          y2={p2y}
+                          stroke={pad2Temp.lockedAxis ? '#00ffff' : '#f59e0b'}
+                          strokeWidth="1.5"
+                          strokeDasharray="3, 3"
+                          vectorEffect="non-scaling-stroke"
+                        />
+                        {/* Indicador numérico de distancia y eje en tiempo real */}
+                        <g transform={`translate(${midX}, ${midY - 12})`}>
+                          <rect
+                            x="-36"
+                            y="-9"
+                            width="72"
+                            height="16"
+                            rx="4"
+                            fill="#111827"
+                            stroke={pad2Temp.lockedAxis ? '#00ffff' : '#f59e0b'}
+                            strokeWidth="1"
+                            opacity="0.92"
+                          />
+                          <text
+                            x="0"
+                            y="2.5"
+                            textAnchor="middle"
+                            fill="#ffffff"
+                            style={{ fontSize: '9px', fontFamily: 'Consolas, monospace', fontWeight: 'bold' }}
+                          >
+                            ↔ {dist}px {pad2Temp.lockedAxis ? `(${pad2Temp.lockedAxis === 'H' ? 'Horiz' : 'Vert'})` : ''}
+                          </text>
+                        </g>
+                      </g>
+                    );
+                  })()}
 
                   {pad2Temp && (
                     <rect
@@ -2204,9 +2293,9 @@ export default function VisorMapeoPCB({
                       width={Math.max(pad1Temp.x + pad1Temp.w, pad2Temp.x + pad2Temp.w) - Math.min(pad1Temp.x, pad2Temp.x)}
                       height={Math.max(pad1Temp.y + pad1Temp.h, pad2Temp.y + pad2Temp.h) - Math.min(pad1Temp.y, pad2Temp.y)}
                       fill="transparent"
-                      stroke="#ffffff"
+                      stroke="rgba(255, 255, 255, 0.4)"
                       strokeWidth="1"
-                      strokeDasharray="4, 4"
+                      strokeDasharray="3, 3"
                       vectorEffect="non-scaling-stroke"
                     />
                   )}
