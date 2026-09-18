@@ -128,6 +128,17 @@ const comprimirImagen = (file, maxDim = 1920, quality = 0.82) => {
   });
 };
 
+export const SECTORES_PRESET = [
+  'Placa Completa',
+  'Área Carga / PMIC',
+  'Área CPU / Memoria UFS',
+  'Área Backlight / Display',
+  'Área Conectores FPC',
+  'Área RF / Transceiver',
+  'Área Audio / Códec',
+  'Área Cámaras / Sensores'
+];
+
 export default function VisorMapeoPCB({
   lecturaEnVivo = '----',
   unidadLectura = '---',
@@ -138,16 +149,23 @@ export default function VisorMapeoPCB({
   guardando = false,
   ultimaSincronizacion = null,
   componentesIniciales = null,       // lista previa de componentes (persistencia)
-  imagenPlacaInicial = null,          // URL foto de placa (persistencia)
+  imagenPlacaInicial = null,          // URL foto de placa Cara A (persistencia)
+  imagenPlacaCaraBInicial = null,     // URL foto de placa Cara B (persistencia)
+  sectorInicial = 'Placa Completa',  // Sector o área de la placa
   imagenEsquemaInicial = null,        // URL diagrama esquemático (persistencia)
-  onCambios = null,                  // callback ({ componentes, imagenPlaca, imagenEsquema })
+  onCambios = null,                  // callback ({ componentes, imagenPlacaCaraA, imagenPlacaCaraB, imagenEsquema, sector })
   fullscreen = false,                // modo pantalla completa
   onCerrar = null,                   // botón de cierre en modo fullscreen
   tiposCustom = [],                  // lista global de tipos de línea personalizados
   setTiposCustom = null,             // setter de tipos de línea personalizados
   nombreModelo = ''                  // nombre del modelo activo (ej: Samsung Galaxy S22)
 }) {
-  // --- Estados locales del Boardview ---
+  // --- Organización de Placa: Cara A (Superior) / Cara B (Inferior) & Sector ---
+  const [caraPlaca, setCaraPlaca] = useState('A'); // 'A' | 'B'
+  const [sectorPlaca, setSectorPlaca] = useState(sectorInicial || 'Placa Completa');
+  const [bannerGuiaCerrado, setBannerGuiaCerrado] = useState(false);
+
+  // --- Estados locales de componentes del Boardview ---
   const [componentes, setComponentes] = useState(() => {
     if (Array.isArray(componentesIniciales)) return componentesIniciales;
     return [];
@@ -160,9 +178,10 @@ export default function VisorMapeoPCB({
   const [selectedPadId, setSelectedPadId] = useState('1'); // '1' | '2'
   const [mostrarTodasEscalas, setMostrarTodasEscalas] = useState(false);
 
-  // --- Capas de Imágenes de Fondo (Placa + Esquemático) ---
+  // --- Capas de Imágenes de Fondo (Placa Cara A, Placa Cara B + Esquemático) ---
   const [capaActiva, setCapaActiva] = useState('placa'); // 'placa' | 'esquema'
-  const [imgPlacaUrl, setImgPlacaUrl] = useState(imagenPlacaInicial || IMAGEN_PREDETERMINADA);
+  const [imgPlacaCaraAUrl, setImgPlacaCaraAUrl] = useState(imagenPlacaInicial || IMAGEN_PREDETERMINADA);
+  const [imgPlacaCaraBUrl, setImgPlacaCaraBUrl] = useState(imagenPlacaCaraBInicial || '');
   const [imgEsquemaUrl, setImgEsquemaUrl] = useState(imagenEsquemaInicial || '');
   const [showPlaca, setShowPlaca] = useState(true);
   const [showEsquema, setShowEsquema] = useState(false);
@@ -172,6 +191,16 @@ export default function VisorMapeoPCB({
   const [esquemaSize, setEsquemaSize] = useState({ w: 1024, h: 1024 });
   const [comprimiendoImagen, setComprimiendoImagen] = useState(false);
   const [modalUrlConfig, setModalUrlConfig] = useState({ abierto: false, tipo: 'placa', urlInput: '' });
+
+  // Imagen activa según la cara seleccionada
+  const activeImgPlacaUrl = caraPlaca === 'A' 
+    ? (imgPlacaCaraAUrl || IMAGEN_PREDETERMINADA) 
+    : (imgPlacaCaraBUrl || IMAGEN_PREDETERMINADA);
+
+  // Componentes filtrados para la cara actual
+  const componentesVisibles = useMemo(() => {
+    return componentes.filter(c => (c.cara || 'A') === caraPlaca);
+  }, [componentes, caraPlaca]);
 
   // --- Gestor Dinámico de Net Names (Nombres de Línea) con LocalStorage ---
   const [netNamesCustom, setNetNamesCustom] = useState(() => {
@@ -217,11 +246,19 @@ export default function VisorMapeoPCB({
   }, [componentesIniciales]);
 
   useEffect(() => {
-    setImgPlacaUrl(imagenPlacaInicial || IMAGEN_PREDETERMINADA);
+    if (imagenPlacaInicial) setImgPlacaCaraAUrl(imagenPlacaInicial);
   }, [imagenPlacaInicial]);
 
   useEffect(() => {
-    setImgEsquemaUrl(imagenEsquemaInicial || '');
+    if (imagenPlacaCaraBInicial) setImgPlacaCaraBUrl(imagenPlacaCaraBInicial);
+  }, [imagenPlacaCaraBInicial]);
+
+  useEffect(() => {
+    if (sectorInicial) setSectorPlaca(sectorInicial);
+  }, [sectorInicial]);
+
+  useEffect(() => {
+    if (imagenEsquemaInicial) setImgEsquemaUrl(imagenEsquemaInicial);
   }, [imagenEsquemaInicial]);
 
   // Configuración de visualización de vectores
@@ -316,10 +353,16 @@ export default function VisorMapeoPCB({
   useEffect(() => {
     if (!onCambiosRef.current) return;
     const t = setTimeout(() => {
-      onCambiosRef.current(componentes, imgPlacaUrl, imgEsquemaUrl);
+      onCambiosRef.current({
+        componentes,
+        imagenPlacaCaraA: imgPlacaCaraAUrl,
+        imagenPlacaCaraB: imgPlacaCaraBUrl,
+        imagenEsquema: imgEsquemaUrl,
+        sector: sectorPlaca
+      });
     }, 400);
     return () => clearTimeout(t);
-  }, [componentes, imgPlacaUrl, imgEsquemaUrl]);
+  }, [componentes, imgPlacaCaraAUrl, imgPlacaCaraBUrl, imgEsquemaUrl, sectorPlaca]);
 
   // Sonido Beep Sintetizado de Confirmación (Web Audio API)
   const playBeep = useCallback(() => {
@@ -358,9 +401,9 @@ export default function VisorMapeoPCB({
     setPosicion({ x: (cw - baseW * z) / 2, y: (ch - baseH * z) / 2 });
   }, [capaActiva]);
 
-  // Cargar dimensiones de imagen Placa
+  // Cargar dimensiones de imagen Placa (según Cara A o Cara B activa)
   useEffect(() => {
-    if (!imgPlacaUrl) return;
+    if (!activeImgPlacaUrl) return;
     const img = new Image();
     img.onload = () => {
       const w = img.naturalWidth || img.width || 1024;
@@ -369,8 +412,8 @@ export default function VisorMapeoPCB({
       if (capaActiva === 'placa') requestAnimationFrame(() => fitToView());
     };
     img.onerror = () => setPlacaSize({ w: 1024, h: 1024 });
-    img.src = imgPlacaUrl;
-  }, [imgPlacaUrl, fitToView, capaActiva]);
+    img.src = activeImgPlacaUrl;
+  }, [activeImgPlacaUrl, fitToView, capaActiva]);
 
   // Cargar dimensiones de imagen Esquemático
   useEffect(() => {
@@ -438,8 +481,13 @@ export default function VisorMapeoPCB({
     try {
       setComprimiendoImagen(true);
       const dataUrl = await comprimirImagen(file, 1920, 0.80);
-      setImgPlacaUrl(dataUrl);
+      if (caraPlaca === 'A') {
+        setImgPlacaCaraAUrl(dataUrl);
+      } else {
+        setImgPlacaCaraBUrl(dataUrl);
+      }
       setShowPlaca(true);
+      setBannerGuiaCerrado(true);
     } catch (err) {
       console.error('Error al procesar imagen de placa:', err);
     } finally {
@@ -465,7 +513,8 @@ export default function VisorMapeoPCB({
   };
 
   const pedirUrlPlaca = () => {
-    const actual = imgPlacaUrl === IMAGEN_PREDETERMINADA ? '' : imgPlacaUrl;
+    const current = caraPlaca === 'A' ? imgPlacaCaraAUrl : imgPlacaCaraBUrl;
+    const actual = current === IMAGEN_PREDETERMINADA ? '' : current;
     setModalUrlConfig({ abierto: true, tipo: 'placa', urlInput: actual || '' });
   };
 
@@ -476,8 +525,13 @@ export default function VisorMapeoPCB({
   const aplicarModalUrl = () => {
     const urlLimpia = modalUrlConfig.urlInput.trim();
     if (modalUrlConfig.tipo === 'placa') {
-      setImgPlacaUrl(urlLimpia || IMAGEN_PREDETERMINADA);
+      if (caraPlaca === 'A') {
+        setImgPlacaCaraAUrl(urlLimpia || IMAGEN_PREDETERMINADA);
+      } else {
+        setImgPlacaCaraBUrl(urlLimpia);
+      }
       setShowPlaca(true);
+      setBannerGuiaCerrado(true);
     } else {
       setImgEsquemaUrl(urlLimpia);
       setShowEsquema(true);
@@ -564,6 +618,9 @@ export default function VisorMapeoPCB({
 
   // Centrar en Componente
   const centrarEnComponente = (comp) => {
+    if (comp.cara && comp.cara !== caraPlaca) {
+      setCaraPlaca(comp.cara);
+    }
     setSelectedCompId(comp.id);
     setSelectedPadId('1');
     setMostrarResultadosBusqueda(false);
@@ -817,7 +874,8 @@ export default function VisorMapeoPCB({
       if (matrixClonesPreview.length > 0) {
         const consolidados = matrixClonesPreview.map(clone => ({
           ...clone,
-          id: `smd_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`
+          id: `smd_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+          cara: clone.cara || caraPlaca
         }));
         setComponentes(prev => [...prev, ...consolidados]);
         setMatrixClonesPreview([]);
@@ -847,6 +905,7 @@ export default function VisorMapeoPCB({
       id: `smd_${Date.now()}`,
       nombre: nombreSugerido,
       tipo: tipoDrawing,
+      cara: caraPlaca,
       x: minX,
       y: minY,
       w: compW,
@@ -1180,10 +1239,102 @@ export default function VisorMapeoPCB({
             <Map size={18} /> BOARDVIEW PRO
           </span>
           {nombreModelo && (
-            <span style={{ fontSize: '0.75rem', padding: '3px 8px', borderRadius: '6px', background: '#111827', color: '#00ffff', fontWeight: 'bold', border: '1px solid #374151' }}>
-              {nombreModelo.toUpperCase()}
+            <span style={{ fontSize: '0.78rem', padding: '3px 10px', borderRadius: '6px', background: '#111827', color: '#00ffff', fontWeight: 'bold', border: '1px solid #374151', letterSpacing: '0.03em' }}>
+              📱 {nombreModelo.toUpperCase()}
             </span>
           )}
+
+          {/* Toggle de Caras: Cara A (Superior) / Cara B (Inferior) */}
+          <div style={{ display: 'flex', background: '#0b0f19', padding: '2px', borderRadius: '8px', border: '1px solid #374151' }}>
+            <button 
+              type="button"
+              onClick={() => {
+                setCaraPlaca('A');
+                const compA = componentes.find(c => (c.cara || 'A') === 'A');
+                if (compA) { setSelectedCompId(compA.id); setSelectedPadId('1'); }
+                else { setSelectedCompId(null); }
+              }}
+              style={{
+                padding: '4px 10px',
+                borderRadius: '6px',
+                border: 'none',
+                background: caraPlaca === 'A' ? 'linear-gradient(135deg, #2563eb, #3b82f6)' : 'transparent',
+                color: caraPlaca === 'A' ? '#ffffff' : '#9ca3af',
+                fontWeight: 'bold',
+                fontSize: '0.74rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                boxShadow: caraPlaca === 'A' ? '0 0 10px rgba(59,130,246,0.5)' : 'none',
+                transition: 'all 0.15s'
+              }}
+              title="Cambiar a Cara A (Superior / Frontal)"
+            >
+              🅰️ Cara A (Superior)
+            </button>
+            <button 
+              type="button"
+              onClick={() => {
+                setCaraPlaca('B');
+                const compB = componentes.find(c => c.cara === 'B');
+                if (compB) { setSelectedCompId(compB.id); setSelectedPadId('1'); }
+                else { setSelectedCompId(null); }
+              }}
+              style={{
+                padding: '4px 10px',
+                borderRadius: '6px',
+                border: 'none',
+                background: caraPlaca === 'B' ? 'linear-gradient(135deg, #7c3aed, #8b5cf6)' : 'transparent',
+                color: caraPlaca === 'B' ? '#ffffff' : '#9ca3af',
+                fontWeight: 'bold',
+                fontSize: '0.74rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                boxShadow: caraPlaca === 'B' ? '0 0 10px rgba(139,92,246,0.5)' : 'none',
+                transition: 'all 0.15s'
+              }}
+              title="Cambiar a Cara B (Inferior / Posterior)"
+            >
+              🅱️ Cara B (Inferior)
+            </button>
+          </div>
+
+          {/* Selector de Sector de la Placa */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <span style={{ fontSize: '0.68rem', color: '#9ca3af', fontWeight: 'bold' }}>📍 Sector:</span>
+            <select
+              value={SECTORES_PRESET.includes(sectorPlaca) ? sectorPlaca : '__custom__'}
+              onChange={(e) => {
+                if (e.target.value === '__custom__') {
+                  const custom = window.prompt("Ingresa el nombre del sector o área de la placa:", sectorPlaca);
+                  if (custom && custom.trim()) setSectorPlaca(custom.trim());
+                } else {
+                  setSectorPlaca(e.target.value);
+                }
+              }}
+              style={{
+                background: '#0b0f19',
+                color: '#38bdf8',
+                border: '1px solid #374151',
+                borderRadius: '6px',
+                padding: '3px 8px',
+                fontSize: '0.72rem',
+                fontWeight: 'bold',
+                cursor: 'pointer'
+              }}
+              title="Selecciona a qué área o sector de la placa corresponde esta vista"
+            >
+              {SECTORES_PRESET.map(sec => <option key={sec} value={sec}>{sec}</option>)}
+              <option value="__custom__">✏️ {SECTORES_PRESET.includes(sectorPlaca) ? 'Personalizado...' : sectorPlaca}</option>
+            </select>
+          </div>
+
+          <span style={{ fontSize: '0.7rem', padding: '3px 8px', borderRadius: '6px', background: 'rgba(56, 189, 248, 0.1)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.25)', fontWeight: 'bold' }}>
+            CARA {caraPlaca} • {sectorPlaca.toUpperCase()}
+          </span>
 
           <div style={styles.divider} />
 
@@ -1345,7 +1496,13 @@ export default function VisorMapeoPCB({
           )}
           {onGuardar && (
             <button 
-              onClick={() => onGuardar(componentes, imgPlacaUrl, imgEsquemaUrl)} 
+              onClick={() => onGuardar({
+                componentes,
+                imagenPlacaCaraA: imgPlacaCaraAUrl,
+                imagenPlacaCaraB: imgPlacaCaraBUrl,
+                imagenEsquema: imgEsquemaUrl,
+                sector: sectorPlaca
+              })} 
               disabled={guardando}
               style={{
                 ...styles.btn, 
@@ -1379,7 +1536,7 @@ export default function VisorMapeoPCB({
               onClick={() => setCapaActiva('placa')} 
               style={{ ...styles.capaBtn, ...(capaActiva === 'placa' && styles.capaBtnActive) }}
             >
-              📸 Capa Placa
+              📸 Placa Cara {caraPlaca}
             </button>
             <button 
               onClick={() => setCapaActiva('esquema')} 
@@ -1397,7 +1554,7 @@ export default function VisorMapeoPCB({
                   checked={showPlaca} 
                   onChange={(e) => setShowPlaca(e.target.checked)} 
                 />
-                Ver Placa
+                Ver Placa ({caraPlaca})
               </label>
 
               {showPlaca && (
@@ -1415,13 +1572,20 @@ export default function VisorMapeoPCB({
                 </div>
               )}
 
-              <button onClick={() => fileInputPlacaRef.current && fileInputPlacaRef.current.click()} style={styles.imgBtn} title="Subir foto de placa desde PC">
-                <Upload size={12} /> Subir
+              <button onClick={() => fileInputPlacaRef.current && fileInputPlacaRef.current.click()} style={styles.imgBtn} title={`Subir foto de Cara ${caraPlaca} desde PC`}>
+                <Upload size={12} /> Subir Cara {caraPlaca}
               </button>
-              <button onClick={pedirUrlPlaca} style={styles.imgBtn} title="Pegar URL de PostImages / postimg.cc">
-                <Link size={12} /> URL
+              <button onClick={pedirUrlPlaca} style={styles.imgBtn} title={`Pegar URL de PostImages para Cara ${caraPlaca}`}>
+                <Link size={12} /> URL Cara {caraPlaca}
               </button>
-              <button onClick={() => setImgPlacaUrl(IMAGEN_PREDETERMINADA)} style={styles.imgBtn} title="Restaurar imagen predeterminada">
+              <button 
+                onClick={() => {
+                  if (caraPlaca === 'A') setImgPlacaCaraAUrl(IMAGEN_PREDETERMINADA);
+                  else setImgPlacaCaraBUrl('');
+                }} 
+                style={styles.imgBtn} 
+                title="Restaurar imagen predeterminada"
+              >
                 <RotateCcw size={12} /> Predet.
               </button>
 
@@ -1630,29 +1794,62 @@ export default function VisorMapeoPCB({
             <button onClick={() => fitToView()} style={styles.zoomBtn} title="Ajustar imagen a la vista"><Maximize2 size={15} /></button>
           </div>
 
-          {/* Empty State Guidance Overlay */}
-          {componentes.length === 0 && (
+          {/* Banner de Orientación Flotante No Invasivo (Se oculta automáticamente al subir imagen o dibujar, o con la X) */}
+          {!bannerGuiaCerrado && componentesVisibles.length === 0 && activeImgPlacaUrl === IMAGEN_PREDETERMINADA && (
             <div style={{
               position: 'absolute',
-              top: '50%',
+              bottom: '22px',
               left: '50%',
-              transform: 'translate(-50%, -50%)',
-              backgroundColor: 'rgba(17, 24, 39, 0.88)',
-              border: '1px dashed #374151',
-              borderRadius: '14px',
-              padding: '24px 32px',
-              textAlign: 'center',
-              pointerEvents: 'none',
-              maxWidth: '400px',
+              transform: 'translateX(-50%)',
+              backgroundColor: 'rgba(17, 24, 39, 0.94)',
+              border: '1px solid #374151',
+              borderRadius: '12px',
+              padding: '10px 18px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '14px',
+              boxShadow: '0 12px 30px rgba(0,0,0,0.7)',
               backdropFilter: 'blur(8px)',
-              boxShadow: '0 15px 35px rgba(0,0,0,0.6)',
-              zIndex: 10
+              zIndex: 30,
+              maxWidth: '90%'
             }}>
-              <Map size={36} color="#00ffff" style={{ opacity: 0.85, margin: '0 auto 10px auto', display: 'block' }} />
-              <h4 style={{ color: 'white', margin: '0 0 6px 0', fontSize: '1rem', fontWeight: 'bold' }}>Placa lista para mapeo</h4>
-              <p style={{ color: '#9ca3af', fontSize: '0.8rem', margin: 0, lineHeight: 1.4 }}>
-                Usa el botón <strong style={{ color: '#00ffff' }}>+ Dibujar SMD</strong> en la barra superior para trazar y mapear tus componentes en la placa.
-              </p>
+              <Map size={18} color="#00ffff" style={{ flexShrink: 0 }} />
+              <span style={{ fontSize: '0.78rem', color: '#e5e7eb' }}>
+                Cara {caraPlaca} lista para mapeo. Sube una foto de la placa o usa <strong style={{ color: '#00ffff' }}>+ Dibujar SMD</strong> para trazar componentes.
+              </span>
+              <button 
+                type="button"
+                onClick={() => { setTool('drawSMD'); setBannerGuiaCerrado(true); }}
+                style={{
+                  padding: '4px 10px',
+                  backgroundColor: '#3b82f6',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '0.72rem',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                + Dibujar SMD
+              </button>
+              <button 
+                type="button"
+                onClick={() => setBannerGuiaCerrado(true)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#9ca3af',
+                  cursor: 'pointer',
+                  padding: '3px',
+                  display: 'flex',
+                  alignItems: 'center'
+                }}
+                title="Cerrar aviso"
+              >
+                <X size={16} />
+              </button>
             </div>
           )}
 
@@ -1697,8 +1894,8 @@ export default function VisorMapeoPCB({
 
             <g transform={`translate(${posicion.x}, ${posicion.y}) scale(${zoom})`}>
               
-              {/* CAPA 1: IMAGEN DE PLACA */}
-              {showPlaca && imgPlacaUrl && (
+              {/* CAPA 1: IMAGEN DE PLACA (CARA A / CARA B) */}
+              {showPlaca && activeImgPlacaUrl && (
                 <g>
                   <rect
                     x="0"
@@ -1706,7 +1903,7 @@ export default function VisorMapeoPCB({
                     width={placaSize.w}
                     height={placaSize.h}
                     fill="none"
-                    stroke="#3b82f6"
+                    stroke={caraPlaca === 'A' ? "#3b82f6" : "#8b5cf6"}
                     strokeWidth="1"
                     strokeDasharray="8, 6"
                     vectorEffect="non-scaling-stroke"
@@ -1714,7 +1911,7 @@ export default function VisorMapeoPCB({
                     style={{ pointerEvents: 'none' }}
                   />
                   <image
-                    href={imgPlacaUrl}
+                    href={activeImgPlacaUrl}
                     x="0"
                     y="0"
                     width={placaSize.w}
@@ -1753,8 +1950,8 @@ export default function VisorMapeoPCB({
                 </g>
               )}
 
-              {/* RENDERIZADO DE COMPONENTES SMD */}
-              {componentes.map((comp) => {
+              {/* RENDERIZADO DE COMPONENTES SMD DE LA CARA ACTIVA */}
+              {componentesVisibles.map((comp) => {
                 const isSelected = selectedCompId === comp.id;
                 
                 return (
@@ -2221,6 +2418,46 @@ export default function VisorMapeoPCB({
                     <span>Posición: ({compActivo.x}, {compActivo.y})</span>
                     <span>Tamaño: {compActivo.w}×{compActivo.h}px</span>
                   </div>
+
+                  {/* Selector de Cara para el Componente Activo */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #1f2937' }}>
+                    <span style={{ fontSize: '0.7rem', color: '#9ca3af', fontWeight: 'bold' }}>Cara Asignada:</span>
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      <button 
+                        type="button" 
+                        onClick={() => setComponentes(prev => prev.map(c => c.id === compActivo.id ? { ...c, cara: 'A' } : c))}
+                        style={{
+                          padding: '3px 8px',
+                          borderRadius: '4px',
+                          border: 'none',
+                          background: (compActivo.cara || 'A') === 'A' ? '#2563eb' : '#1f2937',
+                          color: (compActivo.cara || 'A') === 'A' ? '#fff' : '#9ca3af',
+                          fontSize: '0.68rem',
+                          fontWeight: 'bold',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Cara A
+                      </button>
+                      <button 
+                        type="button" 
+                        onClick={() => setComponentes(prev => prev.map(c => c.id === compActivo.id ? { ...c, cara: 'B' } : c))}
+                        style={{
+                          padding: '3px 8px',
+                          borderRadius: '4px',
+                          border: 'none',
+                          background: compActivo.cara === 'B' ? '#7c3aed' : '#1f2937',
+                          color: compActivo.cara === 'B' ? '#fff' : '#9ca3af',
+                          fontSize: '0.68rem',
+                          fontWeight: 'bold',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Cara B
+                      </button>
+                    </div>
+                  </div>
+
                   <button 
                     onClick={() => borrarComponente(compActivo.id)} 
                     style={{ ...styles.btn, backgroundColor: 'rgba(239, 68, 68, 0.15)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.3)', marginTop: '8px', width: '100%', justifyContent: 'center' }}
@@ -2555,14 +2792,17 @@ export default function VisorMapeoPCB({
             )}
           </div>
 
-          {/* Lista Resumen de Componentes en Orden de Creación */}
+          {/* Lista Resumen de Componentes en Orden de Creación (Filtrada por Cara Activa) */}
           <div style={{ marginTop: 'auto', borderTop: '1px solid #374151', paddingTop: '12px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-              <h4 style={{ ...styles.sectionTitle }}>Componentes ({componentes.length})</h4>
+              <h4 style={{ ...styles.sectionTitle }}>
+                Cara {caraPlaca} ({componentesVisibles.length})
+                <span style={{ fontSize: '0.65rem', color: '#6b7280', fontWeight: 'normal', marginLeft: '6px' }}>Total {componentes.length}</span>
+              </h4>
               <span style={{ fontSize: '0.65rem', color: '#9ca3af' }}>Orden Creación</span>
             </div>
             <div style={styles.compListContainer}>
-              {componentes.map((c, idx) => (
+              {componentesVisibles.map((c, idx) => (
                 <div 
                   key={c.id} 
                   onClick={() => { setSelectedCompId(c.id); setSelectedPadId('1'); }}

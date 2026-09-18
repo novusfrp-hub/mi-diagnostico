@@ -926,6 +926,37 @@ export default function AppDiagnostico() {
     if (!modConBateria.fpcBateria) {
       modConBateria.fpcBateria = inicializarFpcBateria(modConBateria);
     }
+
+    // Respaldo de recuperación local en caso de que Firestore tenga campos vacíos o desconexión
+    if (typeof window !== 'undefined') {
+      try {
+        const localBackup = localStorage.getItem('boardview_local_' + mod.id);
+        if (localBackup) {
+          const parsed = JSON.parse(localBackup);
+          if ((!modConBateria.boardviewComponentes || modConBateria.boardviewComponentes.length === 0) && parsed.componentes) {
+            modConBateria.boardviewComponentes = parsed.componentes;
+          }
+          if (!modConBateria.boardviewImagenPlacaCaraA && parsed.imagenPlacaCaraA) {
+            modConBateria.boardviewImagenPlacaCaraA = parsed.imagenPlacaCaraA;
+          }
+          if (!modConBateria.boardviewImagenPlacaCaraB && parsed.imagenPlacaCaraB) {
+            modConBateria.boardviewImagenPlacaCaraB = parsed.imagenPlacaCaraB;
+          }
+          if (!modConBateria.boardviewImagenPlaca && parsed.imagenPlaca) {
+            modConBateria.boardviewImagenPlaca = parsed.imagenPlaca;
+          }
+          if (!modConBateria.boardviewImagenEsquema && parsed.imagenEsquema) {
+            modConBateria.boardviewImagenEsquema = parsed.imagenEsquema;
+          }
+          if (!modConBateria.boardviewSector && parsed.sector) {
+            modConBateria.boardviewSector = parsed.sector;
+          }
+        }
+      } catch (e) {
+        console.warn('Error al verificar respaldo local boardview:', e);
+      }
+    }
+
     setModeloActivo(modConBateria);
     setFpcActivo(modConBateria.fpcs?.[0] || null);
     setIcActivo(modConBateria.ics?.[0] || null);
@@ -1285,6 +1316,17 @@ export default function AppDiagnostico() {
       const arr = [];
       qs.forEach(doc => arr.push({ id: doc.id, ...doc.data() }));
       setModelosLibreria(arr);
+      // Sincronizar modelo actualmente activo si existe en memoria
+      setModeloActivo(prev => {
+        if (!prev || !prev.id) return prev;
+        const actualizado = arr.find(m => m.id === prev.id);
+        if (!actualizado) return prev;
+        return {
+          ...prev,
+          ...actualizado,
+          fpcBateria: actualizado.fpcBateria || prev.fpcBateria
+        };
+      });
     } catch (error) {
       console.error("Error al cargar la librería de modelos:", error);
     }
@@ -1540,22 +1582,61 @@ export default function AppDiagnostico() {
 
   const [guardandoBoardview, setGuardandoBoardview] = useState(false);
 
-  const guardarBoardviewDB = async (nuevosComp, nuevaPlaca, nuevoEsquema) => {
+  const guardarBoardviewDB = async (payload) => {
     if (!modeloActivo) return;
     setGuardandoBoardview(true);
+
+    let nuevosComp = [];
+    let nuevaPlacaCaraA = '';
+    let nuevaPlacaCaraB = '';
+    let nuevoEsquema = '';
+    let nuevoSector = 'Placa Completa';
+
+    if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
+      nuevosComp = payload.componentes !== undefined ? payload.componentes : (modeloActivo.boardviewComponentes || []);
+      nuevaPlacaCaraA = payload.imagenPlacaCaraA !== undefined ? payload.imagenPlacaCaraA : (modeloActivo.boardviewImagenPlacaCaraA || modeloActivo.boardviewImagenPlaca || '');
+      nuevaPlacaCaraB = payload.imagenPlacaCaraB !== undefined ? payload.imagenPlacaCaraB : (modeloActivo.boardviewImagenPlacaCaraB || '');
+      nuevoEsquema = payload.imagenEsquema !== undefined ? payload.imagenEsquema : (modeloActivo.boardviewImagenEsquema || '');
+      nuevoSector = payload.sector !== undefined ? payload.sector : (modeloActivo.boardviewSector || 'Placa Completa');
+    } else {
+      // Soporte retrocompatible con llamada posicional (nuevosComp, nuevaPlaca, nuevoEsquema)
+      nuevosComp = payload !== undefined ? payload : (modeloActivo.boardviewComponentes || []);
+      nuevaPlacaCaraA = arguments[1] !== undefined ? arguments[1] : (modeloActivo.boardviewImagenPlacaCaraA || modeloActivo.boardviewImagenPlaca || '');
+      nuevaPlacaCaraB = modeloActivo.boardviewImagenPlacaCaraB || '';
+      nuevoEsquema = arguments[2] !== undefined ? arguments[2] : (modeloActivo.boardviewImagenEsquema || '');
+      nuevoSector = modeloActivo.boardviewSector || 'Placa Completa';
+    }
+
     const modeloActualizado = {
       ...modeloActivo,
-      boardviewComponentes: nuevosComp !== undefined ? nuevosComp : (modeloActivo.boardviewComponentes || []),
-      boardviewImagenPlaca: nuevaPlaca !== undefined ? nuevaPlaca : (modeloActivo.boardviewImagenPlaca || ''),
-      boardviewImagenEsquema: nuevoEsquema !== undefined ? nuevoEsquema : (modeloActivo.boardviewImagenEsquema || '')
+      boardviewComponentes: nuevosComp,
+      boardviewImagenPlacaCaraA: nuevaPlacaCaraA,
+      boardviewImagenPlacaCaraB: nuevaPlacaCaraB,
+      boardviewImagenPlaca: nuevaPlacaCaraA, // retrocompatibilidad con campos previos
+      boardviewImagenEsquema: nuevoEsquema,
+      boardviewSector: nuevoSector
     };
+
     setModeloActivo(modeloActualizado);
+
+    // Respaldo inmediato en localStorage para evitar pérdida de datos
+    try {
+      localStorage.setItem('boardview_local_' + modeloActivo.id, JSON.stringify({
+        componentes: nuevosComp,
+        imagenPlacaCaraA: nuevaPlacaCaraA,
+        imagenPlacaCaraB: nuevaPlacaCaraB,
+        imagenPlaca: nuevaPlacaCaraA,
+        imagenEsquema: nuevoEsquema,
+        sector: nuevoSector,
+        _timestamp: Date.now()
+      }));
+    } catch (e) {
+      console.warn('Error al guardar respaldo local boardview:', e);
+    }
+
     try {
       await guardarModeloActualDB(modeloActualizado, true);
-      alert("¡Boardview (componentes e imágenes) guardado en la nube de Marshall Cell exitosamente!");
-      if (sincronizarBoardviewAhora) {
-        await sincronizarBoardviewAhora();
-      }
+      alert("¡Boardview (Cara A/B, componentes y sector) guardado en la nube de Marshall Cell exitosamente!");
     } catch (err) {
       console.error("Error al guardar Boardview en Firestore:", err);
     } finally {
@@ -1567,10 +1648,12 @@ export default function AppDiagnostico() {
     if (!modeloActivo) return null;
     return {
       componentes: modeloActivo.boardviewComponentes || [],
-      imagenPlaca: modeloActivo.boardviewImagenPlaca || '',
-      imagenEsquema: modeloActivo.boardviewImagenEsquema || ''
+      imagenPlacaCaraA: modeloActivo.boardviewImagenPlacaCaraA || modeloActivo.boardviewImagenPlaca || '',
+      imagenPlacaCaraB: modeloActivo.boardviewImagenPlacaCaraB || '',
+      imagenEsquema: modeloActivo.boardviewImagenEsquema || '',
+      sector: modeloActivo.boardviewSector || 'Placa Completa'
     };
-  }, [modeloActivo?.id, modeloActivo?.boardviewComponentes, modeloActivo?.boardviewImagenPlaca, modeloActivo?.boardviewImagenEsquema]);
+  }, [modeloActivo?.id, modeloActivo?.boardviewComponentes, modeloActivo?.boardviewImagenPlacaCaraA, modeloActivo?.boardviewImagenPlacaCaraB, modeloActivo?.boardviewImagenPlaca, modeloActivo?.boardviewImagenEsquema, modeloActivo?.boardviewSector]);
 
   const {
     cambiosPendientes: cambiosPendientesBoardview,
@@ -1591,7 +1674,7 @@ export default function AppDiagnostico() {
   const cargarPaso = async (idPaso, esRetroceso = false) => { setCargando(true); try { const respuesta = await fetch(`/api/diagnostico?paso=${idPaso}`); const datos = await respuesta.json(); setPasoActual((prev) => { if (!esRetroceso && prev) setHistorial(prevHist => [...prevHist, prev.id]); return datos; }); setNotaVisible(false); setImgModalVisible(false); setVideoModalVisible(false); } catch (error) { } setCargando(false); };
   const irAtras = () => { setHistorial(prev => { if (prev.length === 0) return prev; const nuevo = [...prev]; const anterior = nuevo.pop(); cargarPaso(anterior, true); return nuevo; }); };
   const toggleTema = () => setTema(tema === 'light' ? 'dark' : 'light');
-  useEffect(() => { cargarPaso('inicio'); cargarFallasEnSerie(); }, []);
+  useEffect(() => { cargarPaso('inicio'); cargarFallasEnSerie(); cargarLibreriaDB(); }, []);
 
   // AUTH Y ADMIN
   const iniciarSesion = async (e) => { e.preventDefault(); setErrorLogin(''); try { await signInWithEmailAndPassword(auth, emailAdmin, passAdmin); setEstaAutenticado(true); setVistaAdmin('lista'); cargarTodosLosPasos(); } catch (error) { setErrorLogin('❌ Error.'); } };
@@ -2470,21 +2553,27 @@ export default function AppDiagnostico() {
                 <button onClick={() => setModalBoardviewAbierto(false)} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', cursor: 'pointer', padding: '8px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}><X size={20} /></button>
               </div>
             </div>
-            <div style={{ flex: 1, overflow: 'hidden', padding: '10px' }}>
+            <div style={{ flex: 1, overflow: 'hidden', padding: 0 }}>
               <VisorMapeoPCB
                 fullscreen
                 nombreModelo={`${modeloActivo.marca || ''} ${modeloActivo.nombre || ''}`.trim()}
                 onCerrar={() => setModalBoardviewAbierto(false)}
-                componentesIniciales={modeloActivo.boardviewComponentes}
-                imagenPlacaInicial={modeloActivo.boardviewImagenPlaca || modeloActivo.imgPlaca}
+                componentesIniciales={modeloActivo.boardviewComponentes || []}
+                imagenPlacaInicial={modeloActivo.boardviewImagenPlacaCaraA || modeloActivo.boardviewImagenPlaca || modeloActivo.imgPlaca}
+                imagenPlacaCaraBInicial={modeloActivo.boardviewImagenPlacaCaraB || ''}
+                sectorInicial={modeloActivo.boardviewSector || 'Placa Completa'}
                 imagenEsquemaInicial={modeloActivo.boardviewImagenEsquema || modeloActivo.imgEsquema}
-                onCambios={(nuevosComp, nuevaPlaca, nuevoEsquema) => {
-                  setModeloActivo(prev => ({
-                    ...prev,
-                    boardviewComponentes: nuevosComp,
-                    ...(nuevaPlaca !== undefined ? { boardviewImagenPlaca: nuevaPlaca } : {}),
-                    ...(nuevoEsquema !== undefined ? { boardviewImagenEsquema: nuevoEsquema } : {})
-                  }));
+                onCambios={(payload) => {
+                  if (payload && typeof payload === 'object') {
+                    setModeloActivo(prev => ({
+                      ...prev,
+                      ...(payload.componentes !== undefined ? { boardviewComponentes: payload.componentes } : {}),
+                      ...(payload.imagenPlacaCaraA !== undefined ? { boardviewImagenPlacaCaraA: payload.imagenPlacaCaraA, boardviewImagenPlaca: payload.imagenPlacaCaraA } : {}),
+                      ...(payload.imagenPlacaCaraB !== undefined ? { boardviewImagenPlacaCaraB: payload.imagenPlacaCaraB } : {}),
+                      ...(payload.imagenEsquema !== undefined ? { boardviewImagenEsquema: payload.imagenEsquema } : {}),
+                      ...(payload.sector !== undefined ? { boardviewSector: payload.sector } : {})
+                    }));
+                  }
                 }}
                 lecturaEnVivo={lecturaUsb.valor}
                 unidadLectura={lecturaUsb.unidad}
