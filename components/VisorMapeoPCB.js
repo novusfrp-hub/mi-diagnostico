@@ -3,7 +3,7 @@ import {
   Save, Trash2, Plus, Move, ZoomIn, ZoomOut, Layers, Maximize2, 
   Settings, Edit, Play, HelpCircle, Activity, Check, AlertTriangle, 
   Map, Eye, EyeOff, Clipboard, RefreshCw, ChevronRight, CheckCircle2,
-  Image as ImageIcon, Upload, RotateCcw, X, Link, Search, RotateCw, Lock, Zap, ArrowLeftRight, Tag, Gauge
+  Image as ImageIcon, Upload, RotateCcw, X, Link, Search, RotateCw, Lock, Zap, ArrowLeftRight, Tag, Gauge, FolderOpen
 } from 'lucide-react';
 import SelectorTipoLinea from './SelectorTipoLinea';
 
@@ -148,22 +148,42 @@ export default function VisorMapeoPCB({
   cambiosPendientes = false,
   guardando = false,
   ultimaSincronizacion = null,
+  sectoresIniciales = null,          // mapa de sectores guardados en el modelo ({ [nombreSector]: { imagenCaraA, imagenCaraB, componentes } })
   componentesIniciales = null,       // lista previa de componentes (persistencia)
   imagenPlacaInicial = null,          // URL foto de placa Cara A (persistencia)
   imagenPlacaCaraBInicial = null,     // URL foto de placa Cara B (persistencia)
   sectorInicial = 'Placa Completa',  // Sector o área de la placa
   imagenEsquemaInicial = null,        // URL diagrama esquemático (persistencia)
-  onCambios = null,                  // callback ({ componentes, imagenPlacaCaraA, imagenPlacaCaraB, imagenEsquema, sector })
+  onCambios = null,                  // callback ({ componentes, imagenPlacaCaraA, imagenPlacaCaraB, imagenEsquema, sector, sectores })
   fullscreen = false,                // modo pantalla completa
   onCerrar = null,                   // botón de cierre en modo fullscreen
   tiposCustom = [],                  // lista global de tipos de línea personalizados
   setTiposCustom = null,             // setter de tipos de línea personalizados
   nombreModelo = ''                  // nombre del modelo activo (ej: Samsung Galaxy S22)
 }) {
-  // --- Organización de Placa: Cara A (Superior) / Cara B (Inferior) & Sector ---
+  // --- Organización de Placa: Cara A (Superior) / Cara B (Inferior) & Sectores Mapeados ---
   const [caraPlaca, setCaraPlaca] = useState('A'); // 'A' | 'B'
   const [sectorPlaca, setSectorPlaca] = useState(sectorInicial || 'Placa Completa');
   const [bannerGuiaCerrado, setBannerGuiaCerrado] = useState(false);
+  const [modalExploradorSectores, setModalExploradorSectores] = useState(false);
+  const [nuevoSectorInput, setNuevoSectorInput] = useState('');
+
+  // Diccionario multizona de sectores del modelo: { [nombreSector]: { imagenCaraA, imagenCaraB, imagenEsquema, componentes } }
+  const [sectores, setSectores] = useState(() => {
+    if (sectoresIniciales && typeof sectoresIniciales === 'object' && Object.keys(sectoresIniciales).length > 0) {
+      return sectoresIniciales;
+    }
+    const secInit = sectorInicial || 'Placa Completa';
+    return {
+      [secInit]: {
+        nombre: secInit,
+        imagenCaraA: imagenPlacaInicial || '',
+        imagenCaraB: imagenPlacaCaraBInicial || '',
+        imagenEsquema: imagenEsquemaInicial || '',
+        componentes: Array.isArray(componentesIniciales) ? componentesIniciales : []
+      }
+    };
+  });
 
   // --- Estados locales de componentes del Boardview ---
   const [componentes, setComponentes] = useState(() => {
@@ -260,6 +280,19 @@ export default function VisorMapeoPCB({
   useEffect(() => {
     if (imagenEsquemaInicial) setImgEsquemaUrl(imagenEsquemaInicial);
   }, [imagenEsquemaInicial]);
+
+  useEffect(() => {
+    if (sectoresIniciales && typeof sectoresIniciales === 'object' && Object.keys(sectoresIniciales).length > 0) {
+      setSectores(sectoresIniciales);
+      if (sectorInicial && sectoresIniciales[sectorInicial]) {
+        setSectorPlaca(sectorInicial);
+        const secData = sectoresIniciales[sectorInicial];
+        if (secData.componentes) setComponentes(secData.componentes);
+        if (secData.imagenCaraA) setImgPlacaCaraAUrl(secData.imagenCaraA);
+        if (secData.imagenCaraB) setImgPlacaCaraBUrl(secData.imagenCaraB);
+      }
+    }
+  }, [sectoresIniciales]);
 
   // Configuración de visualización de vectores (por defecto limpio sin cajas que estorben)
   const [showHitbox, setShowHitbox] = useState(false);
@@ -963,12 +996,8 @@ export default function VisorMapeoPCB({
 
   const activeNetName = (padActivo && padActivo.netName && padActivo.netName !== 'NC') ? padActivo.netName : null;
 
-  // Evaluar color de pad
+  // Evaluar color de pad (mantiene su color base metálico/GND/salud sin teñirse todo de cian)
   const obtenerColorDePad = (pad, compId) => {
-    if (selectedCompId === compId && selectedPadId === pad.id) {
-      return '#00ffff';
-    }
-
     if (pad.tipo === 'GND') return '#4b5563';
     if (pad.tipo === 'NC') return '#1e3a8a';
 
@@ -1230,6 +1259,127 @@ export default function VisorMapeoPCB({
     );
   };
 
+  // --- Funciones de Gestión y Navegación de Sectores y Caras ---
+
+  // Conmuta de sector de forma segura preservando fotos y SMDs de cada área
+  const cambiarSector = (nuevoNombreSector, caraObjetivo = null) => {
+    if (!nuevoNombreSector) return;
+    if (nuevoNombreSector === sectorPlaca) {
+      if (caraObjetivo) setCaraPlaca(caraObjetivo);
+      return;
+    }
+
+    // 1. Snapshot del sector que estamos abandonando
+    const sectoresActualizados = {
+      ...sectores,
+      [sectorPlaca]: {
+        nombre: sectorPlaca,
+        imagenCaraA: imgPlacaCaraAUrl === IMAGEN_PREDETERMINADA ? '' : imgPlacaCaraAUrl,
+        imagenCaraB: imgPlacaCaraBUrl === IMAGEN_PREDETERMINADA ? '' : imgPlacaCaraBUrl,
+        imagenEsquema: imgEsquemaUrl,
+        componentes: componentes
+      }
+    };
+
+    // 2. Obtener datos del sector destino (o inicializarlo limpio si es nuevo)
+    const destino = sectoresActualizados[nuevoNombreSector] || {
+      nombre: nuevoNombreSector,
+      imagenCaraA: '',
+      imagenCaraB: '',
+      imagenEsquema: '',
+      componentes: []
+    };
+
+    sectoresActualizados[nuevoNombreSector] = destino;
+    setSectores(sectoresActualizados);
+
+    // 3. Cargar en estados reactivos del visor
+    setSectorPlaca(nuevoNombreSector);
+    setImgPlacaCaraAUrl(destino.imagenCaraA || IMAGEN_PREDETERMINADA);
+    setImgPlacaCaraBUrl(destino.imagenCaraB || '');
+    setImgEsquemaUrl(destino.imagenEsquema || '');
+    setComponentes(Array.isArray(destino.componentes) ? destino.componentes : []);
+    if (caraObjetivo) {
+      setCaraPlaca(caraObjetivo);
+    }
+    setSelectedCompId(null);
+    setSelectedPadId('1');
+
+    // 4. Notificar cambios hacia la app
+    if (onCambios) {
+      onCambios({
+        sectores: sectoresActualizados,
+        sector: nuevoNombreSector,
+        componentes: Array.isArray(destino.componentes) ? destino.componentes : [],
+        imagenPlacaCaraA: destino.imagenCaraA || '',
+        imagenPlacaCaraB: destino.imagenCaraB || '',
+        imagenEsquema: destino.imagenEsquema || ''
+      });
+    }
+  };
+
+  // Eliminar un sector
+  const eliminarSector = (nombreAEliminar) => {
+    if (Object.keys(sectores).length <= 1) {
+      alert('Debe existir al menos un sector en la placa.');
+      return;
+    }
+    if (window.confirm(`¿Estás seguro de eliminar el sector "${nombreAEliminar}" y sus componentes?`)) {
+      const copia = { ...sectores };
+      delete copia[nombreAEliminar];
+      setSectores(copia);
+      if (sectorPlaca === nombreAEliminar) {
+        const primerDisp = Object.keys(copia)[0];
+        cambiarSector(primerDisp);
+      }
+    }
+  };
+
+  // Metadatos de todos los sectores registrados en memoria
+  const listaSectoresRegistrados = useMemo(() => {
+    return Object.keys(sectores).map(key => {
+      const sec = sectores[key] || {};
+      const esActual = key === sectorPlaca;
+      const comps = esActual ? componentes : (Array.isArray(sec.componentes) ? sec.componentes : []);
+      const imgA = esActual ? imgPlacaCaraAUrl : (sec.imagenCaraA || '');
+      const imgB = esActual ? imgPlacaCaraBUrl : (sec.imagenCaraB || '');
+      const hasImgA = imgA && imgA !== IMAGEN_PREDETERMINADA && imgA !== '';
+      const hasImgB = imgB && imgB !== IMAGEN_PREDETERMINADA && imgB !== '';
+      const compsA = comps.filter(c => (c.cara || 'A') === 'A').length;
+      const compsB = comps.filter(c => (c.cara || 'A') === 'B').length;
+      const tieneDatos = comps.length > 0 || hasImgA || hasImgB;
+
+      return {
+        nombre: key,
+        compsTotal: comps.length,
+        compsA,
+        compsB,
+        hasImgA,
+        hasImgB,
+        tieneDatos,
+        esActual
+      };
+    });
+  }, [sectores, sectorPlaca, componentes, imgPlacaCaraAUrl, imgPlacaCaraBUrl]);
+
+  // Sectores verdaderamente mapeados / disponibles (con datos o actualmente seleccionado)
+  const sectoresDisponibles = useMemo(() => {
+    return listaSectoresRegistrados.filter(s => s.tieneDatos || s.esActual);
+  }, [listaSectoresRegistrados]);
+
+  // Información del sector actualmente visible en pantalla
+  const sectorActivoInfo = useMemo(() => {
+    return listaSectoresRegistrados.find(s => s.nombre === sectorPlaca) || {
+      nombre: sectorPlaca,
+      compsTotal: componentes.length,
+      compsA: componentes.filter(c => (c.cara || 'A') === 'A').length,
+      compsB: componentes.filter(c => (c.cara || 'A') === 'B').length,
+      hasImgA: activeImgPlacaUrl !== IMAGEN_PREDETERMINADA,
+      hasImgB: !!imgPlacaCaraBUrl,
+      tieneDatos: componentes.length > 0 || (activeImgPlacaUrl !== IMAGEN_PREDETERMINADA)
+    };
+  }, [listaSectoresRegistrados, sectorPlaca, componentes, activeImgPlacaUrl, imgPlacaCaraBUrl]);
+
   return (
     <div style={{ ...styles.container, ...(fullscreen ? { borderRadius: 0, border: 'none' } : {}) }}>
       {/* 1. BARRA SUPERIOR: HERRAMIENTAS, ESCALAS, AUTOHOLD Y BÚSQUEDA */}
@@ -1244,7 +1394,7 @@ export default function VisorMapeoPCB({
             </span>
           )}
 
-          {/* Toggle de Caras: Cara A (Superior) / Cara B (Inferior) */}
+          {/* Toggle de Caras: Cara A (Superior) / Cara B (Inferior) con métricas en tiempo real */}
           <div style={{ display: 'flex', background: '#0b0f19', padding: '2px', borderRadius: '8px', border: '1px solid #374151' }}>
             <button 
               type="button"
@@ -1265,13 +1415,13 @@ export default function VisorMapeoPCB({
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '4px',
+                gap: '5px',
                 boxShadow: caraPlaca === 'A' ? '0 0 10px rgba(59,130,246,0.5)' : 'none',
                 transition: 'all 0.15s'
               }}
               title="Cambiar a Cara A (Superior / Frontal)"
             >
-              🅰️ Cara A (Superior)
+              🅰️ Cara A {sectorActivoInfo.compsA > 0 ? `(${sectorActivoInfo.compsA})` : ''} {sectorActivoInfo.hasImgA ? '📷' : ''}
             </button>
             <button 
               type="button"
@@ -1292,27 +1442,51 @@ export default function VisorMapeoPCB({
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '4px',
+                gap: '5px',
                 boxShadow: caraPlaca === 'B' ? '0 0 10px rgba(139,92,246,0.5)' : 'none',
                 transition: 'all 0.15s'
               }}
               title="Cambiar a Cara B (Inferior / Posterior)"
             >
-              🅱️ Cara B (Inferior)
+              🅱️ Cara B {sectorActivoInfo.compsB > 0 ? `(${sectorActivoInfo.compsB})` : ''} {sectorActivoInfo.hasImgB ? '📷' : ''}
             </button>
           </div>
 
-          {/* Selector de Sector de la Placa */}
+          {/* Botón de Explorador de Sectores (Abre la ventana modal con todos los sectores mapeados) */}
+          <button
+            type="button"
+            onClick={() => setModalExploradorSectores(true)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: 'linear-gradient(135deg, #1e293b, #0f172a)',
+              border: '1px solid #38bdf8',
+              color: '#38bdf8',
+              padding: '4px 10px',
+              borderRadius: '7px',
+              fontSize: '0.73rem',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              boxShadow: '0 0 8px rgba(56, 189, 248, 0.2)'
+            }}
+            title="Abrir ventana de sectores disponibles y administración de áreas de la placa"
+          >
+            <FolderOpen size={14} />
+            <span>Sectores ({sectoresDisponibles.length} disp.)</span>
+          </button>
+
+          {/* Selector Rápido de Sector con diferenciador visual (Disponibles vs Nuevos) */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <span style={{ fontSize: '0.68rem', color: '#9ca3af', fontWeight: 'bold' }}>📍 Sector:</span>
+            <span style={{ fontSize: '0.68rem', color: '#9ca3af', fontWeight: 'bold' }}>📍 Zona:</span>
             <select
-              value={SECTORES_PRESET.includes(sectorPlaca) ? sectorPlaca : '__custom__'}
+              value={sectorPlaca}
               onChange={(e) => {
                 if (e.target.value === '__custom__') {
-                  const custom = window.prompt("Ingresa el nombre del sector o área de la placa:", sectorPlaca);
-                  if (custom && custom.trim()) setSectorPlaca(custom.trim());
+                  const custom = window.prompt("Ingresa el nombre del nuevo sector o área de la placa:", "");
+                  if (custom && custom.trim()) cambiarSector(custom.trim());
                 } else {
-                  setSectorPlaca(e.target.value);
+                  cambiarSector(e.target.value);
                 }
               }}
               style={{
@@ -1323,17 +1497,42 @@ export default function VisorMapeoPCB({
                 padding: '3px 8px',
                 fontSize: '0.72rem',
                 fontWeight: 'bold',
-                cursor: 'pointer'
+                cursor: 'pointer',
+                maxWidth: '190px'
               }}
-              title="Selecciona a qué área o sector de la placa corresponde esta vista"
+              title="Selecciona un sector disponible o mapea una nueva zona"
             >
-              {SECTORES_PRESET.map(sec => <option key={sec} value={sec}>{sec}</option>)}
-              <option value="__custom__">✏️ {SECTORES_PRESET.includes(sectorPlaca) ? 'Personalizado...' : sectorPlaca}</option>
+              <optgroup label="🟢 SECTORES DISPONIBLES EN ESTE MODELO">
+                {sectoresDisponibles.map(sec => (
+                  <option key={sec.nombre} value={sec.nombre}>
+                    🟢 {sec.nombre} ({sec.compsTotal} comps{sec.hasImgA || sec.hasImgB ? ' · 📷' : ''})
+                  </option>
+                ))}
+              </optgroup>
+
+              <optgroup label="➕ MAPEAR NUEVO SECTOR...">
+                {SECTORES_PRESET
+                  .filter(p => !sectoresDisponibles.some(d => d.nombre === p))
+                  .map(p => (
+                    <option key={p} value={p}>
+                      ⚪ {p} (Sin mapear)
+                    </option>
+                  ))}
+                <option value="__custom__">✏️ + Escribir nuevo sector...</option>
+              </optgroup>
             </select>
           </div>
 
-          <span style={{ fontSize: '0.7rem', padding: '3px 8px', borderRadius: '6px', background: 'rgba(56, 189, 248, 0.1)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.25)', fontWeight: 'bold' }}>
-            CARA {caraPlaca} • {sectorPlaca.toUpperCase()}
+          <span style={{
+            fontSize: '0.7rem',
+            padding: '3px 8px',
+            borderRadius: '6px',
+            background: sectorActivoInfo.tieneDatos ? 'rgba(16, 185, 129, 0.12)' : 'rgba(56, 189, 248, 0.1)',
+            color: sectorActivoInfo.tieneDatos ? '#10b981' : '#38bdf8',
+            border: `1px solid ${sectorActivoInfo.tieneDatos ? 'rgba(16, 185, 129, 0.3)' : 'rgba(56, 189, 248, 0.25)'}`,
+            fontWeight: 'bold'
+          }}>
+            CARA {caraPlaca} • {sectorPlaca.toUpperCase()} {sectorActivoInfo.tieneDatos ? '• 🟢 DISPONIBLE' : '• ⚪ NUEVO'}
           </span>
 
           <div style={styles.divider} />
@@ -1496,13 +1695,26 @@ export default function VisorMapeoPCB({
           )}
           {onGuardar && (
             <button 
-              onClick={() => onGuardar({
-                componentes,
-                imagenPlacaCaraA: imgPlacaCaraAUrl,
-                imagenPlacaCaraB: imgPlacaCaraBUrl,
-                imagenEsquema: imgEsquemaUrl,
-                sector: sectorPlaca
-              })} 
+              onClick={() => {
+                const sectoresConsolidados = {
+                  ...sectores,
+                  [sectorPlaca]: {
+                    nombre: sectorPlaca,
+                    imagenCaraA: imgPlacaCaraAUrl === IMAGEN_PREDETERMINADA ? '' : imgPlacaCaraAUrl,
+                    imagenCaraB: imgPlacaCaraBUrl === IMAGEN_PREDETERMINADA ? '' : imgPlacaCaraBUrl,
+                    imagenEsquema: imgEsquemaUrl,
+                    componentes: componentes
+                  }
+                };
+                onGuardar({
+                  sectores: sectoresConsolidados,
+                  componentes,
+                  imagenPlacaCaraA: imgPlacaCaraAUrl,
+                  imagenPlacaCaraB: imgPlacaCaraBUrl,
+                  imagenEsquema: imgEsquemaUrl,
+                  sector: sectorPlaca
+                });
+              }} 
               disabled={guardando}
               style={{
                 ...styles.btn, 
@@ -2058,10 +2270,10 @@ export default function VisorMapeoPCB({
                             </g>
                           )}
 
-                          {/* ESTADO 2: SELECCIÓN SIMPLE PARA CONSULTA / INSPECCIÓN (ANIMACIÓN PRO ACTIVA) */}
+                          {/* ESTADO 2: SELECCIÓN SIMPLE PARA CONSULTA / INSPECCIÓN (ANIMACIÓN PRO ACTIVA EXTERNA) */}
                           {isPadSelected && !autoHoldActivo && (
                             <g style={{ pointerEvents: 'none' }}>
-                              {/* Halo radar dinámico expansivo que irradia desde el pin seleccionado */}
+                              {/* Halo radar dinámico expansivo que irradia desde el exterior del pin */}
                               <circle
                                 className="pin-radar-pulse"
                                 cx={padX + pad.w / 2}
@@ -2070,7 +2282,7 @@ export default function VisorMapeoPCB({
                                 stroke="#00ffff"
                                 vectorEffect="non-scaling-stroke"
                               />
-                              {/* Marco con respiración luminosa cian (Neon Glow) */}
+                              {/* Marco con respiración luminosa cian (Neon Glow) EXTERIOR, sin alterar el interior del pin */}
                               <rect
                                 className="pin-selected-glow-rect"
                                 x={padX - 3}
@@ -2079,19 +2291,9 @@ export default function VisorMapeoPCB({
                                 height={pad.h + 6}
                                 rx="4"
                                 ry="4"
-                                fill="rgba(0, 255, 255, 0.12)"
+                                fill="none"
                                 stroke="#00ffff"
                                 strokeWidth="2"
-                                vectorEffect="non-scaling-stroke"
-                              />
-                              {/* Retícula diana central de precisión para punta de prueba */}
-                              <circle
-                                cx={padX + pad.w / 2}
-                                cy={padY + pad.h / 2}
-                                r="2"
-                                fill="#00ffff"
-                                stroke="#ffffff"
-                                strokeWidth="0.8"
                                 vectorEffect="non-scaling-stroke"
                               />
                             </g>
@@ -2114,6 +2316,7 @@ export default function VisorMapeoPCB({
                             />
                           )}
 
+                          {/* Cuerpo metálico del pad con su color base/salud y borde blanco activo */}
                           <rect
                             x={padX}
                             y={padY}
@@ -2123,7 +2326,7 @@ export default function VisorMapeoPCB({
                             ry="2"
                             fill={obtenerColorDePad(pad, comp.id)}
                             stroke={isPadSelected ? '#ffffff' : (isNetMatch ? '#00ffff' : '#000000')}
-                            strokeWidth={isPadSelected ? '2.5' : (isNetMatch ? '1.5' : '1')}
+                            strokeWidth={isPadSelected ? '2' : (isNetMatch ? '1.5' : '1')}
                             vectorEffect="non-scaling-stroke"
                             style={{ cursor: 'pointer', transition: 'fill 0.2s' }}
                             onClick={(e) => {
@@ -2137,6 +2340,23 @@ export default function VisorMapeoPCB({
                             onMouseMove={(e) => actualizarCoordenadasHover(e, comp, pad)}
                             onMouseLeave={() => setHoveredComp(null)}
                           />
+
+                          {/* Número o identificador de pin legible dentro del pad */}
+                          <text
+                            x={padX + pad.w / 2}
+                            y={padY + pad.h / 2 + Math.min(pad.h * 0.35, 3.5)}
+                            textAnchor="middle"
+                            fill={pad.tipo === 'GND' ? '#d1d5db' : (isPadSelected ? '#ffffff' : '#111827')}
+                            style={{
+                              fontFamily: 'Consolas, monospace',
+                              fontSize: `${Math.max(3.5, Math.min(8, Math.min(pad.w, pad.h) * 0.62))}px`,
+                              fontWeight: 'bold',
+                              pointerEvents: 'none',
+                              userSelect: 'none'
+                            }}
+                          >
+                            {pad.id}
+                          </text>
                         </g>
                       );
                     })}
@@ -3006,6 +3226,311 @@ export default function VisorMapeoPCB({
                 Aplicar Imagen
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 5. MODAL SUBMENÚ: EXPLORADOR DE SECTORES Y CARAS DE LA PLACA */}
+      {modalExploradorSectores && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.78)',
+          backdropFilter: 'blur(7px)',
+          zIndex: 3500,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px'
+        }}>
+          <div style={{
+            backgroundColor: '#111827',
+            border: '1px solid #374151',
+            borderRadius: '14px',
+            width: '100%',
+            maxWidth: '680px',
+            maxHeight: '90vh',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            boxShadow: '0 25px 60px rgba(0,0,0,0.85)'
+          }}>
+            {/* Encabezado del Explorador */}
+            <div style={{
+              padding: '16px 20px',
+              borderBottom: '1px solid #1f2937',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              backgroundColor: '#0f172a'
+            }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <FolderOpen size={20} color="#38bdf8" />
+                  <h3 style={{ margin: 0, color: '#ffffff', fontSize: '1rem', fontWeight: 'bold' }}>
+                    EXPLORADOR DE SECTORES Y CARAS
+                  </h3>
+                </div>
+                <p style={{ margin: '4px 0 0 0', color: '#9ca3af', fontSize: '0.74rem' }}>
+                  Modelo: <strong style={{ color: '#38bdf8' }}>{nombreModelo ? nombreModelo.toUpperCase() : 'PLACA ACTIVA'}</strong> · Diferenciador de áreas disponibles vs zonas por mapear
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalExploradorSectores(false)}
+                style={{ background: 'transparent', border: 'none', color: '#9ca3af', cursor: 'pointer', padding: '6px' }}
+                title="Cerrar ventana"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Cuerpo del Explorador */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: '22px' }}>
+              
+              {/* Sección 1: Sectores Disponibles / Guardados en este modelo */}
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                  <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#10b981', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <CheckCircle2 size={16} /> SECTORES DISPONIBLES EN ESTE MODELO ({sectoresDisponibles.length})
+                  </span>
+                  <span style={{ fontSize: '0.7rem', color: '#6b7280' }}>
+                    Selecciona una cara para abrirla directamente en el visor
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {sectoresDisponibles.map((sec) => (
+                    <div
+                      key={sec.nombre}
+                      style={{
+                        backgroundColor: sec.esActual ? 'rgba(56, 189, 248, 0.08)' : '#1f2937',
+                        border: sec.esActual ? '1px solid #38bdf8' : '1px solid #374151',
+                        borderRadius: '10px',
+                        padding: '12px 16px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '12px',
+                        flexWrap: 'wrap'
+                      }}
+                    >
+                      <div style={{ flex: 1, minWidth: '220px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                          <strong style={{ color: '#ffffff', fontSize: '0.9rem' }}>{sec.nombre}</strong>
+                          {sec.esActual && (
+                            <span style={{ fontSize: '0.65rem', background: '#38bdf8', color: '#000', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>
+                              ACTIVO EN PANTALLA
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ display: 'flex', gap: '10px', fontSize: '0.72rem', color: '#9ca3af', flexWrap: 'wrap' }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <span style={{ color: sec.compsA > 0 ? '#60a5fa' : '#6b7280', fontWeight: 'bold' }}>🅰️ Cara A:</span> 
+                            {sec.compsA} SMD {sec.hasImgA ? '· 📷 Foto' : '· ✕ Sin foto'}
+                          </span>
+                          <span>•</span>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <span style={{ color: sec.compsB > 0 ? '#a78bfa' : '#6b7280', fontWeight: 'bold' }}>🅱️ Cara B:</span> 
+                            {sec.compsB} SMD {sec.hasImgB ? '· 📷 Foto' : '· ✕ Sin foto'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            cambiarSector(sec.nombre, 'A');
+                            setModalExploradorSectores(false);
+                          }}
+                          style={{
+                            padding: '6px 12px',
+                            borderRadius: '6px',
+                            border: 'none',
+                            background: sec.esActual && caraPlaca === 'A' ? '#2563eb' : '#374151',
+                            color: '#ffffff',
+                            fontSize: '0.74rem',
+                            fontWeight: 'bold',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            boxShadow: sec.esActual && caraPlaca === 'A' ? '0 0 8px rgba(37,99,235,0.5)' : 'none'
+                          }}
+                          title="Cargar este sector en Cara A"
+                        >
+                          🅰️ Abrir Cara A
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            cambiarSector(sec.nombre, 'B');
+                            setModalExploradorSectores(false);
+                          }}
+                          style={{
+                            padding: '6px 12px',
+                            borderRadius: '6px',
+                            border: 'none',
+                            background: sec.esActual && caraPlaca === 'B' ? '#7c3aed' : '#374151',
+                            color: '#ffffff',
+                            fontSize: '0.74rem',
+                            fontWeight: 'bold',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            boxShadow: sec.esActual && caraPlaca === 'B' ? '0 0 8px rgba(124,58,237,0.5)' : 'none'
+                          }}
+                          title="Cargar este sector en Cara B"
+                        >
+                          🅱️ Abrir Cara B
+                        </button>
+                        {Object.keys(sectores).length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => eliminarSector(sec.nombre)}
+                            style={{
+                              padding: '6px 8px',
+                              borderRadius: '6px',
+                              border: '1px solid #4b5563',
+                              background: 'transparent',
+                              color: '#ef4444',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center'
+                            }}
+                            title="Eliminar este sector"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Sección 2: Mapear una Nueva Zona / Sector */}
+              <div style={{ borderTop: '1px solid #1f2937', paddingTop: '16px' }}>
+                <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                  <Plus size={16} /> CREAR O MAPEAR OTRO SECTOR DE LA PLACA
+                </span>
+                <p style={{ margin: '0 0 12px 0', color: '#9ca3af', fontSize: '0.72rem' }}>
+                  Selecciona una zona sugerida para mapear un sector con su propia foto de placa y componentes independientes:
+                </p>
+
+                {/* Chips de Sectores Sugeridos no mapeados */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '14px' }}>
+                  {SECTORES_PRESET
+                    .filter(preset => !sectoresDisponibles.some(d => d.nombre === preset))
+                    .map(preset => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => {
+                          cambiarSector(preset, 'A');
+                          setModalExploradorSectores(false);
+                        }}
+                        style={{
+                          background: '#1f2937',
+                          border: '1px dashed #4b5563',
+                          color: '#d1d5db',
+                          padding: '6px 12px',
+                          borderRadius: '6px',
+                          fontSize: '0.72rem',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                      >
+                        + {preset}
+                      </button>
+                    ))}
+                </div>
+
+                {/* Formulario de Sector Personalizado */}
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    value={nuevoSectorInput}
+                    onChange={(e) => setNuevoSectorInput(e.target.value)}
+                    placeholder="Escribir nombre de sector personalizado (ej: Subplaca Carga)..."
+                    style={{
+                      flex: 1,
+                      backgroundColor: '#0b0f19',
+                      border: '1px solid #374151',
+                      color: '#ffffff',
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      fontSize: '0.75rem',
+                      outline: 'none'
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && nuevoSectorInput.trim()) {
+                        cambiarSector(nuevoSectorInput.trim(), 'A');
+                        setNuevoSectorInput('');
+                        setModalExploradorSectores(false);
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (nuevoSectorInput.trim()) {
+                        cambiarSector(nuevoSectorInput.trim(), 'A');
+                        setNuevoSectorInput('');
+                        setModalExploradorSectores(false);
+                      }
+                    }}
+                    style={{
+                      backgroundColor: '#2563eb',
+                      color: '#ffffff',
+                      border: 'none',
+                      padding: '8px 16px',
+                      borderRadius: '6px',
+                      fontSize: '0.75rem',
+                      fontWeight: 'bold',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    + Mapear Sector
+                  </button>
+                </div>
+              </div>
+
+            </div>
+
+            {/* Footer del Modal */}
+            <div style={{
+              padding: '12px 20px',
+              borderTop: '1px solid #1f2937',
+              backgroundColor: '#0f172a',
+              display: 'flex',
+              justifyContent: 'flex-end'
+            }}>
+              <button
+                type="button"
+                onClick={() => setModalExploradorSectores(false)}
+                style={{
+                  padding: '6px 16px',
+                  backgroundColor: '#374151',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '0.75rem',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+              >
+                Cerrar
+              </button>
+            </div>
+
           </div>
         </div>
       )}

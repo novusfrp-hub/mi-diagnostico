@@ -951,6 +951,9 @@ export default function AppDiagnostico() {
           if (!modConBateria.boardviewSector && parsed.sector) {
             modConBateria.boardviewSector = parsed.sector;
           }
+          if (!modConBateria.boardviewSectores && parsed.sectores) {
+            modConBateria.boardviewSectores = parsed.sectores;
+          }
         }
       } catch (e) {
         console.warn('Error al verificar respaldo local boardview:', e);
@@ -1592,6 +1595,10 @@ export default function AppDiagnostico() {
     let nuevoEsquema = '';
     let nuevoSector = 'Placa Completa';
 
+    let nuevosSectores = (payload && typeof payload === 'object' && payload.sectores !== undefined)
+      ? payload.sectores
+      : (modeloActivo.boardviewSectores || null);
+
     if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
       nuevosComp = payload.componentes !== undefined ? payload.componentes : (modeloActivo.boardviewComponentes || []);
       nuevaPlacaCaraA = payload.imagenPlacaCaraA !== undefined ? payload.imagenPlacaCaraA : (modeloActivo.boardviewImagenPlacaCaraA || modeloActivo.boardviewImagenPlaca || '');
@@ -1609,6 +1616,7 @@ export default function AppDiagnostico() {
 
     const modeloActualizado = {
       ...modeloActivo,
+      boardviewSectores: nuevosSectores,
       boardviewComponentes: nuevosComp,
       boardviewImagenPlacaCaraA: nuevaPlacaCaraA,
       boardviewImagenPlacaCaraB: nuevaPlacaCaraB,
@@ -1622,6 +1630,7 @@ export default function AppDiagnostico() {
     // Respaldo inmediato en localStorage para evitar pérdida de datos
     try {
       localStorage.setItem('boardview_local_' + modeloActivo.id, JSON.stringify({
+        sectores: nuevosSectores,
         componentes: nuevosComp,
         imagenPlacaCaraA: nuevaPlacaCaraA,
         imagenPlacaCaraB: nuevaPlacaCaraB,
@@ -2558,6 +2567,7 @@ export default function AppDiagnostico() {
                 fullscreen
                 nombreModelo={`${modeloActivo.marca || ''} ${modeloActivo.nombre || ''}`.trim()}
                 onCerrar={() => setModalBoardviewAbierto(false)}
+                sectoresIniciales={modeloActivo.boardviewSectores || null}
                 componentesIniciales={modeloActivo.boardviewComponentes || []}
                 imagenPlacaInicial={modeloActivo.boardviewImagenPlacaCaraA || modeloActivo.boardviewImagenPlaca || modeloActivo.imgPlaca}
                 imagenPlacaCaraBInicial={modeloActivo.boardviewImagenPlacaCaraB || ''}
@@ -2567,6 +2577,7 @@ export default function AppDiagnostico() {
                   if (payload && typeof payload === 'object') {
                     setModeloActivo(prev => ({
                       ...prev,
+                      ...(payload.sectores !== undefined ? { boardviewSectores: payload.sectores } : {}),
                       ...(payload.componentes !== undefined ? { boardviewComponentes: payload.componentes } : {}),
                       ...(payload.imagenPlacaCaraA !== undefined ? { boardviewImagenPlacaCaraA: payload.imagenPlacaCaraA, boardviewImagenPlaca: payload.imagenPlacaCaraA } : {}),
                       ...(payload.imagenPlacaCaraB !== undefined ? { boardviewImagenPlacaCaraB: payload.imagenPlacaCaraB } : {}),
