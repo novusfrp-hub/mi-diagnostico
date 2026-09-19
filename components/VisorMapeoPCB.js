@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { 
   Save, Trash2, Plus, Move, ZoomIn, ZoomOut, Layers, Maximize2, 
   Settings, Edit, Play, HelpCircle, Activity, Check, AlertTriangle, 
-  Map, Eye, EyeOff, Clipboard, RefreshCw, ChevronRight, CheckCircle2,
+  Map, Eye, EyeOff, Clipboard, RefreshCw, ChevronRight, ChevronLeft, CheckCircle2,
   Image as ImageIcon, Upload, RotateCcw, X, Link, Search, RotateCw, Lock, Zap, ArrowLeftRight, Tag, Gauge, FolderOpen
 } from 'lucide-react';
 import SelectorTipoLinea from './SelectorTipoLinea';
@@ -203,6 +203,7 @@ export default function VisorMapeoPCB({
     return Array.isArray(comps) && comps.length > 0 ? comps[0]?.id : null;
   });
   const [selectedPadId, setSelectedPadId] = useState('1'); // '1' | '2'
+  const [sidebarAbierto, setSidebarAbierto] = useState(true);
   const [mostrarTodasEscalas, setMostrarTodasEscalas] = useState(false);
 
   // --- Capas de Imágenes de Fondo (Placa Cara A, Placa Cara B + Esquemático) ---
@@ -681,6 +682,7 @@ export default function VisorMapeoPCB({
     }
     setSelectedCompId(comp.id);
     setSelectedPadId('1');
+    setSidebarAbierto(true);
     setMostrarResultadosBusqueda(false);
     setBusqueda('');
 
@@ -802,6 +804,12 @@ export default function VisorMapeoPCB({
         confirmComponentCreation();
       }
       return;
+    }
+
+    if (tool === 'select') {
+      // Clic en área vacía/fondo de la placa: desmarcar componente y pin seleccionado
+      setSelectedCompId(null);
+      setSelectedPadId(null);
     }
   };
 
@@ -1791,7 +1799,7 @@ export default function VisorMapeoPCB({
               style={{ ...styles.capaBtn, ...(capaActiva === 'placa' && styles.capaBtnActive) }}
               title={`Capa de Imagen de Placa: Cara ${caraPlaca} del sector "${sectorPlaca}"`}
             >
-              📸 Placa [ Cara {caraPlaca} · {sectorPlaca} ]
+              📸 Foto Placa
             </button>
             <button 
               onClick={() => setCapaActiva('esquema')} 
@@ -1810,7 +1818,7 @@ export default function VisorMapeoPCB({
                   checked={showPlaca} 
                   onChange={(e) => setShowPlaca(e.target.checked)} 
                 />
-                Ver Foto [ Cara {caraPlaca} · {sectorPlaca} ]
+                Ver Foto
               </label>
 
               {showPlaca && (
@@ -1829,10 +1837,10 @@ export default function VisorMapeoPCB({
               )}
 
               <button onClick={() => fileInputPlacaRef.current && fileInputPlacaRef.current.click()} style={styles.imgBtn} title={`Subir foto de Cara ${caraPlaca} para el sector "${sectorPlaca}" desde PC`}>
-                <Upload size={12} /> Subir Foto [ Cara {caraPlaca} · {sectorPlaca} ]
+                <Upload size={12} /> Subir Foto
               </button>
               <button onClick={pedirUrlPlaca} style={styles.imgBtn} title={`Pegar URL directa de imagen para Cara ${caraPlaca} del sector "${sectorPlaca}"`}>
-                <Link size={12} /> URL [ Cara {caraPlaca} · {sectorPlaca} ]
+                <Link size={12} /> URL
               </button>
               <button 
                 onClick={() => {
@@ -2050,6 +2058,36 @@ export default function VisorMapeoPCB({
             <button onClick={() => fitToView()} style={styles.zoomBtn} title="Ajustar imagen a la vista"><Maximize2 size={15} /></button>
           </div>
 
+          {/* Botón flotante para reabrir el panel de detalles cuando está oculto */}
+          {!sidebarAbierto && (
+            <button
+              type="button"
+              onClick={() => setSidebarAbierto(true)}
+              style={{
+                position: 'absolute',
+                top: '16px',
+                right: '16px',
+                zIndex: 35,
+                backgroundColor: 'rgba(17, 24, 39, 0.95)',
+                color: '#00ffff',
+                border: '1.5px solid #374151',
+                borderRadius: '8px',
+                padding: '6px 12px',
+                fontSize: '0.75rem',
+                fontWeight: 'bold',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                cursor: 'pointer',
+                boxShadow: '0 4px 15px rgba(0,0,0,0.6)',
+                backdropFilter: 'blur(6px)'
+              }}
+              title="Mostrar panel de Detalles de Selección"
+            >
+              <ChevronLeft size={16} /> Detalles de Selección
+            </button>
+          )}
+
           {/* Banner de Orientación Flotante No Invasivo (Se oculta automáticamente al subir imagen o dibujar, o con la X) */}
           {!bannerGuiaCerrado && componentesVisibles.length === 0 && activeImgPlacaUrl === IMAGEN_PREDETERMINADA && (
             <div style={{
@@ -2231,7 +2269,9 @@ export default function VisorMapeoPCB({
                     key={comp.id}
                     onMouseDown={(e) => {
                       if (tool === 'select') {
+                        e.stopPropagation();
                         setSelectedCompId(comp.id);
+                        setSidebarAbierto(true);
                         setIsDraggingComp(true);
                         setDragCompId(comp.id);
                         const coords = getCanvasCoords(e);
@@ -2373,11 +2413,15 @@ export default function VisorMapeoPCB({
                             strokeWidth={isPadSelected ? '2' : (isNetMatch ? '1.5' : '1')}
                             vectorEffect="non-scaling-stroke"
                             style={{ cursor: 'pointer', transition: 'fill 0.2s' }}
+                            onMouseDown={(e) => {
+                              e.stopPropagation();
+                            }}
                             onClick={(e) => {
                               e.stopPropagation();
                               if (tool === 'select') {
                                 setSelectedCompId(comp.id);
                                 setSelectedPadId(pad.id);
+                                setSidebarAbierto(true);
                               }
                             }}
                             onMouseEnter={(e) => actualizarCoordenadasHover(e, comp, pad)}
@@ -2715,28 +2759,49 @@ export default function VisorMapeoPCB({
         </div>
 
         {/* SIDEBAR DERECHO: DETALLES, EDICIÓN, TIPO DE LÍNEA Y NET NAMES */}
+        {sidebarAbierto && (
         <div style={styles.sidebar}>
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #374151', paddingBottom: '6px', marginBottom: '10px' }}>
               <h3 style={styles.sidebarTitle}>Detalles de Selección</h3>
-              {compActivo && (
-                <div style={{ display: 'flex', gap: '4px' }}>
-                  <button 
-                    onClick={() => invertirPinesComponente(compActivo.id)}
-                    style={styles.actionSmallBtn}
-                    title="Invertir Pin 1 y Pin 2 (GND ↔ DATA)"
-                  >
-                    <ArrowLeftRight size={12} /> Invertir (1↔2)
-                  </button>
-                  <button 
-                    onClick={() => rotarComponente(compActivo.id)}
-                    style={styles.actionSmallBtn}
-                    title="Rotar componente 90° (Tecla R)"
-                  >
-                    <RotateCw size={12} /> Rotar 90°
-                  </button>
-                </div>
-              )}
+              <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                {compActivo && (
+                  <>
+                    <button 
+                      onClick={() => invertirPinesComponente(compActivo.id)}
+                      style={styles.actionSmallBtn}
+                      title="Invertir Pin 1 y Pin 2 (GND ↔ DATA)"
+                    >
+                      <ArrowLeftRight size={12} /> Invertir (1↔2)
+                    </button>
+                    <button 
+                      onClick={() => rotarComponente(compActivo.id)}
+                      style={styles.actionSmallBtn}
+                      title="Rotar componente 90° (Tecla R)"
+                    >
+                      <RotateCw size={12} /> Rotar 90°
+                    </button>
+                  </>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setSidebarAbierto(false)}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.08)',
+                    border: '1px solid #374151',
+                    color: '#9ca3af',
+                    cursor: 'pointer',
+                    padding: '3px 6px',
+                    borderRadius: '5px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    marginLeft: '4px'
+                  }}
+                  title="Esconder panel de selección"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
             </div>
             
             {compActivo && padActivo ? (
@@ -2766,10 +2831,6 @@ export default function VisorMapeoPCB({
                     >
                       {TIPOS_COMPONENTE.map(t => <option key={t} value={t}>{t}</option>)}
                     </select>
-                  </div>
-                  <div style={{ fontSize: '0.7rem', color: '#9ca3af', marginTop: '6px', display: 'flex', justifyContent: 'space-between' }}>
-                    <span>Posición: ({compActivo.x}, {compActivo.y})</span>
-                    <span>Tamaño: {compActivo.w}×{compActivo.h}px</span>
                   </div>
 
                   {/* Selector de Cara para el Componente Activo */}
@@ -3172,6 +3233,7 @@ export default function VisorMapeoPCB({
             </div>
           </div>
         </div>
+        )}
 
       </div>
 

@@ -841,6 +841,21 @@ export default function AppDiagnostico() {
 
   // ESTADOS LIBRERÍA
   const [libreriaVisible, setLibreriaVisible] = useState(false); const [modelosLibreria, setModelosLibreria] = useState([]); const [modeloActivo, setModeloActivo] = useState(null); const [fpcActivo, setFpcActivo] = useState(null); const [formNuevoModelo, setFormNuevoModelo] = useState({ marca: '', nombre: '' }); const [formNuevoFpc, setFormNuevoFpc] = useState({ nombre: '', pines: 40 }); const [seccionLibreria, setSeccionLibreria] = useState('fpc');
+  const [marcaDbSeleccionada, setMarcaDbSeleccionada] = useState(null);
+  const [nivelDb, setNivelDb] = useState('marcas'); // 'marcas' | 'modelos' | 'mediciones'
+
+  const marcasDisponibles = useMemo(() => {
+    const map = {};
+    modelosLibreria.forEach(m => {
+      const rawMarca = (m.marca || 'Otras').trim();
+      const key = rawMarca.toUpperCase();
+      if (!map[key]) {
+        map[key] = { nombre: rawMarca, modelos: [] };
+      }
+      map[key].modelos.push(m);
+    });
+    return Object.values(map).sort((a, b) => a.nombre.localeCompare(b.nombre));
+  }, [modelosLibreria]);
   const [imagenFpcVisible, setImagenFpcVisible] = useState(false);
   const [tipoImagenViendo, setTipoImagenViendo] = useState('placa');
   const [modalFpcAbierto, setModalFpcAbierto] = useState(false);
@@ -961,6 +976,8 @@ export default function AppDiagnostico() {
     }
 
     setModeloActivo(modConBateria);
+    setMarcaDbSeleccionada(modConBateria.marca || null);
+    setNivelDb('mediciones');
     setFpcActivo(modConBateria.fpcs?.[0] || null);
     setIcActivo(modConBateria.ics?.[0] || null);
 
@@ -1376,7 +1393,9 @@ export default function AppDiagnostico() {
       await setDoc(doc(db, "hardware_db", idUnico), sanitizarObjetoParaFirestore(nuevoObj));
       setFormNuevoModelo({ marca: '', nombre: '' });
       await cargarLibreriaDB();
+      setMarcaDbSeleccionada(nuevoObj.marca);
       setModeloActivo({ ...nuevoObj, id: idUnico });
+      setNivelDb('mediciones');
     } catch (error) {
       console.error("Error al crear modelo:", error);
       alert("❌ Error al añadir modelo: " + error.message);
@@ -1678,7 +1697,17 @@ export default function AppDiagnostico() {
     guardarModeloActualDB
   );
 
-  const abrirLibreria = () => { setLibreriaVisible(true); cargarLibreriaDB(); };
+  const abrirLibreria = () => {
+    setLibreriaVisible(true);
+    cargarLibreriaDB();
+    if (modeloActivo) {
+      setMarcaDbSeleccionada(modeloActivo.marca);
+      setNivelDb('mediciones');
+    } else {
+      setNivelDb('marcas');
+      setMarcaDbSeleccionada(null);
+    }
+  };
 
   // DIAGNÓSTICO BÁSICO (Flujos)
   const cargarFallasEnSerie = async () => { try { const qs = await getDocs(collection(db, "pasos")); const fallas = []; qs.forEach((doc) => { if (doc.data().esFallaEnSerie) fallas.push({ id: doc.id, ...doc.data() }); }); setFallasEnSerie(fallas); } catch (e) { } };
@@ -1931,18 +1960,115 @@ export default function AppDiagnostico() {
                   </form>
                 </div>
                 <div style={{ flex: 1, overflowY: 'auto', padding: '10px' }}>
-                  {modelosLibreria.map(mod => (
-                    <button key={mod.id} onClick={() => seleccionarModeloLibreria(mod)} style={{ width: '100%', padding: '12px', textAlign: 'left', backgroundColor: modeloActivo?.id === mod.id ? '#1f2937' : 'transparent', border: 'none', color: modeloActivo?.id === mod.id ? '#00ffff' : '#9ca3af', borderLeft: modeloActivo?.id === mod.id ? '4px solid #00ffff' : '4px solid transparent', cursor: 'pointer', borderRadius: '0 8px 8px 0', marginBottom: '5px', fontWeight: 'bold' }}>
-                      {mod.marca} {mod.nombre}
-                    </button>
-                  ))}
+                  <button
+                    onClick={() => { setNivelDb('marcas'); setMarcaDbSeleccionada(null); }}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      textAlign: 'left',
+                      backgroundColor: nivelDb === 'marcas' ? 'rgba(139, 92, 246, 0.2)' : 'transparent',
+                      border: 'none',
+                      color: nivelDb === 'marcas' ? '#a78bfa' : '#9ca3af',
+                      borderLeft: nivelDb === 'marcas' ? '4px solid #8b5cf6' : '4px solid transparent',
+                      cursor: 'pointer',
+                      borderRadius: '0 8px 8px 0',
+                      marginBottom: '6px',
+                      fontWeight: 'bold',
+                      fontSize: '0.85rem',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
+                    }}
+                  >
+                    <span>📱 Todas las Marcas</span>
+                    <span style={{ fontSize: '0.72rem', background: '#1f2937', padding: '2px 7px', borderRadius: '10px' }}>{marcasDisponibles.length}</span>
+                  </button>
+
+                  <div style={{ height: '1px', background: '#1f2937', margin: '8px 0' }} />
+                  <span style={{ fontSize: '0.68rem', color: '#6b7280', textTransform: 'uppercase', paddingLeft: '8px', fontWeight: 'bold' }}>Marcas ({marcasDisponibles.length})</span>
+
+                  {marcasDisponibles.map(item => {
+                    const isSelected = marcaDbSeleccionada?.toUpperCase() === item.nombre.toUpperCase();
+                    return (
+                      <button
+                        key={item.nombre}
+                        onClick={() => {
+                          setMarcaDbSeleccionada(item.nombre);
+                          setNivelDb('modelos');
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: '10px 12px',
+                          textAlign: 'left',
+                          backgroundColor: isSelected ? '#1f2937' : 'transparent',
+                          border: 'none',
+                          color: isSelected ? '#00ffff' : '#d1d5db',
+                          borderLeft: isSelected ? '4px solid #00ffff' : '4px solid transparent',
+                          cursor: 'pointer',
+                          borderRadius: '0 8px 8px 0',
+                          marginBottom: '4px',
+                          fontWeight: 'bold',
+                          fontSize: '0.85rem',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center'
+                        }}
+                      >
+                        <span>{item.nombre}</span>
+                        <span style={{ fontSize: '0.72rem', background: isSelected ? '#0e7490' : '#111827', color: isSelected ? '#ffffff' : '#9ca3af', padding: '2px 6px', borderRadius: '10px' }}>
+                          {item.modelos.length}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: '#111827' }}>
                 <div style={{ padding: '15px 20px', borderBottom: '1px solid #374151', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-                  <h2 style={{ color: 'white', margin: 0, fontSize: '1.2rem' }}>{modeloActivo ? `${modeloActivo.marca} ${modeloActivo.nombre}` : 'Selecciona Modelo'}</h2>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                    {nivelDb === 'modelos' && (
+                      <button
+                        onClick={() => { setNivelDb('marcas'); setMarcaDbSeleccionada(null); }}
+                        style={{ background: '#1f2937', border: '1px solid #374151', color: '#00ffff', padding: '6px 12px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '5px' }}
+                      >
+                        ← Volver a Marcas
+                      </button>
+                    )}
+                    {nivelDb === 'mediciones' && (
+                      <>
+                        <button
+                          onClick={() => { setNivelDb('modelos'); }}
+                          style={{ background: '#1f2937', border: '1px solid #374151', color: '#00ffff', padding: '6px 12px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '5px' }}
+                        >
+                          ← Volver a Modelos ({marcaDbSeleccionada || modeloActivo?.marca})
+                        </button>
+                        <button
+                          onClick={() => { setNivelDb('marcas'); setMarcaDbSeleccionada(null); }}
+                          style={{ background: '#111827', border: '1px solid #374151', color: '#9ca3af', padding: '6px 10px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}
+                        >
+                          Marcas
+                        </button>
+                      </>
+                    )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ color: '#9ca3af', fontSize: '0.9rem' }}>HARDWARE DB</span>
+                      {marcaDbSeleccionada && (
+                        <>
+                          <span style={{ color: '#6b7280' }}>/</span>
+                          <span style={{ color: '#c084fc', fontWeight: 'bold', fontSize: '0.95rem' }}>{marcaDbSeleccionada.toUpperCase()}</span>
+                        </>
+                      )}
+                      {nivelDb === 'mediciones' && modeloActivo && (
+                        <>
+                          <span style={{ color: '#6b7280' }}>/</span>
+                          <span style={{ color: '#00ffff', fontWeight: 'bold', fontSize: '1rem' }}>{modeloActivo.nombre.toUpperCase()}</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
                   <div style={{ display: 'flex', gap: '10px' }}>
-                    {modeloActivo && (
+                    {nivelDb === 'mediciones' && modeloActivo && (
                       <button
                         onClick={
                           seccionLibreria === 'ic'
@@ -1987,70 +2113,235 @@ export default function AppDiagnostico() {
                   </div>
                 </div>
 
-                <div style={{ padding: '15px 20px', borderBottom: '1px solid #374151', flexShrink: 0 }}>
-                  <VisorHUD
-                    valor={lecturaUsb.valor}
-                    unidad={lecturaUsb.unidad}
-                    conectado={usbConectado}
-                    conectarFn={conectarMultimetroUSB}
-                    desconectarFn={desconectarMultimetroUSB}
-                    vozActiva={vozActiva}
-                    toggleVozFn={toggleVoz}
-                    autoHoldActivo={autoHoldActivo}
-                    toggleAutoHoldFn={() => setAutoHoldActivo(!autoHoldActivo)}
-                    capturarFn={modeloActivo ? avanzarPinMagico : null}
-                    escalaActiva={
-                      modeloActivo
-                        ? (seccionLibreria === 'ic'
-                          ? escalaIc
-                          : (seccionLibreria === 'fpc_bateria'
-                            ? escalaFpcBateria
-                            : escalaFpc))
-                        : 'amperio'
-                    }
-                    oscilogramaActivo={mostrarOscilograma}
-                    toggleOscilogramaFn={() => {
-                      const nuevoEstado = !mostrarOscilograma;
-                      setMostrarOscilograma(nuevoEstado);
-                      if (nuevoEstado) {
-                        if (modeloActivo) {
-                          if (seccionLibreria === 'ic') {
-                            setEscalaIc('amperio');
-                          } else if (seccionLibreria === 'fpc_bateria') {
-                            setEscalaFpcBateria('diodo');
-                          } else {
-                            setEscalaFpc('amperio');
-                          }
-                        }
-                      }
-                    }}
-                    mostrarOscilogramaBtn={true}
-                  />
-                  {mostrarOscilograma && (
-                    <OscilogramaPanel
-                      valor={lecturaUsb.valor}
-                      unidad={lecturaUsb.unidad}
-                      escalaActiva={
-                        modeloActivo
-                          ? (seccionLibreria === 'ic' ? escalaIc : escalaFpc)
-                          : 'amperio'
-                      }
-                      tick={lecturaUsb.tick}
-                      onClose={() => setMostrarOscilograma(false)}
-                    />
-                  )}
-                </div>
-
-                {modeloActivo ? (
-                  <div style={{ flex: 1, overflowY: 'auto', padding: '15px' }}>
-                    <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
-                      <button onClick={() => cambiarSeccionLibreria('docktest')} style={{ padding: '10px 15px', borderRadius: '8px', border: 'none', background: seccionLibreria === 'docktest' ? '#3b82f6' : '#1f2937', color: 'white', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>Docktest</button>
-                      <button onClick={() => cambiarSeccionLibreria('fpc')} style={{ padding: '10px 15px', borderRadius: '8px', border: 'none', background: seccionLibreria === 'fpc' ? '#8b5cf6' : '#1f2937', color: 'white', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>Planos FPC</button>
-                      <button onClick={() => cambiarSeccionLibreria('fpc_bateria')} style={{ padding: '10px 15px', borderRadius: '8px', border: 'none', background: seccionLibreria === 'fpc_bateria' ? '#f59e0b' : '#1f2937', color: 'white', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>FPC Batería</button>
-                      <button onClick={() => cambiarSeccionLibreria('ic')} style={{ padding: '10px 15px', borderRadius: '8px', border: 'none', background: seccionLibreria === 'ic' ? '#ec4899' : '#1f2937', color: 'white', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>Planos IC / BGA</button>
-                      <button onClick={() => cambiarSeccionLibreria('rffe')} style={{ padding: '10px 15px', borderRadius: '8px', border: 'none', background: seccionLibreria === 'rffe' ? '#10b981' : '#1f2937', color: 'white', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>Módulo RFFE</button>
-                      <button onClick={() => { cambiarSeccionLibreria('boardview'); setModalBoardviewAbierto(true); }} style={{ padding: '10px 15px', borderRadius: '8px', border: 'none', background: seccionLibreria === 'boardview' ? '#00ffff' : '#1f2937', color: seccionLibreria === 'boardview' ? 'black' : 'white', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>Boardview PCB</button>
+                {/* NIVEL 1: VISTA DE TODAS LAS MARCAS */}
+                {nivelDb === 'marcas' && (
+                  <div style={{ flex: 1, overflowY: 'auto', padding: '25px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    <div>
+                      <h3 style={{ color: '#fff', fontSize: '1.4rem', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <Smartphone size={24} color="#00ffff" /> Marcas en Base de Datos
+                      </h3>
+                      <p style={{ color: '#9ca3af', fontSize: '0.85rem', margin: 0 }}>
+                        Selecciona una marca para ver sus modelos creados o añade un nuevo modelo en el panel lateral.
+                      </p>
                     </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px' }}>
+                      {marcasDisponibles.map(m => (
+                        <div
+                          key={m.nombre}
+                          onClick={() => {
+                            setMarcaDbSeleccionada(m.nombre);
+                            setNivelDb('modelos');
+                          }}
+                          style={{
+                            backgroundColor: '#1f2937',
+                            border: '1.5px solid #374151',
+                            borderRadius: '16px',
+                            padding: '20px',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'space-between',
+                            gap: '15px',
+                            boxShadow: '0 4px 15px rgba(0,0,0,0.3)'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.borderColor = '#8b5cf6';
+                            e.currentTarget.style.transform = 'translateY(-3px)';
+                            e.currentTarget.style.boxShadow = '0 8px 25px rgba(139, 92, 246, 0.25)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.borderColor = '#374151';
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.boxShadow = '0 4px 15px rgba(0,0,0,0.3)';
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'rgba(139, 92, 246, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#c084fc' }}>
+                              <Smartphone size={24} />
+                            </div>
+                            <span style={{ fontSize: '0.75rem', fontWeight: 'bold', background: '#111827', color: '#00ffff', padding: '4px 10px', borderRadius: '20px', border: '1px solid #374151' }}>
+                              {m.modelos.length} {m.modelos.length === 1 ? 'modelo' : 'modelos'}
+                            </span>
+                          </div>
+                          <div>
+                            <h4 style={{ color: 'white', margin: '0 0 4px 0', fontSize: '1.15rem', fontWeight: 'bold', letterSpacing: '0.02em' }}>
+                              {m.nombre}
+                            </h4>
+                            <span style={{ color: '#9ca3af', fontSize: '0.75rem' }}>
+                              Ver modelos disponibles →
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+
+                      {marcasDisponibles.length === 0 && (
+                        <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '60px 20px', color: '#6b7280' }}>
+                          <Cpu size={48} style={{ opacity: 0.3, marginBottom: '15px' }} />
+                          <h4 style={{ color: '#d1d5db', margin: '0 0 8px 0' }}>No hay teléfonos en la base de datos</h4>
+                          <p style={{ fontSize: '0.85rem' }}>Usa el formulario de la izquierda para agregar tu primer teléfono.</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* NIVEL 2: VISTA DE MODELOS DE LA MARCA SELECCIONADA */}
+                {nivelDb === 'modelos' && (
+                  <div style={{ flex: 1, overflowY: 'auto', padding: '25px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                      <div>
+                        <h3 style={{ color: '#fff', fontSize: '1.4rem', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <span style={{ color: '#8b5cf6' }}>{marcaDbSeleccionada?.toUpperCase()}</span>
+                          <span style={{ color: '#6b7280', fontSize: '1rem', fontWeight: 'normal' }}>• Modelos Registrados</span>
+                        </h3>
+                        <p style={{ color: '#9ca3af', fontSize: '0.85rem', margin: 0 }}>
+                          Selecciona un modelo para abrir sus mediciones, esquemáticos y boardview.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '16px' }}>
+                      {modelosLibreria
+                        .filter(m => (m.marca || '').trim().toUpperCase() === (marcaDbSeleccionada || '').trim().toUpperCase())
+                        .map(mod => {
+                          const tieneBoardview = !!(mod.boardviewComponentes?.length || mod.boardviewImagenPlaca || mod.imgPlaca);
+                          const tieneFpc = !!(mod.fpcs?.length);
+                          const tieneBateria = !!(mod.fpcBateria?.pines?.length);
+                          const tieneIc = !!(mod.ics?.length);
+
+                          return (
+                            <div
+                              key={mod.id}
+                              onClick={() => {
+                                seleccionarModeloLibreria(mod);
+                                setNivelDb('mediciones');
+                              }}
+                              style={{
+                                backgroundColor: '#1f2937',
+                                border: modeloActivo?.id === mod.id ? '2px solid #00ffff' : '1.5px solid #374151',
+                                borderRadius: '16px',
+                                padding: '18px',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                justifyContent: 'space-between',
+                                gap: '14px',
+                                boxShadow: modeloActivo?.id === mod.id ? '0 0 20px rgba(0, 255, 255, 0.2)' : '0 4px 15px rgba(0,0,0,0.3)'
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.borderColor = '#00ffff';
+                                e.currentTarget.style.transform = 'translateY(-3px)';
+                                e.currentTarget.style.boxShadow = '0 8px 25px rgba(0, 255, 255, 0.2)';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.borderColor = modeloActivo?.id === mod.id ? '#00ffff' : '#374151';
+                                e.currentTarget.style.transform = 'translateY(0)';
+                                e.currentTarget.style.boxShadow = modeloActivo?.id === mod.id ? '0 0 20px rgba(0, 255, 255, 0.2)' : '0 4px 15px rgba(0,0,0,0.3)';
+                              }}
+                            >
+                              <div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                                  <span style={{ fontSize: '0.7rem', color: '#8b5cf6', fontWeight: 'bold', textTransform: 'uppercase', background: 'rgba(139, 92, 246, 0.15)', padding: '2px 8px', borderRadius: '6px' }}>
+                                    {mod.marca}
+                                  </span>
+                                  {tieneBoardview && (
+                                    <span style={{ fontSize: '0.65rem', color: '#00ffff', background: 'rgba(0, 255, 255, 0.15)', padding: '2px 8px', borderRadius: '6px', fontWeight: 'bold' }}>
+                                      🗺️ BOARDVIEW
+                                    </span>
+                                  )}
+                                </div>
+                                <h4 style={{ color: 'white', margin: '0 0 10px 0', fontSize: '1.15rem', fontWeight: 'bold' }}>
+                                  {mod.nombre}
+                                </h4>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', fontSize: '0.68rem', color: '#9ca3af' }}>
+                                  {tieneFpc && <span style={{ background: '#111827', padding: '2px 6px', borderRadius: '4px' }}>FPC: {mod.fpcs.length}</span>}
+                                  {tieneBateria && <span style={{ background: '#111827', padding: '2px 6px', borderRadius: '4px' }}>Batería OK</span>}
+                                  {tieneIc && <span style={{ background: '#111827', padding: '2px 6px', borderRadius: '4px' }}>IC: {mod.ics.length}</span>}
+                                </div>
+                              </div>
+
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '10px', borderTop: '1px solid #374151' }}>
+                                <span style={{ color: '#00ffff', fontSize: '0.78rem', fontWeight: 'bold' }}>
+                                  Abrir Mediciones →
+                                </span>
+                                <ChevronRight size={16} color="#00ffff" />
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
+                )}
+
+                {/* NIVEL 3: VISTA DE MEDICIONES DEL MODELO ACTIVO */}
+                {nivelDb === 'mediciones' && modeloActivo && (
+                  <>
+                    <div style={{ padding: '15px 20px', borderBottom: '1px solid #374151', flexShrink: 0 }}>
+                      <VisorHUD
+                        valor={lecturaUsb.valor}
+                        unidad={lecturaUsb.unidad}
+                        conectado={usbConectado}
+                        conectarFn={conectarMultimetroUSB}
+                        desconectarFn={desconectarMultimetroUSB}
+                        vozActiva={vozActiva}
+                        toggleVozFn={toggleVoz}
+                        autoHoldActivo={autoHoldActivo}
+                        toggleAutoHoldFn={() => setAutoHoldActivo(!autoHoldActivo)}
+                        capturarFn={modeloActivo ? avanzarPinMagico : null}
+                        escalaActiva={
+                          modeloActivo
+                            ? (seccionLibreria === 'ic'
+                              ? escalaIc
+                              : (seccionLibreria === 'fpc_bateria'
+                                ? escalaFpcBateria
+                                : escalaFpc))
+                            : 'amperio'
+                        }
+                        oscilogramaActivo={mostrarOscilograma}
+                        toggleOscilogramaFn={() => {
+                          const nuevoEstado = !mostrarOscilograma;
+                          setMostrarOscilograma(nuevoEstado);
+                          if (nuevoEstado) {
+                            if (modeloActivo) {
+                              if (seccionLibreria === 'ic') {
+                                setEscalaIc('amperio');
+                              } else if (seccionLibreria === 'fpc_bateria') {
+                                setEscalaFpcBateria('diodo');
+                              } else {
+                                setEscalaFpc('amperio');
+                              }
+                            }
+                          }
+                        }}
+                        mostrarOscilogramaBtn={true}
+                      />
+                      {mostrarOscilograma && (
+                        <OscilogramaPanel
+                          valor={lecturaUsb.valor}
+                          unidad={lecturaUsb.unidad}
+                          escalaActiva={
+                            modeloActivo
+                              ? (seccionLibreria === 'ic' ? escalaIc : escalaFpc)
+                              : 'amperio'
+                          }
+                          tick={lecturaUsb.tick}
+                          onClose={() => setMostrarOscilograma(false)}
+                        />
+                      )}
+                    </div>
+
+                    <div style={{ flex: 1, overflowY: 'auto', padding: '15px' }}>
+                      <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
+                        <button onClick={() => cambiarSeccionLibreria('docktest')} style={{ padding: '10px 15px', borderRadius: '8px', border: 'none', background: seccionLibreria === 'docktest' ? '#3b82f6' : '#1f2937', color: 'white', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>Docktest</button>
+                        <button onClick={() => cambiarSeccionLibreria('fpc')} style={{ padding: '10px 15px', borderRadius: '8px', border: 'none', background: seccionLibreria === 'fpc' ? '#8b5cf6' : '#1f2937', color: 'white', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>Planos FPC</button>
+                        <button onClick={() => cambiarSeccionLibreria('fpc_bateria')} style={{ padding: '10px 15px', borderRadius: '8px', border: 'none', background: seccionLibreria === 'fpc_bateria' ? '#f59e0b' : '#1f2937', color: 'white', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>FPC Batería</button>
+                        <button onClick={() => cambiarSeccionLibreria('ic')} style={{ padding: '10px 15px', borderRadius: '8px', border: 'none', background: seccionLibreria === 'ic' ? '#ec4899' : '#1f2937', color: 'white', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>Planos IC / BGA</button>
+                        <button onClick={() => cambiarSeccionLibreria('rffe')} style={{ padding: '10px 15px', borderRadius: '8px', border: 'none', background: seccionLibreria === 'rffe' ? '#10b981' : '#1f2937', color: 'white', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>Módulo RFFE</button>
+                        <button onClick={() => { cambiarSeccionLibreria('boardview'); setModalBoardviewAbierto(true); }} style={{ padding: '10px 15px', borderRadius: '8px', border: 'none', background: seccionLibreria === 'boardview' ? '#00ffff' : '#1f2937', color: seccionLibreria === 'boardview' ? 'black' : 'white', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>Boardview PCB</button>
+                      </div>
 
                     {seccionLibreria === 'docktest' && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -2320,8 +2611,8 @@ export default function AppDiagnostico() {
                     )}
 
                     {seccionLibreria === 'boardview' && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                        <div style={{ backgroundColor: '#111827', border: '1px solid #374151', borderRadius: '12px', padding: '35px 20px', textAlign: 'center' }}>
+                      <div style={{ padding: '20px', textAlign: 'center', color: '#6b7280' }}>
+                        <div style={{ background: '#0a0d16', border: '1.5px dashed #00ffff', borderRadius: '15px', padding: '40px 20px', maxWidth: '600px', margin: '20px auto' }}>
                           <Map size={44} color="#00ffff" style={{ opacity: 0.7, marginBottom: '12px' }} />
                           <h3 style={{ color: '#fff', margin: '0 0 6px 0' }}>BOARDVIEW PRO</h3>
                           <p style={{ color: '#9ca3af', fontSize: '0.85rem', margin: '0 auto 20px auto', maxWidth: '440px', lineHeight: '1.5' }}>
@@ -2334,7 +2625,8 @@ export default function AppDiagnostico() {
                       </div>
                     )}
                   </div>
-                ) : (<div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', color: 'gray' }}><Smartphone size={64} style={{ opacity: 0.2, marginBottom: '15px' }} /><h3>Selecciona un teléfono</h3></div>)}
+                  </>
+                )}
               </div>
             </motion.div>
           </motion.div>
@@ -2546,27 +2838,6 @@ export default function AppDiagnostico() {
       <AnimatePresence>
         {modalBoardviewAbierto && modeloActivo && (
           <motion.div className="no-print" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#0a0b0f', zIndex: 2500, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            <div style={{ padding: '10px 20px', borderBottom: '1px solid #374151', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#111827', flexShrink: 0, flexWrap: 'wrap', gap: '8px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Map size={20} color="#00ffff" />
-                  <span style={{ color: 'white', fontWeight: 'bold', fontSize: '1.1rem' }}>BOARDVIEW PRO</span>
-                </div>
-                <span style={{ fontSize: '0.8rem', padding: '3px 10px', borderRadius: '8px', background: '#1f2937', color: '#00ffff', fontWeight: 'bold', border: '1px solid #374151' }}>
-                  {modeloActivo.marca?.toUpperCase()} • {modeloActivo.nombre?.toUpperCase()}
-                </span>
-                <span style={{ fontSize: '0.74rem', padding: '3px 10px', borderRadius: '8px', background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', fontWeight: 'bold', border: '1px solid rgba(56, 189, 248, 0.35)' }}>
-                  📍 SECTOR: {(modeloActivo.boardviewSector || 'Placa Completa').toUpperCase()}
-                </span>
-                <span style={{ fontSize: '0.7rem', padding: '3px 8px', borderRadius: '12px', background: 'rgba(255,255,255,0.05)', color: '#9ca3af', fontWeight: 'bold' }}>MAPEO SMD / CALCADO</span>
-              </div>
-              <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-                <span className="hide-on-mobile" style={{ fontSize: '0.7rem', color: '#6b7280' }}>
-                  Rueda: zoom al cursor · Mover: paneo · + Dibujar SMD: trazar componente
-                </span>
-                <button onClick={() => setModalBoardviewAbierto(false)} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', cursor: 'pointer', padding: '8px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}><X size={20} /></button>
-              </div>
-            </div>
             <div style={{ flex: 1, overflow: 'hidden', padding: 0 }}>
               <VisorMapeoPCB
                 fullscreen
