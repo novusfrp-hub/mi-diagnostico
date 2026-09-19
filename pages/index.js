@@ -1645,7 +1645,9 @@ export default function AppDiagnostico() {
 
     try {
       await guardarModeloActualDB(modeloActualizado, true);
-      alert("¡Boardview (Cara A/B, componentes y sector) guardado en la nube de Marshall Cell exitosamente!");
+      const compsA = nuevosComp.filter(c => (c.cara || 'A') === 'A').length;
+      const compsB = nuevosComp.filter(c => c.cara === 'B').length;
+      alert(`¡Boardview guardado exitosamente en Marshall Cell!\n📍 Sector: ${nuevoSector}\n🅰️ Cara A: ${compsA} componentes | 🅱️ Cara B: ${compsB} componentes`);
     } catch (err) {
       console.error("Error al guardar Boardview en Firestore:", err);
     } finally {
@@ -2552,6 +2554,9 @@ export default function AppDiagnostico() {
                 </div>
                 <span style={{ fontSize: '0.8rem', padding: '3px 10px', borderRadius: '8px', background: '#1f2937', color: '#00ffff', fontWeight: 'bold', border: '1px solid #374151' }}>
                   {modeloActivo.marca?.toUpperCase()} • {modeloActivo.nombre?.toUpperCase()}
+                </span>
+                <span style={{ fontSize: '0.74rem', padding: '3px 10px', borderRadius: '8px', background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', fontWeight: 'bold', border: '1px solid rgba(56, 189, 248, 0.35)' }}>
+                  📍 SECTOR: {(modeloActivo.boardviewSector || 'Placa Completa').toUpperCase()}
                 </span>
                 <span style={{ fontSize: '0.7rem', padding: '3px 8px', borderRadius: '12px', background: 'rgba(255,255,255,0.05)', color: '#9ca3af', fontWeight: 'bold' }}>MAPEO SMD / CALCADO</span>
               </div>

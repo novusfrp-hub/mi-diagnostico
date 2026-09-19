@@ -130,13 +130,14 @@ const comprimirImagen = (file, maxDim = 1920, quality = 0.82) => {
 
 export const SECTORES_PRESET = [
   'Placa Completa',
+  'Backlight / Pantalla LCD',
   'Área Carga / PMIC',
   'Área CPU / Memoria UFS',
-  'Área Backlight / Display',
   'Área Conectores FPC',
   'Área RF / Transceiver',
   'Área Audio / Códec',
-  'Área Cámaras / Sensores'
+  'Área Cámaras / Sensores',
+  'Wi-Fi & Bluetooth'
 ];
 
 export default function VisorMapeoPCB({
@@ -187,22 +188,46 @@ export default function VisorMapeoPCB({
 
   // --- Estados locales de componentes del Boardview ---
   const [componentes, setComponentes] = useState(() => {
+    const secInit = sectorInicial || 'Placa Completa';
+    if (sectoresIniciales && sectoresIniciales[secInit]?.componentes) {
+      return sectoresIniciales[secInit].componentes;
+    }
     if (Array.isArray(componentesIniciales)) return componentesIniciales;
     return [];
   });
 
   const [activeScale, setActiveScale] = useState(escala);
   const [selectedCompId, setSelectedCompId] = useState(() => {
-    return Array.isArray(componentesIniciales) && componentesIniciales.length > 0 ? componentesIniciales[0]?.id : null;
+    const secInit = sectorInicial || 'Placa Completa';
+    const comps = (sectoresIniciales && sectoresIniciales[secInit]?.componentes) || componentesIniciales;
+    return Array.isArray(comps) && comps.length > 0 ? comps[0]?.id : null;
   });
   const [selectedPadId, setSelectedPadId] = useState('1'); // '1' | '2'
   const [mostrarTodasEscalas, setMostrarTodasEscalas] = useState(false);
 
   // --- Capas de Imágenes de Fondo (Placa Cara A, Placa Cara B + Esquemático) ---
   const [capaActiva, setCapaActiva] = useState('placa'); // 'placa' | 'esquema'
-  const [imgPlacaCaraAUrl, setImgPlacaCaraAUrl] = useState(imagenPlacaInicial || IMAGEN_PREDETERMINADA);
-  const [imgPlacaCaraBUrl, setImgPlacaCaraBUrl] = useState(imagenPlacaCaraBInicial || '');
-  const [imgEsquemaUrl, setImgEsquemaUrl] = useState(imagenEsquemaInicial || '');
+  const [imgPlacaCaraAUrl, setImgPlacaCaraAUrl] = useState(() => {
+    const secInit = sectorInicial || 'Placa Completa';
+    if (sectoresIniciales && sectoresIniciales[secInit]?.imagenCaraA) {
+      return sectoresIniciales[secInit].imagenCaraA;
+    }
+    return imagenPlacaInicial || IMAGEN_PREDETERMINADA;
+  });
+  const [imgPlacaCaraBUrl, setImgPlacaCaraBUrl] = useState(() => {
+    const secInit = sectorInicial || 'Placa Completa';
+    if (sectoresIniciales && sectoresIniciales[secInit]?.imagenCaraB) {
+      return sectoresIniciales[secInit].imagenCaraB;
+    }
+    return imagenPlacaCaraBInicial || '';
+  });
+  const [imgEsquemaUrl, setImgEsquemaUrl] = useState(() => {
+    const secInit = sectorInicial || 'Placa Completa';
+    if (sectoresIniciales && sectoresIniciales[secInit]?.imagenEsquema) {
+      return sectoresIniciales[secInit].imagenEsquema;
+    }
+    return imagenEsquemaInicial || '';
+  });
   const [showPlaca, setShowPlaca] = useState(true);
   const [showEsquema, setShowEsquema] = useState(false);
   const [placaOpacity, setPlacaOpacity] = useState(0.85);
@@ -1394,146 +1419,163 @@ export default function VisorMapeoPCB({
             </span>
           )}
 
-          {/* Toggle de Caras: Cara A (Superior) / Cara B (Inferior) con métricas en tiempo real */}
-          <div style={{ display: 'flex', background: '#0b0f19', padding: '2px', borderRadius: '8px', border: '1px solid #374151' }}>
-            <button 
-              type="button"
-              onClick={() => {
-                setCaraPlaca('A');
-                const compA = componentes.find(c => (c.cara || 'A') === 'A');
-                if (compA) { setSelectedCompId(compA.id); setSelectedPadId('1'); }
-                else { setSelectedCompId(null); }
-              }}
-              style={{
-                padding: '4px 10px',
-                borderRadius: '6px',
-                border: 'none',
-                background: caraPlaca === 'A' ? 'linear-gradient(135deg, #2563eb, #3b82f6)' : 'transparent',
-                color: caraPlaca === 'A' ? '#ffffff' : '#9ca3af',
-                fontWeight: 'bold',
-                fontSize: '0.74rem',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px',
-                boxShadow: caraPlaca === 'A' ? '0 0 10px rgba(59,130,246,0.5)' : 'none',
-                transition: 'all 0.15s'
-              }}
-              title="Cambiar a Cara A (Superior / Frontal)"
-            >
-              🅰️ Cara A {sectorActivoInfo.compsA > 0 ? `(${sectorActivoInfo.compsA})` : ''} {sectorActivoInfo.hasImgA ? '📷' : ''}
-            </button>
-            <button 
-              type="button"
-              onClick={() => {
-                setCaraPlaca('B');
-                const compB = componentes.find(c => c.cara === 'B');
-                if (compB) { setSelectedCompId(compB.id); setSelectedPadId('1'); }
-                else { setSelectedCompId(null); }
-              }}
-              style={{
-                padding: '4px 10px',
-                borderRadius: '6px',
-                border: 'none',
-                background: caraPlaca === 'B' ? 'linear-gradient(135deg, #7c3aed, #8b5cf6)' : 'transparent',
-                color: caraPlaca === 'B' ? '#ffffff' : '#9ca3af',
-                fontWeight: 'bold',
-                fontSize: '0.74rem',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px',
-                boxShadow: caraPlaca === 'B' ? '0 0 10px rgba(139,92,246,0.5)' : 'none',
-                transition: 'all 0.15s'
-              }}
-              title="Cambiar a Cara B (Inferior / Posterior)"
-            >
-              🅱️ Cara B {sectorActivoInfo.compsB > 0 ? `(${sectorActivoInfo.compsB})` : ''} {sectorActivoInfo.hasImgB ? '📷' : ''}
-            </button>
-          </div>
-
-          {/* Botón de Explorador de Sectores (Abre la ventana modal con todos los sectores mapeados) */}
-          <button
-            type="button"
-            onClick={() => setModalExploradorSectores(true)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              background: 'linear-gradient(135deg, #1e293b, #0f172a)',
-              border: '1px solid #38bdf8',
-              color: '#38bdf8',
-              padding: '4px 10px',
-              borderRadius: '7px',
-              fontSize: '0.73rem',
-              fontWeight: 'bold',
-              cursor: 'pointer',
-              boxShadow: '0 0 8px rgba(56, 189, 248, 0.2)'
-            }}
-            title="Abrir ventana de sectores disponibles y administración de áreas de la placa"
-          >
-            <FolderOpen size={14} />
-            <span>Sectores ({sectoresDisponibles.length} disp.)</span>
-          </button>
-
-          {/* Selector Rápido de Sector con diferenciador visual (Disponibles vs Nuevos) */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <span style={{ fontSize: '0.68rem', color: '#9ca3af', fontWeight: 'bold' }}>📍 Zona:</span>
-            <select
-              value={sectorPlaca}
-              onChange={(e) => {
-                if (e.target.value === '__custom__') {
-                  const custom = window.prompt("Ingresa el nombre del nuevo sector o área de la placa:", "");
-                  if (custom && custom.trim()) cambiarSector(custom.trim());
-                } else {
-                  cambiarSector(e.target.value);
-                }
-              }}
-              style={{
-                background: '#0b0f19',
-                color: '#38bdf8',
-                border: '1px solid #374151',
-                borderRadius: '6px',
-                padding: '3px 8px',
-                fontSize: '0.72rem',
-                fontWeight: 'bold',
-                cursor: 'pointer',
-                maxWidth: '190px'
-              }}
-              title="Selecciona un sector disponible o mapea una nueva zona"
-            >
-              <optgroup label="🟢 SECTORES DISPONIBLES EN ESTE MODELO">
-                {sectoresDisponibles.map(sec => (
-                  <option key={sec.nombre} value={sec.nombre}>
-                    🟢 {sec.nombre} ({sec.compsTotal} comps{sec.hasImgA || sec.hasImgB ? ' · 📷' : ''})
-                  </option>
-                ))}
-              </optgroup>
-
-              <optgroup label="➕ MAPEAR NUEVO SECTOR...">
-                {SECTORES_PRESET
-                  .filter(p => !sectoresDisponibles.some(d => d.nombre === p))
-                  .map(p => (
-                    <option key={p} value={p}>
-                      ⚪ {p} (Sin mapear)
+          {/* PANEL INTEGRADO: SECTOR Y CARA DE LA PLACA */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            background: 'linear-gradient(135deg, #0b0f19, #111827)',
+            padding: '3px 8px',
+            borderRadius: '8px',
+            border: '1.5px solid #38bdf8',
+            boxShadow: '0 0 12px rgba(56, 189, 248, 0.2)'
+          }}>
+            {/* Selector de Sector / Zona */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <span style={{ fontSize: '0.65rem', color: '#9ca3af', fontWeight: 'bold' }}>📍 SECTOR:</span>
+              <select
+                value={sectorPlaca}
+                onChange={(e) => {
+                  if (e.target.value === '__custom__') {
+                    const custom = window.prompt("Ingresa el nombre del nuevo sector o área de la placa (ej: Backlight LCD):", "");
+                    if (custom && custom.trim()) cambiarSector(custom.trim());
+                  } else {
+                    cambiarSector(e.target.value);
+                  }
+                }}
+                style={{
+                  background: '#111827',
+                  color: '#00ffff',
+                  border: '1px solid #374151',
+                  borderRadius: '5px',
+                  padding: '3px 8px',
+                  fontSize: '0.73rem',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  maxWidth: '185px'
+                }}
+                title="Seleccionar sector de la placa base"
+              >
+                <optgroup label="🟢 SECTORES DISPONIBLES EN ESTE MODELO">
+                  {sectoresDisponibles.map(sec => (
+                    <option key={sec.nombre} value={sec.nombre}>
+                      🟢 {sec.nombre} (A: {sec.compsA} | B: {sec.compsB}{sec.hasImgA || sec.hasImgB ? ' · 📷' : ''})
                     </option>
                   ))}
-                <option value="__custom__">✏️ + Escribir nuevo sector...</option>
-              </optgroup>
-            </select>
-          </div>
+                </optgroup>
 
-          <span style={{
-            fontSize: '0.7rem',
-            padding: '3px 8px',
-            borderRadius: '6px',
-            background: sectorActivoInfo.tieneDatos ? 'rgba(16, 185, 129, 0.12)' : 'rgba(56, 189, 248, 0.1)',
-            color: sectorActivoInfo.tieneDatos ? '#10b981' : '#38bdf8',
-            border: `1px solid ${sectorActivoInfo.tieneDatos ? 'rgba(16, 185, 129, 0.3)' : 'rgba(56, 189, 248, 0.25)'}`,
-            fontWeight: 'bold'
-          }}>
-            CARA {caraPlaca} • {sectorPlaca.toUpperCase()} {sectorActivoInfo.tieneDatos ? '• 🟢 DISPONIBLE' : '• ⚪ NUEVO'}
-          </span>
+                <optgroup label="➕ MAPEAR NUEVO SECTOR...">
+                  {SECTORES_PRESET
+                    .filter(p => !sectoresDisponibles.some(d => d.nombre === p))
+                    .map(p => (
+                      <option key={p} value={p}>
+                        ⚪ {p} (Sin mapear)
+                      </option>
+                    ))}
+                  <option value="__custom__">✏️ + Escribir nuevo sector...</option>
+                </optgroup>
+              </select>
+            </div>
+
+            {/* Selector de Cara integrado al sector activo */}
+            <div style={{ display: 'flex', background: '#0b0f19', padding: '2px', borderRadius: '6px', border: '1px solid #374151' }}>
+              <button 
+                type="button"
+                onClick={() => {
+                  setCaraPlaca('A');
+                  const compA = componentes.find(c => (c.cara || 'A') === 'A');
+                  if (compA) { setSelectedCompId(compA.id); setSelectedPadId('1'); }
+                  else { setSelectedCompId(null); }
+                }}
+                style={{
+                  padding: '3px 8px',
+                  borderRadius: '5px',
+                  border: 'none',
+                  background: caraPlaca === 'A' ? 'linear-gradient(135deg, #2563eb, #3b82f6)' : 'transparent',
+                  color: caraPlaca === 'A' ? '#ffffff' : '#9ca3af',
+                  fontWeight: 'bold',
+                  fontSize: '0.72rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  boxShadow: caraPlaca === 'A' ? '0 0 8px rgba(59,130,246,0.6)' : 'none',
+                  transition: 'all 0.15s'
+                }}
+                title={`Ver Cara A del sector "${sectorPlaca}"`}
+              >
+                🅰️ Cara A {sectorActivoInfo.compsA > 0 ? `(${sectorActivoInfo.compsA})` : ''} {sectorActivoInfo.hasImgA ? '📷' : ''}
+              </button>
+              <button 
+                type="button"
+                onClick={() => {
+                  setCaraPlaca('B');
+                  const compB = componentes.find(c => c.cara === 'B');
+                  if (compB) { setSelectedCompId(compB.id); setSelectedPadId('1'); }
+                  else { setSelectedCompId(null); }
+                }}
+                style={{
+                  padding: '3px 8px',
+                  borderRadius: '5px',
+                  border: 'none',
+                  background: caraPlaca === 'B' ? 'linear-gradient(135deg, #7c3aed, #8b5cf6)' : 'transparent',
+                  color: caraPlaca === 'B' ? '#ffffff' : '#9ca3af',
+                  fontWeight: 'bold',
+                  fontSize: '0.72rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  boxShadow: caraPlaca === 'B' ? '0 0 8px rgba(139,92,246,0.6)' : 'none',
+                  transition: 'all 0.15s'
+                }}
+                title={`Ver Cara B del sector "${sectorPlaca}"`}
+              >
+                🅱️ Cara B {sectorActivoInfo.compsB > 0 ? `(${sectorActivoInfo.compsB})` : ''} {sectorActivoInfo.hasImgB ? '📷' : ''}
+              </button>
+            </div>
+
+            {/* Badge visual claro y explícito: CARA + SECTOR */}
+            <span style={{
+              fontSize: '0.71rem',
+              padding: '2px 8px',
+              borderRadius: '5px',
+              background: sectorActivoInfo.tieneDatos ? 'rgba(16, 185, 129, 0.15)' : 'rgba(56, 189, 248, 0.12)',
+              color: sectorActivoInfo.tieneDatos ? '#34d399' : '#38bdf8',
+              border: `1px solid ${sectorActivoInfo.tieneDatos ? 'rgba(16, 185, 129, 0.4)' : 'rgba(56, 189, 248, 0.3)'}`,
+              fontWeight: 'bold',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}>
+              <span style={{ color: caraPlaca === 'A' ? '#60a5fa' : '#c084fc' }}>CARA {caraPlaca}</span>
+              <span style={{ opacity: 0.6 }}>•</span>
+              <span>{sectorPlaca.toUpperCase()}</span>
+              <span style={{ fontSize: '0.62rem', opacity: 0.85 }}>({sectorActivoInfo.tieneDatos ? '🟢 Mapeado' : '⚪ Sin datos'})</span>
+            </span>
+
+            {/* Botón Explorador Modal */}
+            <button
+              type="button"
+              onClick={() => setModalExploradorSectores(true)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                background: '#1f2937',
+                border: '1px solid #4b5563',
+                color: '#38bdf8',
+                padding: '3px 8px',
+                borderRadius: '5px',
+                fontSize: '0.7rem',
+                fontWeight: 'bold',
+                cursor: 'pointer'
+              }}
+              title="Abrir explorador detallado de sectores y caras"
+            >
+              <FolderOpen size={13} /> Explorador
+            </button>
+          </div>
 
           <div style={styles.divider} />
 
@@ -1747,12 +1789,14 @@ export default function VisorMapeoPCB({
             <button 
               onClick={() => setCapaActiva('placa')} 
               style={{ ...styles.capaBtn, ...(capaActiva === 'placa' && styles.capaBtnActive) }}
+              title={`Capa de Imagen de Placa: Cara ${caraPlaca} del sector "${sectorPlaca}"`}
             >
-              📸 Placa Cara {caraPlaca}
+              📸 Placa [ Cara {caraPlaca} · {sectorPlaca} ]
             </button>
             <button 
               onClick={() => setCapaActiva('esquema')} 
               style={{ ...styles.capaBtn, ...(capaActiva === 'esquema' && styles.capaBtnActive) }}
+              title={`Capa de Diagrama Esquemático del sector "${sectorPlaca}"`}
             >
               🗺️ Capa Esquema
             </button>
@@ -1766,7 +1810,7 @@ export default function VisorMapeoPCB({
                   checked={showPlaca} 
                   onChange={(e) => setShowPlaca(e.target.checked)} 
                 />
-                Ver Placa ({caraPlaca})
+                Ver Foto [ Cara {caraPlaca} · {sectorPlaca} ]
               </label>
 
               {showPlaca && (
@@ -1776,7 +1820,7 @@ export default function VisorMapeoPCB({
                     type="range" 
                     min="0.1" 
                     max="1.0" 
-                    step="0.05"
+                    step="0.05" 
                     value={placaOpacity} 
                     onChange={(e) => setPlacaOpacity(parseFloat(e.target.value))}
                     style={{ width: '55px', accentColor: '#3b82f6' }}
@@ -1784,11 +1828,11 @@ export default function VisorMapeoPCB({
                 </div>
               )}
 
-              <button onClick={() => fileInputPlacaRef.current && fileInputPlacaRef.current.click()} style={styles.imgBtn} title={`Subir foto de Cara ${caraPlaca} desde PC`}>
-                <Upload size={12} /> Subir Cara {caraPlaca}
+              <button onClick={() => fileInputPlacaRef.current && fileInputPlacaRef.current.click()} style={styles.imgBtn} title={`Subir foto de Cara ${caraPlaca} para el sector "${sectorPlaca}" desde PC`}>
+                <Upload size={12} /> Subir Foto [ Cara {caraPlaca} · {sectorPlaca} ]
               </button>
-              <button onClick={pedirUrlPlaca} style={styles.imgBtn} title={`Pegar URL de PostImages para Cara ${caraPlaca}`}>
-                <Link size={12} /> URL Cara {caraPlaca}
+              <button onClick={pedirUrlPlaca} style={styles.imgBtn} title={`Pegar URL directa de imagen para Cara ${caraPlaca} del sector "${sectorPlaca}"`}>
+                <Link size={12} /> URL [ Cara {caraPlaca} · {sectorPlaca} ]
               </button>
               <button 
                 onClick={() => {
@@ -1796,7 +1840,7 @@ export default function VisorMapeoPCB({
                   else setImgPlacaCaraBUrl('');
                 }} 
                 style={styles.imgBtn} 
-                title="Restaurar imagen predeterminada"
+                title={`Restaurar imagen predeterminada de Cara ${caraPlaca} (${sectorPlaca})`}
               >
                 <RotateCcw size={12} /> Predet.
               </button>
@@ -2027,7 +2071,7 @@ export default function VisorMapeoPCB({
             }}>
               <Map size={18} color="#00ffff" style={{ flexShrink: 0 }} />
               <span style={{ fontSize: '0.78rem', color: '#e5e7eb' }}>
-                Cara {caraPlaca} lista para mapeo. Sube una foto de la placa o usa <strong style={{ color: '#00ffff' }}>+ Dibujar SMD</strong> para trazar componentes.
+                Mapeando <strong>Cara {caraPlaca} · Sector "{sectorPlaca}"</strong>. Sube una foto de esta área usando <strong>"Subir Foto"</strong> o usa <strong style={{ color: '#00ffff' }}>+ Dibujar SMD</strong> para trazar componentes.
               </span>
               <button 
                 type="button"
@@ -2730,7 +2774,7 @@ export default function VisorMapeoPCB({
 
                   {/* Selector de Cara para el Componente Activo */}
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #1f2937' }}>
-                    <span style={{ fontSize: '0.7rem', color: '#9ca3af', fontWeight: 'bold' }}>Cara Asignada:</span>
+                    <span style={{ fontSize: '0.7rem', color: '#9ca3af', fontWeight: 'bold' }}>Cara en "{sectorPlaca}":</span>
                     <div style={{ display: 'flex', gap: '4px' }}>
                       <button 
                         type="button" 
@@ -3105,8 +3149,8 @@ export default function VisorMapeoPCB({
           <div style={{ marginTop: 'auto', borderTop: '1px solid #374151', paddingTop: '12px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
               <h4 style={{ ...styles.sectionTitle }}>
-                Cara {caraPlaca} ({componentesVisibles.length})
-                <span style={{ fontSize: '0.65rem', color: '#6b7280', fontWeight: 'normal', marginLeft: '6px' }}>Total {componentes.length}</span>
+                Cara {caraPlaca} · {sectorPlaca} ({componentesVisibles.length})
+                <span style={{ fontSize: '0.65rem', color: '#6b7280', fontWeight: 'normal', marginLeft: '6px' }}>Total Sector: {componentes.length}</span>
               </h4>
               <span style={{ fontSize: '0.65rem', color: '#9ca3af' }}>Orden Creación</span>
             </div>
@@ -3158,7 +3202,7 @@ export default function VisorMapeoPCB({
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #374151', paddingBottom: '10px' }}>
               <span style={{ fontSize: '0.95rem', fontWeight: 'bold', color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Link size={18} /> {modalUrlConfig.tipo === 'placa' ? 'URL Imagen de Placa' : 'URL Diagrama Esquema'}
+                <Link size={18} /> {modalUrlConfig.tipo === 'placa' ? `URL Imagen: Cara ${caraPlaca} · ${sectorPlaca}` : `URL Esquema: ${sectorPlaca}`}
               </span>
               <button 
                 onClick={() => setModalUrlConfig({ abierto: false, tipo: 'placa', urlInput: '' })}
@@ -3275,7 +3319,7 @@ export default function VisorMapeoPCB({
                   </h3>
                 </div>
                 <p style={{ margin: '4px 0 0 0', color: '#9ca3af', fontSize: '0.74rem' }}>
-                  Modelo: <strong style={{ color: '#38bdf8' }}>{nombreModelo ? nombreModelo.toUpperCase() : 'PLACA ACTIVA'}</strong> · Diferenciador de áreas disponibles vs zonas por mapear
+                  Modelo: <strong style={{ color: '#38bdf8' }}>{nombreModelo ? nombreModelo.toUpperCase() : 'PLACA ACTIVA'}</strong> · Vista en pantalla: <strong style={{ color: '#00ffff' }}>Cara {caraPlaca} · {sectorPlaca}</strong>
                 </p>
               </div>
               <button
@@ -3340,7 +3384,7 @@ export default function VisorMapeoPCB({
                         </div>
                       </div>
 
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                         <button
                           type="button"
                           onClick={() => {
@@ -3361,9 +3405,9 @@ export default function VisorMapeoPCB({
                             gap: '4px',
                             boxShadow: sec.esActual && caraPlaca === 'A' ? '0 0 8px rgba(37,99,235,0.5)' : 'none'
                           }}
-                          title="Cargar este sector en Cara A"
+                          title={`Cargar Cara A del sector "${sec.nombre}"`}
                         >
-                          🅰️ Abrir Cara A
+                          🅰️ Cara A · {sec.nombre}
                         </button>
                         <button
                           type="button"
@@ -3385,9 +3429,9 @@ export default function VisorMapeoPCB({
                             gap: '4px',
                             boxShadow: sec.esActual && caraPlaca === 'B' ? '0 0 8px rgba(124,58,237,0.5)' : 'none'
                           }}
-                          title="Cargar este sector en Cara B"
+                          title={`Cargar Cara B del sector "${sec.nombre}"`}
                         >
-                          🅱️ Abrir Cara B
+                          🅱️ Cara B · {sec.nombre}
                         </button>
                         {Object.keys(sectores).length > 1 && (
                           <button
