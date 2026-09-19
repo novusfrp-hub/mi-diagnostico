@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { 
   Save, Trash2, Plus, Move, ZoomIn, ZoomOut, Layers, Maximize2, 
-  Settings, Edit, Play, HelpCircle, Activity, Check, AlertTriangle, 
+  Settings, Edit, Edit3, Play, HelpCircle, Activity, Check, AlertTriangle, 
   Map, Eye, EyeOff, Clipboard, RefreshCw, ChevronRight, ChevronLeft, CheckCircle2,
   Image as ImageIcon, Upload, RotateCcw, X, Link, Search, RotateCw, Lock, Zap, ArrowLeftRight, Tag, Gauge, FolderOpen
 } from 'lucide-react';
@@ -166,7 +166,11 @@ export default function VisorMapeoPCB({
   const [caraPlaca, setCaraPlaca] = useState('A'); // 'A' | 'B'
   const [sectorPlaca, setSectorPlaca] = useState(sectorInicial || 'Placa Completa');
   const [bannerGuiaCerrado, setBannerGuiaCerrado] = useState(false);
+  const [bannerReasignarCerrado, setBannerReasignarCerrado] = useState(false);
   const [modalExploradorSectores, setModalExploradorSectores] = useState(false);
+  const [modalReasignarSector, setModalReasignarSector] = useState(false);
+  const [sectorModalOrigen, setSectorModalOrigen] = useState(null);
+  const [sectorDestinoInput, setSectorDestinoInput] = useState('');
   const [nuevoSectorInput, setNuevoSectorInput] = useState('');
 
   // Diccionario multizona de sectores del modelo: { [nombreSector]: { imagenCaraA, imagenCaraB, imagenEsquema, componentes } }
@@ -412,16 +416,27 @@ export default function VisorMapeoPCB({
   useEffect(() => {
     if (!onCambiosRef.current) return;
     const t = setTimeout(() => {
+      const sectoresActualizados = {
+        ...sectores,
+        [sectorPlaca]: {
+          nombre: sectorPlaca,
+          imagenCaraA: imgPlacaCaraAUrl === IMAGEN_PREDETERMINADA ? '' : imgPlacaCaraAUrl,
+          imagenCaraB: imgPlacaCaraBUrl === IMAGEN_PREDETERMINADA ? '' : imgPlacaCaraBUrl,
+          imagenEsquema: imgEsquemaUrl,
+          componentes: componentes
+        }
+      };
       onCambiosRef.current({
         componentes,
         imagenPlacaCaraA: imgPlacaCaraAUrl,
         imagenPlacaCaraB: imgPlacaCaraBUrl,
         imagenEsquema: imgEsquemaUrl,
-        sector: sectorPlaca
+        sector: sectorPlaca,
+        sectores: sectoresActualizados
       });
     }, 400);
     return () => clearTimeout(t);
-  }, [componentes, imgPlacaCaraAUrl, imgPlacaCaraBUrl, imgEsquemaUrl, sectorPlaca]);
+  }, [componentes, imgPlacaCaraAUrl, imgPlacaCaraBUrl, imgEsquemaUrl, sectorPlaca, sectores]);
 
   // Sonido Beep Sintetizado de Confirmación (Web Audio API)
   const playBeep = useCallback(() => {
@@ -1294,12 +1309,93 @@ export default function VisorMapeoPCB({
 
   // --- Funciones de Gestión y Navegación de Sectores y Caras ---
 
+  // Reasigna / Renombra un sector transfiriendo todas las fotos y SMDs sin perder datos
+  const reasignarSector = (sectorOrigen, sectorDestino) => {
+    if (!sectorOrigen || !sectorDestino) return;
+    const origen = sectorOrigen.trim();
+    const destino = sectorDestino.trim();
+    if (!destino || origen === destino) return;
+
+    const esActivo = origen === sectorPlaca;
+    const datosOrigen = esActivo ? {
+      nombre: destino,
+      imagenCaraA: imgPlacaCaraAUrl === IMAGEN_PREDETERMINADA ? '' : imgPlacaCaraAUrl,
+      imagenCaraB: imgPlacaCaraBUrl === IMAGEN_PREDETERMINADA ? '' : imgPlacaCaraBUrl,
+      imagenEsquema: imgEsquemaUrl,
+      componentes: componentes
+    } : (sectores[origen] || {
+      nombre: destino,
+      imagenCaraA: '',
+      imagenCaraB: '',
+      imagenEsquema: '',
+      componentes: []
+    });
+
+    const copia = { ...sectores };
+    delete copia[origen];
+    copia[destino] = {
+      ...datosOrigen,
+      nombre: destino
+    };
+
+    setSectores(copia);
+
+    if (esActivo) {
+      setSectorPlaca(destino);
+      if (onCambios) {
+        onCambios({
+          sectores: copia,
+          sector: destino,
+          componentes: datosOrigen.componentes,
+          imagenPlacaCaraA: datosOrigen.imagenCaraA,
+          imagenPlacaCaraB: datosOrigen.imagenCaraB,
+          imagenEsquema: datosOrigen.imagenEsquema
+        });
+      }
+    } else {
+      if (onCambios) {
+        onCambios({
+          sectores: copia,
+          sector: sectorPlaca,
+          componentes: componentes,
+          imagenPlacaCaraA: imgPlacaCaraAUrl === IMAGEN_PREDETERMINADA ? '' : imgPlacaCaraAUrl,
+          imagenPlacaCaraB: imgPlacaCaraBUrl === IMAGEN_PREDETERMINADA ? '' : imgPlacaCaraBUrl,
+          imagenEsquema: imgEsquemaUrl
+        });
+      }
+    }
+
+    setModalReasignarSector(false);
+    setBannerReasignarCerrado(true);
+    playBeep();
+  };
+
   // Conmuta de sector de forma segura preservando fotos y SMDs de cada área
   const cambiarSector = (nuevoNombreSector, caraObjetivo = null) => {
     if (!nuevoNombreSector) return;
     if (nuevoNombreSector === sectorPlaca) {
       if (caraObjetivo) setCaraPlaca(caraObjetivo);
       return;
+    }
+
+    // Si el sector actual tiene foto o componentes y el sector destino no tiene datos aún, ofrecer moverlos
+    const tieneDatosActual = (componentes && componentes.length > 0) || (imgPlacaCaraAUrl && imgPlacaCaraAUrl !== IMAGEN_PREDETERMINADA) || (imgPlacaCaraBUrl && imgPlacaCaraBUrl !== IMAGEN_PREDETERMINADA);
+    const destinoExistente = sectores[nuevoNombreSector];
+    const destinoTieneDatos = destinoExistente && (
+      (destinoExistente.componentes && destinoExistente.componentes.length > 0) ||
+      (destinoExistente.imagenCaraA && destinoExistente.imagenCaraA !== IMAGEN_PREDETERMINADA) ||
+      (destinoExistente.imagenCaraB && destinoExistente.imagenCaraB !== IMAGEN_PREDETERMINADA)
+    );
+
+    if (tieneDatosActual && !destinoTieneDatos) {
+      const deseaMover = window.confirm(
+        `Has seleccionado "${nuevoNombreSector}".\n\nEl sector actual ("${sectorPlaca}") tiene fotos o componentes mapeados.\n\n¿Deseas REASIGNAR y MOVER los datos actuales a "${nuevoNombreSector}"?\n\n• Pulsa ACEPTAR si subiste la foto creyendo estar en ${nuevoNombreSector}.\n• Pulsa CANCELAR si deseas abrir ${nuevoNombreSector} como un sector nuevo y vacío.`
+      );
+      if (deseaMover) {
+        reasignarSector(sectorPlaca, nuevoNombreSector);
+        if (caraObjetivo) setCaraPlaca(caraObjetivo);
+        return;
+      }
     }
 
     // 1. Snapshot del sector que estamos abandonando
@@ -1462,19 +1558,27 @@ export default function VisorMapeoPCB({
                   cursor: 'pointer',
                   maxWidth: '185px'
                 }}
-                title="Seleccionar sector de la placa base"
+                title="Seleccionar sector o sección de la placa base"
               >
-                <optgroup label="🟢 SECTORES DISPONIBLES EN ESTE MODELO">
-                  {sectoresDisponibles.map(sec => (
-                    <option key={sec.nombre} value={sec.nombre}>
-                      🟢 {sec.nombre} (A: {sec.compsA} | B: {sec.compsB}{sec.hasImgA || sec.hasImgB ? ' · 📷' : ''})
-                    </option>
-                  ))}
+                <optgroup label="📐 VISTA GENERAL (MACRO)">
+                  <option value="Placa Completa">
+                    📐 Placa Completa {sectores['Placa Completa']?.componentes?.length ? `(${sectores['Placa Completa'].componentes.length} SMD)` : ''}
+                  </option>
                 </optgroup>
 
-                <optgroup label="➕ MAPEAR NUEVO SECTOR...">
+                <optgroup label="🟢 SECTORES MAPEADOS EN ESTE MODELO">
+                  {sectoresDisponibles
+                    .filter(sec => sec.nombre !== 'Placa Completa')
+                    .map(sec => (
+                      <option key={sec.nombre} value={sec.nombre}>
+                        🔍 {sec.nombre} (A: {sec.compsA} | B: {sec.compsB}{sec.hasImgA || sec.hasImgB ? ' · 📷' : ''})
+                      </option>
+                    ))}
+                </optgroup>
+
+                <optgroup label="➕ MAPEAR NUEVA SECCIÓN...">
                   {SECTORES_PRESET
-                    .filter(p => !sectoresDisponibles.some(d => d.nombre === p))
+                    .filter(p => p !== 'Placa Completa' && !sectoresDisponibles.some(d => d.nombre === p))
                     .map(p => (
                       <option key={p} value={p}>
                         ⚪ {p} (Sin mapear)
@@ -1483,6 +1587,33 @@ export default function VisorMapeoPCB({
                   <option value="__custom__">✏️ + Escribir nuevo sector...</option>
                 </optgroup>
               </select>
+
+              {/* Botón directo de Reasignar Sector */}
+              <button
+                type="button"
+                onClick={() => {
+                  setSectorModalOrigen(sectorPlaca);
+                  setSectorDestinoInput(sectorPlaca === 'Placa Completa' ? 'Backlight / Pantalla LCD' : '');
+                  setModalReasignarSector(true);
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '3px',
+                  background: '#1f2937',
+                  border: '1px solid #3b82f6',
+                  color: '#60a5fa',
+                  padding: '3px 7px',
+                  borderRadius: '5px',
+                  fontSize: '0.7rem',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s'
+                }}
+                title="Reasignar o renombrar este sector (mover fotos y componentes a otro sector sin perderlos)"
+              >
+                <Edit3 size={12} /> Reasignar
+              </button>
             </div>
 
             {/* Selector de Cara integrado al sector activo */}
@@ -1543,7 +1674,7 @@ export default function VisorMapeoPCB({
               </button>
             </div>
 
-            {/* Badge visual claro y explícito: CARA + SECTOR */}
+            {/* Badge visual claro y explícito: CARA + SECTOR (contextual) */}
             <span style={{
               fontSize: '0.71rem',
               padding: '2px 8px',
@@ -1556,9 +1687,19 @@ export default function VisorMapeoPCB({
               alignItems: 'center',
               gap: '4px'
             }}>
-              <span style={{ color: caraPlaca === 'A' ? '#60a5fa' : '#c084fc' }}>CARA {caraPlaca}</span>
-              <span style={{ opacity: 0.6 }}>•</span>
-              <span>{sectorPlaca.toUpperCase()}</span>
+              {sectorPlaca === 'Placa Completa' ? (
+                <>
+                  <span style={{ color: '#00ffff' }}>📐 Placa Completa</span>
+                  <span style={{ opacity: 0.6 }}>·</span>
+                  <span style={{ color: caraPlaca === 'A' ? '#60a5fa' : '#c084fc' }}>Cara {caraPlaca} (Macro)</span>
+                </>
+              ) : (
+                <>
+                  <span style={{ color: caraPlaca === 'A' ? '#60a5fa' : '#c084fc' }}>Cara {caraPlaca}</span>
+                  <span style={{ opacity: 0.6 }}>·</span>
+                  <span style={{ color: '#00ffff' }}>🔍 {sectorPlaca}</span>
+                </>
+              )}
               <span style={{ fontSize: '0.62rem', opacity: 0.85 }}>({sectorActivoInfo.tieneDatos ? '🟢 Mapeado' : '⚪ Sin datos'})</span>
             </span>
 
@@ -2086,6 +2227,87 @@ export default function VisorMapeoPCB({
             >
               <ChevronLeft size={16} /> Detalles de Selección
             </button>
+          )}
+
+          {/* Asistente Inteligente de Reasignación si está en Placa Completa con fotos o componentes */}
+          {sectorPlaca === 'Placa Completa' && sectorActivoInfo.tieneDatos && !bannerReasignarCerrado && (
+            <div style={{
+              position: 'absolute',
+              top: '16px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              backgroundColor: 'rgba(17, 24, 39, 0.95)',
+              border: '1.5px solid #f59e0b',
+              borderRadius: '10px',
+              padding: '7px 14px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              boxShadow: '0 8px 25px rgba(245, 158, 11, 0.3)',
+              backdropFilter: 'blur(8px)',
+              zIndex: 34,
+              maxWidth: '92%'
+            }}>
+              <span style={{ fontSize: '0.76rem', color: '#fef3c7' }}>
+                💡 ¿Esta foto o área mapeada es de una sección específica (como Backlight)?
+              </span>
+              <button
+                type="button"
+                onClick={() => reasignarSector('Placa Completa', 'Backlight / Pantalla LCD')}
+                style={{
+                  padding: '4px 10px',
+                  backgroundColor: '#f59e0b',
+                  color: '#000',
+                  border: 'none',
+                  borderRadius: '5px',
+                  fontSize: '0.72rem',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap'
+                }}
+                title="Mover foto y componentes inmediatamente a 'Backlight / Pantalla LCD' sin perder nada"
+              >
+                💡 Reasignar a Backlight LCD
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSectorModalOrigen(sectorPlaca);
+                  setSectorDestinoInput('');
+                  setModalReasignarSector(true);
+                }}
+                style={{
+                  padding: '4px 8px',
+                  backgroundColor: '#374151',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '5px',
+                  fontSize: '0.72rem',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap'
+                }}
+                title="Elegir otra sección"
+              >
+                <Edit3 size={11} style={{ display: 'inline', marginRight: '3px' }} /> Otro sector...
+              </button>
+              <button
+                type="button"
+                onClick={() => setBannerReasignarCerrado(true)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#9ca3af',
+                  cursor: 'pointer',
+                  padding: '2px',
+                  display: 'flex',
+                  alignItems: 'center'
+                }}
+                title="Cerrar sugerencia"
+              >
+                <X size={14} />
+              </button>
+            </div>
           )}
 
           {/* Banner de Orientación Flotante No Invasivo (Se oculta automáticamente al subir imagen o dibujar, o con la X) */}
@@ -3210,7 +3432,9 @@ export default function VisorMapeoPCB({
           <div style={{ marginTop: 'auto', borderTop: '1px solid #374151', paddingTop: '12px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
               <h4 style={{ ...styles.sectionTitle }}>
-                Cara {caraPlaca} · {sectorPlaca} ({componentesVisibles.length})
+                {sectorPlaca === 'Placa Completa'
+                  ? `Cara ${caraPlaca} · 📐 Placa Completa (${componentesVisibles.length})`
+                  : `Cara ${caraPlaca} · 🔍 ${sectorPlaca} (${componentesVisibles.length})`}
                 <span style={{ fontSize: '0.65rem', color: '#6b7280', fontWeight: 'normal', marginLeft: '6px' }}>Total Sector: {componentes.length}</span>
               </h4>
               <span style={{ fontSize: '0.65rem', color: '#9ca3af' }}>Orden Creación</span>
@@ -3495,6 +3719,30 @@ export default function VisorMapeoPCB({
                         >
                           🅱️ Cara B · {sec.nombre}
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSectorModalOrigen(sec.nombre);
+                            setSectorDestinoInput(sec.nombre === 'Placa Completa' ? 'Backlight / Pantalla LCD' : '');
+                            setModalReasignarSector(true);
+                          }}
+                          style={{
+                            padding: '6px 10px',
+                            borderRadius: '6px',
+                            border: '1px solid #3b82f6',
+                            background: 'rgba(59, 130, 246, 0.12)',
+                            color: '#60a5fa',
+                            fontSize: '0.74rem',
+                            fontWeight: 'bold',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                          title={`Reasignar o renombrar el sector "${sec.nombre}"`}
+                        >
+                          <Edit3 size={13} /> Reasignar
+                        </button>
                         {Object.keys(sectores).length > 1 && (
                           <button
                             type="button"
@@ -3637,6 +3885,168 @@ export default function VisorMapeoPCB({
               </button>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* MODAL MODERNO PARA REASIGNAR / RENOMBRAR SECTOR */}
+      {modalReasignarSector && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.82)',
+          backdropFilter: 'blur(8px)',
+          zIndex: 4000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px'
+        }}>
+          <div style={{
+            backgroundColor: '#111827',
+            border: '1.5px solid #38bdf8',
+            borderRadius: '14px',
+            width: '100%',
+            maxWidth: '520px',
+            boxShadow: '0 25px 60px rgba(0,0,0,0.85)',
+            overflow: 'hidden'
+          }}>
+            <div style={{
+              padding: '14px 18px',
+              borderBottom: '1px solid #1f2937',
+              backgroundColor: '#0f172a',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Edit3 size={18} color="#38bdf8" />
+                <h3 style={{ margin: 0, color: '#ffffff', fontSize: '0.95rem', fontWeight: 'bold' }}>
+                  REASIGNAR / RENOMBRAR SECTOR
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalReasignarSector(false)}
+                style={{ background: 'transparent', border: 'none', color: '#9ca3af', cursor: 'pointer', padding: '4px' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ padding: '18px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ background: '#1f2937', padding: '12px 14px', borderRadius: '8px', border: '1px solid #374151', fontSize: '0.78rem', color: '#d1d5db' }}>
+                <div>Sector origen a reasignar: <strong style={{ color: '#00ffff' }}>{sectorModalOrigen || sectorPlaca}</strong></div>
+                <div style={{ fontSize: '0.72rem', color: '#9ca3af', marginTop: '4px' }}>
+                  Se transferirá la foto de la placa (Cara A y B) y los <strong>{componentes.length}</strong> componentes SMD mapeados a la nueva sección sin perder nada.
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 'bold', color: '#9ca3af', marginBottom: '8px' }}>
+                  Selecciona la sección correcta:
+                </label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                  {[
+                    'Backlight / Pantalla LCD',
+                    'Área Carga / PMIC',
+                    'Área CPU / Memoria UFS',
+                    'Área Conectores FPC',
+                    'Área RF / Transceiver',
+                    'Área Audio / Códec',
+                    'Área Cámaras / Sensores',
+                    'Wi-Fi & Bluetooth',
+                    'Placa Completa'
+                  ].map(sec => (
+                    <button
+                      key={sec}
+                      type="button"
+                      onClick={() => setSectorDestinoInput(sec)}
+                      style={{
+                        padding: '6px 10px',
+                        borderRadius: '6px',
+                        border: sectorDestinoInput === sec ? '1.5px solid #00ffff' : '1px solid #374151',
+                        background: sectorDestinoInput === sec ? 'rgba(0, 255, 255, 0.15)' : '#1f2937',
+                        color: sectorDestinoInput === sec ? '#00ffff' : '#d1d5db',
+                        fontSize: '0.72rem',
+                        fontWeight: sectorDestinoInput === sec ? 'bold' : 'normal',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {sec === 'Backlight / Pantalla LCD' ? '💡 ' : ''}
+                      {sec === 'Placa Completa' ? '📐 ' : ''}
+                      {sec}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 'bold', color: '#9ca3af', marginBottom: '6px' }}>
+                  O escribe un nombre personalizado:
+                </label>
+                <input
+                  type="text"
+                  value={sectorDestinoInput}
+                  onChange={(e) => setSectorDestinoInput(e.target.value)}
+                  placeholder="Ej: Subplaca Carga, Conector Flex..."
+                  style={{
+                    width: '100%',
+                    backgroundColor: '#0b0f19',
+                    border: '1px solid #374151',
+                    borderRadius: '6px',
+                    padding: '8px 12px',
+                    color: '#fff',
+                    fontSize: '0.8rem',
+                    outline: 'none',
+                    boxSizing: 'border-box'
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && sectorDestinoInput.trim()) {
+                      reasignarSector(sectorModalOrigen || sectorPlaca, sectorDestinoInput.trim());
+                    }
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '6px' }}>
+                <button
+                  type="button"
+                  onClick={() => setModalReasignarSector(false)}
+                  style={{
+                    padding: '7px 14px',
+                    borderRadius: '6px',
+                    border: '1px solid #374151',
+                    background: 'transparent',
+                    color: '#9ca3af',
+                    fontSize: '0.75rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  disabled={!sectorDestinoInput.trim()}
+                  onClick={() => reasignarSector(sectorModalOrigen || sectorPlaca, sectorDestinoInput.trim())}
+                  style={{
+                    padding: '7px 16px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: sectorDestinoInput.trim() ? '#2563eb' : '#374151',
+                    color: '#fff',
+                    fontSize: '0.75rem',
+                    fontWeight: 'bold',
+                    cursor: sectorDestinoInput.trim() ? 'pointer' : 'not-allowed',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <Check size={14} /> Reasignar Todo a Este Sector
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
