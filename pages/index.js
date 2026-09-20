@@ -2152,8 +2152,8 @@ export default function AppDiagnostico() {
                         </div>
                       </div>
 
-                      {/* Rejilla compacta de marcas: ~1/4 del tamaño anterior */}
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '10px' }}>
+                      {/* Rejilla compacta de marcas: ~1/4 del tamaño anterior pero con ancho suficiente para marcas largas */}
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(185px, 1fr))', gap: '10px' }}>
                         {marcasFiltradas.map(m => (
                           <div
                             key={m.nombre}
@@ -2263,7 +2263,7 @@ export default function AppDiagnostico() {
                       </div>
 
                       {/* Rejilla compacta de modelos: ~1/4 del tamaño anterior */}
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '10px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px' }}>
                         {modelosFiltrados.map(mod => {
                           const tieneBoardview = !!(mod.boardviewComponentes?.length || mod.boardviewImagenPlaca || mod.imgPlaca);
                           const tieneFpc = !!(mod.fpcs?.length);
