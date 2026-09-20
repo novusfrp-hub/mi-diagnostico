@@ -1706,13 +1706,8 @@ export default function AppDiagnostico() {
     setLibreriaVisible(true);
     setBusquedaHardwareDb('');
     cargarLibreriaDB();
-    if (modeloActivo) {
-      setMarcaDbSeleccionada(modeloActivo.marca);
-      setNivelDb('mediciones');
-    } else {
-      setNivelDb('marcas');
-      setMarcaDbSeleccionada(null);
-    }
+    setNivelDb('marcas');
+    setMarcaDbSeleccionada(null);
   };
 
   // DIAGNÓSTICO BÁSICO (Flujos)
@@ -1958,47 +1953,67 @@ export default function AppDiagnostico() {
             <motion.div className="modal-lib" initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} style={{ width: '95vw', maxWidth: '1600px', height: '95vh', backgroundColor: '#111827', borderRadius: '1.5rem', display: 'flex', flexDirection: 'column', overflow: 'hidden', border: '1px solid #374151', position: 'relative' }}>
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: '#111827', overflow: 'hidden', position: 'relative' }}>
                 {/* BARRA SUPERIOR UNIFICADA DE NAVEGACIÓN Y ACCIONES */}
-                <div style={{ padding: '14px 24px', borderBottom: '1px solid #374151', backgroundColor: '#0d1117', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', flexWrap: 'wrap', flexShrink: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                <div style={{ padding: '12px 20px', borderBottom: '1px solid #374151', backgroundColor: '#0d1117', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap', flexShrink: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    {/* Botón directo de Inicio para volver inmediatamente al catálogo de marcas */}
+                    {nivelDb !== 'marcas' && (
+                      <button
+                        onClick={() => {
+                          setNivelDb('marcas');
+                          setMarcaDbSeleccionada(null);
+                          setBusquedaHardwareDb('');
+                        }}
+                        style={{
+                          background: 'rgba(139, 92, 246, 0.2)',
+                          border: '1px solid #8b5cf6',
+                          color: '#c084fc',
+                          padding: '6px 12px',
+                          borderRadius: '8px',
+                          cursor: 'pointer',
+                          fontSize: '0.8rem',
+                          fontWeight: 'bold',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '5px'
+                        }}
+                        title="Ir directamente al inicio de Marcas"
+                      >
+                        <Home size={15} /> Inicio
+                      </button>
+                    )}
                     {nivelDb === 'modelos' && (
                       <button
                         onClick={() => { setNivelDb('marcas'); setMarcaDbSeleccionada(null); setBusquedaHardwareDb(''); }}
-                        style={{ background: '#1f2937', border: '1px solid #374151', color: '#00ffff', padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}
+                        style={{ background: '#1f2937', border: '1px solid #374151', color: '#00ffff', padding: '6px 12px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '5px' }}
                       >
-                        <ArrowLeft size={16} /> Volver a Marcas
+                        <ArrowLeft size={15} /> Volver a Marcas
                       </button>
                     )}
                     {nivelDb === 'mediciones' && (
-                      <>
-                        <button
-                          onClick={() => { setNivelDb('modelos'); setBusquedaHardwareDb(''); }}
-                          style={{ background: '#1f2937', border: '1px solid #374151', color: '#00ffff', padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}
-                        >
-                          <ArrowLeft size={16} /> Volver a {marcaDbSeleccionada || modeloActivo?.marca}
-                        </button>
-                        <button
-                          onClick={() => { setNivelDb('marcas'); setMarcaDbSeleccionada(null); setBusquedaHardwareDb(''); }}
-                          style={{ background: '#111827', border: '1px solid #374151', color: '#9ca3af', padding: '6px 10px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}
-                        >
-                          Marcas
-                        </button>
-                      </>
+                      <button
+                        onClick={() => { setNivelDb('modelos'); setBusquedaHardwareDb(''); }}
+                        style={{ background: '#1f2937', border: '1px solid #374151', color: '#00ffff', padding: '6px 12px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '5px' }}
+                      >
+                        <ArrowLeft size={15} /> Volver a {marcaDbSeleccionada || modeloActivo?.marca}
+                      </button>
                     )}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+
+                    {/* Breadcrumbs */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <div
                         onClick={() => { setNivelDb('marcas'); setMarcaDbSeleccionada(null); setBusquedaHardwareDb(''); }}
-                        style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '4px 8px', borderRadius: '6px' }}
+                        style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', padding: '4px 6px', borderRadius: '6px' }}
                         title="Ir al inicio de Hardware DB"
                       >
-                        <Cpu size={22} color="#8b5cf6" />
-                        <span style={{ color: '#fff', fontSize: '1rem', fontWeight: '800', letterSpacing: '0.04em' }}>HARDWARE DB</span>
+                        <Cpu size={20} color="#8b5cf6" />
+                        <span style={{ color: '#fff', fontSize: '0.92rem', fontWeight: '800', letterSpacing: '0.03em' }}>HARDWARE DB</span>
                       </div>
                       {marcaDbSeleccionada && (
                         <>
-                          <span style={{ color: '#4b5563', fontSize: '1.1rem' }}>/</span>
+                          <span style={{ color: '#4b5563', fontSize: '1rem' }}>/</span>
                           <span
                             onClick={() => { if (nivelDb === 'mediciones') { setNivelDb('modelos'); setBusquedaHardwareDb(''); } }}
-                            style={{ color: '#c084fc', fontWeight: 'bold', fontSize: '0.95rem', cursor: nivelDb === 'mediciones' ? 'pointer' : 'default', padding: '2px 6px', borderRadius: '4px' }}
+                            style={{ color: '#c084fc', fontWeight: 'bold', fontSize: '0.9rem', cursor: nivelDb === 'mediciones' ? 'pointer' : 'default', padding: '2px 6px', borderRadius: '4px' }}
                           >
                             {marcaDbSeleccionada.toUpperCase()}
                           </span>
@@ -2006,30 +2021,30 @@ export default function AppDiagnostico() {
                       )}
                       {nivelDb === 'mediciones' && modeloActivo && (
                         <>
-                          <span style={{ color: '#4b5563', fontSize: '1.1rem' }}>/</span>
-                          <span style={{ color: '#00ffff', fontWeight: 'bold', fontSize: '1rem' }}>{modeloActivo.nombre.toUpperCase()}</span>
+                          <span style={{ color: '#4b5563', fontSize: '1rem' }}>/</span>
+                          <span style={{ color: '#00ffff', fontWeight: 'bold', fontSize: '0.92rem' }}>{modeloActivo.nombre.toUpperCase()}</span>
                         </>
                       )}
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', flex: 1, justifyContent: 'flex-end' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', flex: 1, justifyContent: 'flex-end' }}>
                     {nivelDb !== 'mediciones' && (
-                      <div style={{ position: 'relative', width: '100%', maxWidth: '300px' }}>
-                        <Search size={16} color="#9ca3af" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+                      <div style={{ position: 'relative', width: '100%', maxWidth: '260px' }}>
+                        <Search size={15} color="#9ca3af" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
                         <input
                           type="text"
                           value={busquedaHardwareDb}
                           onChange={(e) => setBusquedaHardwareDb(e.target.value)}
                           placeholder={nivelDb === 'marcas' ? 'Buscar marca...' : `Buscar modelo en ${marcaDbSeleccionada}...`}
-                          style={{ width: '100%', padding: '8px 32px 8px 36px', backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '10px', color: 'white', fontSize: '0.85rem', outline: 'none' }}
+                          style={{ width: '100%', padding: '7px 28px 7px 32px', backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px', color: 'white', fontSize: '0.82rem', outline: 'none' }}
                         />
                         {busquedaHardwareDb && (
                           <button
                             onClick={() => setBusquedaHardwareDb('')}
-                            style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', padding: 0 }}
+                            style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', padding: 0 }}
                           >
-                            <X size={14} />
+                            <X size={13} />
                           </button>
                         )}
                       </div>
@@ -2044,9 +2059,9 @@ export default function AppDiagnostico() {
                         });
                         setModalNuevoDispositivoAbierto(true);
                       }}
-                      style={{ background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)', color: 'white', border: 'none', padding: '9px 18px', borderRadius: '10px', fontWeight: 'bold', fontSize: '0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 14px rgba(139, 92, 246, 0.4)' }}
+                      style={{ background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)', color: 'white', border: 'none', padding: '7px 14px', borderRadius: '8px', fontWeight: 'bold', fontSize: '0.82rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 4px 12px rgba(139, 92, 246, 0.4)' }}
                     >
-                      <Plus size={16} /> + Añadir Teléfono
+                      <Plus size={15} /> + Añadir Teléfono
                     </button>
 
                     {nivelDb === 'mediciones' && modeloActivo && (
@@ -2068,16 +2083,17 @@ export default function AppDiagnostico() {
                           ) ? '#f59e0b' : '#10b981',
                           color: 'white',
                           border: 'none',
-                          padding: '8px 16px',
+                          padding: '7px 14px',
                           borderRadius: '8px',
                           fontWeight: 'bold',
                           cursor: 'pointer',
                           display: 'flex',
                           alignItems: 'center',
-                          gap: '6px'
+                          gap: '6px',
+                          fontSize: '0.82rem'
                         }}
                       >
-                        <Save size={16} />
+                        <Save size={15} />
                         {seccionLibreria === 'ic'
                           ? (guardandoIc ? 'Guardando...' : 'Guardar IC')
                           : seccionLibreria === 'fpc'
@@ -2092,16 +2108,21 @@ export default function AppDiagnostico() {
                     )}
 
                     <button
-                      onClick={() => { setLibreriaVisible(false); setBusquedaHardwareDb(''); }}
-                      style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', cursor: 'pointer', padding: '8px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                      onClick={() => {
+                        setLibreriaVisible(false);
+                        setBusquedaHardwareDb('');
+                        setNivelDb('marcas');
+                        setMarcaDbSeleccionada(null);
+                      }}
+                      style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', cursor: 'pointer', padding: '7px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                       title="Cerrar ventana"
                     >
-                      <X size={18} />
+                      <X size={16} />
                     </button>
                   </div>
                 </div>
 
-                {/* NIVEL 1: DASHBOARD COMPLETO DE MARCAS */}
+                {/* NIVEL 1: DASHBOARD COMPLETO DE MARCAS (COMPACTO ~1/4 DE TAMAÑO) */}
                 {nivelDb === 'marcas' && (() => {
                   const marcasFiltradas = marcasDisponibles.filter(m =>
                     m.nombre.toLowerCase().includes(busquedaHardwareDb.toLowerCase().trim())
@@ -2109,29 +2130,30 @@ export default function AppDiagnostico() {
                   const totalModelosRegistrados = marcasDisponibles.reduce((acc, m) => acc + (m.modelos?.length || 0), 0);
 
                   return (
-                    <div style={{ flex: 1, overflowY: 'auto', padding: '28px 32px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px' }}>
+                    <div style={{ flex: 1, overflowY: 'auto', padding: '18px 24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
                         <div>
-                          <h2 style={{ color: '#fff', fontSize: '1.5rem', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '10px', fontWeight: '800' }}>
-                            <Smartphone size={26} color="#00ffff" /> Marcas de Dispositivos
+                          <h2 style={{ color: '#fff', fontSize: '1.25rem', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '800' }}>
+                            <Smartphone size={22} color="#00ffff" /> Marcas de Dispositivos
                           </h2>
-                          <p style={{ color: '#9ca3af', fontSize: '0.88rem', margin: 0 }}>
-                            Explora las marcas registradas en el laboratorio o añade nuevos modelos con mediciones de diodo, voltajes y esquemáticos.
+                          <p style={{ color: '#9ca3af', fontSize: '0.8rem', margin: 0 }}>
+                            Selecciona una marca para explorar sus modelos o añade nuevos equipos.
                           </p>
                         </div>
-                        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                          <div style={{ background: '#1f2937', border: '1px solid #374151', padding: '8px 16px', borderRadius: '12px', textAlign: 'center' }}>
-                            <div style={{ color: '#c084fc', fontSize: '1.2rem', fontWeight: 'bold' }}>{marcasDisponibles.length}</div>
-                            <div style={{ color: '#9ca3af', fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: '600' }}>Marcas</div>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <div style={{ background: '#1f2937', border: '1px solid #374151', padding: '5px 12px', borderRadius: '10px', textAlign: 'center' }}>
+                            <span style={{ color: '#c084fc', fontSize: '1rem', fontWeight: 'bold' }}>{marcasDisponibles.length}</span>
+                            <span style={{ color: '#9ca3af', fontSize: '0.7rem', marginLeft: '6px', fontWeight: '600' }}>Marcas</span>
                           </div>
-                          <div style={{ background: '#1f2937', border: '1px solid #374151', padding: '8px 16px', borderRadius: '12px', textAlign: 'center' }}>
-                            <div style={{ color: '#00ffff', fontSize: '1.2rem', fontWeight: 'bold' }}>{totalModelosRegistrados}</div>
-                            <div style={{ color: '#9ca3af', fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: '600' }}>Modelos Totales</div>
+                          <div style={{ background: '#1f2937', border: '1px solid #374151', padding: '5px 12px', borderRadius: '10px', textAlign: 'center' }}>
+                            <span style={{ color: '#00ffff', fontSize: '1rem', fontWeight: 'bold' }}>{totalModelosRegistrados}</span>
+                            <span style={{ color: '#9ca3af', fontSize: '0.7rem', marginLeft: '6px', fontWeight: '600' }}>Modelos</span>
                           </div>
                         </div>
                       </div>
 
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '20px' }}>
+                      {/* Rejilla compacta de marcas: ~1/4 del tamaño anterior */}
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '10px' }}>
                         {marcasFiltradas.map(m => (
                           <div
                             key={m.nombre}
@@ -2142,61 +2164,52 @@ export default function AppDiagnostico() {
                             }}
                             style={{
                               backgroundColor: '#161e2e',
-                              border: '1.5px solid #2d3748',
-                              borderRadius: '16px',
-                              padding: '22px',
+                              border: '1px solid #2d3748',
+                              borderRadius: '10px',
+                              padding: '10px 12px',
                               cursor: 'pointer',
-                              transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                              transition: 'all 0.15s ease',
                               display: 'flex',
-                              flexDirection: 'column',
+                              alignItems: 'center',
                               justifyContent: 'space-between',
-                              gap: '18px',
-                              boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
-                              position: 'relative',
-                              overflow: 'hidden'
+                              gap: '8px',
+                              boxShadow: '0 2px 6px rgba(0,0,0,0.25)'
                             }}
                             onMouseEnter={(e) => {
                               e.currentTarget.style.borderColor = '#8b5cf6';
-                              e.currentTarget.style.transform = 'translateY(-4px)';
-                              e.currentTarget.style.boxShadow = '0 12px 30px rgba(139, 92, 246, 0.25)';
+                              e.currentTarget.style.transform = 'translateY(-2px)';
+                              e.currentTarget.style.boxShadow = '0 6px 14px rgba(139, 92, 246, 0.25)';
                               e.currentTarget.style.backgroundColor = '#1c2538';
                             }}
                             onMouseLeave={(e) => {
                               e.currentTarget.style.borderColor = '#2d3748';
                               e.currentTarget.style.transform = 'translateY(0)';
-                              e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.3)';
+                              e.currentTarget.style.boxShadow = '0 2px 6px rgba(0,0,0,0.25)';
                               e.currentTarget.style.backgroundColor = '#161e2e';
                             }}
                           >
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(109, 40, 217, 0.2) 100%)', border: '1px solid rgba(139, 92, 246, 0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#c084fc' }}>
-                                <Smartphone size={26} />
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                              <div style={{ width: '28px', height: '28px', borderRadius: '7px', background: 'rgba(139, 92, 246, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#c084fc', flexShrink: 0 }}>
+                                <Smartphone size={15} />
                               </div>
-                              <span style={{ fontSize: '0.78rem', fontWeight: 'bold', background: '#111827', color: '#00ffff', padding: '4px 12px', borderRadius: '20px', border: '1px solid #374151' }}>
-                                {m.modelos.length} {m.modelos.length === 1 ? 'modelo' : 'modelos'}
+                              <span style={{ color: 'white', fontSize: '0.88rem', fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {m.nombre}
                               </span>
                             </div>
-
-                            <div>
-                              <h3 style={{ color: 'white', margin: '0 0 6px 0', fontSize: '1.3rem', fontWeight: 'bold', letterSpacing: '0.02em' }}>
-                                {m.nombre}
-                              </h3>
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: '#9ca3af', fontSize: '0.8rem' }}>
-                                <span>Explorar modelos</span>
-                                <ChevronRight size={18} color="#8b5cf6" />
-                              </div>
-                            </div>
+                            <span style={{ fontSize: '0.7rem', fontWeight: 'bold', background: '#111827', color: '#00ffff', padding: '2px 7px', borderRadius: '10px', border: '1px solid #374151', flexShrink: 0 }}>
+                              {m.modelos.length}
+                            </span>
                           </div>
                         ))}
 
                         {marcasFiltradas.length === 0 && (
-                          <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '60px 20px', backgroundColor: '#161e2e', borderRadius: '16px', border: '1px dashed #374151' }}>
-                            <Smartphone size={48} style={{ opacity: 0.3, marginBottom: '15px', color: '#8b5cf6' }} />
-                            <h4 style={{ color: '#d1d5db', margin: '0 0 8px 0', fontSize: '1.1rem' }}>
+                          <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px 20px', backgroundColor: '#161e2e', borderRadius: '12px', border: '1px dashed #374151' }}>
+                            <Smartphone size={36} style={{ opacity: 0.3, marginBottom: '10px', color: '#8b5cf6' }} />
+                            <h4 style={{ color: '#d1d5db', margin: '0 0 6px 0', fontSize: '1rem' }}>
                               {busquedaHardwareDb ? `No se encontraron marcas para "${busquedaHardwareDb}"` : 'No hay marcas en la base de datos'}
                             </h4>
-                            <p style={{ fontSize: '0.85rem', color: '#9ca3af', maxWidth: '400px', margin: '0 auto 16px auto' }}>
-                              {busquedaHardwareDb ? 'Prueba con otro término de búsqueda o crea una nueva marca.' : 'Comienza añadiendo tu primer dispositivo a la base de datos de hardware.'}
+                            <p style={{ fontSize: '0.8rem', color: '#9ca3af', maxWidth: '360px', margin: '0 auto 12px auto' }}>
+                              {busquedaHardwareDb ? 'Prueba con otro término o crea una nueva marca.' : 'Comienza añadiendo tu primer dispositivo a la base de datos.'}
                             </p>
                             <button
                               onClick={() => {
@@ -2204,9 +2217,9 @@ export default function AppDiagnostico() {
                                 setFormNuevoModelo({ marca: busquedaHardwareDb || '', nombre: '' });
                                 setModalNuevoDispositivoAbierto(true);
                               }}
-                              style={{ backgroundColor: '#8b5cf6', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+                              style={{ backgroundColor: '#8b5cf6', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}
                             >
-                              <Plus size={16} /> Crear Teléfono Ahora
+                              <Plus size={15} /> Crear Teléfono Ahora
                             </button>
                           </div>
                         )}
@@ -2215,7 +2228,7 @@ export default function AppDiagnostico() {
                   );
                 })()}
 
-                {/* NIVEL 2: DASHBOARD COMPLETO DE MODELOS DE LA MARCA SELECCIONADA */}
+                {/* NIVEL 2: DASHBOARD COMPLETO DE MODELOS DE LA MARCA (COMPACTO ~1/4 DE TAMAÑO) */}
                 {nivelDb === 'modelos' && (() => {
                   const modelosDeMarca = modelosLibreria.filter(
                     m => (m.marca || '').trim().toUpperCase() === (marcaDbSeleccionada || '').trim().toUpperCase()
@@ -2225,15 +2238,15 @@ export default function AppDiagnostico() {
                   );
 
                   return (
-                    <div style={{ flex: 1, overflowY: 'auto', padding: '28px 32px', display: 'flex', flexDirection: 'column', gap: '22px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px' }}>
+                    <div style={{ flex: 1, overflowY: 'auto', padding: '18px 24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
                         <div>
-                          <h2 style={{ color: '#fff', fontSize: '1.5rem', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '10px', fontWeight: '800' }}>
+                          <h2 style={{ color: '#fff', fontSize: '1.25rem', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '800' }}>
                             <span style={{ color: '#8b5cf6' }}>{marcaDbSeleccionada?.toUpperCase()}</span>
-                            <span style={{ color: '#6b7280', fontSize: '1.1rem', fontWeight: 'normal' }}>• Modelos Registrados ({modelosDeMarca.length})</span>
+                            <span style={{ color: '#6b7280', fontSize: '0.95rem', fontWeight: 'normal' }}>• Modelos Registrados ({modelosDeMarca.length})</span>
                           </h2>
-                          <p style={{ color: '#9ca3af', fontSize: '0.88rem', margin: 0 }}>
-                            Selecciona un modelo para acceder a su multímetro HUD, Docktest, Planos FPC, IC BGA y Boardview.
+                          <p style={{ color: '#9ca3af', fontSize: '0.8rem', margin: 0 }}>
+                            Selecciona un modelo para ver sus mediciones, planos FPC, IC BGA y Boardview.
                           </p>
                         </div>
 
@@ -2243,13 +2256,14 @@ export default function AppDiagnostico() {
                             setFormNuevoModelo({ marca: marcaDbSeleccionada, nombre: '' });
                             setModalNuevoDispositivoAbierto(true);
                           }}
-                          style={{ background: 'rgba(139, 92, 246, 0.15)', border: '1px solid #8b5cf6', color: '#c084fc', padding: '9px 16px', borderRadius: '10px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}
+                          style={{ background: 'rgba(139, 92, 246, 0.15)', border: '1px solid #8b5cf6', color: '#c084fc', padding: '7px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}
                         >
-                          <Plus size={16} /> Añadir Modelo a {marcaDbSeleccionada}
+                          <Plus size={15} /> Añadir Modelo a {marcaDbSeleccionada}
                         </button>
                       </div>
 
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '18px' }}>
+                      {/* Rejilla compacta de modelos: ~1/4 del tamaño anterior */}
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '10px' }}>
                         {modelosFiltrados.map(mod => {
                           const tieneBoardview = !!(mod.boardviewComponentes?.length || mod.boardviewImagenPlaca || mod.imgPlaca);
                           const tieneFpc = !!(mod.fpcs?.length);
@@ -2267,74 +2281,62 @@ export default function AppDiagnostico() {
                               }}
                               style={{
                                 backgroundColor: '#161e2e',
-                                border: esActivo ? '2px solid #00ffff' : '1.5px solid #2d3748',
-                                borderRadius: '16px',
-                                padding: '20px',
+                                border: esActivo ? '1.5px solid #00ffff' : '1px solid #2d3748',
+                                borderRadius: '10px',
+                                padding: '10px 12px',
                                 cursor: 'pointer',
-                                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                                transition: 'all 0.15s ease',
                                 display: 'flex',
                                 flexDirection: 'column',
                                 justifyContent: 'space-between',
-                                gap: '16px',
-                                boxShadow: esActivo ? '0 0 25px rgba(0, 255, 255, 0.25)' : '0 4px 20px rgba(0,0,0,0.3)'
+                                gap: '8px',
+                                minHeight: '68px',
+                                boxShadow: esActivo ? '0 0 15px rgba(0, 255, 255, 0.25)' : '0 2px 6px rgba(0,0,0,0.25)'
                               }}
                               onMouseEnter={(e) => {
                                 e.currentTarget.style.borderColor = '#00ffff';
-                                e.currentTarget.style.transform = 'translateY(-3px)';
-                                e.currentTarget.style.boxShadow = '0 8px 25px rgba(0, 255, 255, 0.2)';
+                                e.currentTarget.style.transform = 'translateY(-2px)';
+                                e.currentTarget.style.boxShadow = '0 6px 14px rgba(0, 255, 255, 0.2)';
                                 e.currentTarget.style.backgroundColor = '#1c2538';
                               }}
                               onMouseLeave={(e) => {
                                 e.currentTarget.style.borderColor = esActivo ? '#00ffff' : '#2d3748';
                                 e.currentTarget.style.transform = 'translateY(0)';
-                                e.currentTarget.style.boxShadow = esActivo ? '0 0 25px rgba(0, 255, 255, 0.25)' : '0 4px 20px rgba(0,0,0,0.3)';
+                                e.currentTarget.style.boxShadow = esActivo ? '0 0 15px rgba(0, 255, 255, 0.25)' : '0 2px 6px rgba(0,0,0,0.25)';
                                 e.currentTarget.style.backgroundColor = '#161e2e';
                               }}
                             >
-                              <div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
-                                  <span style={{ fontSize: '0.72rem', color: '#8b5cf6', fontWeight: 'bold', textTransform: 'uppercase', background: 'rgba(139, 92, 246, 0.15)', padding: '3px 9px', borderRadius: '6px' }}>
-                                    {mod.marca}
-                                  </span>
-                                  {tieneBoardview && (
-                                    <span style={{ fontSize: '0.68rem', color: '#00ffff', background: 'rgba(0, 255, 255, 0.12)', border: '1px solid rgba(0,255,255,0.3)', padding: '2px 8px', borderRadius: '6px', fontWeight: 'bold' }}>
-                                      🗺️ BOARDVIEW
-                                    </span>
-                                  )}
-                                </div>
-
-                                <h3 style={{ color: 'white', margin: '0 0 12px 0', fontSize: '1.25rem', fontWeight: 'bold' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
+                                <h4 style={{ color: 'white', margin: 0, fontSize: '0.88rem', fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={mod.nombre}>
                                   {mod.nombre}
-                                </h3>
-
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', fontSize: '0.72rem', color: '#9ca3af' }}>
-                                  {tieneFpc && <span style={{ background: '#111827', border: '1px solid #374151', padding: '3px 8px', borderRadius: '6px' }}>FPC: {mod.fpcs.length}</span>}
-                                  {tieneBateria && <span style={{ background: '#111827', border: '1px solid #374151', padding: '3px 8px', borderRadius: '6px' }}>🔋 Batería OK</span>}
-                                  {tieneIc && <span style={{ background: '#111827', border: '1px solid #374151', padding: '3px 8px', borderRadius: '6px' }}>IC: {mod.ics.length}</span>}
-                                  {!tieneFpc && !tieneBateria && !tieneIc && !tieneBoardview && (
-                                    <span style={{ color: '#6b7280', fontStyle: 'italic' }}>Sin mediciones aún</span>
-                                  )}
-                                </div>
+                                </h4>
+                                {tieneBoardview && (
+                                  <span style={{ fontSize: '0.58rem', color: '#00ffff', background: 'rgba(0, 255, 255, 0.12)', border: '1px solid rgba(0,255,255,0.3)', padding: '1px 4px', borderRadius: '4px', fontWeight: 'bold', flexShrink: 0 }}>
+                                    BV
+                                  </span>
+                                )}
                               </div>
 
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '12px', borderTop: '1px solid #2d3748' }}>
-                                <span style={{ color: '#00ffff', fontSize: '0.82rem', fontWeight: 'bold' }}>
-                                  Abrir Mediciones →
-                                </span>
-                                <ChevronRight size={18} color="#00ffff" />
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', fontSize: '0.62rem', color: '#9ca3af', alignItems: 'center' }}>
+                                {tieneFpc && <span style={{ background: '#111827', border: '1px solid #374151', padding: '1px 5px', borderRadius: '4px' }}>FPC:{mod.fpcs.length}</span>}
+                                {tieneBateria && <span style={{ background: '#111827', border: '1px solid #374151', padding: '1px 4px', borderRadius: '4px' }} title="Batería OK">🔋</span>}
+                                {tieneIc && <span style={{ background: '#111827', border: '1px solid #374151', padding: '1px 5px', borderRadius: '4px' }}>IC:{mod.ics.length}</span>}
+                                {!tieneFpc && !tieneBateria && !tieneIc && !tieneBoardview && (
+                                  <span style={{ color: '#6b7280', fontStyle: 'italic' }}>Sin datos</span>
+                                )}
                               </div>
                             </div>
                           );
                         })}
 
                         {modelosFiltrados.length === 0 && (
-                          <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '50px 20px', backgroundColor: '#161e2e', borderRadius: '16px', border: '1px dashed #374151' }}>
-                            <Cpu size={44} style={{ opacity: 0.3, marginBottom: '12px', color: '#00ffff' }} />
-                            <h4 style={{ color: '#d1d5db', margin: '0 0 8px 0', fontSize: '1.05rem' }}>
+                          <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px 20px', backgroundColor: '#161e2e', borderRadius: '12px', border: '1px dashed #374151' }}>
+                            <Cpu size={36} style={{ opacity: 0.3, marginBottom: '10px', color: '#00ffff' }} />
+                            <h4 style={{ color: '#d1d5db', margin: '0 0 6px 0', fontSize: '1rem' }}>
                               {busquedaHardwareDb ? `No se encontraron modelos para "${busquedaHardwareDb}" en ${marcaDbSeleccionada}` : `No hay modelos registrados para ${marcaDbSeleccionada}`}
                             </h4>
-                            <p style={{ fontSize: '0.85rem', color: '#9ca3af', maxWidth: '380px', margin: '0 auto 16px auto' }}>
-                              Registra el primer modelo de esta marca para comenzar a guardar planos y lecturas.
+                            <p style={{ fontSize: '0.8rem', color: '#9ca3af', maxWidth: '360px', margin: '0 auto 12px auto' }}>
+                              Registra el primer modelo de esta marca para comenzar a guardar mediciones.
                             </p>
                             <button
                               onClick={() => {
@@ -2342,9 +2344,9 @@ export default function AppDiagnostico() {
                                 setFormNuevoModelo({ marca: marcaDbSeleccionada, nombre: busquedaHardwareDb || '' });
                                 setModalNuevoDispositivoAbierto(true);
                               }}
-                              style={{ backgroundColor: '#8b5cf6', color: 'white', border: 'none', padding: '9px 18px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+                              style={{ backgroundColor: '#8b5cf6', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}
                             >
-                              <Plus size={16} /> Añadir Modelo
+                              <Plus size={15} /> Añadir Modelo
                             </button>
                           </div>
                         )}
