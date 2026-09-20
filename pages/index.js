@@ -2003,10 +2003,11 @@ export default function AppDiagnostico() {
                       <div
                         onClick={() => { setNivelDb('marcas'); setMarcaDbSeleccionada(null); setBusquedaHardwareDb(''); }}
                         style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', padding: '4px 6px', borderRadius: '6px' }}
-                        title="Ir al inicio de Hardware DB"
+                        title="Ir al inicio de Marshall Hardware Suite"
                       >
                         <Cpu size={20} color="#8b5cf6" />
-                        <span style={{ color: '#fff', fontSize: '0.92rem', fontWeight: '800', letterSpacing: '0.03em' }}>HARDWARE DB</span>
+                        <span style={{ color: '#fff', fontSize: '0.92rem', fontWeight: '800', letterSpacing: '0.03em' }}>MARSHALL HARDWARE SUITE™</span>
+                        <span style={{ fontSize: '0.62rem', background: 'rgba(139, 92, 246, 0.25)', color: '#c084fc', border: '1px solid rgba(139, 92, 246, 0.4)', padding: '1px 6px', borderRadius: '4px', fontWeight: 'bold' }}>MHS PRO</span>
                       </div>
                       {marcaDbSeleccionada && (
                         <>
@@ -2755,7 +2756,7 @@ export default function AppDiagnostico() {
                             </div>
                             <div>
                               <h3 style={{ color: 'white', margin: 0, fontSize: '1.2rem', fontWeight: 'bold' }}>Añadir Nuevo Teléfono</h3>
-                              <span style={{ color: '#9ca3af', fontSize: '0.75rem' }}>Registro en Hardware DB</span>
+                              <span style={{ color: '#9ca3af', fontSize: '0.75rem' }}>Registro en Marshall Hardware Suite™ (MHS Pro)</span>
                             </div>
                           </div>
                           <button
