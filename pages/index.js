@@ -1,10 +1,10 @@
 /* eslint-disable */
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { doc, setDoc, addDoc, collection, getDocs, deleteDoc, updateDoc } from 'firebase/firestore';
-import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { doc, setDoc, addDoc, collection, getDocs, deleteDoc, updateDoc, getDoc, onSnapshot } from 'firebase/firestore';
+import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
 import { db, auth } from '../firebase';
-import { Sun, Moon, ArrowLeft, RefreshCcw, RefreshCw, Zap, Smartphone, AlertTriangle, ChevronRight, Home, ShieldCheck, Camera, CheckCircle2, XCircle, Settings, Plus, Save, X, Trash2, Edit, ChevronDown, CornerDownRight, LogOut, Lightbulb, Usb, Map, Play, Flame, ClipboardList, History, Printer, FileText, MessageCircle, Link, Monitor, Mic, MicOff, Cpu, Image as ImageIcon, Maximize2, Search } from 'lucide-react';
+import { Sun, Moon, ArrowLeft, RefreshCcw, RefreshCw, Zap, Smartphone, AlertTriangle, ChevronRight, Home, ShieldCheck, Camera, CheckCircle2, XCircle, Settings, Plus, Save, X, Trash2, Edit, ChevronDown, CornerDownRight, LogOut, Lightbulb, Usb, Map, Play, Flame, ClipboardList, History, Printer, FileText, MessageCircle, Link, Monitor, Mic, MicOff, Cpu, Image as ImageIcon, Maximize2, Search, User, Users, Lock } from 'lucide-react';
 
 import FPCInteligente from '../components/FPCInteligente.js';
 import ICInteligente from '../components/ICInteligente.js';
@@ -13,6 +13,9 @@ import EscanerRFFE from '../components/EscanerRFFE.js';
 import FormularioIngresoAvanzado from '../components/FormularioIngresoAvanzado.js';
 import VisorReporteAvanzado from '../components/VisorReporteAvanzado.js';
 import VisorMapeoPCB from '../components/VisorMapeoPCB.js';
+import ModalAutenticacion from '../components/ModalAutenticacion.js';
+import ModalGestionUsuarios from '../components/ModalGestionUsuarios.js';
+import ModalEstadoUsuario from '../components/ModalEstadoUsuario.js';
 import { toPng } from 'html-to-image';
 import useAutoSave from '../hooks/useAutoSave';
 
@@ -832,6 +835,32 @@ export default function AppDiagnostico() {
   // MODALES GLOBALES
   const [mostrarAdmin, setMostrarAdmin] = useState(false); const [vistaAdmin, setVistaAdmin] = useState('login');
   const [estaAutenticado, setEstaAutenticado] = useState(false); const [emailAdmin, setEmailAdmin] = useState(''); const [passAdmin, setPassAdmin] = useState(''); const [errorLogin, setErrorLogin] = useState('');
+  
+  // AUTENTICACIÓN Y ROLES RBAC
+  const [usuarioActual, setUsuarioActual] = useState(null);
+  const [perfilUsuario, setPerfilUsuario] = useState(null);
+  const [modalAuthAbierto, setModalAuthAbierto] = useState(false);
+  const [modalGestionUsuariosAbierto, setModalGestionUsuariosAbierto] = useState(false);
+
+  const esSuperAdmin = useMemo(() => {
+    if (!usuarioActual) return false;
+    if (perfilUsuario?.rol === 'super_admin') return true;
+    if (estaAutenticado && !perfilUsuario) return true;
+    const email = (usuarioActual.email || '').toLowerCase();
+    return email === 'marshallcell@gmail.com' || email.includes('marshall');
+  }, [usuarioActual, perfilUsuario, estaAutenticado]);
+
+  const esEditor = useMemo(() => {
+    if (esSuperAdmin) return true;
+    return perfilUsuario?.rol === 'editor';
+  }, [esSuperAdmin, perfilUsuario]);
+
+  const esTecnico = useMemo(() => {
+    if (esEditor) return true;
+    return perfilUsuario?.rol === 'tecnico' || !usuarioActual;
+  }, [esEditor, perfilUsuario, usuarioActual]);
+
+  const puedeEditarHardware = esSuperAdmin || esEditor;
   const [listaPasos, setListaPasos] = useState([]); const [pasosExpandidos, setPasosExpandidos] = useState({});
   const [notaVisible, setNotaVisible] = useState(false); const [tipTabActiva, setTipTabActiva] = useState(0);
   const [imgModalVisible, setImgModalVisible] = useState(false); const [videoModalVisible, setVideoModalVisible] = useState(false);
@@ -1717,9 +1746,53 @@ export default function AppDiagnostico() {
   const toggleTema = () => setTema(tema === 'light' ? 'dark' : 'light');
   useEffect(() => { cargarPaso('inicio'); cargarFallasEnSerie(); cargarLibreriaDB(); }, []);
 
-  // AUTH Y ADMIN
+  // AUTH Y RBAC EN TIEMPO REAL
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, async (user) => {
+      setUsuarioActual(user);
+      if (user) {
+        setEstaAutenticado(true);
+        const docRef = doc(db, 'usuarios', user.uid);
+        const unsubDoc = onSnapshot(docRef, async (snap) => {
+          if (snap.exists()) {
+            setPerfilUsuario(snap.data());
+          } else {
+            const nuevoPerfil = {
+              uid: user.uid,
+              email: user.email || '',
+              nombre: user.displayName || 'Marshall Cell Admin',
+              taller: 'Laboratorio Marshall Cell',
+              rol: 'super_admin',
+              estado: 'activo',
+              fechaRegistro: new Date().toISOString()
+            };
+            try {
+              await setDoc(docRef, nuevoPerfil);
+              setPerfilUsuario(nuevoPerfil);
+            } catch (e) {
+              setPerfilUsuario(nuevoPerfil);
+            }
+          }
+        });
+        return () => unsubDoc();
+      } else {
+        setPerfilUsuario(null);
+        setEstaAutenticado(false);
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  const recargarPerfilActual = async () => {
+    if (!usuarioActual) return;
+    try {
+      const snap = await getDoc(doc(db, 'usuarios', usuarioActual.uid));
+      if (snap.exists()) setPerfilUsuario(snap.data());
+    } catch (e) {}
+  };
+
   const iniciarSesion = async (e) => { e.preventDefault(); setErrorLogin(''); try { await signInWithEmailAndPassword(auth, emailAdmin, passAdmin); setEstaAutenticado(true); setVistaAdmin('lista'); cargarTodosLosPasos(); } catch (error) { setErrorLogin('❌ Error.'); } };
-  const cerrarSesion = async () => { await signOut(auth); setEstaAutenticado(false); setMostrarAdmin(false); };
+  const cerrarSesion = async () => { await signOut(auth); setUsuarioActual(null); setPerfilUsuario(null); setEstaAutenticado(false); setMostrarAdmin(false); };
   const cargarTodosLosPasos = async () => { try { const qs = await getDocs(collection(db, "pasos")); const arr = []; qs.forEach((doc) => arr.push({ id: doc.id, ...doc.data() })); setListaPasos(arr); } catch (e) { } };
   const abrirAdmin = () => { setMostrarAdmin(true); if (estaAutenticado) { setVistaAdmin('lista'); cargarTodosLosPasos(); } else { setVistaAdmin('login'); } };
 
@@ -1896,6 +1969,58 @@ export default function AppDiagnostico() {
             >
               <RefreshCw size={14} /> <span style={{ fontSize: '0.7rem', fontWeight: 'bold' }} className="hide-on-mobile">ACTUALIZAR</span>
             </button>
+            {/* Control de Sesión y Rol RBAC */}
+            {usuarioActual ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '3px 10px',
+                  borderRadius: '16px',
+                  backgroundColor: esSuperAdmin ? 'rgba(245, 158, 11, 0.15)' : (esEditor ? 'rgba(139, 92, 246, 0.15)' : 'rgba(6, 182, 212, 0.15)'),
+                  border: `1px solid ${esSuperAdmin ? '#f59e0b' : (esEditor ? '#8b5cf6' : '#06b6d4')}`
+                }}>
+                  <span style={{
+                    fontSize: '0.68rem',
+                    fontWeight: 800,
+                    color: esSuperAdmin ? '#f59e0b' : (esEditor ? '#c084fc' : '#38bdf8')
+                  }}>
+                    {esSuperAdmin ? '👑 SUPER ADMIN' : (esEditor ? '🛠️ EDITOR' : '⚡ TÉCNICO')}
+                  </span>
+                  <span style={{ fontSize: '0.72rem', color: '#e2e8f0', fontWeight: 600 }} className="hide-on-mobile">
+                    {perfilUsuario?.nombre || usuarioActual.email?.split('@')[0]}
+                  </span>
+                </div>
+
+                {esSuperAdmin && (
+                  <button
+                    onClick={() => setModalGestionUsuariosAbierto(true)}
+                    style={{ ...estilos.btnHeader, backgroundColor: 'rgba(245, 158, 11, 0.2)', color: '#fbbf24', border: '1px solid rgba(245, 158, 11, 0.4)' }}
+                    title="Panel de Gestión de Usuarios y Roles (RBAC)"
+                  >
+                    <Users size={14} /> <span style={{ fontSize: '0.7rem', fontWeight: 'bold' }} className="hide-on-mobile">USUARIOS</span>
+                  </button>
+                )}
+
+                <button
+                  onClick={cerrarSesion}
+                  style={{ ...estilos.btnHeader, backgroundColor: 'transparent', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.3)' }}
+                  title="Cerrar Sesión"
+                >
+                  <LogOut size={14} />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setModalAuthAbierto(true)}
+                style={{ ...estilos.btnHeader, backgroundColor: '#0284c7', color: 'white', border: 'none', boxShadow: '0 0 12px rgba(2, 132, 199, 0.4)' }}
+                title="Iniciar sesión o registrar cuenta de técnico"
+              >
+                <Lock size={14} /> <span style={{ fontSize: '0.7rem', fontWeight: 'bold' }}>ACCESO / REGISTRO</span>
+              </button>
+            )}
+
             <button onClick={toggleTema} style={{ ...estilos.btnTema, ...t.textoSutil, marginLeft: '5px' }}>{tema === 'light' ? <Moon size={20} /> : <Sun size={20} />}</button>
           </div>
         </div>
@@ -2051,21 +2176,27 @@ export default function AppDiagnostico() {
                       </div>
                     )}
 
-                    <button
-                      onClick={() => {
-                        setMarcaModoNuevo(marcaDbSeleccionada ? 'existente' : (marcasDisponibles.length > 0 ? 'existente' : 'nueva'));
-                        setFormNuevoModelo({
-                          marca: marcaDbSeleccionada || (marcasDisponibles[0]?.nombre || ''),
-                          nombre: ''
-                        });
-                        setModalNuevoDispositivoAbierto(true);
-                      }}
-                      style={{ background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)', color: 'white', border: 'none', padding: '7px 14px', borderRadius: '8px', fontWeight: 'bold', fontSize: '0.82rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 4px 12px rgba(139, 92, 246, 0.4)' }}
-                    >
-                      <Plus size={15} /> + Añadir Teléfono
-                    </button>
+                    {puedeEditarHardware ? (
+                      <button
+                        onClick={() => {
+                          setMarcaModoNuevo(marcaDbSeleccionada ? 'existente' : (marcasDisponibles.length > 0 ? 'existente' : 'nueva'));
+                          setFormNuevoModelo({
+                            marca: marcaDbSeleccionada || (marcasDisponibles[0]?.nombre || ''),
+                            nombre: ''
+                          });
+                          setModalNuevoDispositivoAbierto(true);
+                        }}
+                        style={{ background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)', color: 'white', border: 'none', padding: '7px 14px', borderRadius: '8px', fontWeight: 'bold', fontSize: '0.82rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 4px 12px rgba(139, 92, 246, 0.4)' }}
+                      >
+                        <Plus size={15} /> + Añadir Teléfono
+                      </button>
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '5px 10px', borderRadius: '8px', backgroundColor: 'rgba(6, 182, 212, 0.15)', border: '1px solid rgba(6, 182, 212, 0.35)', color: '#38bdf8', fontSize: '0.75rem', fontWeight: 700 }}>
+                        <Zap size={13} /> MODO TÉCNICO (CONSULTA)
+                      </div>
+                    )}
 
-                    {nivelDb === 'mediciones' && modeloActivo && (
+                    {nivelDb === 'mediciones' && modeloActivo && puedeEditarHardware && (
                       <button
                         onClick={
                           seccionLibreria === 'ic'
@@ -2251,16 +2382,18 @@ export default function AppDiagnostico() {
                           </p>
                         </div>
 
-                        <button
-                          onClick={() => {
-                            setMarcaModoNuevo('existente');
-                            setFormNuevoModelo({ marca: marcaDbSeleccionada, nombre: '' });
-                            setModalNuevoDispositivoAbierto(true);
-                          }}
-                          style={{ background: 'rgba(139, 92, 246, 0.15)', border: '1px solid #8b5cf6', color: '#c084fc', padding: '7px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}
-                        >
-                          <Plus size={15} /> Añadir Modelo a {marcaDbSeleccionada}
-                        </button>
+                        {puedeEditarHardware && (
+                          <button
+                            onClick={() => {
+                              setMarcaModoNuevo('existente');
+                              setFormNuevoModelo({ marca: marcaDbSeleccionada, nombre: '' });
+                              setModalNuevoDispositivoAbierto(true);
+                            }}
+                            style={{ background: 'rgba(139, 92, 246, 0.15)', border: '1px solid #8b5cf6', color: '#c084fc', padding: '7px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}
+                          >
+                            <Plus size={15} /> Añadir Modelo a {marcaDbSeleccionada}
+                          </button>
+                        )}
                       </div>
 
                       {/* Rejilla compacta de modelos: ~1/4 del tamaño anterior */}
@@ -3144,6 +3277,7 @@ export default function AppDiagnostico() {
               <VisorMapeoPCB
                 fullscreen
                 nombreModelo={`${modeloActivo.marca || ''} ${modeloActivo.nombre || ''}`.trim()}
+                puedeEditar={puedeEditarHardware}
                 onCerrar={() => setModalBoardviewAbierto(false)}
                 sectoresIniciales={modeloActivo.boardviewSectores || null}
                 componentesIniciales={modeloActivo.boardviewComponentes || []}
@@ -3536,6 +3670,27 @@ export default function AppDiagnostico() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* --- MODALES DE SEGURIDAD Y CONTROL DE ACCESO RBAC --- */}
+      <ModalAutenticacion
+        visible={modalAuthAbierto}
+        onCerrar={() => setModalAuthAbierto(false)}
+        onLoginExitoso={(u, p) => {
+          setUsuarioActual(u);
+          if (p) setPerfilUsuario(p);
+        }}
+      />
+
+      <ModalGestionUsuarios
+        visible={modalGestionUsuariosAbierto}
+        onCerrar={() => setModalGestionUsuariosAbierto(false)}
+        usuarioActualUid={usuarioActual?.uid}
+      />
+
+      <ModalEstadoUsuario
+        perfil={perfilUsuario}
+        onRecargarPerfil={recargarPerfilActual}
+      />
     </div>
   );
 }

@@ -160,7 +160,8 @@ export default function VisorMapeoPCB({
   onCerrar = null,                   // botón de cierre en modo fullscreen
   tiposCustom = [],                  // lista global de tipos de línea personalizados
   setTiposCustom = null,             // setter de tipos de línea personalizados
-  nombreModelo = ''                  // nombre del modelo activo (ej: Samsung Galaxy S22)
+  nombreModelo = '',                 // nombre del modelo activo (ej: Samsung Galaxy S22)
+  puedeEditar = true                 // control de permisos RBAC (solo super_admin y editor pueden alterar mapa)
 }) {
   // --- Organización de Placa: Cara A (Superior) / Cara B (Inferior) & Sectores Mapeados ---
   const [caraPlaca, setCaraPlaca] = useState('A'); // 'A' | 'B'
@@ -1733,17 +1734,19 @@ export default function VisorMapeoPCB({
             <button 
               onClick={() => { setTool('select'); setDrawingStep(0); }} 
               style={{ ...styles.toolBtn, ...(tool === 'select' && styles.toolBtnActive) }}
-              title="Puntero de selección y arrastre"
+              title="Puntero de selección"
             >
               Puntero
             </button>
-            <button 
-              onClick={() => { setTool('drawSMD'); setDrawingStep(0); }} 
-              style={{ ...styles.toolBtn, ...(tool === 'drawSMD' && styles.toolBtnActive) }}
-              title="Dibujar Componente SMD (Shift para alinear recto)"
-            >
-              + Dibujar SMD
-            </button>
+            {puedeEditar && (
+              <button 
+                onClick={() => { setTool('drawSMD'); setDrawingStep(0); }} 
+                style={{ ...styles.toolBtn, ...(tool === 'drawSMD' && styles.toolBtnActive) }}
+                title="Dibujar Componente SMD (Shift para alinear recto)"
+              >
+                + Dibujar SMD
+              </button>
+            )}
             <button 
               onClick={() => { setTool('pan'); setDrawingStep(0); }} 
               style={{ ...styles.toolBtn, ...(tool === 'pan' && styles.toolBtnActive) }}
@@ -1752,6 +1755,12 @@ export default function VisorMapeoPCB({
               Mover
             </button>
           </div>
+
+          {!puedeEditar && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '3px 8px', borderRadius: '6px', backgroundColor: 'rgba(6, 182, 212, 0.12)', border: '1px solid rgba(6, 182, 212, 0.3)', color: '#38bdf8', fontSize: '0.72rem', fontWeight: 700 }}>
+              <Zap size={12} /> MODO TÉCNICO (CONSULTA)
+            </div>
+          )}
 
           {tool === 'drawSMD' && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', animation: 'fadeIn 0.3s' }}>
@@ -1977,22 +1986,26 @@ export default function VisorMapeoPCB({
                 </div>
               )}
 
-              <button onClick={() => fileInputPlacaRef.current && fileInputPlacaRef.current.click()} style={styles.imgBtn} title={`Subir foto de Cara ${caraPlaca} para el sector "${sectorPlaca}" desde PC`}>
-                <Upload size={12} /> Subir Foto
-              </button>
-              <button onClick={pedirUrlPlaca} style={styles.imgBtn} title={`Pegar URL directa de imagen para Cara ${caraPlaca} del sector "${sectorPlaca}"`}>
-                <Link size={12} /> URL
-              </button>
-              <button 
-                onClick={() => {
-                  if (caraPlaca === 'A') setImgPlacaCaraAUrl(IMAGEN_PREDETERMINADA);
-                  else setImgPlacaCaraBUrl('');
-                }} 
-                style={styles.imgBtn} 
-                title={`Restaurar imagen predeterminada de Cara ${caraPlaca} (${sectorPlaca})`}
-              >
-                <RotateCcw size={12} /> Predet.
-              </button>
+              {puedeEditar && (
+                <>
+                  <button onClick={() => fileInputPlacaRef.current && fileInputPlacaRef.current.click()} style={styles.imgBtn} title={`Subir foto de Cara ${caraPlaca} para el sector "${sectorPlaca}" desde PC`}>
+                    <Upload size={12} /> Subir Foto
+                  </button>
+                  <button onClick={pedirUrlPlaca} style={styles.imgBtn} title={`Pegar URL directa de imagen para Cara ${caraPlaca} del sector "${sectorPlaca}"`}>
+                    <Link size={12} /> URL
+                  </button>
+                  <button 
+                    onClick={() => {
+                      if (caraPlaca === 'A') setImgPlacaCaraAUrl(IMAGEN_PREDETERMINADA);
+                      else setImgPlacaCaraBUrl('');
+                    }} 
+                    style={styles.imgBtn} 
+                    title={`Restaurar imagen predeterminada de Cara ${caraPlaca} (${sectorPlaca})`}
+                  >
+                    <RotateCcw size={12} /> Predet.
+                  </button>
+                </>
+              )}
 
               <input
                 ref={fileInputPlacaRef}
@@ -2494,10 +2507,12 @@ export default function VisorMapeoPCB({
                         e.stopPropagation();
                         setSelectedCompId(comp.id);
                         setSidebarAbierto(true);
-                        setIsDraggingComp(true);
-                        setDragCompId(comp.id);
-                        const coords = getCanvasCoords(e);
-                        setDragOffset({ x: coords.x - comp.x, y: coords.y - comp.y });
+                        if (puedeEditar) {
+                          setIsDraggingComp(true);
+                          setDragCompId(comp.id);
+                          const coords = getCanvasCoords(e);
+                          setDragOffset({ x: coords.x - comp.x, y: coords.y - comp.y });
+                        }
                       }
                     }}
                   >
@@ -3094,12 +3109,14 @@ export default function VisorMapeoPCB({
                     </div>
                   </div>
 
-                  <button 
-                    onClick={() => borrarComponente(compActivo.id)} 
-                    style={{ ...styles.btn, backgroundColor: 'rgba(239, 68, 68, 0.15)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.3)', marginTop: '8px', width: '100%', justifyContent: 'center' }}
-                  >
-                    <Trash2 size={13} /> Eliminar Componente
-                  </button>
+                  {puedeEditar && (
+                    <button 
+                      onClick={() => borrarComponente(compActivo.id)} 
+                      style={{ ...styles.btn, backgroundColor: 'rgba(239, 68, 68, 0.15)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.3)', marginTop: '8px', width: '100%', justifyContent: 'center' }}
+                    >
+                      <Trash2 size={13} /> Eliminar Componente
+                    </button>
+                  )}
                 </div>
 
                 {/* Info del Pad Seleccionado */}
