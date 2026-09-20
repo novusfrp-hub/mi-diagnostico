@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { doc, setDoc, addDoc, collection, getDocs, deleteDoc, updateDoc } from 'firebase/firestore';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { db, auth } from '../firebase';
-import { Sun, Moon, ArrowLeft, RefreshCcw, RefreshCw, Zap, Smartphone, AlertTriangle, ChevronRight, Home, ShieldCheck, Camera, CheckCircle2, XCircle, Settings, Plus, Save, X, Trash2, Edit, ChevronDown, CornerDownRight, LogOut, Lightbulb, Usb, Map, Play, Flame, ClipboardList, History, Printer, FileText, MessageCircle, Link, Monitor, Mic, MicOff, Cpu, Image as ImageIcon, Maximize2 } from 'lucide-react';
+import { Sun, Moon, ArrowLeft, RefreshCcw, RefreshCw, Zap, Smartphone, AlertTriangle, ChevronRight, Home, ShieldCheck, Camera, CheckCircle2, XCircle, Settings, Plus, Save, X, Trash2, Edit, ChevronDown, CornerDownRight, LogOut, Lightbulb, Usb, Map, Play, Flame, ClipboardList, History, Printer, FileText, MessageCircle, Link, Monitor, Mic, MicOff, Cpu, Image as ImageIcon, Maximize2, Search } from 'lucide-react';
 
 import FPCInteligente from '../components/FPCInteligente.js';
 import ICInteligente from '../components/ICInteligente.js';
@@ -843,6 +843,9 @@ export default function AppDiagnostico() {
   const [libreriaVisible, setLibreriaVisible] = useState(false); const [modelosLibreria, setModelosLibreria] = useState([]); const [modeloActivo, setModeloActivo] = useState(null); const [fpcActivo, setFpcActivo] = useState(null); const [formNuevoModelo, setFormNuevoModelo] = useState({ marca: '', nombre: '' }); const [formNuevoFpc, setFormNuevoFpc] = useState({ nombre: '', pines: 40 }); const [seccionLibreria, setSeccionLibreria] = useState('fpc');
   const [marcaDbSeleccionada, setMarcaDbSeleccionada] = useState(null);
   const [nivelDb, setNivelDb] = useState('marcas'); // 'marcas' | 'modelos' | 'mediciones'
+  const [modalNuevoDispositivoAbierto, setModalNuevoDispositivoAbierto] = useState(false);
+  const [marcaModoNuevo, setMarcaModoNuevo] = useState('existente'); // 'existente' | 'nueva'
+  const [busquedaHardwareDb, setBusquedaHardwareDb] = useState('');
 
   const marcasDisponibles = useMemo(() => {
     const map = {};
@@ -1392,6 +1395,8 @@ export default function AppDiagnostico() {
     try {
       await setDoc(doc(db, "hardware_db", idUnico), sanitizarObjetoParaFirestore(nuevoObj));
       setFormNuevoModelo({ marca: '', nombre: '' });
+      setModalNuevoDispositivoAbierto(false);
+      setBusquedaHardwareDb('');
       await cargarLibreriaDB();
       setMarcaDbSeleccionada(nuevoObj.marca);
       setModeloActivo({ ...nuevoObj, id: idUnico });
@@ -1699,6 +1704,7 @@ export default function AppDiagnostico() {
 
   const abrirLibreria = () => {
     setLibreriaVisible(true);
+    setBusquedaHardwareDb('');
     cargarLibreriaDB();
     if (modeloActivo) {
       setMarcaDbSeleccionada(modeloActivo.marca);
@@ -1862,9 +1868,9 @@ export default function AppDiagnostico() {
   return (
     <div style={{ ...estilos.contenedor, ...t.fondoPrincipal }}>
       <style>{`
-        .modal-lib { flex-direction: row; } .modal-lib-side { width: 300px; border-right: 1px solid #374151; } .fpc-tools { display: flex; gap: 10px; margin-bottom: 15px; justify-content: flex-end; }
+        .modal-lib { flex-direction: column; } .fpc-tools { display: flex; gap: 10px; margin-bottom: 15px; justify-content: flex-end; }
         ::-webkit-scrollbar { height: 8px; width: 8px; } ::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); border-radius: 4px; } ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; } ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.4); }
-        @media (max-width: 850px) { .modal-lib { flex-direction: column !important; border-radius: 0 !important; width: 100vw !important; height: 100vh !important; } .modal-lib-side { width: 100% !important; border-right: none !important; border-bottom: 1px solid #374151; max-height: 250px; } .fpc-tools { flex-wrap: wrap; justify-content: center !important; } .hide-on-mobile { display: none !important; } .hud-valor-text { font-size: 3rem !important; } .grid-dock { grid-template-columns: repeat(3, 1fr) !important; } }
+        @media (max-width: 850px) { .modal-lib { flex-direction: column !important; border-radius: 0 !important; width: 100vw !important; height: 100vh !important; } .fpc-tools { flex-wrap: wrap; justify-content: center !important; } .hide-on-mobile { display: none !important; } .hud-valor-text { font-size: 3rem !important; } .grid-dock { grid-template-columns: repeat(3, 1fr) !important; } }
       `}</style>
 
       <header className="no-print" style={{ ...estilos.header, ...t.bordeFantasmaBottom }}>
@@ -1949,125 +1955,100 @@ export default function AppDiagnostico() {
       <AnimatePresence>
         {libreriaVisible && (
           <motion.div className="no-print" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={estilos.modalOverlay}>
-            <motion.div className="modal-lib" initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} style={{ width: '95vw', maxWidth: '1600px', height: '95vh', backgroundColor: '#111827', borderRadius: '1.5rem', display: 'flex', overflow: 'hidden', border: '1px solid #374151' }}>
-              <div className="modal-lib-side" style={{ backgroundColor: '#000', display: 'flex', flexDirection: 'column' }}>
-                <div style={{ padding: '20px', borderBottom: '1px solid #374151' }}>
-                  <h3 style={{ color: '#8b5cf6', margin: '0 0 15px 0', display: 'flex', alignItems: 'center', gap: '10px' }}><Cpu size={24} /> HARDWARE DB</h3>
-                  <form onSubmit={crearNuevoModeloDB} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <input required placeholder="Marca (Ej: Xiaomi)" value={formNuevoModelo.marca} onChange={e => setFormNuevoModelo({ ...formNuevoModelo, marca: e.target.value })} style={estilos.inputDark} />
-                    <input required placeholder="Modelo (Ej: POCO X3)" value={formNuevoModelo.nombre} onChange={e => setFormNuevoModelo({ ...formNuevoModelo, nombre: e.target.value })} style={estilos.inputDark} />
-                    <button type="submit" style={{ backgroundColor: '#8b5cf6', color: 'white', border: 'none', padding: '8px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}>+ Añadir Teléfono</button>
-                  </form>
-                </div>
-                <div style={{ flex: 1, overflowY: 'auto', padding: '10px' }}>
-                  <button
-                    onClick={() => { setNivelDb('marcas'); setMarcaDbSeleccionada(null); }}
-                    style={{
-                      width: '100%',
-                      padding: '10px 12px',
-                      textAlign: 'left',
-                      backgroundColor: nivelDb === 'marcas' ? 'rgba(139, 92, 246, 0.2)' : 'transparent',
-                      border: 'none',
-                      color: nivelDb === 'marcas' ? '#a78bfa' : '#9ca3af',
-                      borderLeft: nivelDb === 'marcas' ? '4px solid #8b5cf6' : '4px solid transparent',
-                      cursor: 'pointer',
-                      borderRadius: '0 8px 8px 0',
-                      marginBottom: '6px',
-                      fontWeight: 'bold',
-                      fontSize: '0.85rem',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center'
-                    }}
-                  >
-                    <span>📱 Todas las Marcas</span>
-                    <span style={{ fontSize: '0.72rem', background: '#1f2937', padding: '2px 7px', borderRadius: '10px' }}>{marcasDisponibles.length}</span>
-                  </button>
-
-                  <div style={{ height: '1px', background: '#1f2937', margin: '8px 0' }} />
-                  <span style={{ fontSize: '0.68rem', color: '#6b7280', textTransform: 'uppercase', paddingLeft: '8px', fontWeight: 'bold' }}>Marcas ({marcasDisponibles.length})</span>
-
-                  {marcasDisponibles.map(item => {
-                    const isSelected = marcaDbSeleccionada?.toUpperCase() === item.nombre.toUpperCase();
-                    return (
-                      <button
-                        key={item.nombre}
-                        onClick={() => {
-                          setMarcaDbSeleccionada(item.nombre);
-                          setNivelDb('modelos');
-                        }}
-                        style={{
-                          width: '100%',
-                          padding: '10px 12px',
-                          textAlign: 'left',
-                          backgroundColor: isSelected ? '#1f2937' : 'transparent',
-                          border: 'none',
-                          color: isSelected ? '#00ffff' : '#d1d5db',
-                          borderLeft: isSelected ? '4px solid #00ffff' : '4px solid transparent',
-                          cursor: 'pointer',
-                          borderRadius: '0 8px 8px 0',
-                          marginBottom: '4px',
-                          fontWeight: 'bold',
-                          fontSize: '0.85rem',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center'
-                        }}
-                      >
-                        <span>{item.nombre}</span>
-                        <span style={{ fontSize: '0.72rem', background: isSelected ? '#0e7490' : '#111827', color: isSelected ? '#ffffff' : '#9ca3af', padding: '2px 6px', borderRadius: '10px' }}>
-                          {item.modelos.length}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: '#111827' }}>
-                <div style={{ padding: '15px 20px', borderBottom: '1px solid #374151', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <motion.div className="modal-lib" initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} style={{ width: '95vw', maxWidth: '1600px', height: '95vh', backgroundColor: '#111827', borderRadius: '1.5rem', display: 'flex', flexDirection: 'column', overflow: 'hidden', border: '1px solid #374151', position: 'relative' }}>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: '#111827', overflow: 'hidden', position: 'relative' }}>
+                {/* BARRA SUPERIOR UNIFICADA DE NAVEGACIÓN Y ACCIONES */}
+                <div style={{ padding: '14px 24px', borderBottom: '1px solid #374151', backgroundColor: '#0d1117', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', flexWrap: 'wrap', flexShrink: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                     {nivelDb === 'modelos' && (
                       <button
-                        onClick={() => { setNivelDb('marcas'); setMarcaDbSeleccionada(null); }}
-                        style={{ background: '#1f2937', border: '1px solid #374151', color: '#00ffff', padding: '6px 12px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '5px' }}
+                        onClick={() => { setNivelDb('marcas'); setMarcaDbSeleccionada(null); setBusquedaHardwareDb(''); }}
+                        style={{ background: '#1f2937', border: '1px solid #374151', color: '#00ffff', padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}
                       >
-                        ← Volver a Marcas
+                        <ArrowLeft size={16} /> Volver a Marcas
                       </button>
                     )}
                     {nivelDb === 'mediciones' && (
                       <>
                         <button
-                          onClick={() => { setNivelDb('modelos'); }}
-                          style={{ background: '#1f2937', border: '1px solid #374151', color: '#00ffff', padding: '6px 12px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '5px' }}
+                          onClick={() => { setNivelDb('modelos'); setBusquedaHardwareDb(''); }}
+                          style={{ background: '#1f2937', border: '1px solid #374151', color: '#00ffff', padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}
                         >
-                          ← Volver a Modelos ({marcaDbSeleccionada || modeloActivo?.marca})
+                          <ArrowLeft size={16} /> Volver a {marcaDbSeleccionada || modeloActivo?.marca}
                         </button>
                         <button
-                          onClick={() => { setNivelDb('marcas'); setMarcaDbSeleccionada(null); }}
+                          onClick={() => { setNivelDb('marcas'); setMarcaDbSeleccionada(null); setBusquedaHardwareDb(''); }}
                           style={{ background: '#111827', border: '1px solid #374151', color: '#9ca3af', padding: '6px 10px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}
                         >
                           Marcas
                         </button>
                       </>
                     )}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{ color: '#9ca3af', fontSize: '0.9rem' }}>HARDWARE DB</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div
+                        onClick={() => { setNivelDb('marcas'); setMarcaDbSeleccionada(null); setBusquedaHardwareDb(''); }}
+                        style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '4px 8px', borderRadius: '6px' }}
+                        title="Ir al inicio de Hardware DB"
+                      >
+                        <Cpu size={22} color="#8b5cf6" />
+                        <span style={{ color: '#fff', fontSize: '1rem', fontWeight: '800', letterSpacing: '0.04em' }}>HARDWARE DB</span>
+                      </div>
                       {marcaDbSeleccionada && (
                         <>
-                          <span style={{ color: '#6b7280' }}>/</span>
-                          <span style={{ color: '#c084fc', fontWeight: 'bold', fontSize: '0.95rem' }}>{marcaDbSeleccionada.toUpperCase()}</span>
+                          <span style={{ color: '#4b5563', fontSize: '1.1rem' }}>/</span>
+                          <span
+                            onClick={() => { if (nivelDb === 'mediciones') { setNivelDb('modelos'); setBusquedaHardwareDb(''); } }}
+                            style={{ color: '#c084fc', fontWeight: 'bold', fontSize: '0.95rem', cursor: nivelDb === 'mediciones' ? 'pointer' : 'default', padding: '2px 6px', borderRadius: '4px' }}
+                          >
+                            {marcaDbSeleccionada.toUpperCase()}
+                          </span>
                         </>
                       )}
                       {nivelDb === 'mediciones' && modeloActivo && (
                         <>
-                          <span style={{ color: '#6b7280' }}>/</span>
+                          <span style={{ color: '#4b5563', fontSize: '1.1rem' }}>/</span>
                           <span style={{ color: '#00ffff', fontWeight: 'bold', fontSize: '1rem' }}>{modeloActivo.nombre.toUpperCase()}</span>
                         </>
                       )}
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', gap: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', flex: 1, justifyContent: 'flex-end' }}>
+                    {nivelDb !== 'mediciones' && (
+                      <div style={{ position: 'relative', width: '100%', maxWidth: '300px' }}>
+                        <Search size={16} color="#9ca3af" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+                        <input
+                          type="text"
+                          value={busquedaHardwareDb}
+                          onChange={(e) => setBusquedaHardwareDb(e.target.value)}
+                          placeholder={nivelDb === 'marcas' ? 'Buscar marca...' : `Buscar modelo en ${marcaDbSeleccionada}...`}
+                          style={{ width: '100%', padding: '8px 32px 8px 36px', backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '10px', color: 'white', fontSize: '0.85rem', outline: 'none' }}
+                        />
+                        {busquedaHardwareDb && (
+                          <button
+                            onClick={() => setBusquedaHardwareDb('')}
+                            style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', padding: 0 }}
+                          >
+                            <X size={14} />
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    <button
+                      onClick={() => {
+                        setMarcaModoNuevo(marcaDbSeleccionada ? 'existente' : (marcasDisponibles.length > 0 ? 'existente' : 'nueva'));
+                        setFormNuevoModelo({
+                          marca: marcaDbSeleccionada || (marcasDisponibles[0]?.nombre || ''),
+                          nombre: ''
+                        });
+                        setModalNuevoDispositivoAbierto(true);
+                      }}
+                      style={{ background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)', color: 'white', border: 'none', padding: '9px 18px', borderRadius: '10px', fontWeight: 'bold', fontSize: '0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 14px rgba(139, 92, 246, 0.4)' }}
+                    >
+                      <Plus size={16} /> + Añadir Teléfono
+                    </button>
+
                     {nivelDb === 'mediciones' && modeloActivo && (
                       <button
                         onClick={
@@ -2087,13 +2068,13 @@ export default function AppDiagnostico() {
                           ) ? '#f59e0b' : '#10b981',
                           color: 'white',
                           border: 'none',
-                          padding: '8px 15px',
+                          padding: '8px 16px',
                           borderRadius: '8px',
                           fontWeight: 'bold',
                           cursor: 'pointer',
                           display: 'flex',
                           alignItems: 'center',
-                          gap: '5px'
+                          gap: '6px'
                         }}
                       >
                         <Save size={16} />
@@ -2109,107 +2090,172 @@ export default function AppDiagnostico() {
                         }
                       </button>
                     )}
-                    <button onClick={() => setLibreriaVisible(false)} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', cursor: 'pointer', padding: '8px', borderRadius: '8px' }}><X size={16} /></button>
+
+                    <button
+                      onClick={() => { setLibreriaVisible(false); setBusquedaHardwareDb(''); }}
+                      style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', cursor: 'pointer', padding: '8px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                      title="Cerrar ventana"
+                    >
+                      <X size={18} />
+                    </button>
                   </div>
                 </div>
 
-                {/* NIVEL 1: VISTA DE TODAS LAS MARCAS */}
-                {nivelDb === 'marcas' && (
-                  <div style={{ flex: 1, overflowY: 'auto', padding: '25px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                    <div>
-                      <h3 style={{ color: '#fff', fontSize: '1.4rem', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <Smartphone size={24} color="#00ffff" /> Marcas en Base de Datos
-                      </h3>
-                      <p style={{ color: '#9ca3af', fontSize: '0.85rem', margin: 0 }}>
-                        Selecciona una marca para ver sus modelos creados o añade un nuevo modelo en el panel lateral.
-                      </p>
-                    </div>
+                {/* NIVEL 1: DASHBOARD COMPLETO DE MARCAS */}
+                {nivelDb === 'marcas' && (() => {
+                  const marcasFiltradas = marcasDisponibles.filter(m =>
+                    m.nombre.toLowerCase().includes(busquedaHardwareDb.toLowerCase().trim())
+                  );
+                  const totalModelosRegistrados = marcasDisponibles.reduce((acc, m) => acc + (m.modelos?.length || 0), 0);
 
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px' }}>
-                      {marcasDisponibles.map(m => (
-                        <div
-                          key={m.nombre}
-                          onClick={() => {
-                            setMarcaDbSeleccionada(m.nombre);
-                            setNivelDb('modelos');
-                          }}
-                          style={{
-                            backgroundColor: '#1f2937',
-                            border: '1.5px solid #374151',
-                            borderRadius: '16px',
-                            padding: '20px',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s ease',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            justifyContent: 'space-between',
-                            gap: '15px',
-                            boxShadow: '0 4px 15px rgba(0,0,0,0.3)'
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.borderColor = '#8b5cf6';
-                            e.currentTarget.style.transform = 'translateY(-3px)';
-                            e.currentTarget.style.boxShadow = '0 8px 25px rgba(139, 92, 246, 0.25)';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.borderColor = '#374151';
-                            e.currentTarget.style.transform = 'translateY(0)';
-                            e.currentTarget.style.boxShadow = '0 4px 15px rgba(0,0,0,0.3)';
-                          }}
-                        >
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'rgba(139, 92, 246, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#c084fc' }}>
-                              <Smartphone size={24} />
+                  return (
+                    <div style={{ flex: 1, overflowY: 'auto', padding: '28px 32px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px' }}>
+                        <div>
+                          <h2 style={{ color: '#fff', fontSize: '1.5rem', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '10px', fontWeight: '800' }}>
+                            <Smartphone size={26} color="#00ffff" /> Marcas de Dispositivos
+                          </h2>
+                          <p style={{ color: '#9ca3af', fontSize: '0.88rem', margin: 0 }}>
+                            Explora las marcas registradas en el laboratorio o añade nuevos modelos con mediciones de diodo, voltajes y esquemáticos.
+                          </p>
+                        </div>
+                        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                          <div style={{ background: '#1f2937', border: '1px solid #374151', padding: '8px 16px', borderRadius: '12px', textAlign: 'center' }}>
+                            <div style={{ color: '#c084fc', fontSize: '1.2rem', fontWeight: 'bold' }}>{marcasDisponibles.length}</div>
+                            <div style={{ color: '#9ca3af', fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: '600' }}>Marcas</div>
+                          </div>
+                          <div style={{ background: '#1f2937', border: '1px solid #374151', padding: '8px 16px', borderRadius: '12px', textAlign: 'center' }}>
+                            <div style={{ color: '#00ffff', fontSize: '1.2rem', fontWeight: 'bold' }}>{totalModelosRegistrados}</div>
+                            <div style={{ color: '#9ca3af', fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: '600' }}>Modelos Totales</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '20px' }}>
+                        {marcasFiltradas.map(m => (
+                          <div
+                            key={m.nombre}
+                            onClick={() => {
+                              setMarcaDbSeleccionada(m.nombre);
+                              setNivelDb('modelos');
+                              setBusquedaHardwareDb('');
+                            }}
+                            style={{
+                              backgroundColor: '#161e2e',
+                              border: '1.5px solid #2d3748',
+                              borderRadius: '16px',
+                              padding: '22px',
+                              cursor: 'pointer',
+                              transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              justifyContent: 'space-between',
+                              gap: '18px',
+                              boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+                              position: 'relative',
+                              overflow: 'hidden'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.borderColor = '#8b5cf6';
+                              e.currentTarget.style.transform = 'translateY(-4px)';
+                              e.currentTarget.style.boxShadow = '0 12px 30px rgba(139, 92, 246, 0.25)';
+                              e.currentTarget.style.backgroundColor = '#1c2538';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.borderColor = '#2d3748';
+                              e.currentTarget.style.transform = 'translateY(0)';
+                              e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.3)';
+                              e.currentTarget.style.backgroundColor = '#161e2e';
+                            }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(109, 40, 217, 0.2) 100%)', border: '1px solid rgba(139, 92, 246, 0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#c084fc' }}>
+                                <Smartphone size={26} />
+                              </div>
+                              <span style={{ fontSize: '0.78rem', fontWeight: 'bold', background: '#111827', color: '#00ffff', padding: '4px 12px', borderRadius: '20px', border: '1px solid #374151' }}>
+                                {m.modelos.length} {m.modelos.length === 1 ? 'modelo' : 'modelos'}
+                              </span>
                             </div>
-                            <span style={{ fontSize: '0.75rem', fontWeight: 'bold', background: '#111827', color: '#00ffff', padding: '4px 10px', borderRadius: '20px', border: '1px solid #374151' }}>
-                              {m.modelos.length} {m.modelos.length === 1 ? 'modelo' : 'modelos'}
-                            </span>
+
+                            <div>
+                              <h3 style={{ color: 'white', margin: '0 0 6px 0', fontSize: '1.3rem', fontWeight: 'bold', letterSpacing: '0.02em' }}>
+                                {m.nombre}
+                              </h3>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: '#9ca3af', fontSize: '0.8rem' }}>
+                                <span>Explorar modelos</span>
+                                <ChevronRight size={18} color="#8b5cf6" />
+                              </div>
+                            </div>
                           </div>
-                          <div>
-                            <h4 style={{ color: 'white', margin: '0 0 4px 0', fontSize: '1.15rem', fontWeight: 'bold', letterSpacing: '0.02em' }}>
-                              {m.nombre}
+                        ))}
+
+                        {marcasFiltradas.length === 0 && (
+                          <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '60px 20px', backgroundColor: '#161e2e', borderRadius: '16px', border: '1px dashed #374151' }}>
+                            <Smartphone size={48} style={{ opacity: 0.3, marginBottom: '15px', color: '#8b5cf6' }} />
+                            <h4 style={{ color: '#d1d5db', margin: '0 0 8px 0', fontSize: '1.1rem' }}>
+                              {busquedaHardwareDb ? `No se encontraron marcas para "${busquedaHardwareDb}"` : 'No hay marcas en la base de datos'}
                             </h4>
-                            <span style={{ color: '#9ca3af', fontSize: '0.75rem' }}>
-                              Ver modelos disponibles →
-                            </span>
+                            <p style={{ fontSize: '0.85rem', color: '#9ca3af', maxWidth: '400px', margin: '0 auto 16px auto' }}>
+                              {busquedaHardwareDb ? 'Prueba con otro término de búsqueda o crea una nueva marca.' : 'Comienza añadiendo tu primer dispositivo a la base de datos de hardware.'}
+                            </p>
+                            <button
+                              onClick={() => {
+                                setMarcaModoNuevo('nueva');
+                                setFormNuevoModelo({ marca: busquedaHardwareDb || '', nombre: '' });
+                                setModalNuevoDispositivoAbierto(true);
+                              }}
+                              style={{ backgroundColor: '#8b5cf6', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+                            >
+                              <Plus size={16} /> Crear Teléfono Ahora
+                            </button>
                           </div>
-                        </div>
-                      ))}
-
-                      {marcasDisponibles.length === 0 && (
-                        <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '60px 20px', color: '#6b7280' }}>
-                          <Cpu size={48} style={{ opacity: 0.3, marginBottom: '15px' }} />
-                          <h4 style={{ color: '#d1d5db', margin: '0 0 8px 0' }}>No hay teléfonos en la base de datos</h4>
-                          <p style={{ fontSize: '0.85rem' }}>Usa el formulario de la izquierda para agregar tu primer teléfono.</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* NIVEL 2: VISTA DE MODELOS DE LA MARCA SELECCIONADA */}
-                {nivelDb === 'modelos' && (
-                  <div style={{ flex: 1, overflowY: 'auto', padding: '25px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-                      <div>
-                        <h3 style={{ color: '#fff', fontSize: '1.4rem', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <span style={{ color: '#8b5cf6' }}>{marcaDbSeleccionada?.toUpperCase()}</span>
-                          <span style={{ color: '#6b7280', fontSize: '1rem', fontWeight: 'normal' }}>• Modelos Registrados</span>
-                        </h3>
-                        <p style={{ color: '#9ca3af', fontSize: '0.85rem', margin: 0 }}>
-                          Selecciona un modelo para abrir sus mediciones, esquemáticos y boardview.
-                        </p>
+                        )}
                       </div>
                     </div>
+                  );
+                })()}
 
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '16px' }}>
-                      {modelosLibreria
-                        .filter(m => (m.marca || '').trim().toUpperCase() === (marcaDbSeleccionada || '').trim().toUpperCase())
-                        .map(mod => {
+                {/* NIVEL 2: DASHBOARD COMPLETO DE MODELOS DE LA MARCA SELECCIONADA */}
+                {nivelDb === 'modelos' && (() => {
+                  const modelosDeMarca = modelosLibreria.filter(
+                    m => (m.marca || '').trim().toUpperCase() === (marcaDbSeleccionada || '').trim().toUpperCase()
+                  );
+                  const modelosFiltrados = modelosDeMarca.filter(
+                    m => m.nombre.toLowerCase().includes(busquedaHardwareDb.toLowerCase().trim())
+                  );
+
+                  return (
+                    <div style={{ flex: 1, overflowY: 'auto', padding: '28px 32px', display: 'flex', flexDirection: 'column', gap: '22px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px' }}>
+                        <div>
+                          <h2 style={{ color: '#fff', fontSize: '1.5rem', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '10px', fontWeight: '800' }}>
+                            <span style={{ color: '#8b5cf6' }}>{marcaDbSeleccionada?.toUpperCase()}</span>
+                            <span style={{ color: '#6b7280', fontSize: '1.1rem', fontWeight: 'normal' }}>• Modelos Registrados ({modelosDeMarca.length})</span>
+                          </h2>
+                          <p style={{ color: '#9ca3af', fontSize: '0.88rem', margin: 0 }}>
+                            Selecciona un modelo para acceder a su multímetro HUD, Docktest, Planos FPC, IC BGA y Boardview.
+                          </p>
+                        </div>
+
+                        <button
+                          onClick={() => {
+                            setMarcaModoNuevo('existente');
+                            setFormNuevoModelo({ marca: marcaDbSeleccionada, nombre: '' });
+                            setModalNuevoDispositivoAbierto(true);
+                          }}
+                          style={{ background: 'rgba(139, 92, 246, 0.15)', border: '1px solid #8b5cf6', color: '#c084fc', padding: '9px 16px', borderRadius: '10px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}
+                        >
+                          <Plus size={16} /> Añadir Modelo a {marcaDbSeleccionada}
+                        </button>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '18px' }}>
+                        {modelosFiltrados.map(mod => {
                           const tieneBoardview = !!(mod.boardviewComponentes?.length || mod.boardviewImagenPlaca || mod.imgPlaca);
                           const tieneFpc = !!(mod.fpcs?.length);
                           const tieneBateria = !!(mod.fpcBateria?.pines?.length);
                           const tieneIc = !!(mod.ics?.length);
+                          const esActivo = modeloActivo?.id === mod.id;
 
                           return (
                             <div
@@ -2217,64 +2263,95 @@ export default function AppDiagnostico() {
                               onClick={() => {
                                 seleccionarModeloLibreria(mod);
                                 setNivelDb('mediciones');
+                                setBusquedaHardwareDb('');
                               }}
                               style={{
-                                backgroundColor: '#1f2937',
-                                border: modeloActivo?.id === mod.id ? '2px solid #00ffff' : '1.5px solid #374151',
+                                backgroundColor: '#161e2e',
+                                border: esActivo ? '2px solid #00ffff' : '1.5px solid #2d3748',
                                 borderRadius: '16px',
-                                padding: '18px',
+                                padding: '20px',
                                 cursor: 'pointer',
-                                transition: 'all 0.2s ease',
+                                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
                                 display: 'flex',
                                 flexDirection: 'column',
                                 justifyContent: 'space-between',
-                                gap: '14px',
-                                boxShadow: modeloActivo?.id === mod.id ? '0 0 20px rgba(0, 255, 255, 0.2)' : '0 4px 15px rgba(0,0,0,0.3)'
+                                gap: '16px',
+                                boxShadow: esActivo ? '0 0 25px rgba(0, 255, 255, 0.25)' : '0 4px 20px rgba(0,0,0,0.3)'
                               }}
                               onMouseEnter={(e) => {
                                 e.currentTarget.style.borderColor = '#00ffff';
                                 e.currentTarget.style.transform = 'translateY(-3px)';
                                 e.currentTarget.style.boxShadow = '0 8px 25px rgba(0, 255, 255, 0.2)';
+                                e.currentTarget.style.backgroundColor = '#1c2538';
                               }}
                               onMouseLeave={(e) => {
-                                e.currentTarget.style.borderColor = modeloActivo?.id === mod.id ? '#00ffff' : '#374151';
+                                e.currentTarget.style.borderColor = esActivo ? '#00ffff' : '#2d3748';
                                 e.currentTarget.style.transform = 'translateY(0)';
-                                e.currentTarget.style.boxShadow = modeloActivo?.id === mod.id ? '0 0 20px rgba(0, 255, 255, 0.2)' : '0 4px 15px rgba(0,0,0,0.3)';
+                                e.currentTarget.style.boxShadow = esActivo ? '0 0 25px rgba(0, 255, 255, 0.25)' : '0 4px 20px rgba(0,0,0,0.3)';
+                                e.currentTarget.style.backgroundColor = '#161e2e';
                               }}
                             >
                               <div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                                  <span style={{ fontSize: '0.7rem', color: '#8b5cf6', fontWeight: 'bold', textTransform: 'uppercase', background: 'rgba(139, 92, 246, 0.15)', padding: '2px 8px', borderRadius: '6px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
+                                  <span style={{ fontSize: '0.72rem', color: '#8b5cf6', fontWeight: 'bold', textTransform: 'uppercase', background: 'rgba(139, 92, 246, 0.15)', padding: '3px 9px', borderRadius: '6px' }}>
                                     {mod.marca}
                                   </span>
                                   {tieneBoardview && (
-                                    <span style={{ fontSize: '0.65rem', color: '#00ffff', background: 'rgba(0, 255, 255, 0.15)', padding: '2px 8px', borderRadius: '6px', fontWeight: 'bold' }}>
+                                    <span style={{ fontSize: '0.68rem', color: '#00ffff', background: 'rgba(0, 255, 255, 0.12)', border: '1px solid rgba(0,255,255,0.3)', padding: '2px 8px', borderRadius: '6px', fontWeight: 'bold' }}>
                                       🗺️ BOARDVIEW
                                     </span>
                                   )}
                                 </div>
-                                <h4 style={{ color: 'white', margin: '0 0 10px 0', fontSize: '1.15rem', fontWeight: 'bold' }}>
+
+                                <h3 style={{ color: 'white', margin: '0 0 12px 0', fontSize: '1.25rem', fontWeight: 'bold' }}>
                                   {mod.nombre}
-                                </h4>
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', fontSize: '0.68rem', color: '#9ca3af' }}>
-                                  {tieneFpc && <span style={{ background: '#111827', padding: '2px 6px', borderRadius: '4px' }}>FPC: {mod.fpcs.length}</span>}
-                                  {tieneBateria && <span style={{ background: '#111827', padding: '2px 6px', borderRadius: '4px' }}>Batería OK</span>}
-                                  {tieneIc && <span style={{ background: '#111827', padding: '2px 6px', borderRadius: '4px' }}>IC: {mod.ics.length}</span>}
+                                </h3>
+
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', fontSize: '0.72rem', color: '#9ca3af' }}>
+                                  {tieneFpc && <span style={{ background: '#111827', border: '1px solid #374151', padding: '3px 8px', borderRadius: '6px' }}>FPC: {mod.fpcs.length}</span>}
+                                  {tieneBateria && <span style={{ background: '#111827', border: '1px solid #374151', padding: '3px 8px', borderRadius: '6px' }}>🔋 Batería OK</span>}
+                                  {tieneIc && <span style={{ background: '#111827', border: '1px solid #374151', padding: '3px 8px', borderRadius: '6px' }}>IC: {mod.ics.length}</span>}
+                                  {!tieneFpc && !tieneBateria && !tieneIc && !tieneBoardview && (
+                                    <span style={{ color: '#6b7280', fontStyle: 'italic' }}>Sin mediciones aún</span>
+                                  )}
                                 </div>
                               </div>
 
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '10px', borderTop: '1px solid #374151' }}>
-                                <span style={{ color: '#00ffff', fontSize: '0.78rem', fontWeight: 'bold' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '12px', borderTop: '1px solid #2d3748' }}>
+                                <span style={{ color: '#00ffff', fontSize: '0.82rem', fontWeight: 'bold' }}>
                                   Abrir Mediciones →
                                 </span>
-                                <ChevronRight size={16} color="#00ffff" />
+                                <ChevronRight size={18} color="#00ffff" />
                               </div>
                             </div>
                           );
                         })}
+
+                        {modelosFiltrados.length === 0 && (
+                          <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '50px 20px', backgroundColor: '#161e2e', borderRadius: '16px', border: '1px dashed #374151' }}>
+                            <Cpu size={44} style={{ opacity: 0.3, marginBottom: '12px', color: '#00ffff' }} />
+                            <h4 style={{ color: '#d1d5db', margin: '0 0 8px 0', fontSize: '1.05rem' }}>
+                              {busquedaHardwareDb ? `No se encontraron modelos para "${busquedaHardwareDb}" en ${marcaDbSeleccionada}` : `No hay modelos registrados para ${marcaDbSeleccionada}`}
+                            </h4>
+                            <p style={{ fontSize: '0.85rem', color: '#9ca3af', maxWidth: '380px', margin: '0 auto 16px auto' }}>
+                              Registra el primer modelo de esta marca para comenzar a guardar planos y lecturas.
+                            </p>
+                            <button
+                              onClick={() => {
+                                setMarcaModoNuevo('existente');
+                                setFormNuevoModelo({ marca: marcaDbSeleccionada, nombre: busquedaHardwareDb || '' });
+                                setModalNuevoDispositivoAbierto(true);
+                              }}
+                              style={{ backgroundColor: '#8b5cf6', color: 'white', border: 'none', padding: '9px 18px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+                            >
+                              <Plus size={16} /> Añadir Modelo
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
 
                 {/* NIVEL 3: VISTA DE MEDICIONES DEL MODELO ACTIVO */}
                 {nivelDb === 'mediciones' && modeloActivo && (
@@ -2627,6 +2704,228 @@ export default function AppDiagnostico() {
                   </div>
                   </>
                 )}
+
+                {/* --- MODAL DIALOG: NUEVO DISPOSITIVO --- */}
+                <AnimatePresence>
+                  {modalNuevoDispositivoAbierto && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        backgroundColor: 'rgba(0, 0, 0, 0.75)',
+                        backdropFilter: 'blur(6px)',
+                        zIndex: 100,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '20px'
+                      }}
+                      onClick={() => setModalNuevoDispositivoAbierto(false)}
+                    >
+                      <motion.div
+                        initial={{ scale: 0.95, y: 20 }}
+                        animate={{ scale: 1, y: 0 }}
+                        exit={{ scale: 0.95, y: 20 }}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                          width: '100%',
+                          maxWidth: '480px',
+                          backgroundColor: '#161e2e',
+                          border: '1.5px solid #374151',
+                          borderRadius: '1.2rem',
+                          padding: '28px',
+                          boxShadow: '0 20px 50px rgba(0,0,0,0.7)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '20px'
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: 'rgba(139, 92, 246, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#c084fc' }}>
+                              <Smartphone size={22} />
+                            </div>
+                            <div>
+                              <h3 style={{ color: 'white', margin: 0, fontSize: '1.2rem', fontWeight: 'bold' }}>Añadir Nuevo Teléfono</h3>
+                              <span style={{ color: '#9ca3af', fontSize: '0.75rem' }}>Registro en Hardware DB</span>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => setModalNuevoDispositivoAbierto(false)}
+                            style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', padding: '4px' }}
+                          >
+                            <X size={20} />
+                          </button>
+                        </div>
+
+                        <form onSubmit={crearNuevoModeloDB} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                          {/* Selector de Marca */}
+                          <div>
+                            <label style={{ display: 'block', color: '#cbd5e1', fontSize: '0.82rem', fontWeight: 'bold', marginBottom: '8px' }}>
+                              Marca del Dispositivo
+                            </label>
+
+                            {marcasDisponibles.length > 0 && (
+                              <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setMarcaModoNuevo('existente');
+                                    if (!formNuevoModelo.marca && marcasDisponibles.length > 0) {
+                                      setFormNuevoModelo({ ...formNuevoModelo, marca: marcasDisponibles[0].nombre });
+                                    }
+                                  }}
+                                  style={{
+                                    flex: 1,
+                                    padding: '8px',
+                                    borderRadius: '8px',
+                                    border: 'none',
+                                    fontSize: '0.78rem',
+                                    fontWeight: 'bold',
+                                    cursor: 'pointer',
+                                    backgroundColor: marcaModoNuevo === 'existente' ? '#8b5cf6' : '#1f2937',
+                                    color: marcaModoNuevo === 'existente' ? 'white' : '#9ca3af'
+                                  }}
+                                >
+                                  Marca Existente
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setMarcaModoNuevo('nueva');
+                                    setFormNuevoModelo({ ...formNuevoModelo, marca: '' });
+                                  }}
+                                  style={{
+                                    flex: 1,
+                                    padding: '8px',
+                                    borderRadius: '8px',
+                                    border: 'none',
+                                    fontSize: '0.78rem',
+                                    fontWeight: 'bold',
+                                    cursor: 'pointer',
+                                    backgroundColor: marcaModoNuevo === 'nueva' ? '#8b5cf6' : '#1f2937',
+                                    color: marcaModoNuevo === 'nueva' ? 'white' : '#9ca3af'
+                                  }}
+                                >
+                                  + Nueva Marca
+                                </button>
+                              </div>
+                            )}
+
+                            {marcaModoNuevo === 'existente' && marcasDisponibles.length > 0 ? (
+                              <select
+                                value={formNuevoModelo.marca}
+                                onChange={(e) => setFormNuevoModelo({ ...formNuevoModelo, marca: e.target.value })}
+                                required
+                                style={{
+                                  width: '100%',
+                                  padding: '12px 14px',
+                                  backgroundColor: '#111827',
+                                  border: '1px solid #374151',
+                                  borderRadius: '10px',
+                                  color: 'white',
+                                  fontSize: '0.9rem',
+                                  outline: 'none',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                {marcasDisponibles.map(m => (
+                                  <option key={m.nombre} value={m.nombre}>
+                                    {m.nombre} ({m.modelos.length} modelos)
+                                  </option>
+                                ))}
+                              </select>
+                            ) : (
+                              <input
+                                required
+                                placeholder="Nombre de la marca (ej: Xiaomi, Apple, Motorola)..."
+                                value={formNuevoModelo.marca}
+                                onChange={(e) => setFormNuevoModelo({ ...formNuevoModelo, marca: e.target.value })}
+                                style={{
+                                  width: '100%',
+                                  padding: '12px 14px',
+                                  backgroundColor: '#111827',
+                                  border: '1px solid #374151',
+                                  borderRadius: '10px',
+                                  color: 'white',
+                                  fontSize: '0.9rem',
+                                  outline: 'none'
+                                }}
+                              />
+                            )}
+                          </div>
+
+                          {/* Nombre del Modelo */}
+                          <div>
+                            <label style={{ display: 'block', color: '#cbd5e1', fontSize: '0.82rem', fontWeight: 'bold', marginBottom: '8px' }}>
+                              Nombre del Modelo
+                            </label>
+                            <input
+                              required
+                              placeholder="Ej: POCO X3 Pro, Galaxy A52, iPhone 13..."
+                              value={formNuevoModelo.nombre}
+                              onChange={(e) => setFormNuevoModelo({ ...formNuevoModelo, nombre: e.target.value })}
+                              style={{
+                                width: '100%',
+                                padding: '12px 14px',
+                                backgroundColor: '#111827',
+                                border: '1px solid #374151',
+                                borderRadius: '10px',
+                                color: 'white',
+                                fontSize: '0.9rem',
+                                outline: 'none'
+                              }}
+                            />
+                          </div>
+
+                          {/* Botones de Acción */}
+                          <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
+                            <button
+                              type="button"
+                              onClick={() => setModalNuevoDispositivoAbierto(false)}
+                              style={{
+                                flex: 1,
+                                padding: '11px',
+                                borderRadius: '10px',
+                                border: '1px solid #374151',
+                                background: '#1f2937',
+                                color: '#9ca3af',
+                                fontWeight: 'bold',
+                                cursor: 'pointer',
+                                fontSize: '0.85rem'
+                              }}
+                            >
+                              Cancelar
+                            </button>
+                            <button
+                              type="submit"
+                              style={{
+                                flex: 2,
+                                padding: '11px',
+                                borderRadius: '10px',
+                                border: 'none',
+                                background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
+                                color: 'white',
+                                fontWeight: 'bold',
+                                cursor: 'pointer',
+                                fontSize: '0.85rem',
+                                boxShadow: '0 4px 15px rgba(139, 92, 246, 0.4)'
+                              }}
+                            >
+                              Crear y Abrir Mediciones
+                            </button>
+                          </div>
+                        </form>
+                      </motion.div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             </motion.div>
           </motion.div>
