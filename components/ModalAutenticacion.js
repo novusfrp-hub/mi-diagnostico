@@ -112,8 +112,20 @@ export default function ModalAutenticacion({ visible, onCerrar, onLoginExitoso }
       setErrorMsg('Completa tu correo y contraseña.');
       return;
     }
-    if (password.length < 6) {
-      setErrorMsg('La contraseña debe tener al menos 6 caracteres.');
+    if (password.length < 8) {
+      setErrorMsg('La contraseña debe tener un mínimo de 8 caracteres.');
+      return;
+    }
+    if (!/[A-Z]/.test(password)) {
+      setErrorMsg('La contraseña debe incluir al menos una letra mayúscula (A-Z).');
+      return;
+    }
+    if (!/[0-9]/.test(password)) {
+      setErrorMsg('La contraseña debe incluir al menos un número (0-9).');
+      return;
+    }
+    if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?~`]/.test(password)) {
+      setErrorMsg('La contraseña debe incluir al menos un símbolo especial (ej. @, #, $, *, _, -).');
       return;
     }
     if (password !== passwordConfirm) {
@@ -617,7 +629,7 @@ export default function ModalAutenticacion({ visible, onCerrar, onLoginExitoso }
                     type={mostrarPass ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Mín. 6 caracteres"
+                    placeholder="Mín. 8 caracteres (A-Z, 0-9, #$)"
                     required
                     style={{
                       width: '100%',
@@ -656,6 +668,64 @@ export default function ModalAutenticacion({ visible, onCerrar, onLoginExitoso }
                   />
                 </div>
               </div>
+
+              {/* Indicadores de requisitos de contraseña segura */}
+              {password.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', padding: '2px 0' }}>
+                  <span style={{
+                    fontSize: '0.68rem',
+                    padding: '2px 6px',
+                    borderRadius: '4px',
+                    backgroundColor: password.length >= 8 ? 'rgba(16, 185, 129, 0.2)' : 'rgba(107, 114, 128, 0.2)',
+                    color: password.length >= 8 ? '#34d399' : '#9ca3af',
+                    border: password.length >= 8 ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid transparent'
+                  }}>
+                    {password.length >= 8 ? '✓' : '•'} 8+ caracteres
+                  </span>
+                  <span style={{
+                    fontSize: '0.68rem',
+                    padding: '2px 6px',
+                    borderRadius: '4px',
+                    backgroundColor: /[A-Z]/.test(password) ? 'rgba(16, 185, 129, 0.2)' : 'rgba(107, 114, 128, 0.2)',
+                    color: /[A-Z]/.test(password) ? '#34d399' : '#9ca3af',
+                    border: /[A-Z]/.test(password) ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid transparent'
+                  }}>
+                    {/[A-Z]/.test(password) ? '✓' : '•'} Mayúscula (A-Z)
+                  </span>
+                  <span style={{
+                    fontSize: '0.68rem',
+                    padding: '2px 6px',
+                    borderRadius: '4px',
+                    backgroundColor: /[0-9]/.test(password) ? 'rgba(16, 185, 129, 0.2)' : 'rgba(107, 114, 128, 0.2)',
+                    color: /[0-9]/.test(password) ? '#34d399' : '#9ca3af',
+                    border: /[0-9]/.test(password) ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid transparent'
+                  }}>
+                    {/[0-9]/.test(password) ? '✓' : '•'} Número (0-9)
+                  </span>
+                  <span style={{
+                    fontSize: '0.68rem',
+                    padding: '2px 6px',
+                    borderRadius: '4px',
+                    backgroundColor: /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?~`]/.test(password) ? 'rgba(16, 185, 129, 0.2)' : 'rgba(107, 114, 128, 0.2)',
+                    color: /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?~`]/.test(password) ? '#34d399' : '#9ca3af',
+                    border: /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?~`]/.test(password) ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid transparent'
+                  }}>
+                    {/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?~`]/.test(password) ? '✓' : '•'} Símbolo (!@#$)
+                  </span>
+                  {passwordConfirm.length > 0 && (
+                    <span style={{
+                      fontSize: '0.68rem',
+                      padding: '2px 6px',
+                      borderRadius: '4px',
+                      backgroundColor: password === passwordConfirm ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                      color: password === passwordConfirm ? '#34d399' : '#f87171',
+                      border: password === passwordConfirm ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(239, 68, 68, 0.4)'
+                    }}>
+                      {password === passwordConfirm ? '✓ Coinciden' : '✕ No coinciden'}
+                    </span>
+                  )}
+                </div>
+              )}
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '2px 0' }}>
                 <input
@@ -720,9 +790,23 @@ export default function ModalAutenticacion({ visible, onCerrar, onLoginExitoso }
           {/* 3. RECUPERAR CONTRASEÑA */}
           {tab === 'recuperar' && (
             <form onSubmit={handleRecuperar} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <p style={{ margin: 0, fontSize: '0.82rem', color: '#9ca3af', lineHeight: 1.5 }}>
-                Ingresa el correo electrónico con el que te registraste. Te enviaremos un enlace oficial de Firebase para restablecer tu contraseña.
-              </p>
+              <div style={{
+                padding: '10px 14px',
+                borderRadius: '8px',
+                backgroundColor: 'rgba(6, 182, 212, 0.12)',
+                border: '1px solid rgba(6, 182, 212, 0.35)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '4px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#38bdf8', fontSize: '0.82rem', fontWeight: 700 }}>
+                  <ShieldCheck size={16} />
+                  <span>Recuperación Gratuita e Ilimitada</span>
+                </div>
+                <p style={{ margin: 0, fontSize: '0.78rem', color: '#94a3b8', lineHeight: 1.45 }}>
+                  Ingresa tu correo registrado. Te enviaremos un enlace oficial y seguro de Firebase para restablecer tu contraseña directamente en tu bandeja de entrada sin costo alguno.
+                </p>
+              </div>
 
               <div>
                 <label style={{ display: 'block', fontSize: '0.78rem', color: '#9ca3af', marginBottom: '6px', fontWeight: 600 }}>

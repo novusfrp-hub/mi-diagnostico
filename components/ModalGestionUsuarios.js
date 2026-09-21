@@ -101,6 +101,29 @@ export default function ModalGestionUsuarios({ visible, onCerrar, usuarioActualU
     }
   };
 
+  const generarPasswordSegura = () => {
+    const uppers = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+    const lowers = 'abcdefghijkmnpqrstuvwxyz';
+    const numbers = '23456789';
+    const symbols = '!@#$%&*?_';
+    
+    // Garantizar al menos uno de cada tipo
+    let pass = '';
+    pass += uppers[Math.floor(Math.random() * uppers.length)];
+    pass += lowers[Math.floor(Math.random() * lowers.length)];
+    pass += numbers[Math.floor(Math.random() * numbers.length)];
+    pass += symbols[Math.floor(Math.random() * symbols.length)];
+    
+    const all = uppers + lowers + numbers + symbols;
+    for (let i = 0; i < 6; i++) {
+      pass += all[Math.floor(Math.random() * all.length)];
+    }
+    
+    const shuffled = pass.split('').sort(() => 0.5 - Math.random()).join('');
+    setNuevoPassword(shuffled);
+    setErrorNuevoUser('');
+  };
+
   // Creación directa de nuevo usuario con instancia secundaria de Firebase
   const handleCrearUsuarioDirecto = async (e) => {
     e.preventDefault();
@@ -114,8 +137,20 @@ export default function ModalGestionUsuarios({ visible, onCerrar, usuarioActualU
       setErrorNuevoUser('Ingresa correo y contraseña.');
       return;
     }
-    if (nuevoPassword.length < 6) {
-      setErrorNuevoUser('La contraseña debe tener al menos 6 caracteres.');
+    if (nuevoPassword.length < 8) {
+      setErrorNuevoUser('La contraseña debe tener un mínimo de 8 caracteres.');
+      return;
+    }
+    if (!/[A-Z]/.test(nuevoPassword)) {
+      setErrorNuevoUser('La contraseña debe incluir al menos una letra mayúscula (A-Z).');
+      return;
+    }
+    if (!/[0-9]/.test(nuevoPassword)) {
+      setErrorNuevoUser('La contraseña debe incluir al menos un número (0-9).');
+      return;
+    }
+    if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?~`]/.test(nuevoPassword)) {
+      setErrorNuevoUser('La contraseña debe incluir al menos un símbolo especial (ej. @, #, $, *, _, -).');
       return;
     }
 
@@ -498,14 +533,36 @@ export default function ModalGestionUsuarios({ visible, onCerrar, usuarioActualU
                   </div>
 
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.75rem', color: '#9ca3af', marginBottom: '4px', fontWeight: 600 }}>
-                      CONTRASEÑA ASIGNADA *
-                    </label>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                      <label style={{ fontSize: '0.75rem', color: '#9ca3af', fontWeight: 600 }}>
+                        CONTRASEÑA ASIGNADA *
+                      </label>
+                      <button
+                        type="button"
+                        onClick={generarPasswordSegura}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#06b6d4',
+                          fontSize: '0.73rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '3px',
+                          padding: 0
+                        }}
+                        title="Generar automáticamente una contraseña con mayúsculas, números y símbolos"
+                      >
+                        <Key size={12} />
+                        <span>⚡ Generar Segura</span>
+                      </button>
+                    </div>
                     <input
                       type="text"
                       value={nuevoPassword}
                       onChange={(e) => setNuevoPassword(e.target.value)}
-                      placeholder="Mínimo 6 caracteres"
+                      placeholder="Mín. 8 caracteres (A-Z, 0-9, #$)"
                       required
                       style={{
                         width: '100%',
@@ -519,6 +576,50 @@ export default function ModalGestionUsuarios({ visible, onCerrar, usuarioActualU
                         boxSizing: 'border-box'
                       }}
                     />
+                    {nuevoPassword.length > 0 && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '6px' }}>
+                        <span style={{
+                          fontSize: '0.68rem',
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          backgroundColor: nuevoPassword.length >= 8 ? 'rgba(16, 185, 129, 0.2)' : 'rgba(107, 114, 128, 0.2)',
+                          color: nuevoPassword.length >= 8 ? '#34d399' : '#9ca3af',
+                          border: nuevoPassword.length >= 8 ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid transparent'
+                        }}>
+                          {nuevoPassword.length >= 8 ? '✓' : '•'} 8+ car.
+                        </span>
+                        <span style={{
+                          fontSize: '0.68rem',
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          backgroundColor: /[A-Z]/.test(nuevoPassword) ? 'rgba(16, 185, 129, 0.2)' : 'rgba(107, 114, 128, 0.2)',
+                          color: /[A-Z]/.test(nuevoPassword) ? '#34d399' : '#9ca3af',
+                          border: /[A-Z]/.test(nuevoPassword) ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid transparent'
+                        }}>
+                          {/[A-Z]/.test(nuevoPassword) ? '✓' : '•'} Mayús (A-Z)
+                        </span>
+                        <span style={{
+                          fontSize: '0.68rem',
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          backgroundColor: /[0-9]/.test(nuevoPassword) ? 'rgba(16, 185, 129, 0.2)' : 'rgba(107, 114, 128, 0.2)',
+                          color: /[0-9]/.test(nuevoPassword) ? '#34d399' : '#9ca3af',
+                          border: /[0-9]/.test(nuevoPassword) ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid transparent'
+                        }}>
+                          {/[0-9]/.test(nuevoPassword) ? '✓' : '•'} Núm (0-9)
+                        </span>
+                        <span style={{
+                          fontSize: '0.68rem',
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          backgroundColor: /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?~`]/.test(nuevoPassword) ? 'rgba(16, 185, 129, 0.2)' : 'rgba(107, 114, 128, 0.2)',
+                          color: /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?~`]/.test(nuevoPassword) ? '#34d399' : '#9ca3af',
+                          border: /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?~`]/.test(nuevoPassword) ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid transparent'
+                        }}>
+                          {/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?~`]/.test(nuevoPassword) ? '✓' : '•'} Símbolo (!@#)
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   <div>
