@@ -16,4 +16,4 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app); // <-- NUEVO: Inicializamos Autenticación
 
-export { db, auth }; // <-- NUEVO: Exportamos auth para usarlo en el panel
+export { db, auth, firebaseConfig };

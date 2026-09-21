@@ -1,17 +1,33 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Users, ShieldCheck, CheckCircle2, XCircle, Search, RefreshCw, 
-  X, AlertTriangle, Building2, Mail, Phone, Clock, UserCheck, ShieldAlert
+  X, AlertTriangle, Building2, Mail, Phone, Clock, UserCheck, ShieldAlert,
+  UserPlus, Plus, Key, Lock, Copy, Check, Send, Sparkles
 } from 'lucide-react';
-import { collection, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { initializeApp, getApps } from 'firebase/app';
+import { getAuth, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
+import { db, firebaseConfig } from '../firebase';
 
 export default function ModalGestionUsuarios({ visible, onCerrar, usuarioActualUid }) {
   const [usuarios, setUsuarios] = useState([]);
   const [cargando, setCargando] = useState(false);
   const [filtro, setFiltro] = useState('');
   const [mensajeAccion, setMensajeAccion] = useState('');
+
+  // Estados para formulario "Crear Nuevo Usuario Directamente"
+  const [mostrarFormNuevo, setMostrarFormNuevo] = useState(false);
+  const [nuevoNombre, setNuevoNombre] = useState('');
+  const [nuevoTaller, setNuevoTaller] = useState('');
+  const [nuevoTelefono, setNuevoTelefono] = useState('');
+  const [nuevoEmail, setNuevoEmail] = useState('');
+  const [nuevoPassword, setNuevoPassword] = useState('');
+  const [nuevoRol, setNuevoRol] = useState('tecnico'); // 'tecnico' | 'editor' | 'super_admin'
+  const [creandoUser, setCreandoUser] = useState(false);
+  const [errorNuevoUser, setErrorNuevoUser] = useState('');
+  const [usuarioRecienCreado, setUsuarioRecienCreado] = useState(null);
+  const [copiado, setCopiado] = useState(false);
 
   const cargarUsuarios = async () => {
     setCargando(true);
@@ -38,6 +54,7 @@ export default function ModalGestionUsuarios({ visible, onCerrar, usuarioActualU
   useEffect(() => {
     if (visible) {
       cargarUsuarios();
+      setUsuarioRecienCreado(null);
     }
   }, [visible]);
 
@@ -45,7 +62,7 @@ export default function ModalGestionUsuarios({ visible, onCerrar, usuarioActualU
 
   const notificar = (msg) => {
     setMensajeAccion(msg);
-    setTimeout(() => setMensajeAccion(''), 3000);
+    setTimeout(() => setMensajeAccion(''), 3500);
   };
 
   const cambiarEstado = async (uid, nuevoEstado) => {
@@ -84,6 +101,83 @@ export default function ModalGestionUsuarios({ visible, onCerrar, usuarioActualU
     }
   };
 
+  // Creación directa de nuevo usuario con instancia secundaria de Firebase
+  const handleCrearUsuarioDirecto = async (e) => {
+    e.preventDefault();
+    setErrorNuevoUser('');
+
+    if (!nuevoNombre.trim()) {
+      setErrorNuevoUser('Ingresa el nombre del técnico.');
+      return;
+    }
+    if (!nuevoEmail.trim() || !nuevoPassword) {
+      setErrorNuevoUser('Ingresa correo y contraseña.');
+      return;
+    }
+    if (nuevoPassword.length < 6) {
+      setErrorNuevoUser('La contraseña debe tener al menos 6 caracteres.');
+      return;
+    }
+
+    setCreandoUser(true);
+    try {
+      // Instancia secundaria para NO desconectar la sesión actual del Super Admin
+      const secondaryAppName = 'MHSProSecondaryCreator';
+      const secondaryApp = getApps().find(a => a.name === secondaryAppName) || initializeApp(firebaseConfig, secondaryAppName);
+      const secondaryAuth = getAuth(secondaryApp);
+      
+      const cred = await createUserWithEmailAndPassword(secondaryAuth, nuevoEmail.trim(), nuevoPassword);
+      await signOut(secondaryAuth);
+
+      const nuevoPerfil = {
+        uid: cred.user.uid,
+        nombre: nuevoNombre.trim(),
+        taller: nuevoTaller.trim() || 'Taller Técnico',
+        telefono: nuevoTelefono.trim() || '',
+        email: nuevoEmail.trim().toLowerCase(),
+        rol: nuevoRol,
+        estado: 'activo', // Activo de inmediato porque lo crea el Super Admin
+        creadoPor: 'super_admin_directo',
+        fechaRegistro: new Date().toISOString()
+      };
+
+      await setDoc(doc(db, 'usuarios', cred.user.uid), nuevoPerfil);
+
+      setUsuarioRecienCreado({
+        ...nuevoPerfil,
+        password: nuevoPassword
+      });
+
+      // Limpiar campos
+      setNuevoNombre('');
+      setNuevoTaller('');
+      setNuevoTelefono('');
+      setNuevoEmail('');
+      setNuevoPassword('');
+      setNuevoRol('tecnico');
+      setMostrarFormNuevo(false);
+
+      await cargarUsuarios();
+      notificar(`✅ ¡Técnico ${nuevoPerfil.nombre} creado con rol ${nuevoPerfil.rol.toUpperCase()}!`);
+    } catch (err) {
+      console.error(err);
+      if (err.code === 'auth/email-already-in-use') {
+        setErrorNuevoUser('Este correo ya está registrado en el sistema.');
+      } else {
+        setErrorNuevoUser(err.message || 'Error al crear la cuenta.');
+      }
+    } finally {
+      setCreandoUser(false);
+    }
+  };
+
+  const copiarCredenciales = (u) => {
+    const texto = `📱 *MARSHALL HARDWARE SUITE™ (MHS PRO)*\n\nHola ${u.nombre}, tu cuenta ha sido creada:\n📧 *Correo:* ${u.email}\n🔑 *Contraseña:* ${u.password}\n🛡️ *Rol:* ${u.rol.toUpperCase()}\n\n🔗 Acceso: ${window.location.origin}`;
+    navigator.clipboard.writeText(texto);
+    setCopiado(true);
+    setTimeout(() => setCopiado(false), 2500);
+  };
+
   const usuariosFiltrados = usuarios.filter(u => {
     const q = filtro.toLowerCase();
     return (
@@ -112,15 +206,15 @@ export default function ModalGestionUsuarios({ visible, onCerrar, usuarioActualU
         exit={{ opacity: 0, scale: 0.95 }}
         style={{
           width: '100%',
-          maxWidth: '900px',
-          height: '85vh',
+          maxWidth: '940px',
+          height: '88vh',
           backgroundColor: '#111827',
           border: '1px solid #374151',
           borderRadius: '1.25rem',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.8)',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 40px rgba(139, 92, 246, 0.2)',
           color: '#f3f4f6'
         }}
       >
@@ -131,38 +225,65 @@ export default function ModalGestionUsuarios({ visible, onCerrar, usuarioActualU
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          background: 'linear-gradient(180deg, rgba(139, 92, 246, 0.1) 0%, rgba(17, 24, 39, 0) 100%)'
+          background: 'linear-gradient(180deg, rgba(139, 92, 246, 0.12) 0%, rgba(17, 24, 39, 0) 100%)',
+          flexWrap: 'wrap',
+          gap: '12px'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{
-              width: '36px',
-              height: '36px',
+              width: '38px',
+              height: '38px',
               borderRadius: '10px',
               backgroundColor: '#f59e0b',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center'
+              justifyContent: 'center',
+              boxShadow: '0 0 15px rgba(245, 158, 11, 0.3)'
             }}>
               <Users size={20} color="#000000" />
             </div>
             <div>
-              <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#ffffff' }}>
-                GESTIÓN DE USUARIOS Y ROLES (RBAC)
+              <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#ffffff', letterSpacing: '0.02em' }}>
+                PANEL SUPER ADMIN • GESTIÓN DE USUARIOS
               </h2>
-              <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>
-                Marshall Hardware Suite™ • Autorización y Niveles de Acceso
+              <span style={{ fontSize: '0.75rem', color: '#a78bfa', fontWeight: 600 }}>
+                Marshall Hardware Suite™ (MHS Pro) • Control de Accesos y Roles
               </span>
             </div>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <button
+              onClick={() => {
+                setMostrarFormNuevo(!mostrarFormNuevo);
+                setErrorNuevoUser('');
+              }}
+              style={{
+                background: mostrarFormNuevo ? '#374151' : 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
+                border: 'none',
+                borderRadius: '8px',
+                padding: '8px 14px',
+                color: '#ffffff',
+                fontSize: '0.82rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                boxShadow: '0 4px 12px rgba(139, 92, 246, 0.35)'
+              }}
+            >
+              <UserPlus size={15} />
+              <span>{mostrarFormNuevo ? 'Cerrar Formulario' : '+ Crear Usuario'}</span>
+            </button>
+
+            <button
               onClick={cargarUsuarios}
               style={{
                 background: '#1f2937',
                 border: '1px solid #374151',
                 borderRadius: '8px',
-                padding: '6px 12px',
+                padding: '8px 12px',
                 color: '#9ca3af',
                 fontSize: '0.8rem',
                 cursor: 'pointer',
@@ -170,10 +291,11 @@ export default function ModalGestionUsuarios({ visible, onCerrar, usuarioActualU
                 alignItems: 'center',
                 gap: '6px'
               }}
+              title="Recargar usuarios"
             >
               <RefreshCw size={14} className={cargando ? 'animate-spin' : ''} />
-              <span>Actualizar</span>
             </button>
+
             <button
               onClick={onCerrar}
               style={{
@@ -189,6 +311,288 @@ export default function ModalGestionUsuarios({ visible, onCerrar, usuarioActualU
           </div>
         </div>
 
+        {/* Notificación de Usuario Recién Creado con Botón para Compartir */}
+        {usuarioRecienCreado && (
+          <div style={{
+            padding: '12px 24px',
+            backgroundColor: 'rgba(16, 185, 129, 0.15)',
+            borderBottom: '1px solid rgba(16, 185, 129, 0.4)',
+            color: '#34d399',
+            fontSize: '0.84rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '12px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <CheckCircle2 size={18} />
+              <span>
+                ¡Cuenta creada para <strong>{usuarioRecienCreado.nombre}</strong>! Correo: <code>{usuarioRecienCreado.email}</code> | Clave: <code>{usuarioRecienCreado.password}</code> | Rol: <strong>{usuarioRecienCreado.rol.toUpperCase()}</strong>
+              </span>
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                onClick={() => copiarCredenciales(usuarioRecienCreado)}
+                style={{
+                  backgroundColor: '#10b981',
+                  color: '#000',
+                  border: 'none',
+                  borderRadius: '6px',
+                  padding: '5px 12px',
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px'
+                }}
+              >
+                {copiado ? <Check size={14} /> : <Copy size={14} />}
+                <span>{copiado ? '¡Copiado!' : 'Copiar Credenciales'}</span>
+              </button>
+              <button
+                onClick={() => setUsuarioRecienCreado(null)}
+                style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer' }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Formulario Desplegable: CREAR NUEVO USUARIO DIRECTAMENTE */}
+        <AnimatePresence>
+          {mostrarFormNuevo && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              style={{
+                backgroundColor: '#0f172a',
+                borderBottom: '1px solid #374151',
+                padding: '18px 24px',
+                overflow: 'hidden'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                <Sparkles size={16} color="#8b5cf6" />
+                <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#ffffff' }}>
+                  Crear y Activar Nuevo Técnico / Editor
+                </h3>
+                <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>
+                  (Tú defines sus credenciales y rol de inmediato)
+                </span>
+              </div>
+
+              {errorNuevoUser && (
+                <div style={{
+                  padding: '8px 12px',
+                  marginBottom: '12px',
+                  borderRadius: '6px',
+                  backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                  border: '1px solid rgba(239, 68, 68, 0.35)',
+                  color: '#f87171',
+                  fontSize: '0.8rem'
+                }}>
+                  {errorNuevoUser}
+                </div>
+              )}
+
+              <form onSubmit={handleCrearUsuarioDirecto} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.75rem', color: '#9ca3af', marginBottom: '4px', fontWeight: 600 }}>
+                      NOMBRE DEL TÉCNICO *
+                    </label>
+                    <input
+                      type="text"
+                      value={nuevoNombre}
+                      onChange={(e) => setNuevoNombre(e.target.value)}
+                      placeholder="Ej. Mario Flores"
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        backgroundColor: '#1e293b',
+                        border: '1px solid #334155',
+                        borderRadius: '6px',
+                        color: '#fff',
+                        fontSize: '0.82rem',
+                        outline: 'none',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.75rem', color: '#9ca3af', marginBottom: '4px', fontWeight: 600 }}>
+                      TALLER / LAB
+                    </label>
+                    <input
+                      type="text"
+                      value={nuevoTaller}
+                      onChange={(e) => setNuevoTaller(e.target.value)}
+                      placeholder="Ej. ElectroCell Pro"
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        backgroundColor: '#1e293b',
+                        border: '1px solid #334155',
+                        borderRadius: '6px',
+                        color: '#fff',
+                        fontSize: '0.82rem',
+                        outline: 'none',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.75rem', color: '#9ca3af', marginBottom: '4px', fontWeight: 600 }}>
+                      TELÉFONO / WHATSAPP
+                    </label>
+                    <input
+                      type="tel"
+                      value={nuevoTelefono}
+                      onChange={(e) => setNuevoTelefono(e.target.value)}
+                      placeholder="+51 987 654 321"
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        backgroundColor: '#1e293b',
+                        border: '1px solid #334155',
+                        borderRadius: '6px',
+                        color: '#fff',
+                        fontSize: '0.82rem',
+                        outline: 'none',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.75rem', color: '#9ca3af', marginBottom: '4px', fontWeight: 600 }}>
+                      CORREO ELECTRÓNICO *
+                    </label>
+                    <input
+                      type="email"
+                      value={nuevoEmail}
+                      onChange={(e) => setNuevoEmail(e.target.value)}
+                      placeholder="mario@electrocell.com"
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        backgroundColor: '#1e293b',
+                        border: '1px solid #334155',
+                        borderRadius: '6px',
+                        color: '#fff',
+                        fontSize: '0.82rem',
+                        outline: 'none',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.75rem', color: '#9ca3af', marginBottom: '4px', fontWeight: 600 }}>
+                      CONTRASEÑA ASIGNADA *
+                    </label>
+                    <input
+                      type="text"
+                      value={nuevoPassword}
+                      onChange={(e) => setNuevoPassword(e.target.value)}
+                      placeholder="Mínimo 6 caracteres"
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        backgroundColor: '#1e293b',
+                        border: '1px solid #334155',
+                        borderRadius: '6px',
+                        color: '#fff',
+                        fontSize: '0.82rem',
+                        outline: 'none',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.75rem', color: '#9ca3af', marginBottom: '4px', fontWeight: 600 }}>
+                      ROL DE ACCESO
+                    </label>
+                    <select
+                      value={nuevoRol}
+                      onChange={(e) => setNuevoRol(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        backgroundColor: '#1e293b',
+                        border: '1px solid #334155',
+                        borderRadius: '6px',
+                        color: nuevoRol === 'super_admin' ? '#f59e0b' : (nuevoRol === 'editor' ? '#c084fc' : '#38bdf8'),
+                        fontSize: '0.82rem',
+                        fontWeight: 700,
+                        outline: 'none',
+                        boxSizing: 'border-box',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <option value="tecnico">⚡ Técnico (Diagnóstico y Medición)</option>
+                      <option value="editor">🛠️ Editor (Modelos y Boardviews)</option>
+                      <option value="super_admin">👑 Super Admin (Control Total)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '4px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setMostrarFormNuevo(false)}
+                    style={{
+                      padding: '8px 16px',
+                      backgroundColor: 'transparent',
+                      border: '1px solid #4b5563',
+                      borderRadius: '6px',
+                      color: '#9ca3af',
+                      fontSize: '0.8rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Cancelar
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={creandoUser}
+                    style={{
+                      padding: '8px 18px',
+                      backgroundColor: '#10b981',
+                      border: 'none',
+                      borderRadius: '6px',
+                      color: '#ffffff',
+                      fontSize: '0.82rem',
+                      fontWeight: 700,
+                      cursor: creandoUser ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      boxShadow: '0 2px 10px rgba(16, 185, 129, 0.4)'
+                    }}
+                  >
+                    {creandoUser ? <RefreshCw size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                    <span>{creandoUser ? 'Creando...' : 'Crear y Activar Usuario'}</span>
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Barra de Filtro y Resumen */}
         <div style={{
           padding: '12px 24px',
@@ -197,7 +601,8 @@ export default function ModalGestionUsuarios({ visible, onCerrar, usuarioActualU
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          gap: '16px'
+          gap: '16px',
+          flexWrap: 'wrap'
         }}>
           <div style={{ position: 'relative', flex: 1, maxWidth: '400px' }}>
             <Search size={16} color="#6b7280" style={{ position: 'absolute', left: '12px', top: '10px' }} />
@@ -220,7 +625,7 @@ export default function ModalGestionUsuarios({ visible, onCerrar, usuarioActualU
             />
           </div>
 
-          <div style={{ display: 'flex', gap: '12px', fontSize: '0.78rem', color: '#9ca3af' }}>
+          <div style={{ display: 'flex', gap: '14px', fontSize: '0.78rem', color: '#9ca3af' }}>
             <span>Total: <strong style={{ color: '#ffffff' }}>{usuarios.length}</strong></span>
             <span>Pendientes: <strong style={{ color: '#f59e0b' }}>{usuarios.filter(u => u.estado === 'pendiente').length}</strong></span>
             <span>Activos: <strong style={{ color: '#10b981' }}>{usuarios.filter(u => u.estado === 'activo').length}</strong></span>
@@ -258,6 +663,7 @@ export default function ModalGestionUsuarios({ visible, onCerrar, usuarioActualU
                 const esPendiente = u.estado === 'pendiente';
                 const esBloqueado = u.estado === 'bloqueado';
                 const esActivo = u.estado === 'activo';
+                const esSuperAdminUser = u.rol === 'super_admin';
 
                 return (
                   <div
@@ -266,7 +672,7 @@ export default function ModalGestionUsuarios({ visible, onCerrar, usuarioActualU
                       padding: '14px 18px',
                       backgroundColor: '#1a2234',
                       borderRadius: '10px',
-                      border: esPendiente ? '1px solid #f59e0b' : '1px solid #2d3748',
+                      border: esPendiente ? '1px solid #f59e0b' : (esSuperAdminUser ? '1px solid rgba(245, 158, 11, 0.4)' : '1px solid #2d3748'),
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
@@ -276,14 +682,14 @@ export default function ModalGestionUsuarios({ visible, onCerrar, usuarioActualU
                   >
                     {/* Información Básica */}
                     <div style={{ minWidth: '220px', flex: '1 1 200px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                         <span style={{ fontWeight: 800, fontSize: '0.95rem', color: '#ffffff' }}>
                           {u.nombre || 'Sin nombre'}
                         </span>
                         {/* Estado Badge */}
                         {esPendiente && (
                           <span style={{ fontSize: '0.68rem', padding: '2px 8px', borderRadius: '12px', backgroundColor: 'rgba(245, 158, 11, 0.2)', color: '#f59e0b', fontWeight: 700, border: '1px solid #f59e0b' }}>
-                            🟡 PENDIENTE
+                            🟡 PENDIENTE DE ACTIVACIÓN
                           </span>
                         )}
                         {esActivo && (
@@ -326,7 +732,7 @@ export default function ModalGestionUsuarios({ visible, onCerrar, usuarioActualU
                           color: u.rol === 'super_admin' ? '#f59e0b' : (u.rol === 'editor' ? '#a78bfa' : '#38bdf8'),
                           border: '1px solid #374151',
                           borderRadius: '6px',
-                          padding: '4px 8px',
+                          padding: '5px 10px',
                           fontSize: '0.8rem',
                           fontWeight: 700,
                           cursor: 'pointer',
@@ -345,17 +751,18 @@ export default function ModalGestionUsuarios({ visible, onCerrar, usuarioActualU
                         <button
                           onClick={() => cambiarEstado(u.id, 'activo')}
                           style={{
-                            padding: '6px 12px',
+                            padding: '6px 14px',
                             borderRadius: '6px',
                             backgroundColor: '#10b981',
                             color: '#ffffff',
                             border: 'none',
-                            fontSize: '0.78rem',
+                            fontSize: '0.8rem',
                             fontWeight: 700,
                             cursor: 'pointer',
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '4px'
+                            gap: '5px',
+                            boxShadow: '0 2px 8px rgba(16, 185, 129, 0.4)'
                           }}
                         >
                           <CheckCircle2 size={14} /> Aprobar

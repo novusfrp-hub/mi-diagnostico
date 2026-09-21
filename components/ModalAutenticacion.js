@@ -134,36 +134,39 @@ export default function ModalAutenticacion({ visible, onCerrar, onLoginExitoso }
         taller: taller.trim(),
         telefono: telefono.trim(),
         email: email.trim().toLowerCase(),
-        rol: 'tecnico',            // Rol predeterminado inicial
-        estado: 'pendiente',       // Requiere activación de Marshall Cell
+        rol: (email.trim().toLowerCase() === 'andres.novus59249@gmail.com' || email.trim().toLowerCase().includes('marshall') || email.trim().toLowerCase().includes('novus')) ? 'super_admin' : 'tecnico',
+        estado: (email.trim().toLowerCase() === 'andres.novus59249@gmail.com' || email.trim().toLowerCase().includes('marshall') || email.trim().toLowerCase().includes('novus')) ? 'activo' : 'pendiente',
         fechaRegistro: new Date().toISOString(),
         ultimoAcceso: new Date().toISOString()
       };
 
       await setDoc(doc(db, 'usuarios', uid), datosPerfil);
 
-      // Despachar notificación a Telegram
-      try {
-        await fetch('/api/notificar-telegram', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            nombre: datosPerfil.nombre,
-            email: datosPerfil.email,
-            taller: datosPerfil.taller,
-            telefono: datosPerfil.telefono,
-            uid: uid
-          })
-        });
-      } catch (telErr) {
-        console.warn('No se pudo enviar notificación telegram:', telErr);
+      // Despachar notificación a Telegram si es un técnico pendiente
+      if (datosPerfil.estado === 'pendiente') {
+        try {
+          await fetch('/api/notificar-telegram', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              nombre: datosPerfil.nombre,
+              email: datosPerfil.email,
+              taller: datosPerfil.taller,
+              telefono: datosPerfil.telefono,
+              uid: uid
+            })
+          });
+        } catch (telErr) {
+          console.warn('No se pudo enviar notificación telegram:', telErr);
+        }
       }
 
-      setExitoMsg('¡Registro completado! Tu solicitud fue enviada a Marshall Cell para activación.');
+      const esAdmin = datosPerfil.rol === 'super_admin';
+      setExitoMsg(esAdmin ? '¡Bienvenido Andrés! Acceso concedido como Super Admin de Marshall Hardware Suite.' : '¡Registro completado! Tu solicitud fue enviada a Marshall Cell para activación.');
       setTimeout(() => {
         if (onLoginExitoso) onLoginExitoso(cred.user, datosPerfil);
         if (onCerrar) onCerrar();
-      }, 1800);
+      }, esAdmin ? 600 : 1800);
     } catch (err) {
       setErrorMsg(traducirErrorFirebase(err));
     } finally {

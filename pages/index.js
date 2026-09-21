@@ -842,13 +842,19 @@ export default function AppDiagnostico() {
   const [modalAuthAbierto, setModalAuthAbierto] = useState(false);
   const [modalGestionUsuariosAbierto, setModalGestionUsuariosAbierto] = useState(false);
 
+  const CORREOS_SUPER_ADMIN = useMemo(() => [
+    'andres.novus59249@gmail.com',
+    'marshallcell@gmail.com'
+  ], []);
+
   const esSuperAdmin = useMemo(() => {
     if (!usuarioActual) return false;
+    const email = (usuarioActual.email || '').toLowerCase().trim();
+    if (CORREOS_SUPER_ADMIN.includes(email) || email.includes('marshall') || email.includes('novus')) return true;
     if (perfilUsuario?.rol === 'super_admin') return true;
     if (estaAutenticado && !perfilUsuario) return true;
-    const email = (usuarioActual.email || '').toLowerCase();
-    return email === 'marshallcell@gmail.com' || email.includes('marshall');
-  }, [usuarioActual, perfilUsuario, estaAutenticado]);
+    return false;
+  }, [usuarioActual, perfilUsuario, estaAutenticado, CORREOS_SUPER_ADMIN]);
 
   const esEditor = useMemo(() => {
     if (esSuperAdmin) return true;
@@ -1754,15 +1760,26 @@ export default function AppDiagnostico() {
         setEstaAutenticado(true);
         const docRef = doc(db, 'usuarios', user.uid);
         const unsubDoc = onSnapshot(docRef, async (snap) => {
+          const emailUser = (user.email || '').toLowerCase().trim();
+          const esAdminMaestro = CORREOS_SUPER_ADMIN.includes(emailUser) || emailUser.includes('marshall') || emailUser.includes('novus');
+
           if (snap.exists()) {
-            setPerfilUsuario(snap.data());
+            const data = snap.data();
+            if (esAdminMaestro && (data.rol !== 'super_admin' || data.estado !== 'activo')) {
+              try {
+                await updateDoc(docRef, { rol: 'super_admin', estado: 'activo' });
+                data.rol = 'super_admin';
+                data.estado = 'activo';
+              } catch (e) {}
+            }
+            setPerfilUsuario(data);
           } else {
             const nuevoPerfil = {
               uid: user.uid,
               email: user.email || '',
-              nombre: user.displayName || 'Marshall Cell Admin',
-              taller: 'Laboratorio Marshall Cell',
-              rol: 'super_admin',
+              nombre: user.displayName || (esAdminMaestro ? 'Andrés (Marshall Pro)' : 'Técnico'),
+              taller: esAdminMaestro ? 'Laboratorio Marshall Cell' : 'Taller Técnico',
+              rol: esAdminMaestro ? 'super_admin' : 'tecnico',
               estado: 'activo',
               fechaRegistro: new Date().toISOString()
             };
@@ -2177,23 +2194,45 @@ export default function AppDiagnostico() {
                     )}
 
                     {puedeEditarHardware ? (
-                      <button
-                        onClick={() => {
-                          setMarcaModoNuevo(marcaDbSeleccionada ? 'existente' : (marcasDisponibles.length > 0 ? 'existente' : 'nueva'));
-                          setFormNuevoModelo({
-                            marca: marcaDbSeleccionada || (marcasDisponibles[0]?.nombre || ''),
-                            nombre: ''
-                          });
-                          setModalNuevoDispositivoAbierto(true);
-                        }}
-                        style={{ background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)', color: 'white', border: 'none', padding: '7px 14px', borderRadius: '8px', fontWeight: 'bold', fontSize: '0.82rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 4px 12px rgba(139, 92, 246, 0.4)' }}
-                      >
-                        <Plus size={15} /> + Añadir Teléfono
-                      </button>
-                    ) : (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '5px 10px', borderRadius: '8px', backgroundColor: 'rgba(6, 182, 212, 0.15)', border: '1px solid rgba(6, 182, 212, 0.35)', color: '#38bdf8', fontSize: '0.75rem', fontWeight: 700 }}>
-                        <Zap size={13} /> MODO TÉCNICO (CONSULTA)
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ padding: '5px 10px', borderRadius: '6px', backgroundColor: esSuperAdmin ? 'rgba(245, 158, 11, 0.15)' : 'rgba(139, 92, 246, 0.15)', border: `1px solid ${esSuperAdmin ? '#f59e0b' : '#8b5cf6'}`, color: esSuperAdmin ? '#f59e0b' : '#c084fc', fontWeight: 800, fontSize: '0.74rem' }}>
+                          {esSuperAdmin ? '👑 SUPER ADMIN' : '🛠️ EDITOR'}
+                        </span>
+                        <button
+                          onClick={() => {
+                            setMarcaModoNuevo(marcaDbSeleccionada ? 'existente' : (marcasDisponibles.length > 0 ? 'existente' : 'nueva'));
+                            setFormNuevoModelo({
+                              marca: marcaDbSeleccionada || (marcasDisponibles[0]?.nombre || ''),
+                              nombre: ''
+                            });
+                            setModalNuevoDispositivoAbierto(true);
+                          }}
+                          style={{ background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)', color: 'white', border: 'none', padding: '7px 14px', borderRadius: '8px', fontWeight: 'bold', fontSize: '0.82rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 4px 12px rgba(139, 92, 246, 0.4)' }}
+                        >
+                          <Plus size={15} /> + Añadir Teléfono
+                        </button>
                       </div>
+                    ) : (
+                      <button
+                        onClick={() => setModalAuthAbierto(true)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          padding: '6px 14px',
+                          borderRadius: '8px',
+                          backgroundColor: '#0284c7',
+                          border: 'none',
+                          color: '#ffffff',
+                          fontSize: '0.82rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          boxShadow: '0 2px 10px rgba(2, 132, 199, 0.4)'
+                        }}
+                        title="Iniciar sesión con tu correo de Super Admin o Técnico"
+                      >
+                        <Lock size={14} /> <span>Ingresar Credenciales</span>
+                      </button>
                     )}
 
                     {nivelDb === 'mediciones' && modeloActivo && puedeEditarHardware && (
