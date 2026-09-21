@@ -12,6 +12,28 @@ import {
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 
+export const PREFIJOS_PAISES = [
+  { codigo: '+51', pais: 'Perú', bandera: '🇵🇪' },
+  { codigo: '+593', pais: 'Ecuador', bandera: '🇪🇨' },
+  { codigo: '+57', pais: 'Colombia', bandera: '🇨🇴' },
+  { codigo: '+52', pais: 'México', bandera: '🇲🇽' },
+  { codigo: '+54', pais: 'Argentina', bandera: '🇦🇷' },
+  { codigo: '+56', pais: 'Chile', bandera: '🇨🇱' },
+  { codigo: '+58', pais: 'Venezuela', bandera: '🇻🇪' },
+  { codigo: '+591', pais: 'Bolivia', bandera: '🇧🇴' },
+  { codigo: '+595', pais: 'Paraguay', bandera: '🇵🇾' },
+  { codigo: '+598', pais: 'Uruguay', bandera: '🇺🇾' },
+  { codigo: '+502', pais: 'Guatemala', bandera: '🇬🇹' },
+  { codigo: '+503', pais: 'El Salvador', bandera: '🇸🇻' },
+  { codigo: '+504', pais: 'Honduras', bandera: '🇭🇳' },
+  { codigo: '+505', pais: 'Nicaragua', bandera: '🇳🇮' },
+  { codigo: '+506', pais: 'Costa Rica', bandera: '🇨🇷' },
+  { codigo: '+507', pais: 'Panamá', bandera: '🇵🇦' },
+  { codigo: '+1', pais: 'EE.UU. / Canadá', bandera: '🇺🇸' },
+  { codigo: '+34', pais: 'España', bandera: '🇪🇸' },
+  { codigo: '+55', pais: 'Brasil', bandera: '🇧🇷' }
+];
+
 export default function ModalAutenticacion({ visible, onCerrar, onLoginExitoso }) {
   const [tab, setTab] = useState('login'); // 'login' | 'registro' | 'recuperar'
   
@@ -22,6 +44,7 @@ export default function ModalAutenticacion({ visible, onCerrar, onLoginExitoso }
   const [nombre, setNombre] = useState('');
   const [taller, setTaller] = useState('');
   const [telefono, setTelefono] = useState('');
+  const [prefijoPais, setPrefijoPais] = useState('');
   
   // UI estados
   const [mostrarPass, setMostrarPass] = useState(false);
@@ -139,12 +162,18 @@ export default function ModalAutenticacion({ visible, onCerrar, onLoginExitoso }
       const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
       const uid = cred.user.uid;
 
+      // Normalizar teléfono con prefijo si se seleccionó
+      let telFinal = telefono.trim();
+      if (prefijoPais && telFinal && !telFinal.startsWith('+')) {
+        telFinal = `${prefijoPais} ${telFinal}`;
+      }
+
       // Crear documento en colección 'usuarios'
       const datosPerfil = {
         uid: uid,
         nombre: nombre.trim(),
         taller: taller.trim(),
-        telefono: telefono.trim(),
+        telefono: telFinal,
         email: email.trim().toLowerCase(),
         rol: (email.trim().toLowerCase() === 'andres.novus59249@gmail.com' || email.trim().toLowerCase().includes('marshall') || email.trim().toLowerCase().includes('novus')) ? 'super_admin' : 'tecnico',
         estado: (email.trim().toLowerCase() === 'andres.novus59249@gmail.com' || email.trim().toLowerCase().includes('marshall') || email.trim().toLowerCase().includes('novus')) ? 'activo' : 'pendiente',
@@ -573,23 +602,48 @@ export default function ModalAutenticacion({ visible, onCerrar, onLoginExitoso }
                   <label style={{ display: 'block', fontSize: '0.78rem', color: '#9ca3af', marginBottom: '4px', fontWeight: 600 }}>
                     WHATSAPP / TEL
                   </label>
-                  <input
-                    type="tel"
-                    value={telefono}
-                    onChange={(e) => setTelefono(e.target.value)}
-                    placeholder="+51 987 654 321"
-                    style={{
-                      width: '100%',
-                      padding: '9px 12px',
-                      backgroundColor: '#1f2937',
-                      border: '1px solid #374151',
-                      borderRadius: '8px',
-                      color: '#ffffff',
-                      fontSize: '0.85rem',
-                      outline: 'none',
-                      boxSizing: 'border-box'
-                    }}
-                  />
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <select
+                      value={prefijoPais}
+                      onChange={(e) => setPrefijoPais(e.target.value)}
+                      style={{
+                        backgroundColor: '#1f2937',
+                        border: '1px solid #374151',
+                        borderRadius: '8px',
+                        color: prefijoPais ? '#ffffff' : '#9ca3af',
+                        fontSize: '0.78rem',
+                        padding: '9px 6px',
+                        outline: 'none',
+                        width: '95px',
+                        cursor: 'pointer'
+                      }}
+                      title="Selecciona el código de tu país si lo deseas"
+                    >
+                      <option value="">🌐 País...</option>
+                      {PREFIJOS_PAISES.map(p => (
+                        <option key={p.codigo} value={p.codigo}>
+                          {p.bandera} {p.codigo}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      type="tel"
+                      value={telefono}
+                      onChange={(e) => setTelefono(e.target.value)}
+                      placeholder={prefijoPais ? `${prefijoPais} 987654321` : "987 654 321"}
+                      style={{
+                        flex: 1,
+                        padding: '9px 10px',
+                        backgroundColor: '#1f2937',
+                        border: '1px solid #374151',
+                        borderRadius: '8px',
+                        color: '#ffffff',
+                        fontSize: '0.85rem',
+                        outline: 'none',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
                 </div>
               </div>
 

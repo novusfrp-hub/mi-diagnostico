@@ -3,12 +3,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Users, ShieldCheck, CheckCircle2, XCircle, Search, RefreshCw, 
   X, AlertTriangle, Building2, Mail, Phone, Clock, UserCheck, ShieldAlert,
-  UserPlus, Plus, Key, Lock, Copy, Check, Send, Sparkles
+  UserPlus, Plus, Key, Lock, Copy, Check, Send, Sparkles,
+  MessageCircle, ExternalLink, Calendar, BadgeCheck
 } from 'lucide-react';
 import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
 import { db, firebaseConfig } from '../firebase';
+import { PREFIJOS_PAISES } from './ModalAutenticacion';
 
 export default function ModalGestionUsuarios({ visible, onCerrar, usuarioActualUid }) {
   const [usuarios, setUsuarios] = useState([]);
@@ -21,6 +23,7 @@ export default function ModalGestionUsuarios({ visible, onCerrar, usuarioActualU
   const [nuevoNombre, setNuevoNombre] = useState('');
   const [nuevoTaller, setNuevoTaller] = useState('');
   const [nuevoTelefono, setNuevoTelefono] = useState('');
+  const [nuevoPrefijoPais, setNuevoPrefijoPais] = useState('');
   const [nuevoEmail, setNuevoEmail] = useState('');
   const [nuevoPassword, setNuevoPassword] = useState('');
   const [nuevoRol, setNuevoRol] = useState('tecnico'); // 'tecnico' | 'editor' | 'super_admin'
@@ -28,6 +31,10 @@ export default function ModalGestionUsuarios({ visible, onCerrar, usuarioActualU
   const [errorNuevoUser, setErrorNuevoUser] = useState('');
   const [usuarioRecienCreado, setUsuarioRecienCreado] = useState(null);
   const [copiado, setCopiado] = useState(false);
+
+  // Estado para Ficha Técnica Completa (Inspector de Usuario)
+  const [usuarioSeleccionado, setUsuarioSeleccionado] = useState(null);
+  const [copiadoCampo, setCopiadoCampo] = useState('');
 
   const cargarUsuarios = async () => {
     setCargando(true);
@@ -65,10 +72,20 @@ export default function ModalGestionUsuarios({ visible, onCerrar, usuarioActualU
     setTimeout(() => setMensajeAccion(''), 3500);
   };
 
+  const copiarAlPortapapeles = (texto, campo) => {
+    if (!texto) return;
+    navigator.clipboard.writeText(texto);
+    setCopiadoCampo(campo);
+    setTimeout(() => setCopiadoCampo(''), 2500);
+  };
+
   const cambiarEstado = async (uid, nuevoEstado) => {
     try {
       await updateDoc(doc(db, 'usuarios', uid), { estado: nuevoEstado });
       setUsuarios(prev => prev.map(u => u.id === uid ? { ...u, estado: nuevoEstado } : u));
+      if (usuarioSeleccionado && (usuarioSeleccionado.id === uid || usuarioSeleccionado.uid === uid)) {
+        setUsuarioSeleccionado(prev => ({ ...prev, estado: nuevoEstado }));
+      }
       notificar(`✅ Estado actualizado a: ${nuevoEstado.toUpperCase()}`);
     } catch (err) {
       notificar('❌ Error al actualizar estado');
@@ -79,6 +96,9 @@ export default function ModalGestionUsuarios({ visible, onCerrar, usuarioActualU
     try {
       await updateDoc(doc(db, 'usuarios', uid), { rol: nuevoRol });
       setUsuarios(prev => prev.map(u => u.id === uid ? { ...u, rol: nuevoRol } : u));
+      if (usuarioSeleccionado && (usuarioSeleccionado.id === uid || usuarioSeleccionado.uid === uid)) {
+        setUsuarioSeleccionado(prev => ({ ...prev, rol: nuevoRol }));
+      }
       notificar(`✅ Rol actualizado a: ${nuevoRol.toUpperCase()}`);
     } catch (err) {
       notificar('❌ Error al actualizar rol');
@@ -94,6 +114,9 @@ export default function ModalGestionUsuarios({ visible, onCerrar, usuarioActualU
       try {
         await deleteDoc(doc(db, 'usuarios', uid));
         setUsuarios(prev => prev.filter(u => u.id !== uid));
+        if (usuarioSeleccionado && (usuarioSeleccionado.id === uid || usuarioSeleccionado.uid === uid)) {
+          setUsuarioSeleccionado(null);
+        }
         notificar('🗑️ Usuario eliminado de la base de datos.');
       } catch (err) {
         notificar('❌ Error al eliminar');
@@ -164,11 +187,16 @@ export default function ModalGestionUsuarios({ visible, onCerrar, usuarioActualU
       const cred = await createUserWithEmailAndPassword(secondaryAuth, nuevoEmail.trim(), nuevoPassword);
       await signOut(secondaryAuth);
 
+      let telefonoFinal = nuevoTelefono.trim();
+      if (nuevoPrefijoPais && telefonoFinal && !telefonoFinal.startsWith('+')) {
+        telefonoFinal = `${nuevoPrefijoPais} ${telefonoFinal}`;
+      }
+
       const nuevoPerfil = {
         uid: cred.user.uid,
         nombre: nuevoNombre.trim(),
         taller: nuevoTaller.trim() || 'Taller Técnico',
-        telefono: nuevoTelefono.trim() || '',
+        telefono: telefonoFinal,
         email: nuevoEmail.trim().toLowerCase(),
         rol: nuevoRol,
         estado: 'activo', // Activo de inmediato porque lo crea el Super Admin
@@ -187,6 +215,7 @@ export default function ModalGestionUsuarios({ visible, onCerrar, usuarioActualU
       setNuevoNombre('');
       setNuevoTaller('');
       setNuevoTelefono('');
+      setNuevoPrefijoPais('');
       setNuevoEmail('');
       setNuevoPassword('');
       setNuevoRol('tecnico');
@@ -487,23 +516,48 @@ export default function ModalGestionUsuarios({ visible, onCerrar, usuarioActualU
                     <label style={{ display: 'block', fontSize: '0.75rem', color: '#9ca3af', marginBottom: '4px', fontWeight: 600 }}>
                       TELÉFONO / WHATSAPP
                     </label>
-                    <input
-                      type="tel"
-                      value={nuevoTelefono}
-                      onChange={(e) => setNuevoTelefono(e.target.value)}
-                      placeholder="+51 987 654 321"
-                      style={{
-                        width: '100%',
-                        padding: '8px 12px',
-                        backgroundColor: '#1e293b',
-                        border: '1px solid #334155',
-                        borderRadius: '6px',
-                        color: '#fff',
-                        fontSize: '0.82rem',
-                        outline: 'none',
-                        boxSizing: 'border-box'
-                      }}
-                    />
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <select
+                        value={nuevoPrefijoPais}
+                        onChange={(e) => setNuevoPrefijoPais(e.target.value)}
+                        style={{
+                          backgroundColor: '#1e293b',
+                          border: '1px solid #334155',
+                          borderRadius: '6px',
+                          color: nuevoPrefijoPais ? '#fff' : '#94a3b8',
+                          fontSize: '0.78rem',
+                          padding: '8px 4px',
+                          outline: 'none',
+                          width: '95px',
+                          cursor: 'pointer'
+                        }}
+                        title="Selecciona el prefijo internacional si lo deseas"
+                      >
+                        <option value="">🌐 País...</option>
+                        {PREFIJOS_PAISES.map(p => (
+                          <option key={p.codigo} value={p.codigo}>
+                            {p.bandera} {p.codigo}
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        type="tel"
+                        value={nuevoTelefono}
+                        onChange={(e) => setNuevoTelefono(e.target.value)}
+                        placeholder={nuevoPrefijoPais ? `${nuevoPrefijoPais} 987654321` : "Ej. 987 654 321"}
+                        style={{
+                          flex: 1,
+                          padding: '8px 12px',
+                          backgroundColor: '#1e293b',
+                          border: '1px solid #334155',
+                          borderRadius: '6px',
+                          color: '#fff',
+                          fontSize: '0.82rem',
+                          outline: 'none',
+                          boxSizing: 'border-box'
+                        }}
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -769,6 +823,7 @@ export default function ModalGestionUsuarios({ visible, onCerrar, usuarioActualU
                 return (
                   <div
                     key={u.id}
+                    onClick={() => setUsuarioSeleccionado(u)}
                     style={{
                       padding: '14px 18px',
                       backgroundColor: '#1a2234',
@@ -778,8 +833,13 @@ export default function ModalGestionUsuarios({ visible, onCerrar, usuarioActualU
                       alignItems: 'center',
                       justifyContent: 'space-between',
                       gap: '16px',
-                      flexWrap: 'wrap'
+                      flexWrap: 'wrap',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
                     }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#222d42'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#1a2234'}
+                    title="Haz clic para ver la ficha técnica completa de este usuario"
                   >
                     {/* Información Básica */}
                     <div style={{ minWidth: '220px', flex: '1 1 200px' }}>
@@ -805,119 +865,178 @@ export default function ModalGestionUsuarios({ visible, onCerrar, usuarioActualU
                         )}
                       </div>
 
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '14px', marginTop: '4px', fontSize: '0.78rem', color: '#9ca3af' }}>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px', marginTop: '6px', fontSize: '0.78rem', color: '#9ca3af' }}>
                         <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <Mail size={13} /> {u.email}
+                          <Mail size={13} color="#9ca3af" /> {u.email}
                         </span>
                         {u.taller && (
                           <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#cbd5e1' }}>
-                            <Building2 size={13} /> {u.taller}
+                            <Building2 size={13} color="#a78bfa" /> {u.taller}
                           </span>
                         )}
-                        {u.telefono && (
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <Phone size={13} /> {u.telefono}
+                        {/* Celular / WhatsApp visible y destacado */}
+                        {u.telefono ? (
+                          <span
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const limpio = u.telefono.replace(/[^0-9]/g, '');
+                              window.open(`https://wa.me/${limpio}`, '_blank');
+                            }}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: '2px 8px',
+                              backgroundColor: 'rgba(37, 211, 102, 0.15)',
+                              border: '1px solid rgba(37, 211, 102, 0.35)',
+                              borderRadius: '6px',
+                              color: '#25d366',
+                              fontWeight: 700,
+                              fontSize: '0.76rem',
+                              cursor: 'pointer'
+                            }}
+                            title="Clic para abrir WhatsApp directo"
+                          >
+                            <MessageCircle size={12} /> {u.telefono}
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: '0.72rem', color: '#64748b', fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                            <Phone size={11} /> Sin teléfono
                           </span>
                         )}
                       </div>
                     </div>
 
-                    {/* Selector de Rol */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontSize: '0.75rem', color: '#9ca3af', fontWeight: 600 }}>ROL:</span>
-                      <select
-                        value={u.rol || 'tecnico'}
-                        onChange={(e) => cambiarRol(u.id, e.target.value)}
+                    {/* Botón Ver Ficha + Selector de Rol + Acciones */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setUsuarioSeleccionado(u);
+                        }}
                         style={{
-                          backgroundColor: '#111827',
-                          color: u.rol === 'super_admin' ? '#f59e0b' : (u.rol === 'editor' ? '#a78bfa' : '#38bdf8'),
-                          border: '1px solid #374151',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          padding: '6px 11px',
+                          backgroundColor: '#26334a',
+                          color: '#e2e8f0',
+                          border: '1px solid #3b4d6d',
                           borderRadius: '6px',
-                          padding: '5px 10px',
-                          fontSize: '0.8rem',
+                          fontSize: '0.76rem',
                           fontWeight: 700,
                           cursor: 'pointer',
-                          outline: 'none'
+                          transition: 'all 0.15s ease'
                         }}
+                        title="Ver Ficha Técnica Completa"
                       >
-                        <option value="super_admin">👑 Super Admin</option>
-                        <option value="editor">🛠️ Editor</option>
-                        <option value="tecnico">⚡ Técnico</option>
-                      </select>
-                    </div>
+                        <UserCheck size={13} color="#38bdf8" />
+                        <span>Ficha</span>
+                      </button>
 
-                    {/* Acciones de Estado */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      {esPendiente && (
-                        <button
-                          onClick={() => cambiarEstado(u.id, 'activo')}
+                      {/* Selector de Rol */}
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                      >
+                        <select
+                          value={u.rol || 'tecnico'}
+                          onChange={(e) => cambiarRol(u.id, e.target.value)}
                           style={{
-                            padding: '6px 14px',
+                            backgroundColor: '#111827',
+                            color: u.rol === 'super_admin' ? '#f59e0b' : (u.rol === 'editor' ? '#a78bfa' : '#38bdf8'),
+                            border: '1px solid #374151',
                             borderRadius: '6px',
-                            backgroundColor: '#10b981',
-                            color: '#ffffff',
-                            border: 'none',
-                            fontSize: '0.8rem',
+                            padding: '5px 8px',
+                            fontSize: '0.78rem',
                             fontWeight: 700,
                             cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '5px',
-                            boxShadow: '0 2px 8px rgba(16, 185, 129, 0.4)'
+                            outline: 'none'
                           }}
                         >
-                          <CheckCircle2 size={14} /> Aprobar
-                        </button>
-                      )}
+                          <option value="super_admin">👑 Super Admin</option>
+                          <option value="editor">🛠️ Editor</option>
+                          <option value="tecnico">⚡ Técnico</option>
+                        </select>
+                      </div>
 
-                      {esActivo && (
-                        <button
-                          onClick={() => cambiarEstado(u.id, 'bloqueado')}
-                          style={{
-                            padding: '5px 10px',
-                            borderRadius: '6px',
-                            backgroundColor: 'transparent',
-                            color: '#f87171',
-                            border: '1px solid rgba(239, 68, 68, 0.4)',
-                            fontSize: '0.74rem',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          Bloquear
-                        </button>
-                      )}
-
-                      {esBloqueado && (
-                        <button
-                          onClick={() => cambiarEstado(u.id, 'activo')}
-                          style={{
-                            padding: '5px 10px',
-                            borderRadius: '6px',
-                            backgroundColor: 'transparent',
-                            color: '#34d399',
-                            border: '1px solid rgba(16, 185, 129, 0.4)',
-                            fontSize: '0.74rem',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          Reactivar
-                        </button>
-                      )}
-
-                      <button
-                        onClick={() => eliminarUsuario(u.id, u.email)}
-                        title="Eliminar usuario"
-                        style={{
-                          padding: '6px',
-                          borderRadius: '6px',
-                          backgroundColor: 'transparent',
-                          color: '#6b7280',
-                          border: 'none',
-                          cursor: 'pointer'
-                        }}
+                      {/* Acciones de Estado */}
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
                       >
-                        <X size={16} />
-                      </button>
+                        {esPendiente && (
+                          <button
+                            onClick={() => cambiarEstado(u.id, 'activo')}
+                            style={{
+                              padding: '6px 12px',
+                              borderRadius: '6px',
+                              backgroundColor: '#10b981',
+                              color: '#ffffff',
+                              border: 'none',
+                              fontSize: '0.78rem',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              boxShadow: '0 2px 8px rgba(16, 185, 129, 0.4)'
+                            }}
+                          >
+                            <CheckCircle2 size={13} /> Aprobar
+                          </button>
+                        )}
+
+                        {esActivo && (
+                          <button
+                            onClick={() => cambiarEstado(u.id, 'bloqueado')}
+                            style={{
+                              padding: '5px 9px',
+                              borderRadius: '6px',
+                              backgroundColor: 'transparent',
+                              color: '#f87171',
+                              border: '1px solid rgba(239, 68, 68, 0.4)',
+                              fontSize: '0.74rem',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Bloquear
+                          </button>
+                        )}
+
+                        {esBloqueado && (
+                          <button
+                            onClick={() => cambiarEstado(u.id, 'activo')}
+                            style={{
+                              padding: '5px 9px',
+                              borderRadius: '6px',
+                              backgroundColor: 'transparent',
+                              color: '#34d399',
+                              border: '1px solid rgba(16, 185, 129, 0.4)',
+                              fontSize: '0.74rem',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Reactivar
+                          </button>
+                        )}
+
+                        <button
+                          onClick={() => eliminarUsuario(u.id, u.email)}
+                          title="Eliminar usuario"
+                          style={{
+                            padding: '6px',
+                            borderRadius: '6px',
+                            backgroundColor: 'transparent',
+                            color: '#6b7280',
+                            border: 'none',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <X size={15} />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
@@ -925,6 +1044,422 @@ export default function ModalGestionUsuarios({ visible, onCerrar, usuarioActualU
             </div>
           )}
         </div>
+
+        {/* MODAL MODERNO: FICHA TÉCNICA COMPLETA DEL USUARIO */}
+        <AnimatePresence>
+          {usuarioSeleccionado && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setUsuarioSeleccionado(null)}
+              style={{
+                position: 'fixed',
+                inset: 0,
+                zIndex: 100000,
+                backgroundColor: 'rgba(0, 0, 0, 0.85)',
+                backdropFilter: 'blur(10px)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '16px'
+              }}
+            >
+              <motion.div
+                initial={{ scale: 0.94, y: 15 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.94, y: 15 }}
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  width: '100%',
+                  maxWidth: '560px',
+                  maxHeight: '92vh',
+                  overflowY: 'auto',
+                  backgroundColor: '#111827',
+                  border: '1px solid #374151',
+                  borderRadius: '1.25rem',
+                  boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.9), 0 0 40px rgba(139, 92, 246, 0.25)',
+                  color: '#f3f4f6',
+                  display: 'flex',
+                  flexDirection: 'column'
+                }}
+              >
+                {/* Header de la Ficha */}
+                <div style={{
+                  padding: '18px 24px',
+                  borderBottom: '1px solid #1f2937',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  background: 'linear-gradient(180deg, rgba(139, 92, 246, 0.12) 0%, rgba(17, 24, 39, 0) 100%)'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{
+                      width: '38px',
+                      height: '38px',
+                      borderRadius: '10px',
+                      backgroundColor: '#8b5cf6',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxShadow: '0 0 15px rgba(139, 92, 246, 0.4)'
+                    }}>
+                      <BadgeCheck size={22} color="#ffffff" />
+                    </div>
+                    <div>
+                      <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#ffffff' }}>
+                        FICHA TÉCNICA DE USUARIO
+                      </h3>
+                      <span style={{ fontSize: '0.74rem', color: '#a78bfa', fontWeight: 600 }}>
+                        Marshall Hardware Suite™ (MHS Pro) • Expediente Técnico
+                      </span>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => setUsuarioSeleccionado(null)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#9ca3af',
+                      cursor: 'pointer',
+                      padding: '6px'
+                    }}
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+
+                {/* Contenido de la Ficha */}
+                <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {/* Banner de Usuario */}
+                  <div style={{
+                    padding: '16px',
+                    borderRadius: '12px',
+                    backgroundColor: '#1e293b',
+                    border: '1px solid #334155',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: '12px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{
+                        width: '46px',
+                        height: '46px',
+                        borderRadius: '50%',
+                        backgroundColor: '#6366f1',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '1.2rem',
+                        fontWeight: 900,
+                        color: '#ffffff'
+                      }}>
+                        {(usuarioSeleccionado.nombre || 'U')[0].toUpperCase()}
+                      </div>
+                      <div>
+                        <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#ffffff' }}>
+                          {usuarioSeleccionado.nombre || 'Técnico sin nombre'}
+                        </h4>
+                        <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
+                          {usuarioSeleccionado.taller || 'Laboratorio Técnico'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                      {/* Badge Rol */}
+                      <span style={{
+                        fontSize: '0.72rem',
+                        padding: '3px 10px',
+                        borderRadius: '12px',
+                        backgroundColor: usuarioSeleccionado.rol === 'super_admin' ? 'rgba(245, 158, 11, 0.2)' : (usuarioSeleccionado.rol === 'editor' ? 'rgba(168, 85, 247, 0.2)' : 'rgba(56, 189, 248, 0.2)'),
+                        color: usuarioSeleccionado.rol === 'super_admin' ? '#f59e0b' : (usuarioSeleccionado.rol === 'editor' ? '#c084fc' : '#38bdf8'),
+                        fontWeight: 800,
+                        border: '1px solid currentColor'
+                      }}>
+                        {usuarioSeleccionado.rol === 'super_admin' ? '👑 SUPER ADMIN' : (usuarioSeleccionado.rol === 'editor' ? '🛠️ EDITOR' : '⚡ TÉCNICO')}
+                      </span>
+                      {/* Badge Estado */}
+                      <span style={{
+                        fontSize: '0.72rem',
+                        padding: '3px 10px',
+                        borderRadius: '12px',
+                        backgroundColor: usuarioSeleccionado.estado === 'activo' ? 'rgba(16, 185, 129, 0.2)' : (usuarioSeleccionado.estado === 'pendiente' ? 'rgba(245, 158, 11, 0.2)' : 'rgba(239, 68, 68, 0.2)'),
+                        color: usuarioSeleccionado.estado === 'activo' ? '#34d399' : (usuarioSeleccionado.estado === 'pendiente' ? '#f59e0b' : '#f87171'),
+                        fontWeight: 800,
+                        border: '1px solid currentColor'
+                      }}>
+                        {usuarioSeleccionado.estado === 'activo' ? '🟢 ACTIVO' : (usuarioSeleccionado.estado === 'pendiente' ? '🟡 PENDIENTE' : '🔴 BLOQUEADO')}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* WhatsApp / Teléfono Destacado */}
+                  <div style={{
+                    padding: '14px 16px',
+                    borderRadius: '10px',
+                    backgroundColor: 'rgba(37, 211, 102, 0.08)',
+                    border: '1px solid rgba(37, 211, 102, 0.25)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '10px'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#22c55e', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <MessageCircle size={15} /> WHATSAPP / CONTACTO DIRECTO
+                      </span>
+                      {usuarioSeleccionado.telefono && (
+                        <button
+                          type="button"
+                          onClick={() => copiarAlPortapapeles(usuarioSeleccionado.telefono, 'telefono')}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#86efac',
+                            fontSize: '0.72rem',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            padding: 0
+                          }}
+                        >
+                          {copiadoCampo === 'telefono' ? <Check size={13} /> : <Copy size={13} />}
+                          <span>{copiadoCampo === 'telefono' ? '¡Copiado!' : 'Copiar número'}</span>
+                        </button>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+                      <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#ffffff' }}>
+                        {usuarioSeleccionado.telefono ? usuarioSeleccionado.telefono : <span style={{ color: '#64748b', fontSize: '0.85rem', fontStyle: 'italic' }}>No registró número telefónico</span>}
+                      </div>
+
+                      {usuarioSeleccionado.telefono && (
+                        <a
+                          href={`https://wa.me/${usuarioSeleccionado.telefono.replace(/[^0-9]/g, '')}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            padding: '8px 16px',
+                            borderRadius: '8px',
+                            backgroundColor: '#25d366',
+                            color: '#000000',
+                            fontWeight: 800,
+                            fontSize: '0.82rem',
+                            textDecoration: 'none',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            boxShadow: '0 4px 12px rgba(37, 211, 102, 0.3)'
+                          }}
+                        >
+                          <MessageCircle size={16} />
+                          <span>Chatear por WhatsApp</span>
+                        </a>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Cuadrícula de Detalles */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
+                    {/* Correo */}
+                    <div style={{ padding: '12px', borderRadius: '8px', backgroundColor: '#1e293b', border: '1px solid #334155' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                        <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 600 }}>CORREO ELECTRÓNICO</span>
+                        <button
+                          type="button"
+                          onClick={() => copiarAlPortapapeles(usuarioSeleccionado.email, 'email')}
+                          style={{ background: 'none', border: 'none', color: '#38bdf8', fontSize: '0.7rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px', padding: 0 }}
+                        >
+                          {copiadoCampo === 'email' ? <Check size={12} /> : <Copy size={12} />}
+                          <span>{copiadoCampo === 'email' ? 'Copiado' : 'Copiar'}</span>
+                        </button>
+                      </div>
+                      <div style={{ fontSize: '0.85rem', color: '#ffffff', fontWeight: 600, wordBreak: 'break-all' }}>
+                        {usuarioSeleccionado.email}
+                      </div>
+                    </div>
+
+                    {/* Taller / Laboratorio */}
+                    <div style={{ padding: '12px', borderRadius: '8px', backgroundColor: '#1e293b', border: '1px solid #334155' }}>
+                      <span style={{ display: 'block', fontSize: '0.72rem', color: '#94a3b8', fontWeight: 600, marginBottom: '4px' }}>TALLER / LAB</span>
+                      <div style={{ fontSize: '0.85rem', color: '#ffffff', fontWeight: 600 }}>
+                        {usuarioSeleccionado.taller || 'No especificado'}
+                      </div>
+                    </div>
+
+                    {/* Fecha de Registro */}
+                    <div style={{ padding: '12px', borderRadius: '8px', backgroundColor: '#1e293b', border: '1px solid #334155' }}>
+                      <span style={{ display: 'block', fontSize: '0.72rem', color: '#94a3b8', fontWeight: 600, marginBottom: '4px' }}>FECHA DE REGISTRO</span>
+                      <div style={{ fontSize: '0.82rem', color: '#cbd5e1' }}>
+                        {usuarioSeleccionado.fechaRegistro ? new Date(usuarioSeleccionado.fechaRegistro).toLocaleString('es-ES', { dateStyle: 'medium', timeStyle: 'short' }) : 'No registrada'}
+                      </div>
+                    </div>
+
+                    {/* Origen / Creador */}
+                    <div style={{ padding: '12px', borderRadius: '8px', backgroundColor: '#1e293b', border: '1px solid #334155' }}>
+                      <span style={{ display: 'block', fontSize: '0.72rem', color: '#94a3b8', fontWeight: 600, marginBottom: '4px' }}>ORIGEN DE CUENTA</span>
+                      <div style={{ fontSize: '0.82rem', color: '#cbd5e1' }}>
+                        {usuarioSeleccionado.creadoPor === 'super_admin_directo' ? '👑 Creado por Super Admin' : '🌐 Solicitud Web Pública'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* UID Firebase */}
+                  <div style={{ padding: '10px 14px', borderRadius: '8px', backgroundColor: '#0d131f', border: '1px solid #1f2937', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.72rem', color: '#64748b' }}>UID Firebase: <code>{usuarioSeleccionado.id || usuarioSeleccionado.uid}</code></span>
+                    <button
+                      type="button"
+                      onClick={() => copiarAlPortapapeles(usuarioSeleccionado.id || usuarioSeleccionado.uid, 'uid')}
+                      style={{ background: 'none', border: 'none', color: '#a78bfa', fontSize: '0.7rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}
+                    >
+                      {copiadoCampo === 'uid' ? <Check size={12} /> : <Copy size={12} />}
+                      <span>{copiadoCampo === 'uid' ? 'Copiado' : 'Copiar UID'}</span>
+                    </button>
+                  </div>
+
+                  {/* Controles de Gestión en Vivo */}
+                  <div style={{
+                    padding: '16px',
+                    borderRadius: '10px',
+                    backgroundColor: '#1f2937',
+                    border: '1px solid #374151',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px'
+                  }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#a78bfa' }}>
+                      ACCIONES DE ADMINISTRACIÓN DIRECTA
+                    </span>
+
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '0.75rem', color: '#9ca3af', fontWeight: 600 }}>Cambiar Rol:</span>
+                        <select
+                          value={usuarioSeleccionado.rol || 'tecnico'}
+                          onChange={(e) => cambiarRol(usuarioSeleccionado.id, e.target.value)}
+                          style={{
+                            backgroundColor: '#111827',
+                            color: usuarioSeleccionado.rol === 'super_admin' ? '#f59e0b' : (usuarioSeleccionado.rol === 'editor' ? '#a78bfa' : '#38bdf8'),
+                            border: '1px solid #4b5563',
+                            borderRadius: '6px',
+                            padding: '6px 10px',
+                            fontSize: '0.8rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            outline: 'none'
+                          }}
+                        >
+                          <option value="super_admin">👑 Super Admin</option>
+                          <option value="editor">🛠️ Editor</option>
+                          <option value="tecnico">⚡ Técnico</option>
+                        </select>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        {usuarioSeleccionado.estado !== 'activo' && (
+                          <button
+                            onClick={() => cambiarEstado(usuarioSeleccionado.id, 'activo')}
+                            style={{
+                              padding: '6px 12px',
+                              backgroundColor: '#10b981',
+                              color: '#fff',
+                              border: 'none',
+                              borderRadius: '6px',
+                              fontSize: '0.78rem',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
+                          >
+                            <CheckCircle2 size={13} /> Activar
+                          </button>
+                        )}
+                        {usuarioSeleccionado.estado !== 'pendiente' && (
+                          <button
+                            onClick={() => cambiarEstado(usuarioSeleccionado.id, 'pendiente')}
+                            style={{
+                              padding: '6px 12px',
+                              backgroundColor: 'transparent',
+                              color: '#f59e0b',
+                              border: '1px solid rgba(245, 158, 11, 0.4)',
+                              borderRadius: '6px',
+                              fontSize: '0.78rem',
+                              fontWeight: 700,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Poner Pendiente
+                          </button>
+                        )}
+                        {usuarioSeleccionado.estado !== 'bloqueado' && (
+                          <button
+                            onClick={() => cambiarEstado(usuarioSeleccionado.id, 'bloqueado')}
+                            style={{
+                              padding: '6px 12px',
+                              backgroundColor: 'transparent',
+                              color: '#ef4444',
+                              border: '1px solid rgba(239, 68, 68, 0.4)',
+                              borderRadius: '6px',
+                              fontSize: '0.78rem',
+                              fontWeight: 700,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Bloquear
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div style={{ borderTop: '1px solid #374151', paddingTop: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <button
+                        onClick={() => eliminarUsuario(usuarioSeleccionado.id, usuarioSeleccionado.email)}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#f87171',
+                          fontSize: '0.78rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                      >
+                        <X size={14} />
+                        <span>Eliminar este registro</span>
+                      </button>
+
+                      <button
+                        onClick={() => setUsuarioSeleccionado(null)}
+                        style={{
+                          padding: '6px 16px',
+                          backgroundColor: '#374151',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: '6px',
+                          fontSize: '0.8rem',
+                          fontWeight: 700,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Cerrar Ficha
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.div>
     </div>
   );
