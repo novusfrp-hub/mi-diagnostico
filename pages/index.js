@@ -18,6 +18,7 @@ import ModalGestionUsuarios from '../components/ModalGestionUsuarios.js';
 import ModalEstadoUsuario from '../components/ModalEstadoUsuario.js';
 import { toPng } from 'html-to-image';
 import useAutoSave from '../hooks/useAutoSave';
+import { sanitizarYMigrarModeloAStorage } from '../lib/storageHelper';
 
 const LETRAS_FILAS = [
   'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K', 'L', 'M', 'N', 'P', 'R', 'T', 'U', 'V', 'W', 'Y',
@@ -1447,8 +1448,27 @@ export default function AppDiagnostico() {
     if (!targetModelo || !targetModelo.id) return false;
 
     try {
-      const modeloSanitizado = sanitizarObjetoParaFirestore(targetModelo);
+      // 1. Migración Lazy transparente: Si el modelo contiene imágenes base64 heredadas, las migra a Storage
+      const modeloMigrado = await sanitizarYMigrarModeloAStorage(targetModelo);
+
+      // 2. Sanitizado estándar para Firestore (remover campos undefined, etc.)
+      const modeloSanitizado = sanitizarObjetoParaFirestore(modeloMigrado);
+
+      // 3. Verificación de tamaño seguro (límite Firestore 1MB)
+      try {
+        const tamanoBytes = new Blob([JSON.stringify(modeloSanitizado)]).size;
+        if (tamanoBytes > 950_000) {
+          console.warn(`⚠️ Advertencia: Documento ${targetModelo.id} pesa ${(tamanoBytes / 1024).toFixed(1)} KB (cerca del límite de 1MB de Firestore).`);
+        }
+      } catch (eSize) {}
+
       await setDoc(doc(db, "hardware_db", targetModelo.id), modeloSanitizado);
+
+      // Sincronizar estado local si se migraron imágenes base64 a Storage
+      if (modeloMigrado !== targetModelo) {
+        setModeloActivo(modeloMigrado);
+      }
+
       if (!silencio) {
         alert("¡Placa guardada en la nube de Marshall Cell!");
       }

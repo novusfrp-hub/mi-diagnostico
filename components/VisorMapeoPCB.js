@@ -6,6 +6,12 @@ import {
   Image as ImageIcon, Upload, RotateCcw, X, Link, Search, RotateCw, Lock, Zap, ArrowLeftRight, Tag, Gauge, FolderOpen
 } from 'lucide-react';
 import SelectorTipoLinea from './SelectorTipoLinea';
+import { 
+  optimizarYComprimirImagen, 
+  subirImagenStorage, 
+  eliminarImagenStorage, 
+  esUrlFirebaseStorage 
+} from '../lib/storageHelper';
 
 const TIPOS_COMPONENTE = ['Capacitor', 'Resistencia', 'Diodo', 'Bobina'];
 
@@ -76,56 +82,20 @@ const COMPONENTES_DEFECTO = [
   }
 ];
 
-// Compresión y optimización automática de imágenes mediante HTML5 Canvas
-// Reduce imágenes de 5MB-15MB a ~120KB-180KB en WebP/JPEG manteniendo resolución 1920px Full HD
-const comprimirImagen = (file, maxDim = 1920, quality = 0.82) => {
-  return new Promise((resolve) => {
-    if (!file || !file.type.startsWith('image/')) {
+// Compresión y optimización automática garantizada mediante Canvas y WebP
+// Garantiza archivos ligeros (< 350KB) preservando resolución nítida para microelectrónica
+const comprimirImagen = async (file, maxDim = 1920) => {
+  try {
+    const res = await optimizarYComprimirImagen(file, maxDim);
+    return res.dataUrl;
+  } catch (e) {
+    console.warn('Fallback al leer imagen:', e);
+    return new Promise((resolve) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result);
       reader.readAsDataURL(file);
-      return;
-    }
-
-    const img = new Image();
-    const objectUrl = URL.createObjectURL(file);
-    img.onload = () => {
-      URL.revokeObjectURL(objectUrl);
-      let w = img.naturalWidth || img.width || 1024;
-      let h = img.naturalHeight || img.height || 1024;
-
-      if (w > maxDim || h > maxDim) {
-        if (w > h) {
-          h = Math.round((h * maxDim) / w);
-          w = maxDim;
-        } else {
-          w = Math.round((w * maxDim) / h);
-          h = maxDim;
-        }
-      }
-
-      const canvas = document.createElement('canvas');
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext('2d');
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
-      ctx.drawImage(img, 0, 0, w, h);
-
-      let dataUrl = canvas.toDataURL('image/webp', quality);
-      if (!dataUrl.startsWith('data:image/webp')) {
-        dataUrl = canvas.toDataURL('image/jpeg', quality);
-      }
-      resolve(dataUrl);
-    };
-    img.onerror = () => {
-      URL.revokeObjectURL(objectUrl);
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.readAsDataURL(file);
-    };
-    img.src = objectUrl;
-  });
+    });
+  }
 };
 
 export const SECTORES_PRESET = [
@@ -241,6 +211,7 @@ export default function VisorMapeoPCB({
   const [placaSize, setPlacaSize] = useState({ w: 1024, h: 1024 });
   const [esquemaSize, setEsquemaSize] = useState({ w: 1024, h: 1024 });
   const [comprimiendoImagen, setComprimiendoImagen] = useState(false);
+  const [eliminandoImagen, setEliminandoImagen] = useState(false);
   const [modalUrlConfig, setModalUrlConfig] = useState({ abierto: false, tipo: 'placa', urlInput: '' });
 
   // Imagen activa según la cara seleccionada
@@ -549,22 +520,41 @@ export default function VisorMapeoPCB({
     setPosicion({ x: mouseX - pX * newZoom, y: mouseY - pY * newZoom });
   };
 
-  // Subida y compresión automática de imágenes con Canvas (resuelve límite de 1MB de Firestore)
+  // Subida y compresión automática de imágenes optimizadas con Canvas y Firebase Storage
   const manejarArchivoImagenPlaca = async (e) => {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
     try {
       setComprimiendoImagen(true);
-      const dataUrl = await comprimirImagen(file, 1920, 0.80);
+      const { blob, dataUrl } = await optimizarYComprimirImagen(file, 1920, 380 * 1024);
+
+      const modeloKey = (nombreModelo || 'modelo_general').toLowerCase().replace(/[^a-z0-9_]/g, '_');
+      const sectorKey = (sectorPlaca || 'placa_completa').toLowerCase().replace(/[^a-z0-9_]/g, '_');
+      const rutaStorage = `boardview/${modeloKey}/${sectorKey}_cara_${caraPlaca}_${Date.now()}.webp`;
+
+      let finalUrl = '';
+      try {
+        finalUrl = await subirImagenStorage(blob, rutaStorage);
+        // Si la imagen previa en esta cara era de Firebase Storage, la eliminamos para no acumular basura
+        const urlAnterior = caraPlaca === 'A' ? imgPlacaCaraAUrl : imgPlacaCaraBUrl;
+        if (esUrlFirebaseStorage(urlAnterior)) {
+          eliminarImagenStorage(urlAnterior).catch(() => {});
+        }
+      } catch (errStorage) {
+        console.warn('Subida a Storage no disponible, usando fallback optimizado:', errStorage);
+        finalUrl = dataUrl;
+      }
+
       if (caraPlaca === 'A') {
-        setImgPlacaCaraAUrl(dataUrl);
+        setImgPlacaCaraAUrl(finalUrl);
       } else {
-        setImgPlacaCaraBUrl(dataUrl);
+        setImgPlacaCaraBUrl(finalUrl);
       }
       setShowPlaca(true);
       setBannerGuiaCerrado(true);
     } catch (err) {
       console.error('Error al procesar imagen de placa:', err);
+      alert('Error al procesar la imagen de la placa: ' + (err?.message || err));
     } finally {
       setComprimiendoImagen(false);
       e.target.value = '';
@@ -576,14 +566,92 @@ export default function VisorMapeoPCB({
     if (!file) return;
     try {
       setComprimiendoImagen(true);
-      const dataUrl = await comprimirImagen(file, 1920, 0.80);
-      setImgEsquemaUrl(dataUrl);
+      const { blob, dataUrl } = await optimizarYComprimirImagen(file, 1920, 380 * 1024);
+
+      const modeloKey = (nombreModelo || 'modelo_general').toLowerCase().replace(/[^a-z0-9_]/g, '_');
+      const sectorKey = (sectorPlaca || 'placa_completa').toLowerCase().replace(/[^a-z0-9_]/g, '_');
+      const rutaStorage = `boardview/${modeloKey}/${sectorKey}_esquema_${Date.now()}.webp`;
+
+      let finalUrl = '';
+      try {
+        finalUrl = await subirImagenStorage(blob, rutaStorage);
+        if (esUrlFirebaseStorage(imgEsquemaUrl)) {
+          eliminarImagenStorage(imgEsquemaUrl).catch(() => {});
+        }
+      } catch (errStorage) {
+        console.warn('Subida de esquema a Storage no disponible, usando fallback:', errStorage);
+        finalUrl = dataUrl;
+      }
+
+      setImgEsquemaUrl(finalUrl);
       setShowEsquema(true);
     } catch (err) {
       console.error('Error al procesar esquema:', err);
+      alert('Error al procesar el esquema: ' + (err?.message || err));
     } finally {
       setComprimiendoImagen(false);
       e.target.value = '';
+    }
+  };
+
+  // Eliminación limpia de foto de placa (Cara A o Cara B)
+  const eliminarFotoPlaca = async () => {
+    const urlActual = caraPlaca === 'A' ? imgPlacaCaraAUrl : imgPlacaCaraBUrl;
+    const esPredet = urlActual === IMAGEN_PREDETERMINADA;
+
+    if (!urlActual || (caraPlaca === 'A' && esPredet)) {
+      alert(`La Cara ${caraPlaca} ya está vacía o tiene la imagen base predeterminada.`);
+      return;
+    }
+
+    const confirma = window.confirm(
+      `¿Deseas eliminar la foto de Cara ${caraPlaca} para el sector "${sectorPlaca}"?\n` +
+      `Se borrará el archivo de la nube y se limpiará la placa.`
+    );
+    if (!confirma) return;
+
+    try {
+      setEliminandoImagen(true);
+      if (esUrlFirebaseStorage(urlActual)) {
+        await eliminarImagenStorage(urlActual);
+      }
+      if (caraPlaca === 'A') {
+        setImgPlacaCaraAUrl(IMAGEN_PREDETERMINADA);
+      } else {
+        setImgPlacaCaraBUrl('');
+      }
+    } catch (err) {
+      console.error('Error al eliminar foto de placa:', err);
+      alert('Error al eliminar la foto: ' + (err?.message || err));
+    } finally {
+      setEliminandoImagen(false);
+    }
+  };
+
+  // Eliminación limpia de diagrama esquemático
+  const eliminarFotoEsquema = async () => {
+    if (!imgEsquemaUrl) {
+      alert('No hay plano esquemático cargado en este sector para eliminar.');
+      return;
+    }
+
+    const confirma = window.confirm(
+      `¿Deseas eliminar el plano esquemático del sector "${sectorPlaca}"?\n` +
+      `Se borrará el archivo de la nube.`
+    );
+    if (!confirma) return;
+
+    try {
+      setEliminandoImagen(true);
+      if (esUrlFirebaseStorage(imgEsquemaUrl)) {
+        await eliminarImagenStorage(imgEsquemaUrl);
+      }
+      setImgEsquemaUrl('');
+    } catch (err) {
+      console.error('Error al eliminar esquema:', err);
+      alert('Error al eliminar el esquema: ' + (err?.message || err));
+    } finally {
+      setEliminandoImagen(false);
     }
   };
 
@@ -600,6 +668,10 @@ export default function VisorMapeoPCB({
   const aplicarModalUrl = () => {
     const urlLimpia = modalUrlConfig.urlInput.trim();
     if (modalUrlConfig.tipo === 'placa') {
+      const urlAnterior = caraPlaca === 'A' ? imgPlacaCaraAUrl : imgPlacaCaraBUrl;
+      if (esUrlFirebaseStorage(urlAnterior) && urlAnterior !== urlLimpia) {
+        eliminarImagenStorage(urlAnterior).catch(() => {});
+      }
       if (caraPlaca === 'A') {
         setImgPlacaCaraAUrl(urlLimpia || IMAGEN_PREDETERMINADA);
       } else {
@@ -608,6 +680,9 @@ export default function VisorMapeoPCB({
       setShowPlaca(true);
       setBannerGuiaCerrado(true);
     } else {
+      if (esUrlFirebaseStorage(imgEsquemaUrl) && imgEsquemaUrl !== urlLimpia) {
+        eliminarImagenStorage(imgEsquemaUrl).catch(() => {});
+      }
       setImgEsquemaUrl(urlLimpia);
       setShowEsquema(true);
     }
@@ -1988,8 +2063,13 @@ export default function VisorMapeoPCB({
 
               {puedeEditar && (
                 <>
-                  <button onClick={() => fileInputPlacaRef.current && fileInputPlacaRef.current.click()} style={styles.imgBtn} title={`Subir foto de Cara ${caraPlaca} para el sector "${sectorPlaca}" desde PC`}>
-                    <Upload size={12} /> Subir Foto
+                  <button 
+                    onClick={() => fileInputPlacaRef.current && fileInputPlacaRef.current.click()} 
+                    disabled={comprimiendoImagen || eliminandoImagen}
+                    style={{ ...styles.imgBtn, opacity: (comprimiendoImagen || eliminandoImagen) ? 0.6 : 1 }} 
+                    title={`Subir foto de Cara ${caraPlaca} para el sector "${sectorPlaca}" desde PC`}
+                  >
+                    <Upload size={12} /> {comprimiendoImagen ? 'Subiendo...' : 'Subir Foto'}
                   </button>
                   <button onClick={pedirUrlPlaca} style={styles.imgBtn} title={`Pegar URL directa de imagen para Cara ${caraPlaca} del sector "${sectorPlaca}"`}>
                     <Link size={12} /> URL
@@ -2004,6 +2084,21 @@ export default function VisorMapeoPCB({
                   >
                     <RotateCcw size={12} /> Predet.
                   </button>
+                  {((caraPlaca === 'A' && imgPlacaCaraAUrl && imgPlacaCaraAUrl !== IMAGEN_PREDETERMINADA) || (caraPlaca === 'B' && Boolean(imgPlacaCaraBUrl))) && (
+                    <button
+                      onClick={eliminarFotoPlaca}
+                      disabled={eliminandoImagen || comprimiendoImagen}
+                      style={{
+                        ...styles.imgBtn,
+                        color: '#f87171',
+                        borderColor: 'rgba(239, 68, 68, 0.45)',
+                        backgroundColor: 'rgba(239, 68, 68, 0.12)'
+                      }}
+                      title={`Eliminar foto subida de Cara ${caraPlaca} (${sectorPlaca})`}
+                    >
+                      <Trash2 size={12} /> {eliminandoImagen ? 'Borrando...' : 'Eliminar'}
+                    </button>
+                  )}
                 </>
               )}
 
@@ -2035,7 +2130,7 @@ export default function VisorMapeoPCB({
                     type="range" 
                     min="0.1" 
                     max="1.0" 
-                    step="0.05"
+                    step="0.05" 
                     value={esquemaOpacity} 
                     onChange={(e) => setEsquemaOpacity(parseFloat(e.target.value))}
                     style={{ width: '55px', accentColor: '#8b5cf6' }}
@@ -2043,12 +2138,36 @@ export default function VisorMapeoPCB({
                 </div>
               )}
 
-              <button onClick={() => fileInputEsquemaRef.current && fileInputEsquemaRef.current.click()} style={styles.imgBtn} title="Subir esquema desde PC">
-                <Upload size={12} /> Subir
-              </button>
-              <button onClick={pedirUrlEsquema} style={styles.imgBtn} title="Pegar URL de esquema (PostImages)">
-                <Link size={12} /> URL
-              </button>
+              {puedeEditar && (
+                <>
+                  <button 
+                    onClick={() => fileInputEsquemaRef.current && fileInputEsquemaRef.current.click()} 
+                    disabled={comprimiendoImagen || eliminandoImagen}
+                    style={{ ...styles.imgBtn, opacity: (comprimiendoImagen || eliminandoImagen) ? 0.6 : 1 }} 
+                    title="Subir esquema desde PC"
+                  >
+                    <Upload size={12} /> {comprimiendoImagen ? 'Subiendo...' : 'Subir'}
+                  </button>
+                  <button onClick={pedirUrlEsquema} style={styles.imgBtn} title="Pegar URL de esquema (PostImages / Directa)">
+                    <Link size={12} /> URL
+                  </button>
+                  {Boolean(imgEsquemaUrl) && (
+                    <button
+                      onClick={eliminarFotoEsquema}
+                      disabled={eliminandoImagen || comprimiendoImagen}
+                      style={{
+                        ...styles.imgBtn,
+                        color: '#f87171',
+                        borderColor: 'rgba(239, 68, 68, 0.45)',
+                        backgroundColor: 'rgba(239, 68, 68, 0.12)'
+                      }}
+                      title="Eliminar plano esquemático subido"
+                    >
+                      <Trash2 size={12} /> {eliminandoImagen ? 'Borrando...' : 'Eliminar'}
+                    </button>
+                  )}
+                </>
+              )}
 
               <input
                 ref={fileInputEsquemaRef}
