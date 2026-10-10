@@ -3,7 +3,7 @@ import {
   Save, Trash2, Plus, Move, ZoomIn, ZoomOut, Layers, Maximize2, 
   Settings, Edit, Edit3, Play, HelpCircle, Activity, Check, AlertTriangle, 
   Map, Eye, EyeOff, Clipboard, RefreshCw, ChevronRight, ChevronLeft, CheckCircle2,
-  Image as ImageIcon, Upload, RotateCcw, X, Link, Search, RotateCw, Lock, Zap, ArrowLeftRight, Tag, Gauge, FolderOpen
+  Image as ImageIcon, Upload, RotateCcw, X, Link, Search, RotateCw, Lock, Zap, ArrowLeftRight, Tag, Gauge, FolderOpen, MousePointer
 } from 'lucide-react';
 import SelectorTipoLinea from './SelectorTipoLinea';
 import { 
@@ -353,19 +353,69 @@ export default function VisorMapeoPCB({
   useEffect(() => { placaSizeRef.current = placaSize; }, [placaSize]);
   useEffect(() => { esquemaSizeRef.current = esquemaSize; }, [esquemaSize]);
 
-  // Listener para tecla Shift / Ctrl y atajos
+  // Historial de cambios para Deshacer (Ctrl + Z) y Rehacer (Ctrl + Y)
+  const [historialComps, setHistorialComps] = useState([]);
+  const [futuroComps, setFuturoComps] = useState([]);
+  const [estadoCargaImagen, setEstadoCargaImagen] = useState(null);
+
+  const guardarSnapshotHistorial = useCallback(() => {
+    setHistorialComps(prev => [...prev.slice(-30), componentes]);
+    setFuturoComps([]);
+  }, [componentes]);
+
+  const deshacer = useCallback(() => {
+    if (historialComps.length === 0) return;
+    const estadoPrevio = historialComps[historialComps.length - 1];
+    setHistorialComps(prev => prev.slice(0, prev.length - 1));
+    setFuturoComps(prev => [componentes, ...prev]);
+    setComponentes(estadoPrevio);
+  }, [historialComps, componentes]);
+
+  const rehacer = useCallback(() => {
+    if (futuroComps.length === 0) return;
+    const estadoSiguiente = futuroComps[0];
+    setFuturoComps(prev => prev.slice(1));
+    setHistorialComps(prev => [...prev, componentes]);
+    setComponentes(estadoSiguiente);
+  }, [futuroComps, componentes]);
+
+  // Limpiar mensaje flotante de estado de imagen después de 5 segundos
+  useEffect(() => {
+    if (estadoCargaImagen) {
+      const timer = setTimeout(() => setEstadoCargaImagen(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [estadoCargaImagen]);
+
+  // Listener para tecla Shift / Ctrl, atajos de teclado y Ctrl + Z / Y
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Shift' || e.key === 'Control') {
         setIsShiftDown(true);
       }
+      // Ctrl + Z: Deshacer
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z') && !e.shiftKey) {
+        if (document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+          e.preventDefault();
+          deshacer();
+        }
+      }
+      // Ctrl + Y o Ctrl + Shift + Z: Rehacer
+      if ((e.ctrlKey || e.metaKey) && (((e.key === 'z' || e.key === 'Z') && e.shiftKey) || e.key === 'y' || e.key === 'Y')) {
+        if (document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+          e.preventDefault();
+          rehacer();
+        }
+      }
       if ((e.key === 'r' || e.key === 'R') && selectedCompId && document.activeElement.tagName !== 'INPUT') {
         rotarComponente(selectedCompId);
       }
+      // ESC: Cancela dibujo y vuelve a Puntero
       if (e.key === 'Escape') {
         setDrawingStep(0);
         setPad1Temp(null);
         setPad2Temp(null);
+        setTool('select');
       }
     };
     const handleKeyUp = (e) => {
@@ -380,7 +430,7 @@ export default function VisorMapeoPCB({
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [selectedCompId]);
+  }, [selectedCompId, deshacer, rehacer]);
 
   // Auto-persistencia de componentes e imágenes hacia el modelo
   const onCambiosRef = useRef(onCambios);
@@ -526,7 +576,8 @@ export default function VisorMapeoPCB({
     if (!file) return;
     try {
       setComprimiendoImagen(true);
-      const { blob, dataUrl } = await optimizarYComprimirImagen(file, 1920, 380 * 1024);
+      const kbOriginal = Math.round(file.size / 1024);
+      const { blob, dataUrl, width, height, sizeKB } = await optimizarYComprimirImagen(file, 1920, 380 * 1024);
 
       const modeloKey = (nombreModelo || 'modelo_general').toLowerCase().replace(/[^a-z0-9_]/g, '_');
       const sectorKey = (sectorPlaca || 'placa_completa').toLowerCase().replace(/[^a-z0-9_]/g, '_');
@@ -540,9 +591,17 @@ export default function VisorMapeoPCB({
         if (esUrlFirebaseStorage(urlAnterior)) {
           eliminarImagenStorage(urlAnterior).catch(() => {});
         }
+        setEstadoCargaImagen({
+          tipo: 'éxito',
+          mensaje: `☁️ Foto Cara ${caraPlaca} subida a Storage: ${sizeKB} KB (original ${kbOriginal} KB, ${width}x${height}px).`
+        });
       } catch (errStorage) {
         console.warn('Subida a Storage no disponible, usando fallback optimizado:', errStorage);
         finalUrl = dataUrl;
+        setEstadoCargaImagen({
+          tipo: 'aviso',
+          mensaje: `📸 Foto Cara ${caraPlaca} optimizada: ${sizeKB} KB (original ${kbOriginal} KB, ${width}x${height}px). Lista para guardar.`
+        });
       }
 
       if (caraPlaca === 'A') {
@@ -554,6 +613,10 @@ export default function VisorMapeoPCB({
       setBannerGuiaCerrado(true);
     } catch (err) {
       console.error('Error al procesar imagen de placa:', err);
+      setEstadoCargaImagen({
+        tipo: 'error',
+        mensaje: 'Error al procesar la imagen de la placa: ' + (err?.message || err)
+      });
       alert('Error al procesar la imagen de la placa: ' + (err?.message || err));
     } finally {
       setComprimiendoImagen(false);
@@ -566,7 +629,8 @@ export default function VisorMapeoPCB({
     if (!file) return;
     try {
       setComprimiendoImagen(true);
-      const { blob, dataUrl } = await optimizarYComprimirImagen(file, 1920, 380 * 1024);
+      const kbOriginal = Math.round(file.size / 1024);
+      const { blob, dataUrl, width, height, sizeKB } = await optimizarYComprimirImagen(file, 1920, 380 * 1024);
 
       const modeloKey = (nombreModelo || 'modelo_general').toLowerCase().replace(/[^a-z0-9_]/g, '_');
       const sectorKey = (sectorPlaca || 'placa_completa').toLowerCase().replace(/[^a-z0-9_]/g, '_');
@@ -578,15 +642,27 @@ export default function VisorMapeoPCB({
         if (esUrlFirebaseStorage(imgEsquemaUrl)) {
           eliminarImagenStorage(imgEsquemaUrl).catch(() => {});
         }
+        setEstadoCargaImagen({
+          tipo: 'éxito',
+          mensaje: `☁️ Esquema subido a Storage: ${sizeKB} KB (original ${kbOriginal} KB, ${width}x${height}px).`
+        });
       } catch (errStorage) {
         console.warn('Subida de esquema a Storage no disponible, usando fallback:', errStorage);
         finalUrl = dataUrl;
+        setEstadoCargaImagen({
+          tipo: 'aviso',
+          mensaje: `🗺️ Esquema optimizado: ${sizeKB} KB (original ${kbOriginal} KB, ${width}x${height}px). Listo para guardar.`
+        });
       }
 
       setImgEsquemaUrl(finalUrl);
       setShowEsquema(true);
     } catch (err) {
       console.error('Error al procesar esquema:', err);
+      setEstadoCargaImagen({
+        tipo: 'error',
+        mensaje: 'Error al procesar esquema: ' + (err?.message || err)
+      });
       alert('Error al procesar el esquema: ' + (err?.message || err));
     } finally {
       setComprimiendoImagen(false);
@@ -703,6 +779,7 @@ export default function VisorMapeoPCB({
 
   // Invertir Pines (1 ↔ 2)
   const invertirPinesComponente = (compId) => {
+    guardarSnapshotHistorial();
     setComponentes(prev => prev.map(comp => {
       if (comp.id !== compId) return comp;
       const pad1 = comp.pads.find(p => p.id === '1');
@@ -746,6 +823,7 @@ export default function VisorMapeoPCB({
 
   // Rotar Componente (90°)
   const rotarComponente = (id) => {
+    guardarSnapshotHistorial();
     setComponentes(prev => prev.map(comp => {
       if (comp.id !== id) return comp;
       const newW = comp.h;
@@ -1011,6 +1089,7 @@ export default function VisorMapeoPCB({
     }
 
     if (isDraggingComp) {
+      guardarSnapshotHistorial();
       setIsDraggingComp(false);
       setDragCompId(null);
       return;
@@ -1029,6 +1108,7 @@ export default function VisorMapeoPCB({
     if (isMatrixDragging) {
       setIsMatrixDragging(false);
       if (matrixClonesPreview.length > 0) {
+        guardarSnapshotHistorial();
         const consolidados = matrixClonesPreview.map(clone => ({
           ...clone,
           id: `smd_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
@@ -1105,6 +1185,7 @@ export default function VisorMapeoPCB({
       ]
     };
 
+    guardarSnapshotHistorial();
     setComponentes(prev => [...prev, nuevoComp]);
     setSelectedCompId(nuevoComp.id);
     setSelectedPadId('1');
@@ -1325,6 +1406,7 @@ export default function VisorMapeoPCB({
 
   const borrarComponente = (id) => {
     if (window.confirm('¿Seguro que deseas eliminar este componente SMD del Boardview?')) {
+      guardarSnapshotHistorial();
       setComponentes(prev => prev.filter(c => c.id !== id));
       if (selectedCompId === id) {
         setSelectedCompId(null);
@@ -1805,29 +1887,100 @@ export default function VisorMapeoPCB({
           <div style={styles.divider} />
 
           {/* Selector de Herramientas */}
-          <div style={{ display: 'flex', background: '#111827', padding: '3px', borderRadius: '8px', border: '1px solid #374151' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '3px', background: '#111827', padding: '3px 4px', borderRadius: '8px', border: '1px solid #374151' }}>
             <button 
               onClick={() => { setTool('select'); setDrawingStep(0); }} 
-              style={{ ...styles.toolBtn, ...(tool === 'select' && styles.toolBtnActive) }}
-              title="Puntero de selección"
+              style={{ 
+                ...styles.toolBtn, 
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                background: tool === 'select' ? '#2563eb' : 'transparent',
+                color: tool === 'select' ? '#ffffff' : '#9ca3af',
+                boxShadow: tool === 'select' ? '0 0 8px rgba(37,99,235,0.6)' : 'none'
+              }}
+              title="Puntero de selección (Haz clic para seleccionar y arrastrar componentes o pins)"
             >
-              Puntero
+              <MousePointer size={13} /> Puntero
             </button>
             {puedeEditar && (
               <button 
-                onClick={() => { setTool('drawSMD'); setDrawingStep(0); }} 
-                style={{ ...styles.toolBtn, ...(tool === 'drawSMD' && styles.toolBtnActive) }}
-                title="Dibujar Componente SMD (Shift para alinear recto)"
+                onClick={() => { 
+                  if (tool === 'drawSMD') {
+                    setTool('select');
+                    setDrawingStep(0);
+                  } else {
+                    setTool('drawSMD'); 
+                    setDrawingStep(0); 
+                  }
+                }} 
+                style={{ 
+                  ...styles.toolBtn, 
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  background: tool === 'drawSMD' ? 'rgba(245, 158, 11, 0.25)' : 'transparent',
+                  color: tool === 'drawSMD' ? '#fbbf24' : '#9ca3af',
+                  border: tool === 'drawSMD' ? '1px solid #f59e0b' : '1px solid transparent',
+                  boxShadow: tool === 'drawSMD' ? '0 0 10px rgba(245, 158, 11, 0.6)' : 'none',
+                  animation: tool === 'drawSMD' ? 'pulseDrawBtn 1.6s infinite' : 'none'
+                }}
+                title="Dibujar Componente SMD (Haz clic para alternar o presiona ESC para salir)"
               >
-                + Dibujar SMD
+                <Edit3 size={13} /> {tool === 'drawSMD' ? '✏️ Dibujando SMD' : '+ Dibujar SMD'}
               </button>
             )}
             <button 
               onClick={() => { setTool('pan'); setDrawingStep(0); }} 
-              style={{ ...styles.toolBtn, ...(tool === 'pan' && styles.toolBtnActive) }}
-              title="Arrastrar / Panear lienzo"
+              style={{ 
+                ...styles.toolBtn, 
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                background: tool === 'pan' ? '#7c3aed' : 'transparent',
+                color: tool === 'pan' ? '#ffffff' : '#9ca3af',
+                boxShadow: tool === 'pan' ? '0 0 8px rgba(124,58,237,0.6)' : 'none'
+              }}
+              title="Arrastrar / Panear lienzo (Mover vista)"
             >
-              Mover
+              <Move size={13} /> Mover
+            </button>
+
+            {/* Separador sutil */}
+            <div style={{ width: '1px', height: '18px', background: '#374151', margin: '0 2px' }} />
+
+            {/* Botones Deshacer y Rehacer */}
+            <button
+              onClick={deshacer}
+              disabled={historialComps.length === 0}
+              style={{
+                ...styles.toolBtn,
+                padding: '4px 7px',
+                color: historialComps.length > 0 ? '#38bdf8' : '#4b5563',
+                cursor: historialComps.length > 0 ? 'pointer' : 'not-allowed',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '3px'
+              }}
+              title="Deshacer cambio en componentes (Ctrl + Z)"
+            >
+              <RotateCcw size={13} /> <span style={{ fontSize: '0.66rem' }}>Ctrl+Z</span>
+            </button>
+            <button
+              onClick={rehacer}
+              disabled={futuroComps.length === 0}
+              style={{
+                ...styles.toolBtn,
+                padding: '4px 7px',
+                color: futuroComps.length > 0 ? '#38bdf8' : '#4b5563',
+                cursor: futuroComps.length > 0 ? 'pointer' : 'not-allowed',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '3px'
+              }}
+              title="Rehacer cambio en componentes (Ctrl + Y)"
+            >
+              <RotateCw size={13} /> <span style={{ fontSize: '0.66rem' }}>Ctrl+Y</span>
             </button>
           </div>
 
@@ -1838,17 +1991,21 @@ export default function VisorMapeoPCB({
           )}
 
           {tool === 'drawSMD' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', animation: 'fadeIn 0.3s' }}>
-              <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Tipo:</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', animation: 'fadeIn 0.3s', background: '#1e293b', padding: '2px 8px', borderRadius: '6px', border: '1px solid #f59e0b' }}>
+              <span style={{ fontSize: '0.72rem', color: '#fbbf24', fontWeight: 'bold' }}>Tipo SMD:</span>
               <select 
                 value={tipoDrawing} 
                 onChange={(e) => setTipoDrawing(e.target.value)}
-                style={styles.selectDark}
+                style={{ ...styles.selectDark, color: '#f8fafc', fontWeight: 'bold' }}
               >
-                {TIPOS_COMPONENTE.map(t => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
+                <option value="Capacitor">⚡ Capacitor (C)</option>
+                <option value="Resistencia">🟣 Resistencia (R)</option>
+                <option value="Bobina">🌀 Bobina / Inductor (L)</option>
+                <option value="Diodo">🔺 Diodo (D)</option>
               </select>
+              <span style={{ fontSize: '0.65rem', color: '#94a3b8' }}>
+                {tipoDrawing === 'Bobina' ? 'Prefijo L | Sin GND' : (tipoDrawing === 'Capacitor' ? 'Prefijo C | Pad 2 GND' : `Prefijo ${TIPO_ABREVIATURAS[tipoDrawing] || 'C'}`)}
+              </span>
             </div>
           )}
 
@@ -2099,6 +2256,23 @@ export default function VisorMapeoPCB({
                       <Trash2 size={12} /> {eliminandoImagen ? 'Borrando...' : 'Eliminar'}
                     </button>
                   )}
+                  {activeImgPlacaUrl && activeImgPlacaUrl !== IMAGEN_PREDETERMINADA && (
+                    <span style={{
+                      fontSize: '0.67rem',
+                      padding: '2px 8px',
+                      borderRadius: '5px',
+                      background: 'rgba(56, 189, 248, 0.12)',
+                      color: '#38bdf8',
+                      border: '1px solid rgba(56, 189, 248, 0.3)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }} title="Foto optimizada en WebP de alta definición (< 380 KB)">
+                      <span>{esUrlFirebaseStorage(activeImgPlacaUrl) ? '☁️ Storage' : '⚡ WebP'}</span>
+                      <span style={{ opacity: 0.5 }}>·</span>
+                      <span>{placaSize.w}x{placaSize.h}px</span>
+                    </span>
+                  )}
                 </>
               )}
 
@@ -2165,6 +2339,23 @@ export default function VisorMapeoPCB({
                     >
                       <Trash2 size={12} /> {eliminandoImagen ? 'Borrando...' : 'Eliminar'}
                     </button>
+                  )}
+                  {Boolean(imgEsquemaUrl) && (
+                    <span style={{
+                      fontSize: '0.67rem',
+                      padding: '2px 8px',
+                      borderRadius: '5px',
+                      background: 'rgba(168, 85, 247, 0.12)',
+                      color: '#c084fc',
+                      border: '1px solid rgba(168, 85, 247, 0.3)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }} title="Esquema optimizado en WebP de alta definición (< 380 KB)">
+                      <span>{esUrlFirebaseStorage(imgEsquemaUrl) ? '☁️ Storage' : '⚡ WebP'}</span>
+                      <span style={{ opacity: 0.5 }}>·</span>
+                      <span>{esquemaSize.w}x{esquemaSize.h}px</span>
+                    </span>
                   )}
                 </>
               )}
@@ -2501,6 +2692,84 @@ export default function VisorMapeoPCB({
             </div>
           )}
 
+          {/* Banner Flotante HUD cuando la herramienta Dibujar SMD está activa */}
+          {tool === 'drawSMD' && (
+            <div style={{
+              position: 'absolute',
+              top: '16px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              backgroundColor: 'rgba(15, 23, 42, 0.96)',
+              border: '2px solid #f59e0b',
+              borderRadius: '10px',
+              padding: '8px 18px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              boxShadow: '0 8px 30px rgba(245, 158, 11, 0.45)',
+              backdropFilter: 'blur(8px)',
+              zIndex: 35,
+              animation: 'pulseGlow 2.5s infinite ease-in-out'
+            }}>
+              <span style={{ fontSize: '0.82rem', color: '#fbbf24', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                ✏️ MODO DIBUJAR SMD ({tipoDrawing === 'Bobina' ? '🌀 Bobina (L)' : tipoDrawing})
+              </span>
+              <span style={{ fontSize: '0.78rem', color: '#e2e8f0' }}>
+                {drawingStep === 0 && '👉 Paso 1: Haz clic en el centro del 1er Pad'}
+                {drawingStep === 1 && '👉 Paso 1: Suelta el botón del mouse para fijar tamaño'}
+                {drawingStep === 2 && '👉 Paso 2: Haz clic en el 2do Pad (Shift alinea recto)'}
+              </span>
+              <button
+                type="button"
+                onClick={() => { setTool('select'); setDrawingStep(0); setPad1Temp(null); setPad2Temp(null); }}
+                style={{
+                  padding: '4px 10px',
+                  backgroundColor: '#374151',
+                  border: '1px solid #4b5563',
+                  color: '#f3f4f6',
+                  borderRadius: '6px',
+                  fontSize: '0.73rem',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+                title="Salir del modo dibujo y volver al puntero (o presiona ESC)"
+              >
+                ✕ Salir a Puntero (ESC)
+              </button>
+            </div>
+          )}
+
+          {/* Notificación flotante de estado de carga y optimización de imágenes */}
+          {estadoCargaImagen && (
+            <div style={{
+              position: 'absolute',
+              top: tool === 'drawSMD' ? '65px' : '16px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              backgroundColor: estadoCargaImagen.tipo === 'error' ? 'rgba(220, 38, 38, 0.95)' : (estadoCargaImagen.tipo === 'aviso' ? 'rgba(217, 119, 6, 0.95)' : 'rgba(16, 185, 129, 0.95)'),
+              color: '#ffffff',
+              border: '1px solid rgba(255, 255, 255, 0.25)',
+              borderRadius: '8px',
+              padding: '7px 16px',
+              fontSize: '0.75rem',
+              fontWeight: 'bold',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+              zIndex: 36,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px'
+            }}>
+              <span>{estadoCargaImagen.mensaje}</span>
+              <button
+                onClick={() => setEstadoCargaImagen(null)}
+                style={{ background: 'transparent', border: 'none', color: '#ffffff', cursor: 'pointer', padding: 0 }}
+                title="Cerrar notificación"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
           <svg
             id="svg-boardview"
             ref={svgRef}
@@ -2513,6 +2782,15 @@ export default function VisorMapeoPCB({
                 <path d="M 30 0 L 0 0 0 30" fill="none" stroke="#1f2937" strokeWidth="0.5" />
               </pattern>
               <style>{`
+                @keyframes pulseDrawBtn {
+                  0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7); }
+                  70% { box-shadow: 0 0 0 6px rgba(245, 158, 11, 0); }
+                  100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+                }
+                @keyframes pulseGlow {
+                  0%, 100% { box-shadow: 0 8px 25px rgba(245, 158, 11, 0.35); border-color: #f59e0b; }
+                  50% { box-shadow: 0 8px 32px rgba(245, 158, 11, 0.65); border-color: #fbbf24; }
+                }
                 @keyframes laserMarch {
                   0% { stroke-dashoffset: 0; }
                   100% { stroke-dashoffset: -20; }
@@ -2632,6 +2910,11 @@ export default function VisorMapeoPCB({
                           const coords = getCanvasCoords(e);
                           setDragOffset({ x: coords.x - comp.x, y: coords.y - comp.y });
                         }
+                      } else if (tool === 'drawSMD' && drawingStep === 0) {
+                        e.stopPropagation();
+                        setTool('select');
+                        setSelectedCompId(comp.id);
+                        setSidebarAbierto(true);
                       }
                     }}
                   >
@@ -2775,6 +3058,11 @@ export default function VisorMapeoPCB({
                             onClick={(e) => {
                               e.stopPropagation();
                               if (tool === 'select') {
+                                setSelectedCompId(comp.id);
+                                setSelectedPadId(pad.id);
+                                setSidebarAbierto(true);
+                              } else if (tool === 'drawSMD' && drawingStep === 0) {
+                                setTool('select');
                                 setSelectedCompId(comp.id);
                                 setSelectedPadId(pad.id);
                                 setSidebarAbierto(true);
@@ -3173,19 +3461,71 @@ export default function VisorMapeoPCB({
                         const val = e.target.value.trim();
                         setComponentes(prev => prev.map(c => c.id === compActivo.id ? { ...c, nombre: val } : c));
                       }}
+                      onBlur={() => guardarSnapshotHistorial()}
                       style={{ ...styles.inputDark, width: '120px', fontWeight: 'bold', fontSize: '0.9rem', color: '#00ffff' }}
                       title="Editar nombre/número del componente"
                     />
                     <select
                       value={compActivo.tipo}
                       onChange={(e) => {
-                        const val = e.target.value;
-                        setComponentes(prev => prev.map(c => c.id === compActivo.id ? { ...c, tipo: val } : c));
+                        const nuevoTipo = e.target.value;
+                        const antiguoTipo = compActivo.tipo;
+                        const antiguoPrefix = TIPO_ABREVIATURAS[antiguoTipo] || 'C';
+                        const nuevoPrefix = TIPO_ABREVIATURAS[nuevoTipo] || 'C';
+
+                        guardarSnapshotHistorial();
+                        setComponentes(prev => prev.map(c => {
+                          if (c.id !== compActivo.id) return c;
+                          
+                          let nuevoNombre = c.nombre;
+                          if (nuevoNombre.startsWith(antiguoPrefix)) {
+                            nuevoNombre = nuevoPrefix + nuevoNombre.slice(antiguoPrefix.length);
+                          }
+
+                          let nuevosPads = c.pads;
+                          if (antiguoTipo === 'Capacitor' && (nuevoTipo === 'Bobina' || nuevoTipo === 'Resistencia')) {
+                            nuevosPads = c.pads.map(p => {
+                              if (p.id === '2' && p.tipo === 'GND' && p.netName === 'GND') {
+                                return {
+                                  ...p,
+                                  tipo: 'DATA',
+                                  netName: `${nuevoNombre}_P2`,
+                                  valorSanoDiodo: '---',
+                                  valorSanoVoltio: '---',
+                                  valorSanoUa: '---',
+                                  valorSanoOhmio: '---'
+                                };
+                              }
+                              if (p.netName && p.netName.startsWith(`${c.nombre}_`)) {
+                                return { ...p, netName: p.netName.replace(`${c.nombre}_`, `${nuevoNombre}_`) };
+                              }
+                              return p;
+                            });
+                          } else {
+                            nuevosPads = c.pads.map(p => {
+                              if (p.netName && p.netName.startsWith(`${c.nombre}_`)) {
+                                return { ...p, netName: p.netName.replace(`${c.nombre}_`, `${nuevoNombre}_`) };
+                              }
+                              return p;
+                            });
+                          }
+
+                          return {
+                            ...c,
+                            tipo: nuevoTipo,
+                            nombre: nuevoNombre,
+                            pads: nuevosPads
+                          };
+                        }));
                       }}
                       style={styles.selectDark}
                       title="Cambiar tipo de componente"
                     >
-                      {TIPOS_COMPONENTE.map(t => <option key={t} value={t}>{t}</option>)}
+                      {TIPOS_COMPONENTE.map(t => (
+                        <option key={t} value={t}>
+                          {t === 'Bobina' ? '🌀 Bobina (L)' : (t === 'Capacitor' ? '⚡ Capacitor (C)' : (t === 'Resistencia' ? '🟣 Resistencia (R)' : '🔺 Diodo (D)'))}
+                        </option>
+                      ))}
                     </select>
                   </div>
 

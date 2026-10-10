@@ -1723,12 +1723,16 @@ export default function AppDiagnostico() {
     }
 
     try {
-      await guardarModeloActualDB(modeloActualizado, true);
+      await Promise.race([
+        guardarModeloActualDB(modeloActualizado, true),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Tiempo de espera agotado al conectar con Firestore (12s).')), 12000))
+      ]);
       const compsA = nuevosComp.filter(c => (c.cara || 'A') === 'A').length;
       const compsB = nuevosComp.filter(c => c.cara === 'B').length;
       alert(`¡Boardview guardado exitosamente en Marshall Cell!\n📍 Sector: ${nuevoSector}\n🅰️ Cara A: ${compsA} componentes | 🅱️ Cara B: ${compsB} componentes`);
     } catch (err) {
       console.error("Error al guardar Boardview en Firestore:", err);
+      alert(`⚠️ No se pudo completar la sincronización con la nube: ${err?.message || err}\n\nLos cambios quedaron respaldados localmente en este navegador.`);
     } finally {
       setGuardandoBoardview(false);
     }
