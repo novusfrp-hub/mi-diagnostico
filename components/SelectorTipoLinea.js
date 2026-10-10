@@ -80,7 +80,9 @@ export default function SelectorTipoLinea({
   onChange,
   tiposCustom = [],
   onAgregarTipo,
-  onEliminarTipo
+  onEliminarTipo,
+  nombreComponente = '',
+  idPad = ''
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [categoriaActiva, setCategoriaActiva] = useState('alimentacion');
@@ -238,22 +240,40 @@ export default function SelectorTipoLinea({
         <div
           style={{
             position: 'absolute',
-            bottom: '105%',
+            top: 'calc(100% + 6px)',
             left: 0,
-            marginBottom: '6px',
             width: '310px',
             maxWidth: '92vw',
             backgroundColor: '#0f172a',
             border: '1px solid #334155',
             borderRadius: '12px',
-            boxShadow: '0 12px 30px rgba(0, 0, 0, 0.8), 0 0 1px rgba(255,255,255,0.2)',
-            zIndex: 9999,
+            boxShadow: '0 16px 36px rgba(0, 0, 0, 0.9), 0 0 1px rgba(255,255,255,0.2)',
+            zIndex: 99999,
             padding: '12px',
             display: 'flex',
             flexDirection: 'column',
             gap: '10px'
           }}
         >
+          {/* Cabecera de Contexto: Indica claramente a qué componente y pin pertenece */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingBottom: '8px',
+            borderBottom: '1px solid #1e293b',
+            gap: '6px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
+              <span style={{ fontSize: '0.95rem' }}>📍</span>
+              <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#38bdf8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {nombreComponente ? `${nombreComponente} — ` : ''}Pin {idPad || ''}
+              </span>
+            </div>
+            <span style={{ fontSize: '0.65rem', background: '#1e293b', border: '1px solid #334155', padding: '2px 6px', borderRadius: '4px', color: '#94a3b8', whiteSpace: 'nowrap' }}>
+              Red: <strong style={{ color: '#00ffff' }}>{valor}</strong>
+            </span>
+          </div>
           {/* Fila superior: GND y NC con acceso inmediato */}
           <div style={{ display: 'flex', gap: '8px' }}>
             <button

@@ -339,6 +339,8 @@ export default function FPCInteligente({ pines, setPines, pinActivo, setPinActiv
 
                 <SelectorTipoLinea
                   valor={pines.find(p => String(p.id) === String(pinActivo))?.tipo || 'DATA'}
+                  nombreComponente={fpc?.nombre || 'FPC'}
+                  idPad={pinActivo}
                   onChange={(val) => {
                     setPines(prev =>
                       prev.map(p =>

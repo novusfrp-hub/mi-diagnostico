@@ -18,7 +18,7 @@ import ModalGestionUsuarios from '../components/ModalGestionUsuarios.js';
 import ModalEstadoUsuario from '../components/ModalEstadoUsuario.js';
 import { toPng } from 'html-to-image';
 import useAutoSave from '../hooks/useAutoSave';
-import { sanitizarYMigrarModeloAStorage } from '../lib/storageHelper';
+import { sanitizarYMigrarModeloAStorage, deduplicarImagenesModelo, rehidratarImagenesModelo } from '../lib/storageHelper';
 
 const LETRAS_FILAS = [
   'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K', 'L', 'M', 'N', 'P', 'R', 'T', 'U', 'V', 'W', 'Y',
@@ -1373,7 +1373,10 @@ export default function AppDiagnostico() {
     try {
       const qs = await getDocs(collection(db, "hardware_db"));
       const arr = [];
-      qs.forEach(doc => arr.push({ id: doc.id, ...doc.data() }));
+      qs.forEach(doc => {
+        const raw = doc.data();
+        arr.push({ id: doc.id, ...rehidratarImagenesModelo(raw) });
+      });
       setModelosLibreria(arr);
       // Sincronizar modelo actualmente activo si existe en memoria
       setModeloActivo(prev => {
@@ -1699,7 +1702,6 @@ export default function AppDiagnostico() {
       boardviewComponentes: nuevosComp,
       boardviewImagenPlacaCaraA: nuevaPlacaCaraA,
       boardviewImagenPlacaCaraB: nuevaPlacaCaraB,
-      boardviewImagenPlaca: nuevaPlacaCaraA, // retrocompatibilidad con campos previos
       boardviewImagenEsquema: nuevoEsquema,
       boardviewSector: nuevoSector
     };
@@ -3355,7 +3357,7 @@ export default function AppDiagnostico() {
                       ...prev,
                       ...(payload.sectores !== undefined ? { boardviewSectores: payload.sectores } : {}),
                       ...(payload.componentes !== undefined ? { boardviewComponentes: payload.componentes } : {}),
-                      ...(payload.imagenPlacaCaraA !== undefined ? { boardviewImagenPlacaCaraA: payload.imagenPlacaCaraA, boardviewImagenPlaca: payload.imagenPlacaCaraA } : {}),
+                      ...(payload.imagenPlacaCaraA !== undefined ? { boardviewImagenPlacaCaraA: payload.imagenPlacaCaraA } : {}),
                       ...(payload.imagenPlacaCaraB !== undefined ? { boardviewImagenPlacaCaraB: payload.imagenPlacaCaraB } : {}),
                       ...(payload.imagenEsquema !== undefined ? { boardviewImagenEsquema: payload.imagenEsquema } : {}),
                       ...(payload.sector !== undefined ? { boardviewSector: payload.sector } : {})

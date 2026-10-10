@@ -490,6 +490,8 @@ export default function ICInteligente({
 
                 <SelectorTipoLinea
                   valor={padActualInfo.tipo || 'DATA'}
+                  nombreComponente={ic?.nombre || 'IC'}
+                  idPad={padActivo}
                   onChange={(val) => {
                     setPines(prev =>
                       prev.map(p =>

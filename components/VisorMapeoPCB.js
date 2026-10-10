@@ -70,6 +70,31 @@ const CATEGORIAS_NETS = {
   }
 };
 
+const deducirCategoriaDeNet = (netName) => {
+  if (!netName) return null;
+  const n = String(netName).toUpperCase().trim();
+  if (n === 'GND') return 'tierra';
+  if (n === 'NC') return 'tierra';
+
+  for (const [catKey, catVal] of Object.entries(CATEGORIAS_NETS)) {
+    if (catKey === 'todas') continue;
+    if (catVal.items && catVal.items.some(item => item.toUpperCase() === n)) {
+      return catKey;
+    }
+  }
+
+  if (/^(VPH|VDD|VBAT|VBUS|VREG|VCC|PP_|PP\d|CHARGER|BATT|LEDA|LED_A|ANODE)/i.test(n)) {
+    return 'alimentacion';
+  }
+  if (/^(I2C|SPI|UART|USB|MIPI|RFFE|SWI|DATA|SDA|SCL|DP|DN|TX|RX|DSI)/i.test(n)) {
+    return 'comunicacion';
+  }
+  if (/^(RESET|RST|EN|ENABLE|INT|IRQ|CLK|CLOCK|KEY|PWM|NTC|ID|SENSE)/i.test(n)) {
+    return 'control';
+  }
+  return null;
+};
+
 const IMAGEN_PREDETERMINADA = '/pcb_motherboard_bg.png';
 
 // Componentes de ejemplo
@@ -1477,12 +1502,13 @@ export default function VisorMapeoPCB({
   const actualizarPropiedadPad = (padId, prop, valor) => {
     setComponentes(prev => prev.map(comp => {
       if (comp.id !== selectedCompId) return comp;
-      return {
-        ...comp,
-        pads: comp.pads.map(p => {
-          if (p.id !== padId) return p;
-          let actualizacion = { [prop]: valor };
-          if (prop === 'tipo' && valor === 'GND') {
+
+      let nuevosPads = comp.pads.map(p => {
+        if (p.id !== padId) return p;
+        let actualizacion = { [prop]: valor };
+
+        if (prop === 'tipo') {
+          if (valor === 'GND') {
             actualizacion = {
               ...actualizacion,
               netName: 'GND',
@@ -1495,9 +1521,50 @@ export default function VisorMapeoPCB({
               valorActualUa: '0',
               valorActualOhmio: '0'
             };
+          } else if (valor === 'NC') {
+            actualizacion.netName = 'NC';
+          } else if (valor && valor !== 'DATA' && (!p.netName || p.netName.startsWith(`${comp.nombre}_`))) {
+            actualizacion.netName = valor;
           }
-          return { ...p, ...actualizacion };
-        })
+        } else if (prop === 'netName') {
+          const valLimpio = String(valor || '').trim().toUpperCase();
+          if (valLimpio === 'GND') {
+            actualizacion.tipo = 'GND';
+            actualizacion.valorSanoDiodo = '0.000';
+            actualizacion.valorActualDiodo = '0.000';
+          } else if (valLimpio === 'NC') {
+            actualizacion.tipo = 'NC';
+          } else if (valLimpio) {
+            const cat = deducirCategoriaDeNet(valLimpio);
+            if (cat === 'alimentacion') {
+              actualizacion.tipo = valLimpio;
+            } else if (cat === 'comunicacion') {
+              actualizacion.tipo = valLimpio;
+            } else if (cat === 'control') {
+              actualizacion.tipo = valLimpio;
+            }
+          }
+        }
+
+        return { ...p, ...actualizacion };
+      });
+
+      // ARMONIZACIÓN DE LA MISMA RED:
+      // Si ambos pines comparten el mismo netName (ej: bobinas, resistencias de paso en la misma línea),
+      // sincronizar tipo de línea para que ambos pines tengan el mismo color de categoría y nunca discrepen.
+      const p1 = nuevosPads.find(p => p.id === '1');
+      const p2 = nuevosPads.find(p => p.id === '2');
+      if (p1 && p2 && p1.netName && p2.netName && p1.netName !== 'NC' && p1.netName === p2.netName) {
+        const tipoComun = (p1.tipo !== 'DATA' ? p1.tipo : p2.tipo) || p1.netName;
+        nuevosPads = nuevosPads.map(p => ({
+          ...p,
+          tipo: tipoComun
+        }));
+      }
+
+      return {
+        ...comp,
+        pads: nuevosPads
       };
     }));
   };
@@ -3700,6 +3767,8 @@ export default function VisorMapeoPCB({
                     <label style={styles.label}>Tipo de Línea (Categoría)</label>
                     <SelectorTipoLinea
                       valor={padActivo.tipo || 'DATA'}
+                      nombreComponente={compActivo?.nombre || ''}
+                      idPad={padActivo?.id || ''}
                       onChange={(val) => {
                         actualizarPropiedadPad(padActivo.id, 'tipo', val);
                       }}

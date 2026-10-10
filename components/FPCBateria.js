@@ -916,6 +916,8 @@ export default function FPCBateria({
 
                 <SelectorTipoLinea
                   valor={activePinInfo.tipo || 'DATA'}
+                  nombreComponente="FPC Batería"
+                  idPad={pinActivo}
                   onChange={(val) => {
                     setPines(prev =>
                       prev.map(p =>
