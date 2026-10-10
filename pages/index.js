@@ -3340,6 +3340,7 @@ export default function AppDiagnostico() {
               <VisorMapeoPCB
                 fullscreen
                 nombreModelo={`${modeloActivo.marca || ''} ${modeloActivo.nombre || ''}`.trim()}
+                modeloId={modeloActivo.id}
                 puedeEditar={puedeEditarHardware}
                 onCerrar={() => setModalBoardviewAbierto(false)}
                 sectoresIniciales={modeloActivo.boardviewSectores || null}

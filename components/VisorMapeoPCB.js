@@ -29,12 +29,46 @@ const ESCALAS_CONFIG = [
   { id: 'ohmio', label: '🟣 Ohmios', unidad: 'Ω', color: '#a855f7', border: '#c084fc' }
 ];
 
-// Sugerencias iniciales comunes de Net Names
+// Sugerencias iniciales comunes de Net Names organizadas
 const NET_NAMES_BASE = [
-  'PP_VDD_MAIN', 'GND', 'PP1V8_S2', 'PP3V0_LDO', 'VBUS_USB', 'PP_BATT_VCC',
+  'VPH_PWR', 'PP_VDD_MAIN', 'VBAT', 'VBUS_USB', 'PP_BATT_VCC', 'PP1V8_S2', 'PP3V0_LDO',
   'AP_TO_I2C_SDA', 'AP_TO_I2C_SCL', 'SPI_AP_MOSI', 'SPI_AP_MISO', 'SPI_AP_CLK',
-  'PMIC_TO_CPU_RESET', 'VREG_L6A_0P6', 'USB_HS_DP', 'USB_HS_DN', 'NC'
+  'PMIC_TO_CPU_RESET', 'VREG_L6A_0P6', 'USB_HS_DP', 'USB_HS_DN', 'CLK_32K_IN', 'GND', 'NC'
 ];
+
+const CATEGORIAS_NETS = {
+  todas: { id: 'todas', label: '📋 Todas las Redes', color: '#38bdf8' },
+  alimentacion: {
+    id: 'alimentacion',
+    label: '⚡ Alimentación (Voltajes / Power)',
+    color: '#ef4444',
+    items: ['VPH_PWR', 'PP_VDD_MAIN', 'VBAT', 'VBUS_USB', 'PP_BATT_VCC', 'PP1V8_S2', 'PP3V0_LDO', 'PP0V8_CORE', 'VREG_L6A_0P6', 'VCC', 'VCC_IO', 'VDD_MEM']
+  },
+  comunicacion: {
+    id: 'comunicacion',
+    label: '📡 Comunicación (Datos / Buses)',
+    color: '#eab308',
+    items: ['DATA', 'AP_TO_I2C_SDA', 'AP_TO_I2C_SCL', 'SPI_AP_MOSI', 'SPI_AP_MISO', 'SPI_AP_CLK', 'SPI_AP_CS', 'UART_TX', 'UART_RX', 'USB_HS_DP', 'USB_HS_DN', 'RFFE_DATA', 'RFFE_CLK', 'SWI_DATA', 'MIPI_DSI']
+  },
+  control: {
+    id: 'control',
+    label: '⚙️ Control y Sincronización',
+    color: '#10b981',
+    items: ['PMIC_TO_CPU_RESET', 'CLK_32K_IN', 'SYS_CLK_19M2', 'POWER_KEY_L', 'VOL_UP_KEY', 'VOL_DOWN_KEY', 'ENABLE', 'EN_BL', 'PWM_BL', 'INT_TOUCH', 'RST_TOUCH', 'NTC_BATT', 'ID']
+  },
+  tierra: {
+    id: 'tierra',
+    label: '🛡️ Tierra y Neutro (GND / NC)',
+    color: '#6b7280',
+    items: ['GND', 'NC']
+  },
+  custom: {
+    id: 'custom',
+    label: '⭐ Redes Personalizadas',
+    color: '#8b5cf6',
+    items: []
+  }
+};
 
 const IMAGEN_PREDETERMINADA = '/pcb_motherboard_bg.png';
 
@@ -131,6 +165,7 @@ export default function VisorMapeoPCB({
   tiposCustom = [],                  // lista global de tipos de línea personalizados
   setTiposCustom = null,             // setter de tipos de línea personalizados
   nombreModelo = '',                 // nombre del modelo activo (ej: Samsung Galaxy S22)
+  modeloId = null,                   // ID único del modelo (para evitar saltos de selección al escribir)
   puedeEditar = true                 // control de permisos RBAC (solo super_admin y editor pueden alterar mapa)
 }) {
   // --- Organización de Placa: Cara A (Superior) / Cara B (Inferior) & Sectores Mapeados ---
@@ -243,6 +278,7 @@ export default function VisorMapeoPCB({
 
   const [nuevoNetInput, setNuevoNetInput] = useState('');
   const [mostrarGestorNets, setMostrarGestorNets] = useState(false);
+  const [categoriaNetFiltro, setCategoriaNetFiltro] = useState('todas');
 
   // --- Sistema de AutoHold Inteligente ---
   const [autoHoldActivo, setAutoHoldActivo] = useState(false);
@@ -255,17 +291,27 @@ export default function VisorMapeoPCB({
     setActiveScale(escala);
   }, [escala]);
 
-  // Sincronizar props cuando cambia el modelo activo
+  // Sincronizar componentes ÚNICAMENTE cuando cambia el modelo/placa activa (o en montaje inicial)
+  // para evitar saltos bruscos de foco al otro componente mientras el técnico escribe
+  const ultimoModeloIdentificadorRef = useRef(null);
+
   useEffect(() => {
-    if (Array.isArray(componentesIniciales)) {
-      setComponentes(componentesIniciales);
-      setSelectedCompId(componentesIniciales[0]?.id || null);
-      setSelectedPadId('1');
-    } else {
-      setComponentes([]);
-      setSelectedCompId(null);
+    const idActual = modeloId || nombreModelo || 'modelo_activo';
+    if (idActual !== ultimoModeloIdentificadorRef.current) {
+      ultimoModeloIdentificadorRef.current = idActual;
+      if (Array.isArray(componentesIniciales)) {
+        setComponentes(componentesIniciales);
+        setSelectedCompId(prevId => {
+          if (prevId && componentesIniciales.some(c => c.id === prevId)) return prevId;
+          return componentesIniciales[0]?.id || null;
+        });
+        setSelectedPadId('1');
+      } else {
+        setComponentes([]);
+        setSelectedCompId(null);
+      }
     }
-  }, [componentesIniciales]);
+  }, [modeloId, nombreModelo, componentesIniciales]);
 
   useEffect(() => {
     if (imagenPlacaInicial) setImgPlacaCaraAUrl(imagenPlacaInicial);
@@ -777,6 +823,41 @@ export default function VisorMapeoPCB({
     return { x, y };
   };
 
+  // Renombrar componente de forma autónoma y sincronizar automáticamente sus pines asociados (ej: L5000 ➔ L5000_P1 y L5000_P2)
+  const renombrarComponente = (compId, nuevoNombre) => {
+    setComponentes(prev => prev.map(comp => {
+      if (comp.id !== compId) return comp;
+      const oldNombre = comp.nombre;
+      const nombreLimpio = nuevoNombre.trim();
+
+      const padsActualizados = comp.pads.map(pad => {
+        // Si el pin tenía el formato NombreAnterior_P1 o NombreAnterior_P2 o similar, o estaba sin nombre
+        if (!pad.netName || pad.netName === `${oldNombre}_P${pad.id}` || pad.netName.startsWith(`${oldNombre}_`) || pad.netName === '---') {
+          return {
+            ...pad,
+            netName: nombreLimpio ? `${nombreLimpio}_P${pad.id}` : pad.netName
+          };
+        }
+        // Para Bobinas y componentes pasivos: si el pin tiene un nombre autónomo con _P1 o _P2
+        if (comp.tipo === 'Bobina' && pad.tipo !== 'GND' && pad.tipo !== 'NC') {
+          if (pad.netName.includes('_P') || pad.netName.startsWith('L') || pad.netName.startsWith('C')) {
+            return {
+              ...pad,
+              netName: nombreLimpio ? `${nombreLimpio}_P${pad.id}` : pad.netName
+            };
+          }
+        }
+        return pad;
+      });
+
+      return {
+        ...comp,
+        nombre: nuevoNombre,
+        pads: padsActualizados
+      };
+    }));
+  };
+
   // Invertir Pines (1 ↔ 2)
   const invertirPinesComponente = (compId) => {
     guardarSnapshotHistorial();
@@ -901,14 +982,19 @@ export default function VisorMapeoPCB({
     }
   };
 
-  // Manejo de Net Names dinámicos
-  const agregarNetNamePersonalizado = (nuevo) => {
+  // Manejo de Net Names dinámicos por categorías
+  const agregarNetNamePersonalizado = (nuevo, categoria = 'custom') => {
     if (!nuevo || !nuevo.trim()) return;
     const limpio = nuevo.trim().toUpperCase().replace(/\s+/g, '_');
     if (!netNamesCustom.includes(limpio)) {
       setNetNamesCustom(prev => [...prev, limpio]);
     }
     actualizarPropiedadPad(selectedPadId, 'netName', limpio);
+    if (categoria === 'alimentacion') {
+      actualizarPropiedadPad(selectedPadId, 'tipo', limpio);
+    } else if (categoria === 'tierra' && (limpio === 'GND' || limpio === 'NC')) {
+      actualizarPropiedadPad(selectedPadId, 'tipo', limpio);
+    }
     setNuevoNetInput('');
   };
 
@@ -917,6 +1003,18 @@ export default function VisorMapeoPCB({
       setNetNamesCustom(prev => prev.filter(n => n !== nombreABorrar));
     }
   };
+
+  const netsParaMostrar = useMemo(() => {
+    if (categoriaNetFiltro === 'todas') {
+      return Array.from(new Set([...NET_NAMES_BASE, ...netNamesCustom]));
+    }
+    const baseItems = CATEGORIAS_NETS[categoriaNetFiltro]?.items || [];
+    if (categoriaNetFiltro === 'custom') {
+      const estandares = Object.values(CATEGORIAS_NETS).flatMap(c => c.items || []);
+      return netNamesCustom.filter(n => !estandares.includes(n));
+    }
+    return Array.from(new Set([...baseItems, ...netNamesCustom.filter(n => baseItems.includes(n))]));
+  }, [categoriaNetFiltro, netNamesCustom]);
 
   // Detección de coincidencia del Dial físico del Multímetro con la Escala Activa
   const dialMismatch = useMemo(() => {
@@ -3458,12 +3556,11 @@ export default function VisorMapeoPCB({
                       type="text" 
                       value={compActivo.nombre}
                       onChange={(e) => {
-                        const val = e.target.value.trim();
-                        setComponentes(prev => prev.map(c => c.id === compActivo.id ? { ...c, nombre: val } : c));
+                        renombrarComponente(compActivo.id, e.target.value);
                       }}
                       onBlur={() => guardarSnapshotHistorial()}
                       style={{ ...styles.inputDark, width: '120px', fontWeight: 'bold', fontSize: '0.9rem', color: '#00ffff' }}
-                      title="Editar nombre/número del componente"
+                      title="Editar nombre/número del componente (actualiza automáticamente sus pines P1 y P2)"
                     />
                     <select
                       value={compActivo.tipo}
@@ -3661,69 +3758,136 @@ export default function VisorMapeoPCB({
                       {netNamesCustom.map(n => <option key={n} value={n} />)}
                     </datalist>
 
-                    {/* Popover / Desplegable del Gestor de Net Names */}
+                    {/* Popover / Desplegable del Gestor de Net Names con Categorías y Lista Vertical */}
                     {mostrarGestorNets && (
                       <div style={styles.gestorNetsCard}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                          <span style={{ fontSize: '0.7rem', fontWeight: 'bold', color: '#60a5fa' }}>Lista de Net Names Sugeridos</span>
-                          <span style={{ fontSize: '0.65rem', color: '#9ca3af' }}>{netNamesCustom.length} nombres</span>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                          <span style={{ fontSize: '0.72rem', fontWeight: 'bold', color: '#60a5fa' }}>Catálogo de Net Names</span>
+                          <span style={{ fontSize: '0.65rem', color: '#9ca3af' }}>{netsParaMostrar.length} redes</span>
                         </div>
 
+                        {/* 1. Selector Combobox de Categoría (Reemplaza botones horizontales) */}
+                        <div style={{ marginBottom: '8px' }}>
+                          <select
+                            value={categoriaNetFiltro}
+                            onChange={(e) => setCategoriaNetFiltro(e.target.value)}
+                            style={{
+                              width: '100%',
+                              background: '#111827',
+                              color: '#38bdf8',
+                              border: '1px solid #3b82f6',
+                              borderRadius: '6px',
+                              padding: '5px 8px',
+                              fontSize: '0.74rem',
+                              fontWeight: 'bold',
+                              outline: 'none',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            {Object.keys(CATEGORIAS_NETS).map(k => (
+                              <option key={k} value={k}>{CATEGORIAS_NETS[k].label}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* 2. Formulario para guardar nueva red en la categoría activa */}
                         <div style={{ display: 'flex', gap: '4px', marginBottom: '8px' }}>
                           <input 
                             type="text" 
-                            placeholder="Nuevo Net Name..." 
+                            placeholder={`Nueva red (${CATEGORIAS_NETS[categoriaNetFiltro]?.label.split(' ')[1] || 'red'})...`}
                             value={nuevoNetInput}
                             onChange={(e) => setNuevoNetInput(e.target.value)}
-                            style={{ ...styles.inputDark, fontSize: '0.7rem', padding: '3px 6px' }}
+                            style={{ ...styles.inputDark, fontSize: '0.72rem', padding: '4px 6px', flex: 1 }}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') {
-                                agregarNetNamePersonalizado(nuevoNetInput);
+                                agregarNetNamePersonalizado(nuevoNetInput, categoriaNetFiltro);
                               }
                             }}
                           />
                           <button 
                             type="button" 
-                            onClick={() => agregarNetNamePersonalizado(nuevoNetInput)}
-                            style={{ ...styles.btn, backgroundColor: '#0284c7', color: 'white', padding: '3px 8px', fontSize: '0.65rem' }}
+                            onClick={() => agregarNetNamePersonalizado(nuevoNetInput, categoriaNetFiltro)}
+                            disabled={!nuevoNetInput.trim()}
+                            style={{
+                              ...styles.btn,
+                              backgroundColor: nuevoNetInput.trim() ? '#0284c7' : '#374151',
+                              color: 'white',
+                              padding: '4px 8px',
+                              fontSize: '0.68rem',
+                              whiteSpace: 'nowrap',
+                              cursor: nuevoNetInput.trim() ? 'pointer' : 'not-allowed'
+                            }}
+                            title="Guardar en esta categoría localmente para reusar siempre"
                           >
-                            + Añadir
+                            💾 Guardar
                           </button>
                         </div>
 
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', maxHeight: '110px', overflowY: 'auto' }}>
-                          {netNamesCustom.map((net) => (
-                            <div 
-                              key={net} 
-                              style={{ 
-                                display: 'inline-flex', 
-                                alignItems: 'center', 
-                                gap: '4px', 
-                                background: padActivo.netName === net ? 'rgba(0,255,255,0.2)' : '#111827', 
-                                border: padActivo.netName === net ? '1px solid #00ffff' : '1px solid #374151',
-                                borderRadius: '4px', 
-                                padding: '2px 6px',
-                                fontSize: '0.65rem',
-                                color: '#e5e7eb'
-                              }}
-                            >
-                              <span 
-                                onClick={() => actualizarPropiedadPad(padActivo.id, 'netName', net)} 
-                                style={{ cursor: 'pointer', fontWeight: 'bold' }}
-                                title="Asignar este Net Name al pad actual"
-                              >
-                                {net}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => eliminarNetNamePersonalizado(net)}
-                                style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', padding: 0, fontSize: '0.65rem', fontWeight: 'bold' }}
-                                title="Eliminar este Net Name de la lista"
-                              >
-                                ✕
-                              </button>
+                        {/* 3. Lista VERTICAL de Net Names (1 columna vertical con scroll sin recortes horizontales) */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '150px', overflowY: 'auto', paddingRight: '2px', scrollbarWidth: 'thin' }}>
+                          {netsParaMostrar.length > 0 ? (
+                            netsParaMostrar.map((net) => {
+                              const isSelected = padActivo.netName === net;
+                              const esEstandar = Object.values(CATEGORIAS_NETS).some(c => c.items && c.items.includes(net));
+                              return (
+                                <div 
+                                  key={net} 
+                                  style={{ 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    justifyContent: 'space-between',
+                                    background: isSelected ? 'rgba(0,255,255,0.18)' : '#111827', 
+                                    border: isSelected ? '1px solid #00ffff' : '1px solid #374151',
+                                    borderRadius: '5px', 
+                                    padding: '5px 8px',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.15s'
+                                  }}
+                                  onClick={() => {
+                                    actualizarPropiedadPad(padActivo.id, 'netName', net);
+                                    if (CATEGORIAS_NETS.alimentacion.items.includes(net)) {
+                                      actualizarPropiedadPad(padActivo.id, 'tipo', net);
+                                    } else if (net === 'GND' || net === 'NC') {
+                                      actualizarPropiedadPad(padActivo.id, 'tipo', net);
+                                    }
+                                  }}
+                                  onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = '#1f2937'; }}
+                                  onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = '#111827'; }}
+                                >
+                                  <span 
+                                    style={{
+                                      fontWeight: 'bold',
+                                      fontSize: '0.74rem',
+                                      color: isSelected ? '#00ffff' : '#f3f4f6',
+                                      whiteSpace: 'nowrap',
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis'
+                                    }}
+                                    title={`Asignar "${net}" a este pin`}
+                                  >
+                                    {net}
+                                  </span>
+                                  {!esEstandar && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        eliminarNetNamePersonalizado(net);
+                                      }}
+                                      style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', padding: '0 4px', fontSize: '0.7rem', fontWeight: 'bold' }}
+                                      title="Eliminar este Net Name de la lista personal"
+                                    >
+                                      ✕
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                            })
+                          ) : (
+                            <div style={{ fontSize: '0.72rem', color: '#64748b', textAlign: 'center', padding: '10px 0' }}>
+                              No hay redes en esta categoría.
                             </div>
-                          ))}
+                          )}
                         </div>
                       </div>
                     )}
