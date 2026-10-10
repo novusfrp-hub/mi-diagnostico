@@ -95,6 +95,25 @@ const deducirCategoriaDeNet = (netName) => {
   return null;
 };
 
+export const obtenerCategoriaInfo = (tipoONet) => {
+  if (!tipoONet) return { id: 'comunicacion', label: '📡 Comunicación (Datos / Buses)', color: '#eab308', bgPill: '#854d0e' };
+  const val = String(tipoONet).trim().toUpperCase();
+  if (val === 'GND') return { id: 'tierra', label: '🛡️ Tierra (GND)', color: '#4b5563', bgPill: '#374151' };
+  if (val === 'NC') return { id: 'tierra', label: '⚪ No Conectado (NC)', color: '#1e3a8a', bgPill: '#1e3a8a' };
+
+  const catId = deducirCategoriaDeNet(val) || 'comunicacion';
+  if (catId === 'alimentacion') {
+    return { id: 'alimentacion', label: '⚡ Alimentación (Voltajes / Power)', color: '#ef4444', bgPill: '#7f1d1d' };
+  }
+  if (catId === 'control') {
+    return { id: 'control', label: '⚙️ Control y Sincronización', color: '#10b981', bgPill: '#065f46' };
+  }
+  if (catId === 'custom') {
+    return { id: 'custom', label: '⭐ Red Personalizada', color: '#8b5cf6', bgPill: '#5b21b6' };
+  }
+  return { id: 'comunicacion', label: '📡 Comunicación (Datos / Buses)', color: '#eab308', bgPill: '#854d0e' };
+};
+
 const IMAGEN_PREDETERMINADA = '/pcb_motherboard_bg.png';
 
 // Componentes de ejemplo
@@ -950,6 +969,55 @@ export default function VisorMapeoPCB({
     }));
   };
 
+  // Cambiar Conexión de Componente: En Serie (Paso de señal) vs A Tierra (GND Paralelo)
+  const cambiarConexionComponente = (compId, modo) => {
+    guardarSnapshotHistorial();
+    setComponentes(prev => prev.map(comp => {
+      if (comp.id !== compId) return comp;
+      const pad1 = comp.pads.find(p => p.id === '1');
+      const pad2 = comp.pads.find(p => p.id === '2');
+      if (!pad1 || !pad2) return comp;
+
+      const nuevosPads = comp.pads.map(p => {
+        if (p.id !== '2') return p;
+        if (modo === 'serie') {
+          return {
+            ...p,
+            tipo: 'DATA',
+            netName: `${comp.nombre}_P2`,
+            valorSanoDiodo: '---',
+            valorActualDiodo: '---',
+            valorSanoVoltio: '---',
+            valorActualVoltio: '---',
+            valorSanoUa: '---',
+            valorActualUa: '---',
+            valorSanoOhmio: '---',
+            valorActualOhmio: '---'
+          };
+        } else {
+          return {
+            ...p,
+            tipo: 'GND',
+            netName: 'GND',
+            valorSanoDiodo: '0.000',
+            valorActualDiodo: '0.000',
+            valorSanoVoltio: '0.000',
+            valorActualVoltio: '0.000',
+            valorSanoUa: '0',
+            valorActualUa: '0',
+            valorSanoOhmio: '0',
+            valorActualOhmio: '0'
+          };
+        }
+      });
+
+      return {
+        ...comp,
+        pads: nuevosPads
+      };
+    }));
+  };
+
   // Centrar en Componente
   const centrarEnComponente = (comp) => {
     if (comp.cara && comp.cara !== caraPlaca) {
@@ -1324,12 +1392,16 @@ export default function VisorMapeoPCB({
 
   const activeNetName = (padActivo && padActivo.netName && padActivo.netName !== 'NC') ? padActivo.netName : null;
 
-  // Evaluar color de pad (mantiene su color base metálico/GND/salud sin teñirse todo de cian)
+  // Evaluar color de pad:
+  // - Si no está medido (---): Hereda el color funcional de su red (Rojo para Alimentación, Amarillo para Datos, etc.)
+  // - Si tiene medición activa real: Refleja el estado de salud (Verde=Sano, Rojo=Corto <0.050V, Naranja=Alterado)
   const obtenerColorDePad = (pad, compId) => {
-    if (pad.tipo === 'GND') return '#4b5563';
-    if (pad.tipo === 'NC') return '#1e3a8a';
+    if (!pad) return '#d4af37';
+    if (pad.tipo === 'GND' || pad.netName === 'GND') return '#4b5563';
+    if (pad.tipo === 'NC' || pad.netName === 'NC') return '#1e3a8a';
 
-    const colorBase = '#d4af37';
+    const catInfo = obtenerCategoriaInfo(pad.netName || pad.tipo);
+    const colorBaseRed = catInfo.color;
 
     let valAct = '---';
     let valSano = '---';
@@ -1348,29 +1420,33 @@ export default function VisorMapeoPCB({
       valSano = pad.valorSanoOhmio;
     }
 
-    if (!valAct || valAct === '---') return colorBase;
-    if (valAct === 'OL' && valSano !== 'OL') return '#f97316';
+    if (!valAct || valAct === '---') return colorBaseRed;
+    if (valAct === 'OL') return valSano === 'OL' ? '#10b981' : '#f97316';
 
     const vAct = parseFloat(valAct);
     const vSano = parseFloat(valSano);
 
-    if (isNaN(vAct) || isNaN(vSano)) return colorBase;
+    if (isNaN(vAct)) return colorBaseRed;
 
     if (activeScale === 'diodo') {
-      if (vAct < 0.050) return '#ef4444';
-      if (Math.abs(vAct - vSano) <= 0.040) return '#10b981';
+      if (vAct < 0.050) return '#ef4444'; // Corto detectado
+      if (!isNaN(vSano) && Math.abs(vAct - vSano) <= 0.040) return '#10b981'; // Sano
+      return '#f97316'; // Alterado
     } else if (activeScale === 'ua') {
       if (vAct > 2000) return '#ef4444';
-      if (Math.abs(vAct - vSano) <= 50) return '#10b981';
+      if (!isNaN(vSano) && Math.abs(vAct - vSano) <= 50) return '#10b981';
+      return '#f97316';
     } else if (activeScale === 'voltio') {
       if (vAct < 0.1 && vSano >= 1.0) return '#ef4444';
-      if (Math.abs(vAct - vSano) <= 0.1) return '#10b981';
+      if (!isNaN(vSano) && Math.abs(vAct - vSano) <= 0.1) return '#10b981';
+      return '#f97316';
     } else if (activeScale === 'ohmio') {
       if (vAct < 2.0 && vSano > 10.0) return '#ef4444';
-      if (Math.abs(vAct - vSano) <= 5.0 || Math.abs(vAct - vSano) / vSano <= 0.1) return '#10b981';
+      if (!isNaN(vSano) && (Math.abs(vAct - vSano) <= 5.0 || Math.abs(vAct - vSano) / vSano <= 0.1)) return '#10b981';
+      return '#f97316';
     }
 
-    return '#f97316';
+    return colorBaseRed;
   };
 
   // Guardar medición en pad activo en la columna de la escala seleccionada
@@ -1523,8 +1599,14 @@ export default function VisorMapeoPCB({
             };
           } else if (valor === 'NC') {
             actualizacion.netName = 'NC';
-          } else if (valor && valor !== 'DATA' && (!p.netName || p.netName.startsWith(`${comp.nombre}_`))) {
-            actualizacion.netName = valor;
+          } else if (valor && valor !== 'DATA') {
+            if (p.netName === 'GND' || p.tipo === 'GND' || p.valorActualDiodo === '0.000') {
+              actualizacion.valorActualDiodo = '---';
+              actualizacion.valorSanoDiodo = '---';
+            }
+            if (!p.netName || p.netName.startsWith(`${comp.nombre}_`) || p.netName === 'GND') {
+              actualizacion.netName = valor;
+            }
           }
         } else if (prop === 'netName') {
           const valLimpio = String(valor || '').trim().toUpperCase();
@@ -1535,14 +1617,12 @@ export default function VisorMapeoPCB({
           } else if (valLimpio === 'NC') {
             actualizacion.tipo = 'NC';
           } else if (valLimpio) {
-            const cat = deducirCategoriaDeNet(valLimpio);
-            if (cat === 'alimentacion') {
-              actualizacion.tipo = valLimpio;
-            } else if (cat === 'comunicacion') {
-              actualizacion.tipo = valLimpio;
-            } else if (cat === 'control') {
-              actualizacion.tipo = valLimpio;
+            // Si el pin antes era GND o tenía residuo 0.000 por defecto de capacitor, limpiarlo
+            if (p.netName === 'GND' || p.tipo === 'GND' || p.valorActualDiodo === '0.000') {
+              actualizacion.valorActualDiodo = '---';
+              actualizacion.valorSanoDiodo = '---';
             }
+            actualizacion.tipo = valLimpio;
           }
         }
 
@@ -3493,7 +3573,24 @@ export default function VisorMapeoPCB({
 
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontSize: '0.68rem', color: '#9ca3af' }}>Tipo Línea:</span>
-                    <span style={{ fontSize: '0.68rem', color: '#d1d5db', fontWeight: 'bold' }}>{pad.tipo || 'DATA'}</span>
+                    {(() => {
+                      const catInfo = obtenerCategoriaInfo(pad.netName || pad.tipo);
+                      return (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <span style={{
+                            display: 'inline-block',
+                            width: '7px',
+                            height: '7px',
+                            borderRadius: '50%',
+                            backgroundColor: catInfo.color,
+                            flexShrink: 0
+                          }} />
+                          <span style={{ fontSize: '0.68rem', color: '#f3f4f6', fontWeight: 'bold' }}>
+                            {catInfo.label}
+                          </span>
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   {/* Badge de Diagnóstico */}
@@ -3647,17 +3744,46 @@ export default function VisorMapeoPCB({
                           }
 
                           let nuevosPads = c.pads;
-                          if (antiguoTipo === 'Capacitor' && (nuevoTipo === 'Bobina' || nuevoTipo === 'Resistencia')) {
+                          const esSerie = nuevoTipo === 'Bobina' || nuevoTipo === 'Diodo' || nuevoTipo === 'Resistencia';
+                          const esParalelo = nuevoTipo === 'Capacitor';
+
+                          if (esSerie && c.pads.some(p => p.id === '2' && (p.tipo === 'GND' || p.netName === 'GND'))) {
                             nuevosPads = c.pads.map(p => {
-                              if (p.id === '2' && p.tipo === 'GND' && p.netName === 'GND') {
+                              if (p.id === '2') {
                                 return {
                                   ...p,
                                   tipo: 'DATA',
                                   netName: `${nuevoNombre}_P2`,
                                   valorSanoDiodo: '---',
+                                  valorActualDiodo: '---',
                                   valorSanoVoltio: '---',
+                                  valorActualVoltio: '---',
                                   valorSanoUa: '---',
-                                  valorSanoOhmio: '---'
+                                  valorActualUa: '---',
+                                  valorSanoOhmio: '---',
+                                  valorActualOhmio: '---'
+                                };
+                              }
+                              if (p.netName && p.netName.startsWith(`${c.nombre}_`)) {
+                                return { ...p, netName: p.netName.replace(`${c.nombre}_`, `${nuevoNombre}_`) };
+                              }
+                              return p;
+                            });
+                          } else if (esParalelo && !c.pads.some(p => p.id === '2' && (p.tipo === 'GND' || p.netName === 'GND'))) {
+                            nuevosPads = c.pads.map(p => {
+                              if (p.id === '2') {
+                                return {
+                                  ...p,
+                                  tipo: 'GND',
+                                  netName: 'GND',
+                                  valorSanoDiodo: '0.000',
+                                  valorActualDiodo: '0.000',
+                                  valorSanoVoltio: '0.000',
+                                  valorActualVoltio: '0.000',
+                                  valorSanoUa: '0',
+                                  valorActualUa: '0',
+                                  valorSanoOhmio: '0',
+                                  valorActualOhmio: '0'
                                 };
                               }
                               if (p.netName && p.netName.startsWith(`${c.nombre}_`)) {
@@ -3732,6 +3858,52 @@ export default function VisorMapeoPCB({
                     </div>
                   </div>
 
+                  {/* Selector de Circuito: En Serie (Paso) vs A Tierra (Paralelo) */}
+                  {(() => {
+                    const tienePinGnd = compActivo.pads.some(p => p.id === '2' && (p.tipo === 'GND' || p.netName === 'GND'));
+                    return (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '6px', paddingTop: '6px', borderTop: '1px solid #1f2937' }}>
+                        <span style={{ fontSize: '0.7rem', color: '#9ca3af', fontWeight: 'bold' }}>Circuito:</span>
+                        <div style={{ display: 'flex', gap: '4px' }}>
+                          <button 
+                            type="button" 
+                            onClick={() => cambiarConexionComponente(compActivo.id, 'serie')}
+                            style={{
+                              padding: '3px 8px',
+                              borderRadius: '4px',
+                              border: !tienePinGnd ? '1px solid #10b981' : '1px solid #374151',
+                              background: !tienePinGnd ? 'rgba(16, 185, 129, 0.2)' : '#1f2937',
+                              color: !tienePinGnd ? '#10b981' : '#9ca3af',
+                              fontSize: '0.68rem',
+                              fontWeight: 'bold',
+                              cursor: 'pointer'
+                            }}
+                            title="Ambos pines en serie (paso de línea activa sin masa GND, típico en Bobinas L, Diodos D y Resistencias R)"
+                          >
+                            ⚡ En Serie (Paso)
+                          </button>
+                          <button 
+                            type="button" 
+                            onClick={() => cambiarConexionComponente(compActivo.id, 'tierra')}
+                            style={{
+                              padding: '3px 8px',
+                              borderRadius: '4px',
+                              border: tienePinGnd ? '1px solid #6b7280' : '1px solid #374151',
+                              background: tienePinGnd ? 'rgba(107, 114, 128, 0.3)' : '#1f2937',
+                              color: tienePinGnd ? '#f3f4f6' : '#9ca3af',
+                              fontSize: '0.68rem',
+                              fontWeight: 'bold',
+                              cursor: 'pointer'
+                            }}
+                            title="Pin 2 conectado a tierra GND (típico en Capacitores de filtro o bobinas de voltaje negativo AMOLED)"
+                          >
+                            🛡️ A Tierra (GND)
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                   {puedeEditar && (
                     <button 
                       onClick={() => borrarComponente(compActivo.id)} 
@@ -3751,13 +3923,13 @@ export default function VisorMapeoPCB({
                         onClick={() => setSelectedPadId('1')} 
                         style={{ ...styles.padSelectorBtn, ...(selectedPadId === '1' && styles.padSelectorBtnActive) }}
                       >
-                        Pin 1 ({compActivo.pads.find(p => p.id === '1')?.tipo})
+                        Pin 1 ({compActivo.pads.find(p => p.id === '1')?.netName || 'NC'})
                       </button>
                       <button 
                         onClick={() => setSelectedPadId('2')} 
                         style={{ ...styles.padSelectorBtn, ...(selectedPadId === '2' && styles.padSelectorBtnActive) }}
                       >
-                        Pin 2 ({compActivo.pads.find(p => p.id === '2')?.tipo})
+                        Pin 2 ({compActivo.pads.find(p => p.id === '2')?.netName || 'NC'})
                       </button>
                     </div>
                   </div>
