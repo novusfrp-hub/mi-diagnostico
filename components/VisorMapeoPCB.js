@@ -31,7 +31,7 @@ const ESCALAS_CONFIG = [
 
 // Sugerencias iniciales comunes de Net Names organizadas
 const NET_NAMES_BASE = [
-  'VPH_PWR', 'PP_VDD_MAIN', 'VBAT', 'VBUS_USB', 'PP_BATT_VCC', 'PP1V8_S2', 'PP3V0_LDO',
+  'VPH_PWR', 'PP_VDD_MAIN', 'VBAT', 'VBUS_USB', 'LCM_LEDA', 'PP_BATT_VCC', 'PP1V8_S2', 'PP3V0_LDO',
   'AP_TO_I2C_SDA', 'AP_TO_I2C_SCL', 'SPI_AP_MOSI', 'SPI_AP_MISO', 'SPI_AP_CLK',
   'PMIC_TO_CPU_RESET', 'VREG_L6A_0P6', 'USB_HS_DP', 'USB_HS_DN', 'CLK_32K_IN', 'GND', 'NC'
 ];
@@ -42,7 +42,11 @@ const CATEGORIAS_NETS = {
     id: 'alimentacion',
     label: '⚡ Alimentación (Voltajes / Power)',
     color: '#ef4444',
-    items: ['VPH_PWR', 'PP_VDD_MAIN', 'VBAT', 'VBUS_USB', 'PP_BATT_VCC', 'PP1V8_S2', 'PP3V0_LDO', 'PP0V8_CORE', 'VREG_L6A_0P6', 'VCC', 'VCC_IO', 'VDD_MEM']
+    items: [
+      'VPH_PWR', 'PP_VDD_MAIN', 'VBAT', 'VBUS_USB', 'PP_BATT_VCC', 'PP1V8_S2', 'PP3V0_LDO', 'PP0V8_CORE',
+      'VREG_L6A_0P6', 'VCC', 'VCC_IO', 'VDD_MEM', 'LCM_LEDA', 'LCM_LED_A', 'LCM_LEDK', 'LCM_LEDK1', 'LCM_LEDK2',
+      'BL_LED_A', 'BL_ANODE', 'VBOOST', 'VLED', 'AVDD', 'ELVDD', 'ELVSS', 'VSP', 'VSN'
+    ]
   },
   comunicacion: {
     id: 'comunicacion',
@@ -70,43 +74,98 @@ const CATEGORIAS_NETS = {
   }
 };
 
-const deducirCategoriaDeNet = (netName) => {
-  if (!netName) return null;
-  const n = String(netName).toUpperCase().trim();
-  if (n === 'GND') return 'tierra';
-  if (n === 'NC') return 'tierra';
+export const deducirCategoriaDeNet = (netName, pad = null) => {
+  const n = String(netName || pad?.netName || '').toUpperCase().trim();
 
-  for (const [catKey, catVal] of Object.entries(CATEGORIAS_NETS)) {
-    if (catKey === 'todas') continue;
-    if (catVal.items && catVal.items.some(item => item.toUpperCase() === n)) {
-      return catKey;
+  // 1. TIERRA Y NEUTRO
+  if (n === 'GND' || n === 'GROUND' || n.endsWith('_GND') || n === 'AGND' || n === 'DGND' || n.startsWith('GND_')) return 'tierra';
+  if (n === 'NC' || n === 'NO_CONNECT') return 'tierra';
+
+  // 2. CATÁLOGO PERSONALIZADO EN LOCALSTORAGE (prioridad máxima del usuario)
+  if (typeof window !== 'undefined' && n) {
+    try {
+      const saved = localStorage.getItem('catalogo_redes_personalizadas');
+      if (saved) {
+        const catObj = JSON.parse(saved);
+        for (const [catKey, netList] of Object.entries(catObj)) {
+          if (Array.isArray(netList) && netList.some(item => String(item).toUpperCase().trim() === n)) {
+            return catKey;
+          }
+        }
+      }
+    } catch (e) {}
+  }
+
+  // 3. CATÁLOGO BASE PREDEFINIDO
+  if (n) {
+    for (const [catKey, catVal] of Object.entries(CATEGORIAS_NETS)) {
+      if (catKey === 'todas') continue;
+      if (catVal.items && catVal.items.some(item => item.toUpperCase().trim() === n)) {
+        return catKey;
+      }
     }
   }
 
-  if (/^(VPH|VDD|VBAT|VBUS|VREG|VCC|PP_|PP\d|CHARGER|BATT|LEDA|LED_A|ANODE)/i.test(n)) {
+  // 4. RECONOCIMIENTO INTELIGENTE DE HARDWARE MÓVIL / SMD (cualquier posición en el nombre)
+  // ALIMENTACIÓN (Voltajes / Power / Backlight / Batería / LDO / Buck / Boost / Anode / Cathode / Rails)
+  if (
+    /(LEDA|LED_A|LEDK|LED_K|ANODE|ANODO|CATODO|CATHODE|VBOOST|BOOST|VBAT|VPH|VDD|VBUS|VREG|VCC|CHARGER|CHG|BATT|VLED|AVDD|ELVDD|ELVSS|VSP|VSN|VIO|VBIAS|HV_|PP_|_PWR|POWER|VOLT|VOUT|VIN)/i.test(n)
+  ) {
     return 'alimentacion';
   }
-  if (/^(I2C|SPI|UART|USB|MIPI|RFFE|SWI|DATA|SDA|SCL|DP|DN|TX|RX|DSI)/i.test(n)) {
-    return 'comunicacion';
+
+  // TIERRA / NEUTRO
+  if (/(^GND|_GND|GROUND|^NC$|NO_CONNECT)/i.test(n)) {
+    return 'tierra';
   }
-  if (/^(RESET|RST|EN|ENABLE|INT|IRQ|CLK|CLOCK|KEY|PWM|NTC|ID|SENSE)/i.test(n)) {
+
+  // CONTROL / SINCRONIZACIÓN / CLOCKS / ENABLES / GATING
+  if (
+    /(RESET|RST|ENABLE|_EN$|^EN_|INT|IRQ|CLK|CLOCK|PWM|NTC|THERM|^ID$|_ID$|SENSE|POWER_KEY|VOL_UP|VOL_DOWN|HOLD|SYNC)/i.test(n)
+  ) {
     return 'control';
   }
-  return null;
+
+  // COMUNICACIÓN (Datos / Buses / Protocolos de señal diferencial)
+  if (
+    /(I2C|SPI|UART|USB|MIPI|DSI|CSI|RFFE|SWI|DATA|SDA|SCL|MOSI|MISO|DP|DN|TX|RX|CAN|BUS|RX_P|RX_N|TX_P|TX_N)/i.test(n)
+  ) {
+    return 'comunicacion';
+  }
+
+  // 5. Fallback a categoría explícita del pad (siempre que no sea 'comunicacion' residual)
+  if (pad?.categoria) {
+    const cat = String(pad.categoria).toLowerCase().trim();
+    if (CATEGORIAS_NETS[cat] && cat !== 'todas' && cat !== 'comunicacion') return cat;
+  }
+
+  // 6. Fallback al tipo asignado al pad (siempre que no sea el genérico 'DATA')
+  if (pad?.tipo) {
+    const t = String(pad.tipo).toLowerCase().trim();
+    if (CATEGORIAS_NETS[t] && t !== 'todas' && t !== 'comunicacion' && t !== 'data') return t;
+  }
+
+  // Redes con categoría 'custom'
+  if (pad?.categoria === 'custom') return 'custom';
+
+  return 'comunicacion';
 };
 
-export const obtenerCategoriaInfo = (tipoONet) => {
-  if (!tipoONet) return { id: 'comunicacion', label: '📡 Comunicación (Datos / Buses)', color: '#eab308', bgPill: '#854d0e' };
-  const val = String(tipoONet).trim().toUpperCase();
-  if (val === 'GND') return { id: 'tierra', label: '🛡️ Tierra (GND)', color: '#4b5563', bgPill: '#374151' };
+export const obtenerCategoriaInfo = (tipoONet, pad = null) => {
+  const val = String(tipoONet || pad?.netName || pad?.tipo || '').trim().toUpperCase();
+  if (!val) return { id: 'comunicacion', label: '📡 Comunicación (Datos / Buses)', color: '#eab308', bgPill: '#854d0e' };
+  if (val === 'GND' || val.endsWith('_GND')) return { id: 'tierra', label: '🛡️ Tierra (GND)', color: '#4b5563', bgPill: '#374151' };
   if (val === 'NC') return { id: 'tierra', label: '⚪ No Conectado (NC)', color: '#1e3a8a', bgPill: '#1e3a8a' };
 
-  const catId = deducirCategoriaDeNet(val) || 'comunicacion';
+  const catId = deducirCategoriaDeNet(val, pad) || 'comunicacion';
   if (catId === 'alimentacion') {
     return { id: 'alimentacion', label: '⚡ Alimentación (Voltajes / Power)', color: '#ef4444', bgPill: '#7f1d1d' };
   }
   if (catId === 'control') {
     return { id: 'control', label: '⚙️ Control y Sincronización', color: '#10b981', bgPill: '#065f46' };
+  }
+  if (catId === 'tierra') {
+    return { id: 'tierra', label: '🛡️ Tierra (GND)', color: '#4b5563', bgPill: '#374151' };
   }
   if (catId === 'custom') {
     return { id: 'custom', label: '⭐ Red Personalizada', color: '#8b5cf6', bgPill: '#5b21b6' };
@@ -1119,18 +1178,47 @@ export default function VisorMapeoPCB({
   };
 
   // Manejo de Net Names dinámicos por categorías
-  const agregarNetNamePersonalizado = (nuevo, categoria = 'custom') => {
+  const agregarNetNamePersonalizado = (nuevo, categoria = null) => {
     if (!nuevo || !nuevo.trim()) return;
     const limpio = nuevo.trim().toUpperCase().replace(/\s+/g, '_');
+    const catFinal = (categoria && categoria !== 'todas') ? categoria : (deducirCategoriaDeNet(limpio) || 'custom');
+
     if (!netNamesCustom.includes(limpio)) {
       setNetNamesCustom(prev => [...prev, limpio]);
     }
-    actualizarPropiedadPad(selectedPadId, 'netName', limpio);
-    if (categoria === 'alimentacion') {
-      actualizarPropiedadPad(selectedPadId, 'tipo', limpio);
-    } else if (categoria === 'tierra' && (limpio === 'GND' || limpio === 'NC')) {
-      actualizarPropiedadPad(selectedPadId, 'tipo', limpio);
+
+    // Persistir asociación permanente en localStorage para que cualquier pad la reconozca
+    if (typeof window !== 'undefined') {
+      try {
+        const guardado = localStorage.getItem('catalogo_redes_personalizadas');
+        const catalogo = guardado ? JSON.parse(guardado) : {};
+        if (!catalogo[catFinal]) catalogo[catFinal] = [];
+        if (!catalogo[catFinal].includes(limpio)) {
+          catalogo[catFinal].push(limpio);
+        }
+        localStorage.setItem('catalogo_redes_personalizadas', JSON.stringify(catalogo));
+      } catch (e) {}
     }
+
+    if (selectedPadId) {
+      actualizarPropiedadPad(selectedPadId, 'netName', limpio, catFinal);
+    }
+
+    // Sincronizar inmediatamente en todos los pads de la placa que compartan este netName
+    setComponentes(prev => prev.map(comp => ({
+      ...comp,
+      pads: comp.pads.map(p => {
+        if (p.netName && p.netName.toUpperCase() === limpio) {
+          return {
+            ...p,
+            categoria: catFinal,
+            tipo: catFinal
+          };
+        }
+        return p;
+      })
+    })));
+
     setNuevoNetInput('');
   };
 
@@ -1141,15 +1229,24 @@ export default function VisorMapeoPCB({
   };
 
   const netsParaMostrar = useMemo(() => {
+    let catalogoDinamico = {};
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('catalogo_redes_personalizadas');
+        if (saved) catalogoDinamico = JSON.parse(saved);
+      } catch (e) {}
+    }
+
     if (categoriaNetFiltro === 'todas') {
-      return Array.from(new Set([...NET_NAMES_BASE, ...netNamesCustom]));
+      const dinamicas = Object.values(catalogoDinamico).flat();
+      return Array.from(new Set([...NET_NAMES_BASE, ...netNamesCustom, ...dinamicas]));
     }
+
     const baseItems = CATEGORIAS_NETS[categoriaNetFiltro]?.items || [];
-    if (categoriaNetFiltro === 'custom') {
-      const estandares = Object.values(CATEGORIAS_NETS).flatMap(c => c.items || []);
-      return netNamesCustom.filter(n => !estandares.includes(n));
-    }
-    return Array.from(new Set([...baseItems, ...netNamesCustom.filter(n => baseItems.includes(n))]));
+    const dynItems = catalogoDinamico[categoriaNetFiltro] || [];
+    const netsCoincidentes = netNamesCustom.filter(n => deducirCategoriaDeNet(n) === categoriaNetFiltro);
+
+    return Array.from(new Set([...baseItems, ...dynItems, ...netsCoincidentes]));
   }, [categoriaNetFiltro, netNamesCustom]);
 
   // Detección de coincidencia del Dial físico del Multímetro con la Escala Activa
@@ -1445,7 +1542,7 @@ export default function VisorMapeoPCB({
     if (pad.tipo === 'GND' || pad.netName === 'GND') return '#4b5563';
     if (pad.tipo === 'NC' || pad.netName === 'NC') return '#1e3a8a';
 
-    const catInfo = obtenerCategoriaInfo(pad.netName || pad.tipo);
+    const catInfo = obtenerCategoriaInfo(pad.netName || pad.tipo, pad);
     const colorBaseRed = catInfo.color;
 
     let valAct = '---';
@@ -1620,70 +1717,94 @@ export default function VisorMapeoPCB({
     }
   };
 
-  const actualizarPropiedadPad = (padId, prop, valor) => {
+  const actualizarPropiedadPad = (padId, prop, valor, extraCategoria = null) => {
+    const valLimpio = String(valor || '').trim().toUpperCase();
+    const catDeducida = extraCategoria || deducirCategoriaDeNet(valLimpio);
+
     setComponentes(prev => prev.map(comp => {
-      if (comp.id !== selectedCompId) return comp;
+      const esCompActivo = comp.id === selectedCompId;
+      const tieneMismaNet = prop === 'netName' && valLimpio && valLimpio !== 'NC' && comp.pads.some(p => p.netName && p.netName.toUpperCase() === valLimpio);
+
+      if (!esCompActivo && !tieneMismaNet) return comp;
 
       let nuevosPads = comp.pads.map(p => {
-        if (p.id !== padId) return p;
-        let actualizacion = { [prop]: valor };
+        // Actualizar el pad seleccionado
+        if (esCompActivo && p.id === padId) {
+          let actualizacion = { [prop]: valor };
 
-        if (prop === 'tipo') {
-          if (valor === 'GND') {
-            actualizacion = {
-              ...actualizacion,
-              netName: 'GND',
-              valorSanoDiodo: '0.000',
-              valorSanoVoltio: '0.000',
-              valorSanoUa: '0',
-              valorSanoOhmio: '0',
-              valorActualDiodo: '0.000',
-              valorActualVoltio: '0.000',
-              valorActualUa: '0',
-              valorActualOhmio: '0'
-            };
-          } else if (valor === 'NC') {
-            actualizacion.netName = 'NC';
-          } else if (valor && valor !== 'DATA') {
-            if (p.netName === 'GND' || p.tipo === 'GND' || p.valorActualDiodo === '0.000') {
-              actualizacion.valorActualDiodo = '---';
-              actualizacion.valorSanoDiodo = '---';
+          if (prop === 'tipo') {
+            const cat = extraCategoria || deducirCategoriaDeNet(valor, p);
+            actualizacion.categoria = cat;
+            if (valor === 'GND') {
+              actualizacion = {
+                ...actualizacion,
+                netName: 'GND',
+                categoria: 'tierra',
+                valorSanoDiodo: '0.000',
+                valorSanoVoltio: '0.000',
+                valorSanoUa: '0',
+                valorSanoOhmio: '0',
+                valorActualDiodo: '0.000',
+                valorActualVoltio: '0.000',
+                valorActualUa: '0',
+                valorActualOhmio: '0'
+              };
+            } else if (valor === 'NC') {
+              actualizacion.netName = 'NC';
+              actualizacion.categoria = 'tierra';
+            } else {
+              actualizacion.tipo = cat;
+              if (p.netName === 'GND' || p.tipo === 'GND' || p.valorActualDiodo === '0.000') {
+                actualizacion.valorActualDiodo = '---';
+                actualizacion.valorSanoDiodo = '---';
+              }
             }
-            if (!p.netName || p.netName.startsWith(`${comp.nombre}_`) || p.netName === 'GND') {
-              actualizacion.netName = valor;
+          } else if (prop === 'netName') {
+            if (valLimpio === 'GND') {
+              actualizacion.tipo = 'GND';
+              actualizacion.categoria = 'tierra';
+              actualizacion.valorSanoDiodo = '0.000';
+              actualizacion.valorActualDiodo = '0.000';
+            } else if (valLimpio === 'NC') {
+              actualizacion.tipo = 'NC';
+              actualizacion.categoria = 'tierra';
+            } else if (valLimpio) {
+              if (p.netName === 'GND' || p.tipo === 'GND' || p.valorActualDiodo === '0.000') {
+                actualizacion.valorActualDiodo = '---';
+                actualizacion.valorSanoDiodo = '---';
+              }
+              actualizacion.categoria = catDeducida;
+              actualizacion.tipo = catDeducida;
             }
           }
-        } else if (prop === 'netName') {
-          const valLimpio = String(valor || '').trim().toUpperCase();
-          if (valLimpio === 'GND') {
-            actualizacion.tipo = 'GND';
-            actualizacion.valorSanoDiodo = '0.000';
-            actualizacion.valorActualDiodo = '0.000';
-          } else if (valLimpio === 'NC') {
-            actualizacion.tipo = 'NC';
-          } else if (valLimpio) {
-            // Si el pin antes era GND o tenía residuo 0.000 por defecto de capacitor, limpiarlo
-            if (p.netName === 'GND' || p.tipo === 'GND' || p.valorActualDiodo === '0.000') {
-              actualizacion.valorActualDiodo = '---';
-              actualizacion.valorSanoDiodo = '---';
-            }
-            actualizacion.tipo = valLimpio;
-          }
+
+          return { ...p, ...actualizacion };
         }
 
-        return { ...p, ...actualizacion };
+        // Si otro pad de este componente comparte la misma net, sincronizar su categoría y tipo
+        if (tieneMismaNet && p.netName && p.netName.toUpperCase() === valLimpio) {
+          return {
+            ...p,
+            categoria: catDeducida,
+            tipo: catDeducida,
+            valorActualDiodo: (p.valorActualDiodo === '0.000' && catDeducida !== 'tierra') ? '---' : p.valorActualDiodo
+          };
+        }
+
+        return p;
       });
 
-      // ARMONIZACIÓN DE LA MISMA RED:
+      // ARMONIZACIÓN DE LA MISMA RED DENTRO DEL COMPONENTE:
       // Si ambos pines comparten el mismo netName (ej: bobinas, resistencias de paso en la misma línea),
       // sincronizar tipo de línea para que ambos pines tengan el mismo color de categoría y nunca discrepen.
       const p1 = nuevosPads.find(p => p.id === '1');
       const p2 = nuevosPads.find(p => p.id === '2');
       if (p1 && p2 && p1.netName && p2.netName && p1.netName !== 'NC' && p1.netName === p2.netName) {
-        const tipoComun = (p1.tipo !== 'DATA' ? p1.tipo : p2.tipo) || p1.netName;
+        const catComun = p1.categoria || p2.categoria || catDeducida;
         nuevosPads = nuevosPads.map(p => ({
           ...p,
-          tipo: tipoComun
+          categoria: catComun,
+          tipo: catComun
         }));
       }
 
@@ -3648,18 +3769,18 @@ export default function VisorMapeoPCB({
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontSize: '0.68rem', color: '#9ca3af' }}>Tipo Línea:</span>
                     {(() => {
-                      const catInfo = obtenerCategoriaInfo(pad.netName || pad.tipo);
+                      const catInfo = obtenerCategoriaInfo(pad.netName || pad.tipo, pad);
                       return (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                           <span style={{
                             display: 'inline-block',
-                            width: '7px',
-                            height: '7px',
+                            width: '8px',
+                            height: '8px',
                             borderRadius: '50%',
                             backgroundColor: catInfo.color,
                             flexShrink: 0
                           }} />
-                          <span style={{ fontSize: '0.68rem', color: '#f3f4f6', fontWeight: 'bold' }}>
+                          <span style={{ fontSize: '0.68rem', color: catInfo.color, fontWeight: 'bold' }}>
                             {catInfo.label}
                           </span>
                         </div>
@@ -4019,21 +4140,16 @@ export default function VisorMapeoPCB({
                   <div style={styles.formGroup}>
                     <label style={styles.label}>Tipo de Línea (Categoría)</label>
                     <SelectorTipoLinea
-                      valor={padActivo.tipo || 'DATA'}
+                      valor={padActivo.netName || padActivo.tipo || 'DATA'}
                       nombreComponente={compActivo?.nombre || ''}
                       idPad={padActivo?.id || ''}
-                      onChange={(val) => {
-                        actualizarPropiedadPad(padActivo.id, 'tipo', val);
+                      onChange={(val, cat) => {
+                        actualizarPropiedadPad(padActivo.id, 'netName', val, cat);
                       }}
                       tiposCustom={tiposCustom}
-                      onAgregarTipo={() => {
-                        const nuevo = window.prompt('Ingrese el nombre del nuevo tipo de línea (Ej: I2C, RFFE):', '');
+                      onAgregarTipo={(nuevo, cat) => {
                         if (nuevo && nuevo.trim()) {
-                          const limpio = nuevo.trim().toUpperCase().replace(/\s+/g, '_');
-                          if (setTiposCustom && !tiposCustom.includes(limpio)) {
-                            setTiposCustom([...tiposCustom, limpio]);
-                          }
-                          actualizarPropiedadPad(padActivo.id, 'tipo', limpio);
+                          agregarNetNamePersonalizado(nuevo, cat || 'custom');
                         }
                       }}
                       onEliminarTipo={(tipoABorrar) => {
@@ -4068,7 +4184,7 @@ export default function VisorMapeoPCB({
                       />
                       <button
                         type="button"
-                        onClick={() => agregarNetNamePersonalizado(padActivo.netName)}
+                        onClick={() => agregarNetNamePersonalizado(padActivo.netName, padActivo.categoria || deducirCategoriaDeNet(padActivo.netName))}
                         style={{ ...styles.btn, backgroundColor: '#374151', color: '#00ffff', padding: '4px 8px', fontSize: '0.7rem' }}
                         title="Guardar este nombre en la lista de sugerencias de Net Names"
                       >
@@ -4166,12 +4282,8 @@ export default function VisorMapeoPCB({
                                     transition: 'all 0.15s'
                                   }}
                                   onClick={() => {
-                                    actualizarPropiedadPad(padActivo.id, 'netName', net);
-                                    if (CATEGORIAS_NETS.alimentacion.items.includes(net)) {
-                                      actualizarPropiedadPad(padActivo.id, 'tipo', net);
-                                    } else if (net === 'GND' || net === 'NC') {
-                                      actualizarPropiedadPad(padActivo.id, 'tipo', net);
-                                    }
+                                    const cat = (categoriaNetFiltro && categoriaNetFiltro !== 'todas') ? categoriaNetFiltro : deducirCategoriaDeNet(net);
+                                    actualizarPropiedadPad(padActivo.id, 'netName', net, cat);
                                   }}
                                   onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = '#1f2937'; }}
                                   onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = '#111827'; }}

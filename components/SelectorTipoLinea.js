@@ -17,7 +17,21 @@ const CATEGORIAS_LINEAS = {
       'VREG_L6A_0P6',
       'VCC',
       'VCC_IO',
-      'VDD_MEM'
+      'VDD_MEM',
+      'LCM_LEDA',
+      'LCM_LED_A',
+      'LCM_LEDK',
+      'LCM_LEDK1',
+      'LCM_LEDK2',
+      'BL_LED_A',
+      'BL_ANODE',
+      'VBOOST',
+      'VLED',
+      'AVDD',
+      'ELVDD',
+      'ELVSS',
+      'VSP',
+      'VSN'
     ]
   },
   comunicacion: {
@@ -122,15 +136,24 @@ export default function SelectorTipoLinea({
   // Si el valor actual coincide con una categoría específica, abrirla por defecto
   useEffect(() => {
     if (isOpen) {
-      if (valor === 'GND' || valor === 'NC') {
+      const v = String(valor || '').toUpperCase().trim();
+      if (v === 'GND' || v === 'NC') {
         setCategoriaActiva('tierra');
-      } else if (CATEGORIAS_LINEAS.alimentacion.items.includes(valor) || (catalogoLocal.alimentacion || []).includes(valor)) {
+      } else if (
+        CATEGORIAS_LINEAS.alimentacion.items.includes(v) || 
+        (catalogoLocal.alimentacion || []).includes(v) ||
+        /(LEDA|LED_A|LEDK|LED_K|ANODE|ANODO|CATODO|CATHODE|VBOOST|BOOST|VBAT|VPH|VDD|VBUS|VREG|VCC|CHARGER|CHG|BATT|VLED|AVDD|ELVDD|ELVSS|VSP|VSN|VIO|VBIAS|HV_|PP_|_PWR|POWER|VOLT|VOUT|VIN)/i.test(v)
+      ) {
         setCategoriaActiva('alimentacion');
-      } else if (CATEGORIAS_LINEAS.comunicacion.items.includes(valor) || (catalogoLocal.comunicacion || []).includes(valor)) {
-        setCategoriaActiva('comunicacion');
-      } else if (CATEGORIAS_LINEAS.control.items.includes(valor) || (catalogoLocal.control || []).includes(valor)) {
+      } else if (
+        CATEGORIAS_LINEAS.control.items.includes(v) || 
+        (catalogoLocal.control || []).includes(v) ||
+        /(RESET|RST|ENABLE|_EN$|^EN_|INT|IRQ|CLK|CLOCK|PWM|NTC|THERM|^ID$|_ID$|SENSE|POWER_KEY|VOL_UP|VOL_DOWN)/i.test(v)
+      ) {
         setCategoriaActiva('control');
-      } else if (tiposCustom.includes(valor) || (catalogoLocal.custom || []).includes(valor)) {
+      } else if (CATEGORIAS_LINEAS.comunicacion.items.includes(v) || (catalogoLocal.comunicacion || []).includes(v)) {
+        setCategoriaActiva('comunicacion');
+      } else if (tiposCustom.includes(v) || (catalogoLocal.custom || []).includes(v)) {
         setCategoriaActiva('custom');
       }
     }
@@ -145,7 +168,24 @@ export default function SelectorTipoLinea({
 
   const handleSelect = (tipo) => {
     if (onChange) {
-      onChange(tipo);
+      let cat = categoriaActiva;
+      const t = String(tipo || '').toUpperCase().trim();
+      if (t === 'GND' || t === 'NC') {
+        cat = 'tierra';
+      } else if (
+        obtenerItemsCategoria('alimentacion').includes(t) || 
+        /(LEDA|LED_A|LEDK|LED_K|ANODE|ANODO|CATODO|CATHODE|VBOOST|BOOST|VBAT|VPH|VDD|VBUS|VREG|VCC|CHARGER|CHG|BATT|VLED|AVDD|ELVDD|ELVSS|VSP|VSN|VIO|VBIAS|HV_|PP_|_PWR|POWER|VOLT|VOUT|VIN)/i.test(t)
+      ) {
+        cat = 'alimentacion';
+      } else if (
+        obtenerItemsCategoria('control').includes(t) ||
+        /(RESET|RST|ENABLE|_EN$|^EN_|INT|IRQ|CLK|CLOCK|PWM|NTC|THERM|^ID$|_ID$|SENSE|POWER_KEY|VOL_UP|VOL_DOWN)/i.test(t)
+      ) {
+        cat = 'control';
+      } else if (obtenerItemsCategoria('comunicacion').includes(t)) {
+        cat = 'comunicacion';
+      }
+      onChange(tipo, cat);
     }
     setIsOpen(false);
   };
@@ -183,11 +223,19 @@ export default function SelectorTipoLinea({
   };
 
   const getPillColor = (tipo) => {
-    if (tipo === 'GND') return '#4b5563';
-    if (tipo === 'NC') return '#1e3a8a';
-    if (obtenerItemsCategoria('alimentacion').includes(tipo)) return '#7f1d1d';
-    if (obtenerItemsCategoria('comunicacion').includes(tipo)) return '#854d0e';
-    if (obtenerItemsCategoria('control').includes(tipo)) return '#065f46';
+    if (!tipo) return '#854d0e';
+    const t = String(tipo).toUpperCase().trim();
+    if (t === 'GND') return '#4b5563';
+    if (t === 'NC') return '#1e3a8a';
+    if (
+      obtenerItemsCategoria('alimentacion').includes(t) ||
+      /(LEDA|LED_A|LEDK|LED_K|ANODE|ANODO|CATODO|CATHODE|VBOOST|BOOST|VBAT|VPH|VDD|VBUS|VREG|VCC|CHARGER|CHG|BATT|VLED|AVDD|ELVDD|ELVSS|VSP|VSN|VIO|VBIAS|HV_|PP_|_PWR|POWER|VOLT|VOUT|VIN)/i.test(t)
+    ) return '#7f1d1d';
+    if (
+      obtenerItemsCategoria('control').includes(t) ||
+      /(RESET|RST|ENABLE|_EN$|^EN_|INT|IRQ|CLK|CLOCK|PWM|NTC|THERM|^ID$|_ID$|SENSE|POWER_KEY|VOL_UP|VOL_DOWN)/i.test(t)
+    ) return '#065f46';
+    if (obtenerItemsCategoria('comunicacion').includes(t)) return '#854d0e';
     return '#5b21b6'; // Custom
   };
 
