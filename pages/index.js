@@ -1725,10 +1725,7 @@ export default function AppDiagnostico() {
     }
 
     try {
-      await Promise.race([
-        guardarModeloActualDB(modeloActualizado, true),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Tiempo de espera agotado al conectar con Firestore (12s).')), 12000))
-      ]);
+      await guardarModeloActualDB(modeloActualizado, true);
       const compsA = nuevosComp.filter(c => (c.cara || 'A') === 'A').length;
       const compsB = nuevosComp.filter(c => c.cara === 'B').length;
       alert(`¡Boardview guardado exitosamente en Marshall Cell!\n📍 Sector: ${nuevoSector}\n🅰️ Cara A: ${compsA} componentes | 🅱️ Cara B: ${compsB} componentes`);

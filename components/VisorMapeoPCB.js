@@ -145,7 +145,7 @@ const COMPONENTES_DEFECTO = [
     x: 480, y: 200, w: 60, h: 100,
     pads: [
       { id: '1', netName: 'VREG_L6A_0P6', tipo: 'DATA', x_rel: 5, y_rel: 5, w: 50, h: 30, valorSanoDiodo: '0.155', valorSanoVoltio: '0.600', valorSanoUa: '450', valorSanoOhmio: '45000', valorActualDiodo: '---', valorActualVoltio: '---', valorActualUa: '---', valorActualOhmio: '---' },
-      { id: '2', netName: 'GND', tipo: 'GND', x_rel: 5, y_rel: 65, w: 50, h: 30, valorSanoDiodo: '0.000', valorSanoVoltio: '0.000', valorSanoUa: '0', valorSanoOhmio: '0', valorActualDiodo: '0.000', valorActualVoltio: '0.000', valorActualUa: '0', valorActualOhmio: '0' }
+      { id: '2', netName: 'VREG_L6A_0P6_OUT', tipo: 'DATA', x_rel: 5, y_rel: 65, w: 50, h: 30, valorSanoDiodo: '0.155', valorSanoVoltio: '0.600', valorSanoUa: '450', valorSanoOhmio: '45000', valorActualDiodo: '---', valorActualVoltio: '---', valorActualUa: '---', valorActualOhmio: '---' }
     ]
   },
   {
@@ -873,21 +873,62 @@ export default function VisorMapeoPCB({
       if (comp.id !== compId) return comp;
       const oldNombre = comp.nombre;
       const nombreLimpio = nuevoNombre.trim();
+      const nUpper = nombreLimpio.toUpperCase();
+
+      // Detección inteligente del tipo por nomenclatura estándar de esquemáticos
+      let tipoDetectado = comp.tipo;
+      if (/^(L|FL|PL|LB)\d/i.test(nUpper) || /^BOBINA/i.test(nUpper)) {
+        tipoDetectado = 'Bobina';
+      } else if (/^(D|ZD|PD)\d/i.test(nUpper) || /^DIODO/i.test(nUpper)) {
+        tipoDetectado = 'Diodo';
+      } else if (/^(R|PR)\d/i.test(nUpper) || /^RESISTENCIA/i.test(nUpper)) {
+        tipoDetectado = 'Resistencia';
+      } else if (/^(C|PC)\d/i.test(nUpper) || /^CAP/i.test(nUpper)) {
+        tipoDetectado = 'Capacitor';
+      }
+
+      const esSerie = tipoDetectado === 'Bobina' || tipoDetectado === 'Diodo' || tipoDetectado === 'Resistencia';
 
       const padsActualizados = comp.pads.map(pad => {
-        // Si el pin tenía el formato NombreAnterior_P1 o NombreAnterior_P2 o similar, o estaba sin nombre
-        if (!pad.netName || pad.netName === `${oldNombre}_P${pad.id}` || pad.netName.startsWith(`${oldNombre}_`) || pad.netName === '---') {
+        // Si el componente es o pasa a ser Bobina, Diodo o Resistencia (En Serie)
+        // y el Pin 2 estaba conectado a GND con 0.000, ¡LO LIBERAMOS A SERIE AUTOMÁTICAMENTE!
+        if (esSerie && pad.id === '2' && (pad.tipo === 'GND' || pad.netName === 'GND')) {
+          const sufijoPad = tipoDetectado === 'Diodo' ? 'K' : 'P2';
           return {
             ...pad,
-            netName: nombreLimpio ? `${nombreLimpio}_P${pad.id}` : pad.netName
+            tipo: 'DATA',
+            netName: nombreLimpio ? `${nombreLimpio}_${sufijoPad}` : 'P2',
+            valorSanoDiodo: '---',
+            valorActualDiodo: '---',
+            valorSanoVoltio: '---',
+            valorActualVoltio: '---',
+            valorSanoUa: '---',
+            valorActualUa: '---',
+            valorSanoOhmio: '---',
+            valorActualOhmio: '---'
           };
         }
-        // Para Bobinas y componentes pasivos: si el pin tiene un nombre autónomo con _P1 o _P2
-        if (comp.tipo === 'Bobina' && pad.tipo !== 'GND' && pad.tipo !== 'NC') {
-          if (pad.netName.includes('_P') || pad.netName.startsWith('L') || pad.netName.startsWith('C')) {
+
+        // Si el pin tenía el formato NombreAnterior_P1 o NombreAnterior_P2 o similar, o estaba sin nombre
+        if (!pad.netName || pad.netName === `${oldNombre}_P${pad.id}` || pad.netName.startsWith(`${oldNombre}_`) || pad.netName === '---') {
+          const sufijoPad = (tipoDetectado === 'Diodo') 
+            ? (pad.id === '1' ? 'A' : 'K')
+            : `P${pad.id}`;
+          return {
+            ...pad,
+            netName: nombreLimpio ? `${nombreLimpio}_${sufijoPad}` : pad.netName
+          };
+        }
+
+        // Para componentes en serie con nombres temporales anteriores
+        if (esSerie && pad.tipo !== 'GND' && pad.tipo !== 'NC') {
+          if (pad.netName.includes('_P') || pad.netName.startsWith('L') || pad.netName.startsWith('C') || pad.netName.startsWith('D')) {
+            const sufijoPad = (tipoDetectado === 'Diodo') 
+              ? (pad.id === '1' ? 'A' : 'K')
+              : `P${pad.id}`;
             return {
               ...pad,
-              netName: nombreLimpio ? `${nombreLimpio}_P${pad.id}` : pad.netName
+              netName: nombreLimpio ? `${nombreLimpio}_${sufijoPad}` : pad.netName
             };
           }
         }
@@ -897,6 +938,7 @@ export default function VisorMapeoPCB({
       return {
         ...comp,
         nombre: nuevoNombre,
+        tipo: tipoDetectado,
         pads: padsActualizados
       };
     }));
@@ -981,10 +1023,11 @@ export default function VisorMapeoPCB({
       const nuevosPads = comp.pads.map(p => {
         if (p.id !== '2') return p;
         if (modo === 'serie') {
+          const sufijo = comp.tipo === 'Diodo' ? 'K' : 'P2';
           return {
             ...p,
             tipo: 'DATA',
-            netName: `${comp.nombre}_P2`,
+            netName: `${comp.nombre}_${sufijo}`,
             valorSanoDiodo: '---',
             valorActualDiodo: '---',
             valorSanoVoltio: '---',
@@ -1328,6 +1371,8 @@ export default function VisorMapeoPCB({
     const nombreSugerido = `${prefix}${numComp}`;
 
     const isGndDefault = tipoDrawing === 'Capacitor';
+    const pad1Net = (tipoDrawing === 'Diodo') ? `${nombreSugerido}_A` : `${nombreSugerido}_P1`;
+    const pad2Net = isGndDefault ? 'GND' : ((tipoDrawing === 'Diodo') ? `${nombreSugerido}_K` : `${nombreSugerido}_P2`);
 
     const nuevoComp = {
       id: `smd_${Date.now()}`,
@@ -1341,7 +1386,7 @@ export default function VisorMapeoPCB({
       pads: [
         {
           id: '1',
-          netName: `${nombreSugerido}_P1`,
+          netName: pad1Net,
           tipo: 'DATA',
           x_rel: pad1Temp.x - minX,
           y_rel: pad1Temp.y - minY,
@@ -1358,7 +1403,7 @@ export default function VisorMapeoPCB({
         },
         {
           id: '2',
-          netName: isGndDefault ? 'GND' : `${nombreSugerido}_P2`,
+          netName: pad2Net,
           tipo: isGndDefault ? 'GND' : 'DATA',
           x_rel: pad2Temp.x - minX,
           y_rel: pad2Temp.y - minY,
@@ -2236,20 +2281,49 @@ export default function VisorMapeoPCB({
           )}
 
           {tool === 'drawSMD' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', animation: 'fadeIn 0.3s', background: '#1e293b', padding: '2px 8px', borderRadius: '6px', border: '1px solid #f59e0b' }}>
-              <span style={{ fontSize: '0.72rem', color: '#fbbf24', fontWeight: 'bold' }}>Tipo SMD:</span>
-              <select 
-                value={tipoDrawing} 
-                onChange={(e) => setTipoDrawing(e.target.value)}
-                style={{ ...styles.selectDark, color: '#f8fafc', fontWeight: 'bold' }}
-              >
-                <option value="Capacitor">⚡ Capacitor (C)</option>
-                <option value="Resistencia">🟣 Resistencia (R)</option>
-                <option value="Bobina">🌀 Bobina / Inductor (L)</option>
-                <option value="Diodo">🔺 Diodo (D)</option>
-              </select>
-              <span style={{ fontSize: '0.65rem', color: '#94a3b8' }}>
-                {tipoDrawing === 'Bobina' ? 'Prefijo L | Sin GND' : (tipoDrawing === 'Capacitor' ? 'Prefijo C | Pad 2 GND' : `Prefijo ${TIPO_ABREVIATURAS[tipoDrawing] || 'C'}`)}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', animation: 'fadeIn 0.3s', background: '#0f172a', padding: '3px 8px', borderRadius: '8px', border: '1px solid #f59e0b' }}>
+              <span style={{ fontSize: '0.7rem', color: '#fbbf24', fontWeight: 'bold' }}>Dibujar:</span>
+              <div style={{ display: 'flex', gap: '3px' }}>
+                {[
+                  { id: 'Capacitor', label: '⚡ Capacitor (C)', desc: 'Filtro (Pad 2 GND)', color: '#38bdf8' },
+                  { id: 'Bobina', label: '🌀 Bobina (L)', desc: 'Serie (Sin GND)', color: '#10b981' },
+                  { id: 'Diodo', label: '🔺 Diodo (D)', desc: 'Serie (Ánodo/Cátodo)', color: '#f59e0b' },
+                  { id: 'Resistencia', label: '🟣 Resistencia (R)', desc: 'Serie (Sin GND)', color: '#c084fc' }
+                ].map(item => {
+                  const isSel = tipoDrawing === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setTipoDrawing(item.id)}
+                      style={{
+                        padding: '3px 7px',
+                        borderRadius: '5px',
+                        border: isSel ? `1px solid ${item.color}` : '1px solid #334155',
+                        background: isSel ? `${item.color}22` : '#1e293b',
+                        color: isSel ? item.color : '#94a3b8',
+                        fontSize: '0.67rem',
+                        fontWeight: isSel ? 'bold' : 'normal',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease'
+                      }}
+                      title={`${item.label} - ${item.desc}`}
+                    >
+                      {item.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <span style={{
+                fontSize: '0.63rem',
+                padding: '2px 6px',
+                borderRadius: '4px',
+                fontWeight: 'bold',
+                backgroundColor: tipoDrawing === 'Capacitor' ? 'rgba(107, 114, 128, 0.25)' : 'rgba(16, 185, 129, 0.2)',
+                color: tipoDrawing === 'Capacitor' ? '#9ca3af' : '#34d399',
+                border: tipoDrawing === 'Capacitor' ? '1px solid #4b5563' : '1px solid #059669'
+              }}>
+                {tipoDrawing === 'Capacitor' ? '🛡️ Pin 2 a Masa GND' : '⚡ En Serie (Sin Masa GND)'}
               </span>
             </div>
           )}
@@ -2957,7 +3031,7 @@ export default function VisorMapeoPCB({
               animation: 'pulseGlow 2.5s infinite ease-in-out'
             }}>
               <span style={{ fontSize: '0.82rem', color: '#fbbf24', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                ✏️ MODO DIBUJAR SMD ({tipoDrawing === 'Bobina' ? '🌀 Bobina (L)' : tipoDrawing})
+                ✏️ MODO DIBUJAR SMD: {tipoDrawing === 'Bobina' ? '🌀 Bobina (L) — Serie (Sin GND)' : (tipoDrawing === 'Diodo' ? '🔺 Diodo (D) — Serie (Ánodo/Cátodo)' : (tipoDrawing === 'Resistencia' ? '🟣 Resistencia (R) — Serie' : '⚡ Capacitor (C) — Filtro GND'))}
               </span>
               <span style={{ fontSize: '0.78rem', color: '#e2e8f0' }}>
                 {drawingStep === 0 && '👉 Paso 1: Haz clic en el centro del 1er Pad'}
@@ -3748,12 +3822,14 @@ export default function VisorMapeoPCB({
                           const esParalelo = nuevoTipo === 'Capacitor';
 
                           if (esSerie && c.pads.some(p => p.id === '2' && (p.tipo === 'GND' || p.netName === 'GND'))) {
+                            const sufijoP2 = nuevoTipo === 'Diodo' ? 'K' : 'P2';
+                            const sufijoP1 = nuevoTipo === 'Diodo' ? 'A' : 'P1';
                             nuevosPads = c.pads.map(p => {
                               if (p.id === '2') {
                                 return {
                                   ...p,
                                   tipo: 'DATA',
-                                  netName: `${nuevoNombre}_P2`,
+                                  netName: `${nuevoNombre}_${sufijoP2}`,
                                   valorSanoDiodo: '---',
                                   valorActualDiodo: '---',
                                   valorSanoVoltio: '---',
@@ -3763,6 +3839,9 @@ export default function VisorMapeoPCB({
                                   valorSanoOhmio: '---',
                                   valorActualOhmio: '---'
                                 };
+                              }
+                              if (p.id === '1' && (p.netName === `${c.nombre}_P1` || p.netName === `${c.nombre}_A`)) {
+                                return { ...p, netName: `${nuevoNombre}_${sufijoP1}` };
                               }
                               if (p.netName && p.netName.startsWith(`${c.nombre}_`)) {
                                 return { ...p, netName: p.netName.replace(`${c.nombre}_`, `${nuevoNombre}_`) };
@@ -3922,14 +4001,16 @@ export default function VisorMapeoPCB({
                       <button 
                         onClick={() => setSelectedPadId('1')} 
                         style={{ ...styles.padSelectorBtn, ...(selectedPadId === '1' && styles.padSelectorBtnActive) }}
+                        title={compActivo.tipo === 'Diodo' ? 'Ánodo (Entrada del Diodo)' : 'Pin 1'}
                       >
-                        Pin 1 ({compActivo.pads.find(p => p.id === '1')?.netName || 'NC'})
+                        {compActivo.tipo === 'Diodo' ? '🔺 Ánodo (Pin 1)' : (compActivo.tipo === 'Bobina' ? '🌀 Pin 1 (In)' : 'Pin 1')} ({compActivo.pads.find(p => p.id === '1')?.netName || 'NC'})
                       </button>
                       <button 
                         onClick={() => setSelectedPadId('2')} 
                         style={{ ...styles.padSelectorBtn, ...(selectedPadId === '2' && styles.padSelectorBtnActive) }}
+                        title={compActivo.tipo === 'Diodo' ? 'Cátodo (Salida del Diodo)' : 'Pin 2'}
                       >
-                        Pin 2 ({compActivo.pads.find(p => p.id === '2')?.netName || 'NC'})
+                        {compActivo.tipo === 'Diodo' ? '⚡ Cátodo (Pin 2)' : (compActivo.tipo === 'Bobina' ? '🌀 Pin 2 (Out)' : 'Pin 2')} ({compActivo.pads.find(p => p.id === '2')?.netName || 'NC'})
                       </button>
                     </div>
                   </div>
