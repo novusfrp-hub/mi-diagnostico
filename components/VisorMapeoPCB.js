@@ -13,13 +13,16 @@ import {
   esUrlFirebaseStorage 
 } from '../lib/storageHelper';
 
-const TIPOS_COMPONENTE = ['Capacitor', 'Resistencia', 'Diodo', 'Bobina'];
+const TIPOS_COMPONENTE = ['Capacitor', 'Resistencia', 'Diodo', 'Bobina', 'Pin_FPC', 'TestPoint', 'Transistor'];
 
 const TIPO_ABREVIATURAS = {
   Capacitor: 'C',
   Resistencia: 'R',
   Diodo: 'D',
-  Bobina: 'L'
+  Bobina: 'L',
+  Pin_FPC: 'J',
+  TestPoint: 'TP',
+  Transistor: 'Q'
 };
 
 const ESCALAS_CONFIG = [
@@ -484,6 +487,15 @@ export default function VisorMapeoPCB({
   const [isMatrixDragging, setIsMatrixDragging] = useState(false);
   const [matrixStartPos, setMatrixStartPos] = useState({ x: 0, y: 0 });
   const [matrixClonesPreview, setMatrixClonesPreview] = useState([]);
+
+  // Lógica de Redimensionamiento interactivo de Componentes / Matrices (con soporte de Ctrl)
+  const [isResizingComp, setIsResizingComp] = useState(false);
+  const [resizeCompId, setResizeCompId] = useState(null);
+  const [resizeStartCoords, setResizeStartCoords] = useState({ x: 0, y: 0 });
+  const [resizeInitialComp, setResizeInitialComp] = useState(null);
+
+  // Ancho dinámico del Sidebar (390px por defecto, ampliable a 450px)
+  const [sidebarAncho, setSidebarAncho] = useState(390);
 
   // Búsqueda rápida de componentes y líneas
   const [busqueda, setBusqueda] = useState('');
@@ -1331,6 +1343,44 @@ export default function VisorMapeoPCB({
       return;
     }
 
+    if (isResizingComp && resizeCompId && resizeInitialComp) {
+      const currentCoords = getCanvasCoords(e);
+      const deltaX = currentCoords.x - resizeStartCoords.x;
+      const deltaY = currentCoords.y - resizeStartCoords.y;
+
+      let newW = Math.max(12, Math.round(resizeInitialComp.w + deltaX));
+      let newH = Math.max(12, Math.round(resizeInitialComp.h + deltaY));
+
+      // Si el usuario mantiene Ctrl: escala proporcional 1:1 (uniforme)
+      if (e.ctrlKey) {
+        const ratio = Math.max(newW / resizeInitialComp.w, newH / resizeInitialComp.h);
+        newW = Math.max(12, Math.round(resizeInitialComp.w * ratio));
+        newH = Math.max(12, Math.round(resizeInitialComp.h * ratio));
+      }
+
+      const factorX = newW / resizeInitialComp.w;
+      const factorY = newH / resizeInitialComp.h;
+
+      const nuevosPads = resizeInitialComp.pads.map(p => ({
+        ...p,
+        x_rel: Math.round(p.x_rel * factorX),
+        y_rel: Math.round(p.y_rel * factorY),
+        w: Math.max(4, Math.round(p.w * factorX)),
+        h: Math.max(4, Math.round(p.h * factorY))
+      }));
+
+      setComponentes(prev => prev.map(c => {
+        if (c.id !== resizeCompId) return c;
+        return {
+          ...c,
+          w: newW,
+          h: newH,
+          pads: nuevosPads
+        };
+      }));
+      return;
+    }
+
     if (tool === 'drawSMD' && drawingStep === 1) {
       const w = Math.abs(coords.x - startPoint.x);
       const h = Math.abs(coords.y - startPoint.y);
@@ -1379,10 +1429,11 @@ export default function VisorMapeoPCB({
       let lockedDeltaX = deltaX;
       let lockedDeltaY = deltaY;
 
-      if (Math.abs(deltaX) > Math.abs(deltaY) * 1.3) {
-        lockedDeltaY = 0;
-      } else if (Math.abs(deltaY) > Math.abs(deltaX) * 1.3) {
-        lockedDeltaX = 0;
+      // Si el usuario mantiene Ctrl: escala uniforme diagonal 1:1
+      if (e.ctrlKey) {
+        const mayor = Math.max(Math.abs(deltaX), Math.abs(deltaY));
+        lockedDeltaX = Math.sign(deltaX || 1) * mayor;
+        lockedDeltaY = Math.sign(deltaY || 1) * mayor;
       }
 
       const rows = parseInt(matrizRows) || 1;
@@ -1419,6 +1470,14 @@ export default function VisorMapeoPCB({
       return;
     }
 
+    if (isResizingComp) {
+      guardarSnapshotHistorial();
+      setIsResizingComp(false);
+      setResizeCompId(null);
+      setResizeInitialComp(null);
+      return;
+    }
+
     if (isDraggingComp) {
       guardarSnapshotHistorial();
       setIsDraggingComp(false);
@@ -1427,12 +1486,34 @@ export default function VisorMapeoPCB({
     }
 
     if (tool === 'drawSMD' && drawingStep === 1 && pad1Temp) {
-      if (pad1Temp.w < 3 || pad1Temp.h < 3) {
-        setDrawingStep(0);
-        setPad1Temp(null);
-      } else {
-        setDrawingStep(2);
+      let finalW = pad1Temp.w;
+      let finalH = pad1Temp.h;
+
+      // Si fue un clic simple sin arrastre suficiente, dar tamaño ergonómico por defecto
+      if (finalW < 6 || finalH < 6) {
+        if (tipoDrawing === 'TestPoint') {
+          finalW = 16;
+          finalH = 16;
+        } else if (tipoDrawing === 'Pin_FPC') {
+          finalW = 12;
+          finalH = 24;
+        } else {
+          finalW = 20;
+          finalH = 30;
+        }
       }
+
+      const padFinal = { ...pad1Temp, w: finalW, h: finalH };
+
+      // Si es un PIN INDIVIDUAL (Pin FPC o Test Point), se crea de inmediato en 1 solo paso:
+      if (tipoDrawing === 'Pin_FPC' || tipoDrawing === 'TestPoint') {
+        confirmSinglePinCreation(padFinal, tipoDrawing);
+        return;
+      }
+
+      // Si es componente tradicional de 2 o 3 pines:
+      setPad1Temp(padFinal);
+      setDrawingStep(2);
       return;
     }
 
@@ -1451,44 +1532,33 @@ export default function VisorMapeoPCB({
     }
   };
 
-  // Creación de Componente SMD
-  const confirmComponentCreation = () => {
-    if (!pad1Temp || !pad2Temp) return;
-
-    const minX = Math.min(pad1Temp.x, pad2Temp.x);
-    const minY = Math.min(pad1Temp.y, pad2Temp.y);
-    const maxX = Math.max(pad1Temp.x + pad1Temp.w, pad2Temp.x + pad2Temp.w);
-    const maxY = Math.max(pad1Temp.y + pad1Temp.h, pad2Temp.y + pad2Temp.h);
-
-    const compW = maxX - minX;
-    const compH = maxY - minY;
-
-    const prefix = TIPO_ABREVIATURAS[tipoDrawing] || 'C';
-    const numComp = componentes.filter(c => c.tipo === tipoDrawing).length + 1401;
-    const nombreSugerido = `${prefix}${numComp}`;
-
-    const isGndDefault = tipoDrawing === 'Capacitor';
-    const pad1Net = (tipoDrawing === 'Diodo') ? `${nombreSugerido}_A` : `${nombreSugerido}_P1`;
-    const pad2Net = isGndDefault ? 'GND' : ((tipoDrawing === 'Diodo') ? `${nombreSugerido}_K` : `${nombreSugerido}_P2`);
+  // Creación de Pin Único / Test Point / Pin FPC (1 Solo Pad)
+  const confirmSinglePinCreation = (padTemp, tipo) => {
+    if (!padTemp) return;
+    const esTP = tipo === 'TestPoint';
+    const numPines = componentes.filter(c => c.tipo === tipo).length + 1;
+    const nombreSugerido = esTP ? `TP${numPines}` : `J${numPines}_P1`;
+    const netSugerido = esTP ? `TP_${numPines}` : `FPC_P${numPines}`;
 
     const nuevoComp = {
-      id: `smd_${Date.now()}`,
+      id: `pin_${Date.now()}`,
       nombre: nombreSugerido,
-      tipo: tipoDrawing,
+      tipo: tipo,
       cara: caraPlaca,
-      x: minX,
-      y: minY,
-      w: compW,
-      h: compH,
+      x: padTemp.x,
+      y: padTemp.y,
+      w: padTemp.w,
+      h: padTemp.h,
       pads: [
         {
           id: '1',
-          netName: pad1Net,
+          netName: netSugerido,
           tipo: 'DATA',
-          x_rel: pad1Temp.x - minX,
-          y_rel: pad1Temp.y - minY,
-          w: pad1Temp.w,
-          h: pad1Temp.h,
+          forma: esTP ? 'circle' : 'rect',
+          x_rel: 0,
+          y_rel: 0,
+          w: padTemp.w,
+          h: padTemp.h,
           valorSanoDiodo: '---',
           valorSanoVoltio: '---',
           valorSanoUa: '---',
@@ -1497,23 +1567,6 @@ export default function VisorMapeoPCB({
           valorActualVoltio: '---',
           valorActualUa: '---',
           valorActualOhmio: '---'
-        },
-        {
-          id: '2',
-          netName: pad2Net,
-          tipo: isGndDefault ? 'GND' : 'DATA',
-          x_rel: pad2Temp.x - minX,
-          y_rel: pad2Temp.y - minY,
-          w: pad2Temp.w,
-          h: pad2Temp.h,
-          valorSanoDiodo: isGndDefault ? '0.000' : '---',
-          valorSanoVoltio: isGndDefault ? '0.000' : '---',
-          valorSanoUa: isGndDefault ? '0' : '---',
-          valorSanoOhmio: isGndDefault ? '0' : '---',
-          valorActualDiodo: isGndDefault ? '0.000' : '---',
-          valorActualVoltio: isGndDefault ? '0.000' : '---',
-          valorActualUa: isGndDefault ? '0' : '---',
-          valorActualOhmio: isGndDefault ? '0' : '---'
         }
       ]
     };
@@ -1527,6 +1580,174 @@ export default function VisorMapeoPCB({
     setPad2Temp(null);
     setDrawingStep(0);
     setTool('select');
+  };
+
+  // Creación de Componente SMD (2 o 3 pines)
+  const confirmComponentCreation = () => {
+    if (!pad1Temp || !pad2Temp) return;
+
+    let minX = Math.min(pad1Temp.x, pad2Temp.x);
+    let minY = Math.min(pad1Temp.y, pad2Temp.y);
+    let maxX = Math.max(pad1Temp.x + pad1Temp.w, pad2Temp.x + pad2Temp.w);
+    let maxY = Math.max(pad1Temp.y + pad1Temp.h, pad2Temp.y + pad2Temp.h);
+
+    const prefix = TIPO_ABREVIATURAS[tipoDrawing] || 'C';
+    const numComp = componentes.filter(c => c.tipo === tipoDrawing).length + 1401;
+    const nombreSugerido = `${prefix}${numComp}`;
+
+    const isGndDefault = tipoDrawing === 'Capacitor';
+    const pad1Net = (tipoDrawing === 'Diodo') ? `${nombreSugerido}_A` : `${nombreSugerido}_P1`;
+    const pad2Net = isGndDefault ? 'GND' : ((tipoDrawing === 'Diodo') ? `${nombreSugerido}_K` : `${nombreSugerido}_P2`);
+
+    const padsIniciales = [
+      {
+        id: '1',
+        netName: pad1Net,
+        tipo: 'DATA',
+        forma: 'rect',
+        x_rel: pad1Temp.x - minX,
+        y_rel: pad1Temp.y - minY,
+        w: pad1Temp.w,
+        h: pad1Temp.h,
+        valorSanoDiodo: '---',
+        valorSanoVoltio: '---',
+        valorSanoUa: '---',
+        valorSanoOhmio: '---',
+        valorActualDiodo: '---',
+        valorActualVoltio: '---',
+        valorActualUa: '---',
+        valorActualOhmio: '---'
+      },
+      {
+        id: '2',
+        netName: pad2Net,
+        tipo: isGndDefault ? 'GND' : 'DATA',
+        forma: 'rect',
+        x_rel: pad2Temp.x - minX,
+        y_rel: pad2Temp.y - minY,
+        w: pad2Temp.w,
+        h: pad2Temp.h,
+        valorSanoDiodo: isGndDefault ? '0.000' : '---',
+        valorSanoVoltio: isGndDefault ? '0.000' : '---',
+        valorSanoUa: isGndDefault ? '0' : '---',
+        valorSanoOhmio: isGndDefault ? '0' : '---',
+        valorActualDiodo: isGndDefault ? '0.000' : '---',
+        valorActualVoltio: isGndDefault ? '0.000' : '---',
+        valorActualUa: isGndDefault ? '0' : '---',
+        valorActualOhmio: isGndDefault ? '0' : '---'
+      }
+    ];
+
+    // Soporte para Transistores (Encapsulado SOT-23 / 3 pines como 2E)
+    if (tipoDrawing === 'Transistor') {
+      const midRelX = Math.round(((pad1Temp.x - minX) + (pad2Temp.x - minX)) / 2);
+      const isHorizontal = Math.abs(pad1Temp.x - pad2Temp.x) > Math.abs(pad1Temp.y - pad2Temp.y);
+      const p3XRel = isHorizontal ? midRelX : (pad1Temp.x - minX + (pad1Temp.w + 12));
+      const p3YRel = isHorizontal ? (pad1Temp.y - minY + (pad1Temp.h + 12)) : midRelX;
+
+      padsIniciales.push({
+        id: '3',
+        netName: `${nombreSugerido}_P3`,
+        tipo: 'DATA',
+        forma: 'rect',
+        x_rel: p3XRel,
+        y_rel: p3YRel,
+        w: pad1Temp.w,
+        h: pad1Temp.h,
+        valorSanoDiodo: '---',
+        valorSanoVoltio: '---',
+        valorSanoUa: '---',
+        valorSanoOhmio: '---',
+        valorActualDiodo: '---',
+        valorActualVoltio: '---',
+        valorActualUa: '---',
+        valorActualOhmio: '---'
+      });
+
+      maxX = Math.max(maxX, minX + p3XRel + pad1Temp.w);
+      maxY = Math.max(maxY, minY + p3YRel + pad1Temp.h);
+    }
+
+    const compW = maxX - minX;
+    const compH = maxY - minY;
+
+    const nuevoComp = {
+      id: `smd_${Date.now()}`,
+      nombre: nombreSugerido,
+      tipo: tipoDrawing,
+      cara: caraPlaca,
+      x: minX,
+      y: minY,
+      w: compW,
+      h: compH,
+      pads: padsIniciales
+    };
+
+    guardarSnapshotHistorial();
+    setComponentes(prev => [...prev, nuevoComp]);
+    setSelectedCompId(nuevoComp.id);
+    setSelectedPadId('1');
+
+    setPad1Temp(null);
+    setPad2Temp(null);
+    setDrawingStep(0);
+    setTool('select');
+  };
+
+  // Añadir un Pin extra a cualquier componente existente (Transistores, ICs o conectores)
+  const agregarPinAComponente = (compId) => {
+    guardarSnapshotHistorial();
+    let nuevoPadIdCreado = null;
+    setComponentes(prev => prev.map(comp => {
+      if (comp.id !== compId) return comp;
+      const nuevoId = String(comp.pads.length + 1);
+      nuevoPadIdCreado = nuevoId;
+      const ultimoPad = comp.pads[comp.pads.length - 1] || { x_rel: 0, y_rel: 0, w: 20, h: 20 };
+      const nuevoPad = {
+        id: nuevoId,
+        netName: `${comp.nombre}_P${nuevoId}`,
+        tipo: 'DATA',
+        forma: comp.tipo === 'TestPoint' ? 'circle' : 'rect',
+        x_rel: ultimoPad.x_rel + ultimoPad.w + 8,
+        y_rel: ultimoPad.y_rel,
+        w: ultimoPad.w,
+        h: ultimoPad.h,
+        valorSanoDiodo: '---',
+        valorSanoVoltio: '---',
+        valorSanoUa: '---',
+        valorSanoOhmio: '---',
+        valorActualDiodo: '---',
+        valorActualVoltio: '---',
+        valorActualUa: '---',
+        valorActualOhmio: '---'
+      };
+      const nuevosPads = [...comp.pads, nuevoPad];
+      const maxRelX = Math.max(...nuevosPads.map(p => p.x_rel + p.w));
+      const maxRelY = Math.max(...nuevosPads.map(p => p.y_rel + p.h));
+      return {
+        ...comp,
+        w: Math.max(comp.w, maxRelX + 4),
+        h: Math.max(comp.h, maxRelY + 4),
+        pads: nuevosPads
+      };
+    }));
+    if (nuevoPadIdCreado) setSelectedPadId(nuevoPadIdCreado);
+  };
+
+  // Eliminar un pin de un componente multi-pin
+  const eliminarPinDeComponente = (compId, padId) => {
+    if (!compActivo || compActivo.pads.length <= 1) {
+      alert('Un componente debe tener al menos 1 pin.');
+      return;
+    }
+    guardarSnapshotHistorial();
+    setComponentes(prev => prev.map(comp => {
+      if (comp.id !== compId) return comp;
+      const nuevosPads = comp.pads.filter(p => p.id !== padId);
+      return { ...comp, pads: nuevosPads };
+    }));
+    const restante = compActivo.pads.find(p => p.id !== padId);
+    if (restante) setSelectedPadId(restante.id);
   };
 
   const compActivo = componentes.find(c => c.id === selectedCompId);
@@ -2402,21 +2623,29 @@ export default function VisorMapeoPCB({
           )}
 
           {tool === 'drawSMD' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', animation: 'fadeIn 0.3s', background: '#0f172a', padding: '3px 8px', borderRadius: '8px', border: '1px solid #f59e0b' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', animation: 'fadeIn 0.3s', background: '#0f172a', padding: '3px 8px', borderRadius: '8px', border: '1px solid #f59e0b', flexWrap: 'wrap' }}>
               <span style={{ fontSize: '0.7rem', color: '#fbbf24', fontWeight: 'bold' }}>Dibujar:</span>
-              <div style={{ display: 'flex', gap: '3px' }}>
+              <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap' }}>
                 {[
-                  { id: 'Capacitor', label: '⚡ Capacitor (C)', desc: 'Filtro (Pad 2 GND)', color: '#38bdf8' },
-                  { id: 'Bobina', label: '🌀 Bobina (L)', desc: 'Serie (Sin GND)', color: '#10b981' },
-                  { id: 'Diodo', label: '🔺 Diodo (D)', desc: 'Serie (Ánodo/Cátodo)', color: '#f59e0b' },
-                  { id: 'Resistencia', label: '🟣 Resistencia (R)', desc: 'Serie (Sin GND)', color: '#c084fc' }
+                  { id: 'Capacitor', label: '⚡ Capacitor (C)', desc: '2 Pines - Filtro Pad 2 GND', color: '#38bdf8' },
+                  { id: 'Bobina', label: '🌀 Bobina (L)', desc: '2 Pines - Serie (Sin GND)', color: '#10b981' },
+                  { id: 'Diodo', label: '🔺 Diodo (D)', desc: '2 Pines - Serie Ánodo/Cátodo', color: '#f59e0b' },
+                  { id: 'Resistencia', label: '🟣 Resistencia (R)', desc: '2 Pines - Serie (Sin GND)', color: '#c084fc' },
+                  { id: 'Pin_FPC', label: '📍 Pin FPC (J)', desc: '1 Solo Pin Rectangular (FPC/Conector)', color: '#06b6d4' },
+                  { id: 'TestPoint', label: '⭕ Test Point (TP)', desc: '1 Solo Pin Circular (Punto dorado)', color: '#eab308' },
+                  { id: 'Transistor', label: '🔲 Transistor (Q)', desc: '3 Pines (SOT-23 / 2E)', color: '#ec4899' }
                 ].map(item => {
                   const isSel = tipoDrawing === item.id;
                   return (
                     <button
                       key={item.id}
                       type="button"
-                      onClick={() => setTipoDrawing(item.id)}
+                      onClick={() => {
+                        setTipoDrawing(item.id);
+                        setDrawingStep(0);
+                        setPad1Temp(null);
+                        setPad2Temp(null);
+                      }}
                       style={{
                         padding: '3px 7px',
                         borderRadius: '5px',
@@ -2440,11 +2669,11 @@ export default function VisorMapeoPCB({
                 padding: '2px 6px',
                 borderRadius: '4px',
                 fontWeight: 'bold',
-                backgroundColor: tipoDrawing === 'Capacitor' ? 'rgba(107, 114, 128, 0.25)' : 'rgba(16, 185, 129, 0.2)',
-                color: tipoDrawing === 'Capacitor' ? '#9ca3af' : '#34d399',
-                border: tipoDrawing === 'Capacitor' ? '1px solid #4b5563' : '1px solid #059669'
+                backgroundColor: (tipoDrawing === 'Pin_FPC' || tipoDrawing === 'TestPoint') ? 'rgba(6, 182, 212, 0.2)' : (tipoDrawing === 'Transistor' ? 'rgba(236, 72, 153, 0.2)' : (tipoDrawing === 'Capacitor' ? 'rgba(107, 114, 128, 0.25)' : 'rgba(16, 185, 129, 0.2)')),
+                color: (tipoDrawing === 'Pin_FPC' || tipoDrawing === 'TestPoint') ? '#22d3ee' : (tipoDrawing === 'Transistor' ? '#f472b6' : (tipoDrawing === 'Capacitor' ? '#9ca3af' : '#34d399')),
+                border: (tipoDrawing === 'Pin_FPC' || tipoDrawing === 'TestPoint') ? '1px solid #0891b2' : (tipoDrawing === 'Transistor' ? '1px solid #db2777' : (tipoDrawing === 'Capacitor' ? '1px solid #4b5563' : '1px solid #059669'))
               }}>
-                {tipoDrawing === 'Capacitor' ? '🛡️ Pin 2 a Masa GND' : '⚡ En Serie (Sin Masa GND)'}
+                {(tipoDrawing === 'Pin_FPC' || tipoDrawing === 'TestPoint') ? '🎯 1 Solo Pin (1 Clic / Arrastre directo)' : (tipoDrawing === 'Transistor' ? '🔲 3 Pines (Base / Emisor / Colector)' : (tipoDrawing === 'Capacitor' ? '🛡️ Pin 2 a Masa GND' : '⚡ En Serie (Sin Masa GND)'))}
               </span>
             </div>
           )}
@@ -3152,12 +3381,26 @@ export default function VisorMapeoPCB({
               animation: 'pulseGlow 2.5s infinite ease-in-out'
             }}>
               <span style={{ fontSize: '0.82rem', color: '#fbbf24', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                ✏️ MODO DIBUJAR SMD: {tipoDrawing === 'Bobina' ? '🌀 Bobina (L) — Serie (Sin GND)' : (tipoDrawing === 'Diodo' ? '🔺 Diodo (D) — Serie (Ánodo/Cátodo)' : (tipoDrawing === 'Resistencia' ? '🟣 Resistencia (R) — Serie' : '⚡ Capacitor (C) — Filtro GND'))}
+                ✏️ DIBUJAR: {
+                  tipoDrawing === 'Bobina' ? '🌀 Bobina (L) — Serie (Sin GND)' :
+                  tipoDrawing === 'Diodo' ? '🔺 Diodo (D) — Serie (Ánodo/Cátodo)' :
+                  tipoDrawing === 'Resistencia' ? '🟣 Resistencia (R) — Serie' :
+                  tipoDrawing === 'Pin_FPC' ? '📍 Pin FPC (J) — 1 Solo Pin Rectangular' :
+                  tipoDrawing === 'TestPoint' ? '⭕ Test Point (TP) — 1 Solo Pin Circular' :
+                  tipoDrawing === 'Transistor' ? '🔲 Transistor (Q) — 3 Pines (SOT-23 / 2E)' :
+                  '⚡ Capacitor (C) — Filtro GND'
+                }
               </span>
               <span style={{ fontSize: '0.78rem', color: '#e2e8f0' }}>
-                {drawingStep === 0 && '👉 Paso 1: Haz clic en el centro del 1er Pad'}
-                {drawingStep === 1 && '👉 Paso 1: Suelta el botón del mouse para fijar tamaño'}
-                {drawingStep === 2 && '👉 Paso 2: Haz clic en el 2do Pad (Shift alinea recto)'}
+                {(tipoDrawing === 'Pin_FPC' || tipoDrawing === 'TestPoint') ? (
+                  drawingStep === 0 ? '👉 Haz un clic o arrastra sobre el pin dorado en la foto para crearlo de inmediato' : '👉 Suelta el mouse para fijar el Pin'
+                ) : (
+                  <>
+                    {drawingStep === 0 && '👉 Paso 1: Haz clic en el centro del 1er Pad'}
+                    {drawingStep === 1 && '👉 Paso 1: Suelta el botón del mouse para fijar tamaño'}
+                    {drawingStep === 2 && '👉 Paso 2: Haz clic en el siguiente Pad (Shift alinea recto)'}
+                  </>
+                )}
               </span>
               <button
                 type="button"
@@ -3485,8 +3728,8 @@ export default function VisorMapeoPCB({
                             y={padY}
                             width={pad.w}
                             height={pad.h}
-                            rx="2"
-                            ry="2"
+                            rx={(pad.forma === 'circle' || comp.tipo === 'TestPoint') ? Math.min(pad.w, pad.h) / 2 : 2}
+                            ry={(pad.forma === 'circle' || comp.tipo === 'TestPoint') ? Math.min(pad.w, pad.h) / 2 : 2}
                             fill={obtenerColorDePad(pad, comp.id)}
                             stroke={isPadSelected ? '#ffffff' : (isNetMatch ? '#00ffff' : '#000000')}
                             strokeWidth={isPadSelected ? '2' : (isNetMatch ? '1.5' : '1')}
@@ -3535,6 +3778,7 @@ export default function VisorMapeoPCB({
 
                     {renderTextosInteligentes(comp)}
 
+                    {/* Tirador de Clonación en Matriz (cuando Matriz está activa) */}
                     {isSelected && matrizActiva && (
                       <circle
                         className="interactive-handle"
@@ -3546,11 +3790,43 @@ export default function VisorMapeoPCB({
                         strokeWidth="1.5"
                         vectorEffect="non-scaling-stroke"
                         style={{ cursor: 'ew-resize' }}
+                        title="Arrastrar para clonar en matriz (Presiona Ctrl para espaciado diagonal uniforme)"
                         onMouseDown={(e) => {
                           e.stopPropagation();
                           setIsMatrixDragging(true);
                           setMatrixStartPos(getCanvasCoords(e));
                           setMatrixClonesPreview([]);
+                        }}
+                      />
+                    )}
+
+                    {/* Tirador de Redimensionamiento Interactivo de Componente / Matriz (Esquina inferior derecha) */}
+                    {isSelected && puedeEditar && (
+                      <rect
+                        className="interactive-handle comp-resize-handle"
+                        x={comp.x + comp.w - 5}
+                        y={comp.y + comp.h - 5}
+                        width="10"
+                        height="10"
+                        rx="2"
+                        fill="#38bdf8"
+                        stroke="#ffffff"
+                        strokeWidth="1.5"
+                        vectorEffect="non-scaling-stroke"
+                        style={{ cursor: 'nwse-resize' }}
+                        title="Arrastrar para redimensionar (Mantén presionado Ctrl para escalar de forma proporcional uniforme)"
+                        onMouseDown={(e) => {
+                          e.stopPropagation();
+                          setIsResizingComp(true);
+                          setResizeCompId(comp.id);
+                          setResizeStartCoords(getCanvasCoords(e));
+                          setResizeInitialComp({
+                            x: comp.x,
+                            y: comp.y,
+                            w: comp.w,
+                            h: comp.h,
+                            pads: comp.pads.map(p => ({ ...p }))
+                          });
                         }}
                       />
                     )}
@@ -3607,6 +3883,8 @@ export default function VisorMapeoPCB({
                       y={pad1Temp.y}
                       width={pad1Temp.w}
                       height={pad1Temp.h}
+                      rx={tipoDrawing === 'TestPoint' ? Math.min(pad1Temp.w, pad1Temp.h) / 2 : 2}
+                      ry={tipoDrawing === 'TestPoint' ? Math.min(pad1Temp.w, pad1Temp.h) / 2 : 2}
                       fill="rgba(212, 175, 55, 0.4)"
                       stroke="#d4af37"
                       strokeWidth="1.5"
@@ -3861,11 +4139,35 @@ export default function VisorMapeoPCB({
 
         {/* SIDEBAR DERECHO: DETALLES, EDICIÓN, TIPO DE LÍNEA Y NET NAMES */}
         {sidebarAbierto && (
-        <div style={styles.sidebar}>
+        <div style={{
+          ...styles.sidebar,
+          width: `${sidebarAncho}px`,
+          minWidth: `${sidebarAncho}px`
+        }}>
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #374151', paddingBottom: '6px', marginBottom: '10px' }}>
               <h3 style={styles.sidebarTitle}>Detalles de Selección</h3>
               <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  onClick={() => setSidebarAncho(prev => prev === 390 ? 450 : 390)}
+                  style={{
+                    background: sidebarAncho === 450 ? 'rgba(59, 130, 246, 0.25)' : 'rgba(255, 255, 255, 0.08)',
+                    border: sidebarAncho === 450 ? '1px solid #3b82f6' : '1px solid #374151',
+                    color: sidebarAncho === 450 ? '#60a5fa' : '#9ca3af',
+                    cursor: 'pointer',
+                    padding: '3px 6px',
+                    borderRadius: '5px',
+                    fontSize: '0.68rem',
+                    fontWeight: 'bold',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '3px'
+                  }}
+                  title="Cambiar ancho del panel (390px / 450px) para ver todas las escalas sin recorte"
+                >
+                  ↔ {sidebarAncho}px
+                </button>
                 {compActivo && (
                   <>
                     <button 
@@ -4013,7 +4315,7 @@ export default function VisorMapeoPCB({
                     >
                       {TIPOS_COMPONENTE.map(t => (
                         <option key={t} value={t}>
-                          {t === 'Bobina' ? '🌀 Bobina (L)' : (t === 'Capacitor' ? '⚡ Capacitor (C)' : (t === 'Resistencia' ? '🟣 Resistencia (R)' : '🔺 Diodo (D)'))}
+                          {t === 'Bobina' ? '🌀 Bobina (L)' : (t === 'Capacitor' ? '⚡ Capacitor (C)' : (t === 'Resistencia' ? '🟣 Resistencia (R)' : (t === 'Diodo' ? '🔺 Diodo (D)' : (t === 'Pin_FPC' ? '📍 Pin FPC (J)' : (t === 'TestPoint' ? '⭕ Test Point (TP)' : '🔲 Transistor (Q)')))))}
                         </option>
                       ))}
                     </select>
@@ -4058,8 +4360,8 @@ export default function VisorMapeoPCB({
                     </div>
                   </div>
 
-                  {/* Selector de Circuito: En Serie (Paso) vs A Tierra (Paralelo) */}
-                  {(() => {
+                  {/* Selector de Circuito: En Serie vs A Tierra (Multi-pin) o Señal vs GND (1 Pin) */}
+                  {compActivo.pads.length > 1 ? (() => {
                     const tienePinGnd = compActivo.pads.some(p => p.id === '2' && (p.tipo === 'GND' || p.netName === 'GND'));
                     return (
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '6px', paddingTop: '6px', borderTop: '1px solid #1f2937' }}>
@@ -4102,7 +4404,57 @@ export default function VisorMapeoPCB({
                         </div>
                       </div>
                     );
-                  })()}
+                  })() : (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '6px', paddingTop: '6px', borderTop: '1px solid #1f2937' }}>
+                      <span style={{ fontSize: '0.7rem', color: '#9ca3af', fontWeight: 'bold' }}>Función del Pin:</span>
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (compActivo.pads[0]) {
+                              actualizarPropiedadPad(compActivo.pads[0].id, 'tipo', 'DATA');
+                              if (compActivo.pads[0].netName === 'GND') {
+                                actualizarPropiedadPad(compActivo.pads[0].id, 'netName', `${compActivo.nombre}_P1`);
+                              }
+                            }
+                          }}
+                          style={{
+                            padding: '3px 8px',
+                            borderRadius: '4px',
+                            border: compActivo.pads[0]?.tipo !== 'GND' && compActivo.pads[0]?.netName !== 'GND' ? '1px solid #06b6d4' : '1px solid #374151',
+                            background: compActivo.pads[0]?.tipo !== 'GND' && compActivo.pads[0]?.netName !== 'GND' ? 'rgba(6, 182, 212, 0.2)' : '#1f2937',
+                            color: compActivo.pads[0]?.tipo !== 'GND' && compActivo.pads[0]?.netName !== 'GND' ? '#22d3ee' : '#9ca3af',
+                            fontSize: '0.68rem',
+                            fontWeight: 'bold',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          ⚡ Línea / Señal
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (compActivo.pads[0]) {
+                              actualizarPropiedadPad(compActivo.pads[0].id, 'tipo', 'GND');
+                              actualizarPropiedadPad(compActivo.pads[0].id, 'netName', 'GND');
+                            }
+                          }}
+                          style={{
+                            padding: '3px 8px',
+                            borderRadius: '4px',
+                            border: compActivo.pads[0]?.tipo === 'GND' || compActivo.pads[0]?.netName === 'GND' ? '1px solid #6b7280' : '1px solid #374151',
+                            background: compActivo.pads[0]?.tipo === 'GND' || compActivo.pads[0]?.netName === 'GND' ? 'rgba(107, 114, 128, 0.3)' : '#1f2937',
+                            color: compActivo.pads[0]?.tipo === 'GND' || compActivo.pads[0]?.netName === 'GND' ? '#f3f4f6' : '#9ca3af',
+                            fontSize: '0.68rem',
+                            fontWeight: 'bold',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          🛡️ Tierra (GND)
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
                   {puedeEditar && (
                     <button 
@@ -4114,25 +4466,87 @@ export default function VisorMapeoPCB({
                   )}
                 </div>
 
-                {/* Info del Pad Seleccionado */}
+                {/* Info del Pad Seleccionado con selector dinámico de pines */}
                 <div style={styles.editSection}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
                     <h4 style={styles.sectionTitle}>Edición de Pin / Pad {padActivo.id}</h4>
-                    <div style={{ display: 'flex', gap: '4px' }}>
-                      <button 
-                        onClick={() => setSelectedPadId('1')} 
-                        style={{ ...styles.padSelectorBtn, ...(selectedPadId === '1' && styles.padSelectorBtnActive) }}
-                        title={compActivo.tipo === 'Diodo' ? 'Ánodo (Entrada del Diodo)' : 'Pin 1'}
-                      >
-                        {compActivo.tipo === 'Diodo' ? '🔺 Ánodo (Pin 1)' : (compActivo.tipo === 'Bobina' ? '🌀 Pin 1 (In)' : 'Pin 1')} ({compActivo.pads.find(p => p.id === '1')?.netName || 'NC'})
-                      </button>
-                      <button 
-                        onClick={() => setSelectedPadId('2')} 
-                        style={{ ...styles.padSelectorBtn, ...(selectedPadId === '2' && styles.padSelectorBtnActive) }}
-                        title={compActivo.tipo === 'Diodo' ? 'Cátodo (Salida del Diodo)' : 'Pin 2'}
-                      >
-                        {compActivo.tipo === 'Diodo' ? '⚡ Cátodo (Pin 2)' : (compActivo.tipo === 'Bobina' ? '🌀 Pin 2 (Out)' : 'Pin 2')} ({compActivo.pads.find(p => p.id === '2')?.netName || 'NC'})
-                      </button>
+                    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
+                      {compActivo.pads.map((p) => {
+                        const isSelected = selectedPadId === p.id;
+                        let labelPin = `Pin ${p.id}`;
+                        if (compActivo.tipo === 'Diodo') {
+                          labelPin = p.id === '1' ? '🔺 Ánodo' : '⚡ Cátodo';
+                        } else if (compActivo.tipo === 'Bobina') {
+                          labelPin = p.id === '1' ? '🌀 In' : '🌀 Out';
+                        } else if (compActivo.tipo === 'Transistor') {
+                          labelPin = p.id === '1' ? 'B (Base)' : (p.id === '2' ? 'E (Emisor)' : (p.id === '3' ? 'C (Colector)' : `P${p.id}`));
+                        } else if (compActivo.tipo === 'TestPoint') {
+                          labelPin = `TP ${p.id}`;
+                        } else if (compActivo.tipo === 'Pin_FPC') {
+                          labelPin = `J ${p.id}`;
+                        }
+
+                        return (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => setSelectedPadId(p.id)}
+                            style={{
+                              ...styles.padSelectorBtn,
+                              ...(isSelected && styles.padSelectorBtnActive),
+                              fontSize: '0.68rem',
+                              padding: '3px 6px'
+                            }}
+                            title={`Seleccionar ${labelPin} (${p.netName || 'NC'})`}
+                          >
+                            {labelPin} ({p.netName || 'NC'})
+                          </button>
+                        );
+                      })}
+
+                      {puedeEditar && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => agregarPinAComponente(compActivo.id)}
+                            style={{
+                              background: 'rgba(16, 185, 129, 0.2)',
+                              border: '1px solid #10b981',
+                              color: '#34d399',
+                              borderRadius: '4px',
+                              padding: '2px 6px',
+                              fontSize: '0.68rem',
+                              fontWeight: 'bold',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '2px'
+                            }}
+                            title="Añadir un pin extra a este componente (ideal para transistores, integrados, FPC)"
+                          >
+                            + Pin
+                          </button>
+
+                          {compActivo.pads.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => eliminarPinDeComponente(compActivo.id, padActivo.id)}
+                              style={{
+                                background: 'rgba(239, 68, 68, 0.15)',
+                                border: '1px solid rgba(239, 68, 68, 0.4)',
+                                color: '#f87171',
+                                borderRadius: '4px',
+                                padding: '2px 5px',
+                                fontSize: '0.65rem',
+                                cursor: 'pointer'
+                              }}
+                              title={`Eliminar el pin actual (${padActivo.id})`}
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -5436,8 +5850,8 @@ const styles = {
     lineHeight: '1.4'
   },
   sidebar: {
-    width: '320px',
-    minWidth: '320px',
+    width: '390px',
+    minWidth: '390px',
     borderLeft: '2px solid #374151',
     backgroundColor: '#1f2937',
     padding: '12px',
