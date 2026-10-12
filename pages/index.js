@@ -1586,24 +1586,42 @@ export default function AppDiagnostico() {
 
   const inicializarFpcBateria = (modelo) => {
     const esIPhone = esIPhoneModelo(modelo);
-    const estiloLayout = esIPhone ? 'hibrido' : 'doble_fila';
-    const numPines = esIPhone ? 6 : 8;
-    const nombresDefecto = Array(numPines).fill('');
-    const tiposDefecto = Array(numPines).fill('DATA');
+    const estiloLayout = modelo?.fpcBateria?.estiloLayout || 'hibrido';
+    const numPines = esIPhone ? 6 : 10;
+    const presetBase = esIPhone
+      ? PRESETS_BATERIA.find(p => p.id === 'iphone_clasico')
+      : PRESETS_BATERIA.find(p => p.id === 'android_hibrido_10p');
 
-    const pines = Array.from({ length: numPines }, (_, i) => ({
-      id: i + 1,
-      nombre: nombresDefecto[i],
-      tipo: tiposDefecto[i],
-      valorSanoDiodo: '---',
-      valorSanoUa: '---',
-      valorSanoOhmio: '---',
-      valorActualDiodo: '---',
-      valorActualUa: '---',
-      valorActualOhmio: '---',
-      valorSano: '---',
-      valorActual: '---'
-    }));
+    const pines = presetBase
+      ? presetBase.pines.map(p => ({
+          id: p.id,
+          nombre: p.nombre,
+          tipo: p.tipo,
+          colorCustom: p.colorCustom,
+          grosor: p.grosor || (p.id <= 2 ? 'grueso' : 'delgado'),
+          valorSanoDiodo: '---',
+          valorSanoUa: '---',
+          valorSanoOhmio: '---',
+          valorActualDiodo: '---',
+          valorActualUa: '---',
+          valorActualOhmio: '---',
+          valorSano: '---',
+          valorActual: '---'
+        }))
+      : Array.from({ length: numPines }, (_, i) => ({
+          id: i + 1,
+          nombre: i === 0 ? 'VBAT' : i === 1 ? 'GND' : '',
+          tipo: i === 0 ? 'VBAT' : i === 1 ? 'GND' : 'DATA',
+          grosor: i < 2 ? 'grueso' : 'delgado',
+          valorSanoDiodo: '---',
+          valorSanoUa: '---',
+          valorSanoOhmio: '---',
+          valorActualDiodo: '---',
+          valorActualUa: '---',
+          valorActualOhmio: '---',
+          valorSano: '---',
+          valorActual: '---'
+        }));
 
     return {
       id: 'bateria',
@@ -2712,11 +2730,14 @@ export default function AppDiagnostico() {
                           guardando={guardandoFpcBateria}
                           ultimaSincronizacion={ultimaSincFpcBateria}
                           esIPhone={modeloActivo.fpcBateria.esIPhone}
-                          estiloLayout={modeloActivo.fpcBateria.estiloLayout || (modeloActivo.fpcBateria.esIPhone ? 'hibrido' : 'doble_fila')}
+                          estiloLayout={modeloActivo.fpcBateria.estiloLayout || 'hibrido'}
                           onCambiarEstiloLayout={(nuevoEstilo) => {
                             let presetDefecto = null;
                             if (nuevoEstilo === 'hibrido') {
-                              presetDefecto = PRESETS_BATERIA.find(p => p.id === 'iphone_clasico');
+                              const esIPhone = esIPhoneModelo(modeloActivo);
+                              presetDefecto = esIPhone
+                                ? PRESETS_BATERIA.find(p => p.id === 'iphone_clasico')
+                                : (PRESETS_BATERIA.find(p => p.id === 'android_hibrido_10p') || PRESETS_BATERIA.find(p => p.id === 'iphone_clasico'));
                             } else if (nuevoEstilo === 'fila_simple') {
                               presetDefecto = PRESETS_BATERIA.find(p => p.id === 'fila_simple_4p');
                             } else {
@@ -2731,6 +2752,7 @@ export default function AppDiagnostico() {
                                   nombre: p.nombre,
                                   tipo: p.tipo,
                                   colorCustom: p.colorCustom,
+                                  grosor: p.grosor || pinExistente?.grosor || (p.id <= 2 ? 'grueso' : 'delgado'),
                                   valorSanoDiodo: pinExistente?.valorSanoDiodo ?? '---',
                                   valorSanoUa: pinExistente?.valorSanoUa ?? '---',
                                   valorSanoOhmio: pinExistente?.valorSanoOhmio ?? '---',
@@ -2770,6 +2792,7 @@ export default function AppDiagnostico() {
                                   id: i,
                                   nombre: '',
                                   tipo: 'DATA',
+                                  grosor: i <= 2 ? 'grueso' : 'delgado',
                                   valorSanoDiodo: '---',
                                   valorSanoUa: '---',
                                   valorSanoOhmio: '---',
@@ -2798,6 +2821,7 @@ export default function AppDiagnostico() {
                                 nombre: p.nombre,
                                 tipo: p.tipo,
                                 colorCustom: p.colorCustom,
+                                grosor: p.grosor || pinExistente?.grosor || (p.id <= 2 ? 'grueso' : 'delgado'),
                                 valorSanoDiodo: pinExistente?.valorSanoDiodo ?? '---',
                                 valorSanoUa: pinExistente?.valorSanoUa ?? '---',
                                 valorSanoOhmio: pinExistente?.valorSanoOhmio ?? '---',

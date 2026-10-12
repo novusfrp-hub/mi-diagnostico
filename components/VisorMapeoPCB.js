@@ -1,16 +1,16 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { 
-  Save, Trash2, Plus, Move, ZoomIn, ZoomOut, Layers, Maximize2, 
-  Settings, Edit, Edit3, Play, HelpCircle, Activity, Check, AlertTriangle, 
+import {
+  Save, Trash2, Plus, Move, ZoomIn, ZoomOut, Layers, Maximize2,
+  Settings, Edit, Edit3, Play, HelpCircle, Activity, Check, AlertTriangle,
   Map, Eye, EyeOff, Clipboard, RefreshCw, ChevronRight, ChevronLeft, CheckCircle2,
   Image as ImageIcon, Upload, RotateCcw, X, Link, Search, RotateCw, Lock, Zap, ArrowLeftRight, Tag, Gauge, FolderOpen, MousePointer
 } from 'lucide-react';
 import SelectorTipoLinea from './SelectorTipoLinea';
-import { 
-  optimizarYComprimirImagen, 
-  subirImagenStorage, 
-  eliminarImagenStorage, 
-  esUrlFirebaseStorage 
+import {
+  optimizarYComprimirImagen,
+  subirImagenStorage,
+  eliminarImagenStorage,
+  esUrlFirebaseStorage
 } from '../lib/storageHelper';
 
 const TIPOS_COMPONENTE = ['Capacitor', 'Resistencia', 'Diodo', 'Bobina', 'Pin_FPC', 'TestPoint', 'Transistor'];
@@ -96,7 +96,7 @@ export const deducirCategoriaDeNet = (netName, pad = null) => {
           }
         }
       }
-    } catch (e) {}
+    } catch (e) { }
   }
 
   // 3. CATÁLOGO BASE PREDEFINIDO
@@ -356,8 +356,8 @@ export default function VisorMapeoPCB({
   const [modalUrlConfig, setModalUrlConfig] = useState({ abierto: false, tipo: 'placa', urlInput: '' });
 
   // Imagen activa según la cara seleccionada
-  const activeImgPlacaUrl = caraPlaca === 'A' 
-    ? (imgPlacaCaraAUrl || IMAGEN_PREDETERMINADA) 
+  const activeImgPlacaUrl = caraPlaca === 'A'
+    ? (imgPlacaCaraAUrl || IMAGEN_PREDETERMINADA)
     : (imgPlacaCaraBUrl || IMAGEN_PREDETERMINADA);
 
   // Componentes filtrados para la cara actual
@@ -370,7 +370,7 @@ export default function VisorMapeoPCB({
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('net_names_personalizados');
       if (saved) {
-        try { return JSON.parse(saved); } catch (e) {}
+        try { return JSON.parse(saved); } catch (e) { }
       }
     }
     return NET_NAMES_BASE;
@@ -637,7 +637,7 @@ export default function VisorMapeoPCB({
       gain.connect(ctx.destination);
       osc.start();
       osc.stop(ctx.currentTime + 0.12);
-    } catch (e) {}
+    } catch (e) { }
   }, []);
 
   // Fit to view
@@ -750,7 +750,7 @@ export default function VisorMapeoPCB({
         // Si la imagen previa en esta cara era de Firebase Storage, la eliminamos para no acumular basura
         const urlAnterior = caraPlaca === 'A' ? imgPlacaCaraAUrl : imgPlacaCaraBUrl;
         if (esUrlFirebaseStorage(urlAnterior)) {
-          eliminarImagenStorage(urlAnterior).catch(() => {});
+          eliminarImagenStorage(urlAnterior).catch(() => { });
         }
         setEstadoCargaImagen({
           tipo: 'éxito',
@@ -801,7 +801,7 @@ export default function VisorMapeoPCB({
       try {
         finalUrl = await subirImagenStorage(blob, rutaStorage);
         if (esUrlFirebaseStorage(imgEsquemaUrl)) {
-          eliminarImagenStorage(imgEsquemaUrl).catch(() => {});
+          eliminarImagenStorage(imgEsquemaUrl).catch(() => { });
         }
         setEstadoCargaImagen({
           tipo: 'éxito',
@@ -907,7 +907,7 @@ export default function VisorMapeoPCB({
     if (modalUrlConfig.tipo === 'placa') {
       const urlAnterior = caraPlaca === 'A' ? imgPlacaCaraAUrl : imgPlacaCaraBUrl;
       if (esUrlFirebaseStorage(urlAnterior) && urlAnterior !== urlLimpia) {
-        eliminarImagenStorage(urlAnterior).catch(() => {});
+        eliminarImagenStorage(urlAnterior).catch(() => { });
       }
       if (caraPlaca === 'A') {
         setImgPlacaCaraAUrl(urlLimpia || IMAGEN_PREDETERMINADA);
@@ -918,7 +918,7 @@ export default function VisorMapeoPCB({
       setBannerGuiaCerrado(true);
     } else {
       if (esUrlFirebaseStorage(imgEsquemaUrl) && imgEsquemaUrl !== urlLimpia) {
-        eliminarImagenStorage(imgEsquemaUrl).catch(() => {});
+        eliminarImagenStorage(imgEsquemaUrl).catch(() => { });
       }
       setImgEsquemaUrl(urlLimpia);
       setShowEsquema(true);
@@ -982,7 +982,7 @@ export default function VisorMapeoPCB({
 
         // Si el pin tenía el formato NombreAnterior_P1 o NombreAnterior_P2 o similar, o estaba sin nombre
         if (!pad.netName || pad.netName === `${oldNombre}_P${pad.id}` || pad.netName.startsWith(`${oldNombre}_`) || pad.netName === '---') {
-          const sufijoPad = (tipoDetectado === 'Diodo') 
+          const sufijoPad = (tipoDetectado === 'Diodo')
             ? (pad.id === '1' ? 'A' : 'K')
             : `P${pad.id}`;
           return {
@@ -994,7 +994,7 @@ export default function VisorMapeoPCB({
         // Para componentes en serie con nombres temporales anteriores
         if (esSerie && pad.tipo !== 'GND' && pad.tipo !== 'NC') {
           if (pad.netName.includes('_P') || pad.netName.startsWith('L') || pad.netName.startsWith('C') || pad.netName.startsWith('D')) {
-            const sufijoPad = (tipoDetectado === 'Diodo') 
+            const sufijoPad = (tipoDetectado === 'Diodo')
               ? (pad.id === '1' ? 'A' : 'K')
               : `P${pad.id}`;
             return {
@@ -1209,7 +1209,7 @@ export default function VisorMapeoPCB({
           catalogo[catFinal].push(limpio);
         }
         localStorage.setItem('catalogo_redes_personalizadas', JSON.stringify(catalogo));
-      } catch (e) {}
+      } catch (e) { }
     }
 
     if (selectedPadId) {
@@ -1246,7 +1246,7 @@ export default function VisorMapeoPCB({
       try {
         const saved = localStorage.getItem('catalogo_redes_personalizadas');
         if (saved) catalogoDinamico = JSON.parse(saved);
-      } catch (e) {}
+      } catch (e) { }
     }
 
     if (categoriaNetFiltro === 'todas') {
@@ -2050,8 +2050,8 @@ export default function VisorMapeoPCB({
   const resultadosBusqueda = useMemo(() => {
     if (!busqueda.trim()) return [];
     const q = busqueda.trim().toLowerCase();
-    return componentes.filter(c => 
-      c.nombre.toLowerCase().includes(q) || 
+    return componentes.filter(c =>
+      c.nombre.toLowerCase().includes(q) ||
       c.tipo.toLowerCase().includes(q) ||
       c.pads.some(p => p.netName.toLowerCase().includes(q))
     ).slice(0, 8);
@@ -2408,7 +2408,7 @@ export default function VisorMapeoPCB({
 
             {/* Selector de Cara integrado al sector activo */}
             <div style={{ display: 'flex', background: '#0b0f19', padding: '2px', borderRadius: '6px', border: '1px solid #374151' }}>
-              <button 
+              <button
                 type="button"
                 onClick={() => {
                   setCaraPlaca('A');
@@ -2435,7 +2435,7 @@ export default function VisorMapeoPCB({
               >
                 🅰️ Cara A {sectorActivoInfo.compsA > 0 ? `(${sectorActivoInfo.compsA})` : ''} {sectorActivoInfo.hasImgA ? '📷' : ''}
               </button>
-              <button 
+              <button
                 type="button"
                 onClick={() => {
                   setCaraPlaca('B');
@@ -2520,10 +2520,10 @@ export default function VisorMapeoPCB({
 
           {/* Selector de Herramientas */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '3px', background: '#111827', padding: '3px 4px', borderRadius: '8px', border: '1px solid #374151' }}>
-            <button 
-              onClick={() => { setTool('select'); setDrawingStep(0); }} 
-              style={{ 
-                ...styles.toolBtn, 
+            <button
+              onClick={() => { setTool('select'); setDrawingStep(0); }}
+              style={{
+                ...styles.toolBtn,
                 display: 'flex',
                 alignItems: 'center',
                 gap: '4px',
@@ -2536,18 +2536,18 @@ export default function VisorMapeoPCB({
               <MousePointer size={13} /> Puntero
             </button>
             {puedeEditar && (
-              <button 
-                onClick={() => { 
+              <button
+                onClick={() => {
                   if (tool === 'drawSMD') {
                     setTool('select');
                     setDrawingStep(0);
                   } else {
-                    setTool('drawSMD'); 
-                    setDrawingStep(0); 
+                    setTool('drawSMD');
+                    setDrawingStep(0);
                   }
-                }} 
-                style={{ 
-                  ...styles.toolBtn, 
+                }}
+                style={{
+                  ...styles.toolBtn,
                   display: 'flex',
                   alignItems: 'center',
                   gap: '4px',
@@ -2562,10 +2562,10 @@ export default function VisorMapeoPCB({
                 <Edit3 size={13} /> {tool === 'drawSMD' ? '✏️ Dibujando SMD' : '+ Dibujar SMD'}
               </button>
             )}
-            <button 
-              onClick={() => { setTool('pan'); setDrawingStep(0); }} 
-              style={{ 
-                ...styles.toolBtn, 
+            <button
+              onClick={() => { setTool('pan'); setDrawingStep(0); }}
+              style={{
+                ...styles.toolBtn,
                 display: 'flex',
                 alignItems: 'center',
                 gap: '4px',
@@ -2717,11 +2717,11 @@ export default function VisorMapeoPCB({
           <div style={styles.divider} />
 
           {/* Botón de AutoHold */}
-          <button 
-            onClick={() => setAutoHoldActivo(!autoHoldActivo)} 
-            style={{ 
-              ...styles.btn, 
-              backgroundColor: autoHoldActivo ? 'rgba(16, 185, 129, 0.2)' : '#1f2937', 
+          <button
+            onClick={() => setAutoHoldActivo(!autoHoldActivo)}
+            style={{
+              ...styles.btn,
+              backgroundColor: autoHoldActivo ? 'rgba(16, 185, 129, 0.2)' : '#1f2937',
               color: autoHoldActivo ? '#10b981' : '#9ca3af',
               border: autoHoldActivo ? '1px solid #10b981' : '1px solid #374151',
               boxShadow: autoHoldActivo ? '0 0 10px rgba(16,185,129,0.4)' : 'none'
@@ -2732,11 +2732,11 @@ export default function VisorMapeoPCB({
           </button>
 
           {/* Botón de Iniciar Flujo de Medición Guiada */}
-          <button 
+          <button
             onClick={iniciarMedicionGuiada}
-            style={{ 
-              ...styles.btn, 
-              backgroundColor: '#3b82f6', 
+            style={{
+              ...styles.btn,
+              backgroundColor: '#3b82f6',
               color: '#ffffff'
             }}
             title="Recorrer componentes en el orden creado para medir"
@@ -2750,9 +2750,9 @@ export default function VisorMapeoPCB({
           <div style={{ position: 'relative' }}>
             <div style={{ display: 'flex', alignItems: 'center', backgroundColor: '#111827', border: '1px solid #374151', borderRadius: '6px', padding: '2px 8px' }}>
               <Search size={14} color="#9ca3af" />
-              <input 
-                type="text" 
-                placeholder="Buscar componente o net..." 
+              <input
+                type="text"
+                placeholder="Buscar componente o net..."
                 value={busqueda}
                 onChange={(e) => { setBusqueda(e.target.value); setMostrarResultadosBusqueda(true); }}
                 onFocus={() => setMostrarResultadosBusqueda(true)}
@@ -2768,8 +2768,8 @@ export default function VisorMapeoPCB({
             {mostrarResultadosBusqueda && resultadosBusqueda.length > 0 && (
               <div style={styles.searchResultsDropdown}>
                 {resultadosBusqueda.map(c => (
-                  <div 
-                    key={c.id} 
+                  <div
+                    key={c.id}
                     onClick={() => centrarEnComponente(c)}
                     style={styles.searchResultItem}
                   >
@@ -2795,7 +2795,7 @@ export default function VisorMapeoPCB({
             </span>
           )}
           {onGuardar && (
-            <button 
+            <button
               onClick={() => {
                 const sectoresConsolidados = {
                   ...sectores,
@@ -2815,10 +2815,10 @@ export default function VisorMapeoPCB({
                   imagenEsquema: imgEsquemaUrl,
                   sector: sectorPlaca
                 });
-              }} 
+              }}
               disabled={guardando}
               style={{
-                ...styles.btn, 
+                ...styles.btn,
                 backgroundColor: cambiosPendientes ? '#d97706' : '#10b981',
                 color: '#fff',
                 boxShadow: cambiosPendientes ? '0 0 10px rgba(217,119,6,0.3)' : 'none'
@@ -2843,17 +2843,17 @@ export default function VisorMapeoPCB({
       {/* 2. BARRA DE CAPAS DE IMAGEN (PLACA / ESQUEMA) Y MATRIZ */}
       <div style={styles.layerBar}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
-          
+
           <div style={{ display: 'flex', background: '#111827', padding: '2px', borderRadius: '6px', border: '1px solid #374151' }}>
-            <button 
-              onClick={() => setCapaActiva('placa')} 
+            <button
+              onClick={() => setCapaActiva('placa')}
               style={{ ...styles.capaBtn, ...(capaActiva === 'placa' && styles.capaBtnActive) }}
               title={`Capa de Imagen de Placa: Cara ${caraPlaca} del sector "${sectorPlaca}"`}
             >
               📸 Foto Placa
             </button>
-            <button 
-              onClick={() => setCapaActiva('esquema')} 
+            <button
+              onClick={() => setCapaActiva('esquema')}
               style={{ ...styles.capaBtn, ...(capaActiva === 'esquema' && styles.capaBtnActive) }}
               title={`Capa de Diagrama Esquemático del sector "${sectorPlaca}"`}
             >
@@ -2864,10 +2864,10 @@ export default function VisorMapeoPCB({
           {capaActiva === 'placa' && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               <label style={styles.checkboxLabel}>
-                <input 
-                  type="checkbox" 
-                  checked={showPlaca} 
-                  onChange={(e) => setShowPlaca(e.target.checked)} 
+                <input
+                  type="checkbox"
+                  checked={showPlaca}
+                  onChange={(e) => setShowPlaca(e.target.checked)}
                 />
                 Ver Foto
               </label>
@@ -2875,12 +2875,12 @@ export default function VisorMapeoPCB({
               {showPlaca && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <span style={{ fontSize: '0.65rem', color: '#9ca3af' }}>Opacidad:</span>
-                  <input 
-                    type="range" 
-                    min="0.1" 
-                    max="1.0" 
-                    step="0.05" 
-                    value={placaOpacity} 
+                  <input
+                    type="range"
+                    min="0.1"
+                    max="1.0"
+                    step="0.05"
+                    value={placaOpacity}
                     onChange={(e) => setPlacaOpacity(parseFloat(e.target.value))}
                     style={{ width: '55px', accentColor: '#3b82f6' }}
                   />
@@ -2889,10 +2889,10 @@ export default function VisorMapeoPCB({
 
               {puedeEditar && (
                 <>
-                  <button 
-                    onClick={() => fileInputPlacaRef.current && fileInputPlacaRef.current.click()} 
+                  <button
+                    onClick={() => fileInputPlacaRef.current && fileInputPlacaRef.current.click()}
                     disabled={comprimiendoImagen || eliminandoImagen}
-                    style={{ ...styles.imgBtn, opacity: (comprimiendoImagen || eliminandoImagen) ? 0.6 : 1 }} 
+                    style={{ ...styles.imgBtn, opacity: (comprimiendoImagen || eliminandoImagen) ? 0.6 : 1 }}
                     title={`Subir foto de Cara ${caraPlaca} para el sector "${sectorPlaca}" desde PC`}
                   >
                     <Upload size={12} /> {comprimiendoImagen ? 'Subiendo...' : 'Subir Foto'}
@@ -2900,12 +2900,12 @@ export default function VisorMapeoPCB({
                   <button onClick={pedirUrlPlaca} style={styles.imgBtn} title={`Pegar URL directa de imagen para Cara ${caraPlaca} del sector "${sectorPlaca}"`}>
                     <Link size={12} /> URL
                   </button>
-                  <button 
+                  <button
                     onClick={() => {
                       if (caraPlaca === 'A') setImgPlacaCaraAUrl(IMAGEN_PREDETERMINADA);
                       else setImgPlacaCaraBUrl('');
-                    }} 
-                    style={styles.imgBtn} 
+                    }}
+                    style={styles.imgBtn}
                     title={`Restaurar imagen predeterminada de Cara ${caraPlaca} (${sectorPlaca})`}
                   >
                     <RotateCcw size={12} /> Predet.
@@ -2958,10 +2958,10 @@ export default function VisorMapeoPCB({
           {capaActiva === 'esquema' && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               <label style={styles.checkboxLabel}>
-                <input 
-                  type="checkbox" 
-                  checked={showEsquema} 
-                  onChange={(e) => setShowEsquema(e.target.checked)} 
+                <input
+                  type="checkbox"
+                  checked={showEsquema}
+                  onChange={(e) => setShowEsquema(e.target.checked)}
                 />
                 Ver Esquema
               </label>
@@ -2969,12 +2969,12 @@ export default function VisorMapeoPCB({
               {showEsquema && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <span style={{ fontSize: '0.65rem', color: '#9ca3af' }}>Opacidad:</span>
-                  <input 
-                    type="range" 
-                    min="0.1" 
-                    max="1.0" 
-                    step="0.05" 
-                    value={esquemaOpacity} 
+                  <input
+                    type="range"
+                    min="0.1"
+                    max="1.0"
+                    step="0.05"
+                    value={esquemaOpacity}
                     onChange={(e) => setEsquemaOpacity(parseFloat(e.target.value))}
                     style={{ width: '55px', accentColor: '#8b5cf6' }}
                   />
@@ -2983,10 +2983,10 @@ export default function VisorMapeoPCB({
 
               {puedeEditar && (
                 <>
-                  <button 
-                    onClick={() => fileInputEsquemaRef.current && fileInputEsquemaRef.current.click()} 
+                  <button
+                    onClick={() => fileInputEsquemaRef.current && fileInputEsquemaRef.current.click()}
                     disabled={comprimiendoImagen || eliminandoImagen}
-                    style={{ ...styles.imgBtn, opacity: (comprimiendoImagen || eliminandoImagen) ? 0.6 : 1 }} 
+                    style={{ ...styles.imgBtn, opacity: (comprimiendoImagen || eliminandoImagen) ? 0.6 : 1 }}
                     title="Subir esquema desde PC"
                   >
                     <Upload size={12} /> {comprimiendoImagen ? 'Subiendo...' : 'Subir'}
@@ -3044,18 +3044,18 @@ export default function VisorMapeoPCB({
           {/* Filtros de Capas Vectoriales */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <label style={styles.checkboxLabel} title="Contornos perimetrales de componentes SMD (desactivado por defecto)">
-              <input 
-                type="checkbox" 
-                checked={showHitbox} 
-                onChange={(e) => setShowHitbox(e.target.checked)} 
+              <input
+                type="checkbox"
+                checked={showHitbox}
+                onChange={(e) => setShowHitbox(e.target.checked)}
               />
               Bordes SMD
             </label>
             <label style={styles.checkboxLabel}>
-              <input 
-                type="checkbox" 
-                checked={showComponentNames} 
-                onChange={(e) => setShowComponentNames(e.target.checked)} 
+              <input
+                type="checkbox"
+                checked={showComponentNames}
+                onChange={(e) => setShowComponentNames(e.target.checked)}
               />
               Nombres
             </label>
@@ -3066,34 +3066,34 @@ export default function VisorMapeoPCB({
           {/* Panel Matriz */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <label style={styles.checkboxLabel} title="Clonar componentes en matriz (arrastrar el nodo cyan)">
-              <input 
-                type="checkbox" 
-                checked={matrizActiva} 
-                onChange={(e) => setMatrizActiva(e.target.checked)} 
+              <input
+                type="checkbox"
+                checked={matrizActiva}
+                onChange={(e) => setMatrizActiva(e.target.checked)}
               />
               <span style={{ color: matrizActiva ? '#00ffff' : '#aaa', fontWeight: 'bold' }}>Matriz</span>
             </label>
 
             {matrizActiva && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '4px', animation: 'fadeIn 0.3s' }}>
-                <input 
-                  type="number" 
-                  min="1" 
+                <input
+                  type="number"
+                  min="1"
                   max="20"
-                  value={matrizRows} 
+                  value={matrizRows}
                   onChange={(e) => setMatrizRows(Math.max(1, parseInt(e.target.value) || 1))}
-                  style={styles.numInput} 
+                  style={styles.numInput}
                   title="Filas"
                   placeholder="F"
                 />
                 <span style={{ color: '#6b7280', fontSize: '0.8rem' }}>x</span>
-                <input 
-                  type="number" 
-                  min="1" 
+                <input
+                  type="number"
+                  min="1"
                   max="20"
-                  value={matrizCols} 
+                  value={matrizCols}
                   onChange={(e) => setMatrizCols(Math.max(1, parseInt(e.target.value) || 1))}
-                  style={styles.numInput} 
+                  style={styles.numInput}
                   title="Columnas"
                   placeholder="C"
                 />
@@ -3115,13 +3115,13 @@ export default function VisorMapeoPCB({
 
       {/* 3. AREA CENTRAL: LIENZO SVG + PANEL LATERAL */}
       <div style={{ display: 'flex', flex: 1, position: 'relative', minHeight: '500px', overflow: 'hidden' }}>
-        
+
         {/* LIENZO SVG */}
-        <div 
+        <div
           ref={svgContainerRef}
-          style={{ 
-            ...styles.canvasContainer, 
-            cursor: tool === 'pan' ? (isPanning ? 'grabbing' : 'grab') : (isDraggingComp ? 'move' : 'default') 
+          style={{
+            ...styles.canvasContainer,
+            cursor: tool === 'pan' ? (isPanning ? 'grabbing' : 'grab') : (isDraggingComp ? 'move' : 'default')
           }}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
@@ -3143,13 +3143,13 @@ export default function VisorMapeoPCB({
 
             {/* Lectura en vivo principal */}
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginTop: '2px' }}>
-              <span 
-                style={{ 
-                  fontSize: '2rem', 
-                  fontWeight: 'bold', 
+              <span
+                style={{
+                  fontSize: '2rem',
+                  fontWeight: 'bold',
                   fontFamily: 'Consolas, monospace',
-                  color: lecturaEnVivo === 'OL' ? '#ef4444' : 
-                         parseFloat(lecturaEnVivo) < 0.050 ? '#ef4444' : '#00ffff',
+                  color: lecturaEnVivo === 'OL' ? '#ef4444' :
+                    parseFloat(lecturaEnVivo) < 0.050 ? '#ef4444' : '#00ffff',
                   textShadow: '0 0 10px rgba(0,255,255,0.3)'
                 }}
               >
@@ -3325,7 +3325,7 @@ export default function VisorMapeoPCB({
               <span style={{ fontSize: '0.78rem', color: '#e5e7eb' }}>
                 Mapeando <strong>Cara {caraPlaca} · Sector "{sectorPlaca}"</strong>. Sube una foto de esta área usando <strong>"Subir Foto"</strong> o usa <strong style={{ color: '#00ffff' }}>+ Dibujar SMD</strong> para trazar componentes.
               </span>
-              <button 
+              <button
                 type="button"
                 onClick={() => { setTool('drawSMD'); setBannerGuiaCerrado(true); }}
                 style={{
@@ -3342,7 +3342,7 @@ export default function VisorMapeoPCB({
               >
                 + Dibujar SMD
               </button>
-              <button 
+              <button
                 type="button"
                 onClick={() => setBannerGuiaCerrado(true)}
                 style={{
@@ -3383,12 +3383,12 @@ export default function VisorMapeoPCB({
               <span style={{ fontSize: '0.82rem', color: '#fbbf24', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 ✏️ DIBUJAR: {
                   tipoDrawing === 'Bobina' ? '🌀 Bobina (L) — Serie (Sin GND)' :
-                  tipoDrawing === 'Diodo' ? '🔺 Diodo (D) — Serie (Ánodo/Cátodo)' :
-                  tipoDrawing === 'Resistencia' ? '🟣 Resistencia (R) — Serie' :
-                  tipoDrawing === 'Pin_FPC' ? '📍 Pin FPC (J) — 1 Solo Pin Rectangular' :
-                  tipoDrawing === 'TestPoint' ? '⭕ Test Point (TP) — 1 Solo Pin Circular' :
-                  tipoDrawing === 'Transistor' ? '🔲 Transistor (Q) — 3 Pines (SOT-23 / 2E)' :
-                  '⚡ Capacitor (C) — Filtro GND'
+                    tipoDrawing === 'Diodo' ? '🔺 Diodo (D) — Serie (Ánodo/Cátodo)' :
+                      tipoDrawing === 'Resistencia' ? '🟣 Resistencia (R) — Serie' :
+                        tipoDrawing === 'Pin_FPC' ? '📍 Pin FPC (J) — 1 Solo Pin Rectangular' :
+                          tipoDrawing === 'TestPoint' ? '⭕ Test Point (TP) — 1 Solo Pin Circular' :
+                            tipoDrawing === 'Transistor' ? '🔲 Transistor (Q) — 3 Pines (SOT-23 / 2E)' :
+                              '⚡ Capacitor (C) — Filtro GND'
                 }
               </span>
               <span style={{ fontSize: '0.78rem', color: '#e2e8f0' }}>
@@ -3518,7 +3518,7 @@ export default function VisorMapeoPCB({
             <rect width="100%" height="100%" fill="url(#gridPattern)" />
 
             <g transform={`translate(${posicion.x}, ${posicion.y}) scale(${zoom})`}>
-              
+
               {/* CAPA 1: IMAGEN DE PLACA (CARA A / CARA B) */}
               {showPlaca && activeImgPlacaUrl && (
                 <g>
@@ -3578,9 +3578,9 @@ export default function VisorMapeoPCB({
               {/* RENDERIZADO DE COMPONENTES SMD DE LA CARA ACTIVA */}
               {componentesVisibles.map((comp) => {
                 const isSelected = selectedCompId === comp.id;
-                
+
                 return (
-                  <g 
+                  <g
                     key={comp.id}
                     onMouseDown={(e) => {
                       if (tool === 'select') {
@@ -3863,10 +3863,10 @@ export default function VisorMapeoPCB({
                       vectorEffect="non-scaling-stroke"
                     />
                   ))}
-                  <text 
-                    x={clone.x + clone.w / 2} 
-                    y={clone.y + clone.h / 2 + 3} 
-                    textAnchor="middle" 
+                  <text
+                    x={clone.x + clone.w / 2}
+                    y={clone.y + clone.h / 2 + 3}
+                    textAnchor="middle"
                     style={{ fontFamily: 'Consolas, monospace', fontSize: '9px', fill: '#00ffff' }}
                   >
                     {clone.nombre}
@@ -4019,11 +4019,11 @@ export default function VisorMapeoPCB({
               : 0;
 
             return (
-              <div 
-                style={{ 
-                  ...styles.tooltip, 
-                  left: `${hoveredCoords.x}px`, 
-                  top: `${hoveredCoords.y}px` 
+              <div
+                style={{
+                  ...styles.tooltip,
+                  left: `${hoveredCoords.x}px`,
+                  top: `${hoveredCoords.y}px`
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #374151', paddingBottom: '6px', marginBottom: '8px' }}>
@@ -4139,812 +4139,812 @@ export default function VisorMapeoPCB({
 
         {/* SIDEBAR DERECHO: DETALLES, EDICIÓN, TIPO DE LÍNEA Y NET NAMES */}
         {sidebarAbierto && (
-        <div style={{
-          ...styles.sidebar,
-          width: `${sidebarAncho}px`,
-          minWidth: `${sidebarAncho}px`
-        }}>
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #374151', paddingBottom: '6px', marginBottom: '10px' }}>
-              <h3 style={styles.sidebarTitle}>Detalles de Selección</h3>
-              <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                <button
-                  type="button"
-                  onClick={() => setSidebarAncho(prev => prev === 390 ? 450 : 390)}
-                  style={{
-                    background: sidebarAncho === 450 ? 'rgba(59, 130, 246, 0.25)' : 'rgba(255, 255, 255, 0.08)',
-                    border: sidebarAncho === 450 ? '1px solid #3b82f6' : '1px solid #374151',
-                    color: sidebarAncho === 450 ? '#60a5fa' : '#9ca3af',
-                    cursor: 'pointer',
-                    padding: '3px 6px',
-                    borderRadius: '5px',
-                    fontSize: '0.68rem',
-                    fontWeight: 'bold',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '3px'
-                  }}
-                  title="Cambiar ancho del panel (390px / 450px) para ver todas las escalas sin recorte"
-                >
-                  ↔ {sidebarAncho}px
-                </button>
-                {compActivo && (
-                  <>
-                    <button 
-                      onClick={() => invertirPinesComponente(compActivo.id)}
-                      style={styles.actionSmallBtn}
-                      title="Invertir Pin 1 y Pin 2 (GND ↔ DATA)"
-                    >
-                      <ArrowLeftRight size={12} /> Invertir (1↔2)
-                    </button>
-                    <button 
-                      onClick={() => rotarComponente(compActivo.id)}
-                      style={styles.actionSmallBtn}
-                      title="Rotar componente 90° (Tecla R)"
-                    >
-                      <RotateCw size={12} /> Rotar 90°
-                    </button>
-                  </>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setSidebarAbierto(false)}
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.08)',
-                    border: '1px solid #374151',
-                    color: '#9ca3af',
-                    cursor: 'pointer',
-                    padding: '3px 6px',
-                    borderRadius: '5px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    marginLeft: '4px'
-                  }}
-                  title="Esconder panel de selección"
-                >
-                  <ChevronRight size={16} />
-                </button>
+          <div style={{
+            ...styles.sidebar,
+            width: `${sidebarAncho}px`,
+            minWidth: `${sidebarAncho}px`
+          }}>
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #374151', paddingBottom: '6px', marginBottom: '10px' }}>
+                <h3 style={styles.sidebarTitle}>Detalles de Selección</h3>
+                <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                  <button
+                    type="button"
+                    onClick={() => setSidebarAncho(prev => prev === 390 ? 450 : 390)}
+                    style={{
+                      background: sidebarAncho === 450 ? 'rgba(59, 130, 246, 0.25)' : 'rgba(255, 255, 255, 0.08)',
+                      border: sidebarAncho === 450 ? '1px solid #3b82f6' : '1px solid #374151',
+                      color: sidebarAncho === 450 ? '#60a5fa' : '#9ca3af',
+                      cursor: 'pointer',
+                      padding: '3px 6px',
+                      borderRadius: '5px',
+                      fontSize: '0.68rem',
+                      fontWeight: 'bold',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '3px'
+                    }}
+                    title="Cambiar ancho del panel (390px / 450px) para ver todas las escalas sin recorte"
+                  >
+                    ↔ {sidebarAncho}px
+                  </button>
+                  {compActivo && (
+                    <>
+                      <button
+                        onClick={() => invertirPinesComponente(compActivo.id)}
+                        style={styles.actionSmallBtn}
+                        title="Invertir Pin 1 y Pin 2 (GND ↔ DATA)"
+                      >
+                        <ArrowLeftRight size={12} /> Invertir (1↔2)
+                      </button>
+                      <button
+                        onClick={() => rotarComponente(compActivo.id)}
+                        style={styles.actionSmallBtn}
+                        title="Rotar componente 90° (Tecla R)"
+                      >
+                        <RotateCw size={12} /> Rotar 90°
+                      </button>
+                    </>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setSidebarAbierto(false)}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.08)',
+                      border: '1px solid #374151',
+                      color: '#9ca3af',
+                      cursor: 'pointer',
+                      padding: '3px 6px',
+                      borderRadius: '5px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      marginLeft: '4px'
+                    }}
+                    title="Esconder panel de selección"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
               </div>
-            </div>
-            
-            {compActivo && padActivo ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                
-                {/* Info General Componente */}
-                <div style={styles.infoCard}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <input 
-                      type="text" 
-                      value={compActivo.nombre}
-                      onChange={(e) => {
-                        renombrarComponente(compActivo.id, e.target.value);
-                      }}
-                      onBlur={() => guardarSnapshotHistorial()}
-                      style={{ ...styles.inputDark, width: '120px', fontWeight: 'bold', fontSize: '0.9rem', color: '#00ffff' }}
-                      title="Editar nombre/número del componente (actualiza automáticamente sus pines P1 y P2)"
-                    />
-                    <select
-                      value={compActivo.tipo}
-                      onChange={(e) => {
-                        const nuevoTipo = e.target.value;
-                        const antiguoTipo = compActivo.tipo;
-                        const antiguoPrefix = TIPO_ABREVIATURAS[antiguoTipo] || 'C';
-                        const nuevoPrefix = TIPO_ABREVIATURAS[nuevoTipo] || 'C';
 
-                        guardarSnapshotHistorial();
-                        setComponentes(prev => prev.map(c => {
-                          if (c.id !== compActivo.id) return c;
-                          
-                          let nuevoNombre = c.nombre;
-                          if (nuevoNombre.startsWith(antiguoPrefix)) {
-                            nuevoNombre = nuevoPrefix + nuevoNombre.slice(antiguoPrefix.length);
-                          }
+              {compActivo && padActivo ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
 
-                          let nuevosPads = c.pads;
-                          const esSerie = nuevoTipo === 'Bobina' || nuevoTipo === 'Diodo' || nuevoTipo === 'Resistencia';
-                          const esParalelo = nuevoTipo === 'Capacitor';
-
-                          if (esSerie && c.pads.some(p => p.id === '2' && (p.tipo === 'GND' || p.netName === 'GND'))) {
-                            const sufijoP2 = nuevoTipo === 'Diodo' ? 'K' : 'P2';
-                            const sufijoP1 = nuevoTipo === 'Diodo' ? 'A' : 'P1';
-                            nuevosPads = c.pads.map(p => {
-                              if (p.id === '2') {
-                                return {
-                                  ...p,
-                                  tipo: 'DATA',
-                                  netName: `${nuevoNombre}_${sufijoP2}`,
-                                  valorSanoDiodo: '---',
-                                  valorActualDiodo: '---',
-                                  valorSanoVoltio: '---',
-                                  valorActualVoltio: '---',
-                                  valorSanoUa: '---',
-                                  valorActualUa: '---',
-                                  valorSanoOhmio: '---',
-                                  valorActualOhmio: '---'
-                                };
-                              }
-                              if (p.id === '1' && (p.netName === `${c.nombre}_P1` || p.netName === `${c.nombre}_A`)) {
-                                return { ...p, netName: `${nuevoNombre}_${sufijoP1}` };
-                              }
-                              if (p.netName && p.netName.startsWith(`${c.nombre}_`)) {
-                                return { ...p, netName: p.netName.replace(`${c.nombre}_`, `${nuevoNombre}_`) };
-                              }
-                              return p;
-                            });
-                          } else if (esParalelo && !c.pads.some(p => p.id === '2' && (p.tipo === 'GND' || p.netName === 'GND'))) {
-                            nuevosPads = c.pads.map(p => {
-                              if (p.id === '2') {
-                                return {
-                                  ...p,
-                                  tipo: 'GND',
-                                  netName: 'GND',
-                                  valorSanoDiodo: '0.000',
-                                  valorActualDiodo: '0.000',
-                                  valorSanoVoltio: '0.000',
-                                  valorActualVoltio: '0.000',
-                                  valorSanoUa: '0',
-                                  valorActualUa: '0',
-                                  valorSanoOhmio: '0',
-                                  valorActualOhmio: '0'
-                                };
-                              }
-                              if (p.netName && p.netName.startsWith(`${c.nombre}_`)) {
-                                return { ...p, netName: p.netName.replace(`${c.nombre}_`, `${nuevoNombre}_`) };
-                              }
-                              return p;
-                            });
-                          } else {
-                            nuevosPads = c.pads.map(p => {
-                              if (p.netName && p.netName.startsWith(`${c.nombre}_`)) {
-                                return { ...p, netName: p.netName.replace(`${c.nombre}_`, `${nuevoNombre}_`) };
-                              }
-                              return p;
-                            });
-                          }
-
-                          return {
-                            ...c,
-                            tipo: nuevoTipo,
-                            nombre: nuevoNombre,
-                            pads: nuevosPads
-                          };
-                        }));
-                      }}
-                      style={styles.selectDark}
-                      title="Cambiar tipo de componente"
-                    >
-                      {TIPOS_COMPONENTE.map(t => (
-                        <option key={t} value={t}>
-                          {t === 'Bobina' ? '🌀 Bobina (L)' : (t === 'Capacitor' ? '⚡ Capacitor (C)' : (t === 'Resistencia' ? '🟣 Resistencia (R)' : (t === 'Diodo' ? '🔺 Diodo (D)' : (t === 'Pin_FPC' ? '📍 Pin FPC (J)' : (t === 'TestPoint' ? '⭕ Test Point (TP)' : '🔲 Transistor (Q)')))))}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Selector de Cara para el Componente Activo */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #1f2937' }}>
-                    <span style={{ fontSize: '0.7rem', color: '#9ca3af', fontWeight: 'bold' }}>Cara en "{sectorPlaca}":</span>
-                    <div style={{ display: 'flex', gap: '4px' }}>
-                      <button 
-                        type="button" 
-                        onClick={() => setComponentes(prev => prev.map(c => c.id === compActivo.id ? { ...c, cara: 'A' } : c))}
-                        style={{
-                          padding: '3px 8px',
-                          borderRadius: '4px',
-                          border: 'none',
-                          background: (compActivo.cara || 'A') === 'A' ? '#2563eb' : '#1f2937',
-                          color: (compActivo.cara || 'A') === 'A' ? '#fff' : '#9ca3af',
-                          fontSize: '0.68rem',
-                          fontWeight: 'bold',
-                          cursor: 'pointer'
+                  {/* Info General Componente */}
+                  <div style={styles.infoCard}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <input
+                        type="text"
+                        value={compActivo.nombre}
+                        onChange={(e) => {
+                          renombrarComponente(compActivo.id, e.target.value);
                         }}
-                      >
-                        Cara A
-                      </button>
-                      <button 
-                        type="button" 
-                        onClick={() => setComponentes(prev => prev.map(c => c.id === compActivo.id ? { ...c, cara: 'B' } : c))}
-                        style={{
-                          padding: '3px 8px',
-                          borderRadius: '4px',
-                          border: 'none',
-                          background: compActivo.cara === 'B' ? '#7c3aed' : '#1f2937',
-                          color: compActivo.cara === 'B' ? '#fff' : '#9ca3af',
-                          fontSize: '0.68rem',
-                          fontWeight: 'bold',
-                          cursor: 'pointer'
+                        onBlur={() => guardarSnapshotHistorial()}
+                        style={{ ...styles.inputDark, width: '120px', fontWeight: 'bold', fontSize: '0.9rem', color: '#00ffff' }}
+                        title="Editar nombre/número del componente (actualiza automáticamente sus pines P1 y P2)"
+                      />
+                      <select
+                        value={compActivo.tipo}
+                        onChange={(e) => {
+                          const nuevoTipo = e.target.value;
+                          const antiguoTipo = compActivo.tipo;
+                          const antiguoPrefix = TIPO_ABREVIATURAS[antiguoTipo] || 'C';
+                          const nuevoPrefix = TIPO_ABREVIATURAS[nuevoTipo] || 'C';
+
+                          guardarSnapshotHistorial();
+                          setComponentes(prev => prev.map(c => {
+                            if (c.id !== compActivo.id) return c;
+
+                            let nuevoNombre = c.nombre;
+                            if (nuevoNombre.startsWith(antiguoPrefix)) {
+                              nuevoNombre = nuevoPrefix + nuevoNombre.slice(antiguoPrefix.length);
+                            }
+
+                            let nuevosPads = c.pads;
+                            const esSerie = nuevoTipo === 'Bobina' || nuevoTipo === 'Diodo' || nuevoTipo === 'Resistencia';
+                            const esParalelo = nuevoTipo === 'Capacitor';
+
+                            if (esSerie && c.pads.some(p => p.id === '2' && (p.tipo === 'GND' || p.netName === 'GND'))) {
+                              const sufijoP2 = nuevoTipo === 'Diodo' ? 'K' : 'P2';
+                              const sufijoP1 = nuevoTipo === 'Diodo' ? 'A' : 'P1';
+                              nuevosPads = c.pads.map(p => {
+                                if (p.id === '2') {
+                                  return {
+                                    ...p,
+                                    tipo: 'DATA',
+                                    netName: `${nuevoNombre}_${sufijoP2}`,
+                                    valorSanoDiodo: '---',
+                                    valorActualDiodo: '---',
+                                    valorSanoVoltio: '---',
+                                    valorActualVoltio: '---',
+                                    valorSanoUa: '---',
+                                    valorActualUa: '---',
+                                    valorSanoOhmio: '---',
+                                    valorActualOhmio: '---'
+                                  };
+                                }
+                                if (p.id === '1' && (p.netName === `${c.nombre}_P1` || p.netName === `${c.nombre}_A`)) {
+                                  return { ...p, netName: `${nuevoNombre}_${sufijoP1}` };
+                                }
+                                if (p.netName && p.netName.startsWith(`${c.nombre}_`)) {
+                                  return { ...p, netName: p.netName.replace(`${c.nombre}_`, `${nuevoNombre}_`) };
+                                }
+                                return p;
+                              });
+                            } else if (esParalelo && !c.pads.some(p => p.id === '2' && (p.tipo === 'GND' || p.netName === 'GND'))) {
+                              nuevosPads = c.pads.map(p => {
+                                if (p.id === '2') {
+                                  return {
+                                    ...p,
+                                    tipo: 'GND',
+                                    netName: 'GND',
+                                    valorSanoDiodo: '0.000',
+                                    valorActualDiodo: '0.000',
+                                    valorSanoVoltio: '0.000',
+                                    valorActualVoltio: '0.000',
+                                    valorSanoUa: '0',
+                                    valorActualUa: '0',
+                                    valorSanoOhmio: '0',
+                                    valorActualOhmio: '0'
+                                  };
+                                }
+                                if (p.netName && p.netName.startsWith(`${c.nombre}_`)) {
+                                  return { ...p, netName: p.netName.replace(`${c.nombre}_`, `${nuevoNombre}_`) };
+                                }
+                                return p;
+                              });
+                            } else {
+                              nuevosPads = c.pads.map(p => {
+                                if (p.netName && p.netName.startsWith(`${c.nombre}_`)) {
+                                  return { ...p, netName: p.netName.replace(`${c.nombre}_`, `${nuevoNombre}_`) };
+                                }
+                                return p;
+                              });
+                            }
+
+                            return {
+                              ...c,
+                              tipo: nuevoTipo,
+                              nombre: nuevoNombre,
+                              pads: nuevosPads
+                            };
+                          }));
                         }}
+                        style={styles.selectDark}
+                        title="Cambiar tipo de componente"
                       >
-                        Cara B
-                      </button>
+                        {TIPOS_COMPONENTE.map(t => (
+                          <option key={t} value={t}>
+                            {t === 'Bobina' ? '🌀 Bobina (L)' : (t === 'Capacitor' ? '⚡ Capacitor (C)' : (t === 'Resistencia' ? '🟣 Resistencia (R)' : (t === 'Diodo' ? '🔺 Diodo (D)' : (t === 'Pin_FPC' ? '📍 Pin FPC (J)' : (t === 'TestPoint' ? '⭕ Test Point (TP)' : '🔲 Transistor (Q)')))))}
+                          </option>
+                        ))}
+                      </select>
                     </div>
-                  </div>
 
-                  {/* Selector de Circuito: En Serie vs A Tierra (Multi-pin) o Señal vs GND (1 Pin) */}
-                  {compActivo.pads.length > 1 ? (() => {
-                    const tienePinGnd = compActivo.pads.some(p => p.id === '2' && (p.tipo === 'GND' || p.netName === 'GND'));
-                    return (
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '6px', paddingTop: '6px', borderTop: '1px solid #1f2937' }}>
-                        <span style={{ fontSize: '0.7rem', color: '#9ca3af', fontWeight: 'bold' }}>Circuito:</span>
-                        <div style={{ display: 'flex', gap: '4px' }}>
-                          <button 
-                            type="button" 
-                            onClick={() => cambiarConexionComponente(compActivo.id, 'serie')}
-                            style={{
-                              padding: '3px 8px',
-                              borderRadius: '4px',
-                              border: !tienePinGnd ? '1px solid #10b981' : '1px solid #374151',
-                              background: !tienePinGnd ? 'rgba(16, 185, 129, 0.2)' : '#1f2937',
-                              color: !tienePinGnd ? '#10b981' : '#9ca3af',
-                              fontSize: '0.68rem',
-                              fontWeight: 'bold',
-                              cursor: 'pointer'
-                            }}
-                            title="Ambos pines en serie (paso de línea activa sin masa GND, típico en Bobinas L, Diodos D y Resistencias R)"
-                          >
-                            ⚡ En Serie (Paso)
-                          </button>
-                          <button 
-                            type="button" 
-                            onClick={() => cambiarConexionComponente(compActivo.id, 'tierra')}
-                            style={{
-                              padding: '3px 8px',
-                              borderRadius: '4px',
-                              border: tienePinGnd ? '1px solid #6b7280' : '1px solid #374151',
-                              background: tienePinGnd ? 'rgba(107, 114, 128, 0.3)' : '#1f2937',
-                              color: tienePinGnd ? '#f3f4f6' : '#9ca3af',
-                              fontSize: '0.68rem',
-                              fontWeight: 'bold',
-                              cursor: 'pointer'
-                            }}
-                            title="Pin 2 conectado a tierra GND (típico en Capacitores de filtro o bobinas de voltaje negativo AMOLED)"
-                          >
-                            🛡️ A Tierra (GND)
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })() : (
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '6px', paddingTop: '6px', borderTop: '1px solid #1f2937' }}>
-                      <span style={{ fontSize: '0.7rem', color: '#9ca3af', fontWeight: 'bold' }}>Función del Pin:</span>
+                    {/* Selector de Cara para el Componente Activo */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #1f2937' }}>
+                      <span style={{ fontSize: '0.7rem', color: '#9ca3af', fontWeight: 'bold' }}>Cara en "{sectorPlaca}":</span>
                       <div style={{ display: 'flex', gap: '4px' }}>
                         <button
                           type="button"
-                          onClick={() => {
-                            if (compActivo.pads[0]) {
-                              actualizarPropiedadPad(compActivo.pads[0].id, 'tipo', 'DATA');
-                              if (compActivo.pads[0].netName === 'GND') {
-                                actualizarPropiedadPad(compActivo.pads[0].id, 'netName', `${compActivo.nombre}_P1`);
-                              }
-                            }
-                          }}
+                          onClick={() => setComponentes(prev => prev.map(c => c.id === compActivo.id ? { ...c, cara: 'A' } : c))}
                           style={{
                             padding: '3px 8px',
                             borderRadius: '4px',
-                            border: compActivo.pads[0]?.tipo !== 'GND' && compActivo.pads[0]?.netName !== 'GND' ? '1px solid #06b6d4' : '1px solid #374151',
-                            background: compActivo.pads[0]?.tipo !== 'GND' && compActivo.pads[0]?.netName !== 'GND' ? 'rgba(6, 182, 212, 0.2)' : '#1f2937',
-                            color: compActivo.pads[0]?.tipo !== 'GND' && compActivo.pads[0]?.netName !== 'GND' ? '#22d3ee' : '#9ca3af',
+                            border: 'none',
+                            background: (compActivo.cara || 'A') === 'A' ? '#2563eb' : '#1f2937',
+                            color: (compActivo.cara || 'A') === 'A' ? '#fff' : '#9ca3af',
                             fontSize: '0.68rem',
                             fontWeight: 'bold',
                             cursor: 'pointer'
                           }}
                         >
-                          ⚡ Línea / Señal
+                          Cara A
                         </button>
                         <button
                           type="button"
-                          onClick={() => {
-                            if (compActivo.pads[0]) {
-                              actualizarPropiedadPad(compActivo.pads[0].id, 'tipo', 'GND');
-                              actualizarPropiedadPad(compActivo.pads[0].id, 'netName', 'GND');
-                            }
-                          }}
+                          onClick={() => setComponentes(prev => prev.map(c => c.id === compActivo.id ? { ...c, cara: 'B' } : c))}
                           style={{
                             padding: '3px 8px',
                             borderRadius: '4px',
-                            border: compActivo.pads[0]?.tipo === 'GND' || compActivo.pads[0]?.netName === 'GND' ? '1px solid #6b7280' : '1px solid #374151',
-                            background: compActivo.pads[0]?.tipo === 'GND' || compActivo.pads[0]?.netName === 'GND' ? 'rgba(107, 114, 128, 0.3)' : '#1f2937',
-                            color: compActivo.pads[0]?.tipo === 'GND' || compActivo.pads[0]?.netName === 'GND' ? '#f3f4f6' : '#9ca3af',
+                            border: 'none',
+                            background: compActivo.cara === 'B' ? '#7c3aed' : '#1f2937',
+                            color: compActivo.cara === 'B' ? '#fff' : '#9ca3af',
                             fontSize: '0.68rem',
                             fontWeight: 'bold',
                             cursor: 'pointer'
                           }}
                         >
-                          🛡️ Tierra (GND)
+                          Cara B
                         </button>
                       </div>
                     </div>
-                  )}
 
-                  {puedeEditar && (
-                    <button 
-                      onClick={() => borrarComponente(compActivo.id)} 
-                      style={{ ...styles.btn, backgroundColor: 'rgba(239, 68, 68, 0.15)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.3)', marginTop: '8px', width: '100%', justifyContent: 'center' }}
-                    >
-                      <Trash2 size={13} /> Eliminar Componente
-                    </button>
-                  )}
-                </div>
-
-                {/* Info del Pad Seleccionado con selector dinámico de pines */}
-                <div style={styles.editSection}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
-                    <h4 style={styles.sectionTitle}>Edición de Pin / Pad {padActivo.id}</h4>
-                    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
-                      {compActivo.pads.map((p) => {
-                        const isSelected = selectedPadId === p.id;
-                        let labelPin = `Pin ${p.id}`;
-                        if (compActivo.tipo === 'Diodo') {
-                          labelPin = p.id === '1' ? '🔺 Ánodo' : '⚡ Cátodo';
-                        } else if (compActivo.tipo === 'Bobina') {
-                          labelPin = p.id === '1' ? '🌀 In' : '🌀 Out';
-                        } else if (compActivo.tipo === 'Transistor') {
-                          labelPin = p.id === '1' ? 'B (Base)' : (p.id === '2' ? 'E (Emisor)' : (p.id === '3' ? 'C (Colector)' : `P${p.id}`));
-                        } else if (compActivo.tipo === 'TestPoint') {
-                          labelPin = `TP ${p.id}`;
-                        } else if (compActivo.tipo === 'Pin_FPC') {
-                          labelPin = `J ${p.id}`;
-                        }
-
-                        return (
-                          <button
-                            key={p.id}
-                            type="button"
-                            onClick={() => setSelectedPadId(p.id)}
-                            style={{
-                              ...styles.padSelectorBtn,
-                              ...(isSelected && styles.padSelectorBtnActive),
-                              fontSize: '0.68rem',
-                              padding: '3px 6px'
-                            }}
-                            title={`Seleccionar ${labelPin} (${p.netName || 'NC'})`}
-                          >
-                            {labelPin} ({p.netName || 'NC'})
-                          </button>
-                        );
-                      })}
-
-                      {puedeEditar && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => agregarPinAComponente(compActivo.id)}
-                            style={{
-                              background: 'rgba(16, 185, 129, 0.2)',
-                              border: '1px solid #10b981',
-                              color: '#34d399',
-                              borderRadius: '4px',
-                              padding: '2px 6px',
-                              fontSize: '0.68rem',
-                              fontWeight: 'bold',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '2px'
-                            }}
-                            title="Añadir un pin extra a este componente (ideal para transistores, integrados, FPC)"
-                          >
-                            + Pin
-                          </button>
-
-                          {compActivo.pads.length > 1 && (
+                    {/* Selector de Circuito: En Serie vs A Tierra (Multi-pin) o Señal vs GND (1 Pin) */}
+                    {compActivo.pads.length > 1 ? (() => {
+                      const tienePinGnd = compActivo.pads.some(p => p.id === '2' && (p.tipo === 'GND' || p.netName === 'GND'));
+                      return (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '6px', paddingTop: '6px', borderTop: '1px solid #1f2937' }}>
+                          <span style={{ fontSize: '0.7rem', color: '#9ca3af', fontWeight: 'bold' }}>Circuito:</span>
+                          <div style={{ display: 'flex', gap: '4px' }}>
                             <button
                               type="button"
-                              onClick={() => eliminarPinDeComponente(compActivo.id, padActivo.id)}
+                              onClick={() => cambiarConexionComponente(compActivo.id, 'serie')}
                               style={{
-                                background: 'rgba(239, 68, 68, 0.15)',
-                                border: '1px solid rgba(239, 68, 68, 0.4)',
-                                color: '#f87171',
+                                padding: '3px 8px',
                                 borderRadius: '4px',
-                                padding: '2px 5px',
-                                fontSize: '0.65rem',
+                                border: !tienePinGnd ? '1px solid #10b981' : '1px solid #374151',
+                                background: !tienePinGnd ? 'rgba(16, 185, 129, 0.2)' : '#1f2937',
+                                color: !tienePinGnd ? '#10b981' : '#9ca3af',
+                                fontSize: '0.68rem',
+                                fontWeight: 'bold',
                                 cursor: 'pointer'
                               }}
-                              title={`Eliminar el pin actual (${padActivo.id})`}
+                              title="Ambos pines en serie (paso de línea activa sin masa GND, típico en Bobinas L, Diodos D y Resistencias R)"
                             >
-                              ✕
+                              ⚡ En Serie (Paso)
                             </button>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Selector Avanzado de Tipo de Línea */}
-                  <div style={styles.formGroup}>
-                    <label style={styles.label}>Tipo de Línea (Categoría)</label>
-                    <SelectorTipoLinea
-                      valor={padActivo.netName || padActivo.tipo || 'DATA'}
-                      nombreComponente={compActivo?.nombre || ''}
-                      idPad={padActivo?.id || ''}
-                      onChange={(val, cat) => {
-                        actualizarPropiedadPad(padActivo.id, 'netName', val, cat);
-                      }}
-                      tiposCustom={tiposCustom}
-                      onAgregarTipo={(nuevo, cat) => {
-                        if (nuevo && nuevo.trim()) {
-                          agregarNetNamePersonalizado(nuevo, cat || 'custom');
-                        }
-                      }}
-                      onEliminarTipo={(tipoABorrar) => {
-                        if (setTiposCustom) {
-                          setTiposCustom(tiposCustom.filter(t => t !== tipoABorrar));
-                        }
-                      }}
-                    />
-                  </div>
-
-                  {/* Net Name (Línea Específica) + Gestor de Nombres */}
-                  <div style={styles.formGroup}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <label style={styles.label}>Net Name (Nombre de Pista / Señal)</label>
-                      <button 
-                        type="button" 
-                        onClick={() => setMostrarGestorNets(!mostrarGestorNets)}
-                        style={{ background: 'none', border: 'none', color: '#60a5fa', fontSize: '0.65rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}
-                      >
-                        <Tag size={11} /> {mostrarGestorNets ? 'Cerrar Gestor' : 'Gestionar Nets'}
-                      </button>
-                    </div>
-
-                    <div style={{ display: 'flex', gap: '4px' }}>
-                      <input 
-                        type="text" 
-                        list="netname-sugerencias-main"
-                        value={padActivo.netName} 
-                        onChange={(e) => actualizarPropiedadPad(padActivo.id, 'netName', e.target.value)}
-                        placeholder="Ej: PP_VDD_MAIN"
-                        style={{ ...styles.inputDark, flex: 1, color: '#00ffff', fontWeight: 'bold' }}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => agregarNetNamePersonalizado(padActivo.netName, padActivo.categoria || deducirCategoriaDeNet(padActivo.netName))}
-                        style={{ ...styles.btn, backgroundColor: '#374151', color: '#00ffff', padding: '4px 8px', fontSize: '0.7rem' }}
-                        title="Guardar este nombre en la lista de sugerencias de Net Names"
-                      >
-                        + Guardar Net
-                      </button>
-                    </div>
-
-                    <datalist id="netname-sugerencias-main">
-                      {netNamesCustom.map(n => <option key={n} value={n} />)}
-                    </datalist>
-
-                    {/* Popover / Desplegable del Gestor de Net Names con Categorías y Lista Vertical */}
-                    {mostrarGestorNets && (
-                      <div style={styles.gestorNetsCard}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                          <span style={{ fontSize: '0.72rem', fontWeight: 'bold', color: '#60a5fa' }}>Catálogo de Net Names</span>
-                          <span style={{ fontSize: '0.65rem', color: '#9ca3af' }}>{netsParaMostrar.length} redes</span>
+                            <button
+                              type="button"
+                              onClick={() => cambiarConexionComponente(compActivo.id, 'tierra')}
+                              style={{
+                                padding: '3px 8px',
+                                borderRadius: '4px',
+                                border: tienePinGnd ? '1px solid #6b7280' : '1px solid #374151',
+                                background: tienePinGnd ? 'rgba(107, 114, 128, 0.3)' : '#1f2937',
+                                color: tienePinGnd ? '#f3f4f6' : '#9ca3af',
+                                fontSize: '0.68rem',
+                                fontWeight: 'bold',
+                                cursor: 'pointer'
+                              }}
+                              title="Pin 2 conectado a tierra GND (típico en Capacitores de filtro o bobinas de voltaje negativo AMOLED)"
+                            >
+                              🛡️ A Tierra (GND)
+                            </button>
+                          </div>
                         </div>
-
-                        {/* 1. Selector Combobox de Categoría (Reemplaza botones horizontales) */}
-                        <div style={{ marginBottom: '8px' }}>
-                          <select
-                            value={categoriaNetFiltro}
-                            onChange={(e) => setCategoriaNetFiltro(e.target.value)}
+                      );
+                    })() : (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '6px', paddingTop: '6px', borderTop: '1px solid #1f2937' }}>
+                        <span style={{ fontSize: '0.7rem', color: '#9ca3af', fontWeight: 'bold' }}>Función del Pin:</span>
+                        <div style={{ display: 'flex', gap: '4px' }}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (compActivo.pads[0]) {
+                                actualizarPropiedadPad(compActivo.pads[0].id, 'tipo', 'DATA');
+                                if (compActivo.pads[0].netName === 'GND') {
+                                  actualizarPropiedadPad(compActivo.pads[0].id, 'netName', `${compActivo.nombre}_P1`);
+                                }
+                              }
+                            }}
                             style={{
-                              width: '100%',
-                              background: '#111827',
-                              color: '#38bdf8',
-                              border: '1px solid #3b82f6',
-                              borderRadius: '6px',
-                              padding: '5px 8px',
-                              fontSize: '0.74rem',
+                              padding: '3px 8px',
+                              borderRadius: '4px',
+                              border: compActivo.pads[0]?.tipo !== 'GND' && compActivo.pads[0]?.netName !== 'GND' ? '1px solid #06b6d4' : '1px solid #374151',
+                              background: compActivo.pads[0]?.tipo !== 'GND' && compActivo.pads[0]?.netName !== 'GND' ? 'rgba(6, 182, 212, 0.2)' : '#1f2937',
+                              color: compActivo.pads[0]?.tipo !== 'GND' && compActivo.pads[0]?.netName !== 'GND' ? '#22d3ee' : '#9ca3af',
+                              fontSize: '0.68rem',
                               fontWeight: 'bold',
-                              outline: 'none',
                               cursor: 'pointer'
                             }}
                           >
-                            {Object.keys(CATEGORIAS_NETS).map(k => (
-                              <option key={k} value={k}>{CATEGORIAS_NETS[k].label}</option>
-                            ))}
-                          </select>
-                        </div>
-
-                        {/* 2. Formulario para guardar nueva red en la categoría activa */}
-                        <div style={{ display: 'flex', gap: '4px', marginBottom: '8px' }}>
-                          <input 
-                            type="text" 
-                            placeholder={`Nueva red (${CATEGORIAS_NETS[categoriaNetFiltro]?.label.split(' ')[1] || 'red'})...`}
-                            value={nuevoNetInput}
-                            onChange={(e) => setNuevoNetInput(e.target.value)}
-                            style={{ ...styles.inputDark, fontSize: '0.72rem', padding: '4px 6px', flex: 1 }}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                agregarNetNamePersonalizado(nuevoNetInput, categoriaNetFiltro);
+                            ⚡ Línea / Señal
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (compActivo.pads[0]) {
+                                actualizarPropiedadPad(compActivo.pads[0].id, 'tipo', 'GND');
+                                actualizarPropiedadPad(compActivo.pads[0].id, 'netName', 'GND');
                               }
                             }}
-                          />
-                          <button 
-                            type="button" 
-                            onClick={() => agregarNetNamePersonalizado(nuevoNetInput, categoriaNetFiltro)}
-                            disabled={!nuevoNetInput.trim()}
                             style={{
-                              ...styles.btn,
-                              backgroundColor: nuevoNetInput.trim() ? '#0284c7' : '#374151',
-                              color: 'white',
-                              padding: '4px 8px',
+                              padding: '3px 8px',
+                              borderRadius: '4px',
+                              border: compActivo.pads[0]?.tipo === 'GND' || compActivo.pads[0]?.netName === 'GND' ? '1px solid #6b7280' : '1px solid #374151',
+                              background: compActivo.pads[0]?.tipo === 'GND' || compActivo.pads[0]?.netName === 'GND' ? 'rgba(107, 114, 128, 0.3)' : '#1f2937',
+                              color: compActivo.pads[0]?.tipo === 'GND' || compActivo.pads[0]?.netName === 'GND' ? '#f3f4f6' : '#9ca3af',
                               fontSize: '0.68rem',
-                              whiteSpace: 'nowrap',
-                              cursor: nuevoNetInput.trim() ? 'pointer' : 'not-allowed'
+                              fontWeight: 'bold',
+                              cursor: 'pointer'
                             }}
-                            title="Guardar en esta categoría localmente para reusar siempre"
                           >
-                            💾 Guardar
+                            🛡️ Tierra (GND)
                           </button>
-                        </div>
-
-                        {/* 3. Lista VERTICAL de Net Names (1 columna vertical con scroll sin recortes horizontales) */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '150px', overflowY: 'auto', paddingRight: '2px', scrollbarWidth: 'thin' }}>
-                          {netsParaMostrar.length > 0 ? (
-                            netsParaMostrar.map((net) => {
-                              const isSelected = padActivo.netName === net;
-                              const esEstandar = Object.values(CATEGORIAS_NETS).some(c => c.items && c.items.includes(net));
-                              return (
-                                <div 
-                                  key={net} 
-                                  style={{ 
-                                    display: 'flex', 
-                                    alignItems: 'center', 
-                                    justifyContent: 'space-between',
-                                    background: isSelected ? 'rgba(0,255,255,0.18)' : '#111827', 
-                                    border: isSelected ? '1px solid #00ffff' : '1px solid #374151',
-                                    borderRadius: '5px', 
-                                    padding: '5px 8px',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.15s'
-                                  }}
-                                  onClick={() => {
-                                    const cat = (categoriaNetFiltro && categoriaNetFiltro !== 'todas') ? categoriaNetFiltro : deducirCategoriaDeNet(net);
-                                    actualizarPropiedadPad(padActivo.id, 'netName', net, cat);
-                                  }}
-                                  onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = '#1f2937'; }}
-                                  onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = '#111827'; }}
-                                >
-                                  <span 
-                                    style={{
-                                      fontWeight: 'bold',
-                                      fontSize: '0.74rem',
-                                      color: isSelected ? '#00ffff' : '#f3f4f6',
-                                      whiteSpace: 'nowrap',
-                                      overflow: 'hidden',
-                                      textOverflow: 'ellipsis'
-                                    }}
-                                    title={`Asignar "${net}" a este pin`}
-                                  >
-                                    {net}
-                                  </span>
-                                  {!esEstandar && (
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        eliminarNetNamePersonalizado(net);
-                                      }}
-                                      style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', padding: '0 4px', fontSize: '0.7rem', fontWeight: 'bold' }}
-                                      title="Eliminar este Net Name de la lista personal"
-                                    >
-                                      ✕
-                                    </button>
-                                  )}
-                                </div>
-                              );
-                            })
-                          ) : (
-                            <div style={{ fontSize: '0.72rem', color: '#64748b', textAlign: 'center', padding: '10px 0' }}>
-                              No hay redes en esta categoría.
-                            </div>
-                          )}
                         </div>
                       </div>
                     )}
+
+                    {puedeEditar && (
+                      <button
+                        onClick={() => borrarComponente(compActivo.id)}
+                        style={{ ...styles.btn, backgroundColor: 'rgba(239, 68, 68, 0.15)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.3)', marginTop: '8px', width: '100%', justifyContent: 'center' }}
+                      >
+                        <Trash2 size={13} /> Eliminar Componente
+                      </button>
+                    )}
                   </div>
 
-                  <div style={styles.divider} />
+                  {/* Info del Pad Seleccionado con selector dinámico de pines */}
+                  <div style={styles.editSection}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+                      <h4 style={styles.sectionTitle}>Edición de Pin / Pad {padActivo.id}</h4>
+                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
+                        {compActivo.pads.map((p) => {
+                          const isSelected = selectedPadId === p.id;
+                          let labelPin = `Pin ${p.id}`;
+                          if (compActivo.tipo === 'Diodo') {
+                            labelPin = p.id === '1' ? '🔺 Ánodo' : '⚡ Cátodo';
+                          } else if (compActivo.tipo === 'Bobina') {
+                            labelPin = p.id === '1' ? '🌀 In' : '🌀 Out';
+                          } else if (compActivo.tipo === 'Transistor') {
+                            labelPin = p.id === '1' ? 'B (Base)' : (p.id === '2' ? 'E (Emisor)' : (p.id === '3' ? 'C (Colector)' : `P${p.id}`));
+                          } else if (compActivo.tipo === 'TestPoint') {
+                            labelPin = `TP ${p.id}`;
+                          } else if (compActivo.tipo === 'Pin_FPC') {
+                            labelPin = `J ${p.id}`;
+                          }
 
-                  {/* Medición en vivo HUD Panel */}
-                  <div style={styles.liveRecordBox}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                      <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: ESCALAS_CONFIG.find(e => e.id === activeScale)?.border || '#60a5fa' }}>
-                        Captura ({activeScale.toUpperCase()})
-                      </span>
-                      <button 
-                        onClick={() => setAutoHoldActivo(!autoHoldActivo)}
-                        style={{ 
-                          fontSize: '0.65rem', 
-                          fontWeight: 'bold', 
-                          padding: '2px 6px', 
-                          borderRadius: '4px',
-                          border: 'none',
-                          backgroundColor: autoHoldActivo ? '#10b981' : '#374151',
-                          color: '#fff',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        {autoHoldActivo ? 'HOLD ACTIVO' : 'ACTIVAR HOLD'}
-                      </button>
-                    </div>
-                    
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <button 
-                        onClick={() => grabarMedicionActual(lecturaEnVivo)} 
-                        disabled={lecturaEnVivo === '----'}
-                        style={{ ...styles.btn, flex: 1, backgroundColor: ESCALAS_CONFIG.find(e => e.id === activeScale)?.color || '#3b82f6', color: 'white' }}
-                        title={`Registrar valor en escala ${activeScale.toUpperCase()}`}
-                      >
-                        Grabar {activeScale.toUpperCase()}: {lecturaEnVivo}
-                      </button>
-                      
-                      <button 
-                        onClick={() => grabarMedicionActual('OL')} 
-                        style={{ ...styles.btn, backgroundColor: '#f97316', color: 'white' }}
-                      >
-                        OL
-                      </button>
-                    </div>
-                    <div style={{ fontSize: '0.6rem', color: '#9ca3af', marginTop: '6px', textAlign: 'center' }}>
-                      * Al grabar (o con AutoHold), avanza automáticamente al siguiente componente (saltando pines GND).
-                    </div>
-                  </div>
+                          return (
+                            <button
+                              key={p.id}
+                              type="button"
+                              onClick={() => setSelectedPadId(p.id)}
+                              style={{
+                                ...styles.padSelectorBtn,
+                                ...(isSelected && styles.padSelectorBtnActive),
+                                fontSize: '0.68rem',
+                                padding: '3px 6px'
+                              }}
+                              title={`Seleccionar ${labelPin} (${p.netName || 'NC'})`}
+                            >
+                              {labelPin} ({p.netName || 'NC'})
+                            </button>
+                          );
+                        })}
 
-                  {/* Panel de Valores: Enfocado en la Escala Activa */}
-                  {(() => {
-                    const cfgEscalaActiva = ESCALAS_CONFIG.find(e => e.id === activeScale) || ESCALAS_CONFIG[0];
-                    const getPropSano = (id) => id === 'diodo' ? 'valorSanoDiodo' : id === 'voltio' ? 'valorSanoVoltio' : id === 'ua' ? 'valorSanoUa' : 'valorSanoOhmio';
-                    const getPropActual = (id) => id === 'diodo' ? 'valorActualDiodo' : id === 'voltio' ? 'valorActualVoltio' : id === 'ua' ? 'valorActualUa' : 'valorActualOhmio';
-                    const propSanoActivo = getPropSano(activeScale);
-                    const propActualActivo = getPropActual(activeScale);
-                    const valActual = padActivo[propActualActivo];
-                    const valSano = padActivo[propSanoActivo];
-
-                    return (
-                      <div style={{ marginTop: '10px' }}>
-                        {/* Tarjeta Principal de la Escala Seleccionada */}
-                        <div style={{
-                          backgroundColor: '#0c0f18',
-                          border: `1px solid ${cfgEscalaActiva.color}55`,
-                          borderRadius: '10px',
-                          padding: '12px',
-                          boxShadow: `0 0 15px ${cfgEscalaActiva.color}15`
-                        }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                            <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: cfgEscalaActiva.border, display: 'flex', alignItems: 'center', gap: '5px' }}>
-                              {cfgEscalaActiva.label}
-                            </span>
+                        {puedeEditar && (
+                          <>
                             <button
                               type="button"
-                              onClick={() => setMostrarTodasEscalas(!mostrarTodasEscalas)}
-                              style={{ background: 'none', border: 'none', color: '#9ca3af', fontSize: '0.68rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}
-                              title="Ver o editar las demás escalas de este pad"
+                              onClick={() => agregarPinAComponente(compActivo.id)}
+                              style={{
+                                background: 'rgba(16, 185, 129, 0.2)',
+                                border: '1px solid #10b981',
+                                color: '#34d399',
+                                borderRadius: '4px',
+                                padding: '2px 6px',
+                                fontSize: '0.68rem',
+                                fontWeight: 'bold',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '2px'
+                              }}
+                              title="Añadir un pin extra a este componente (ideal para transistores, integrados, FPC)"
                             >
-                              {mostrarTodasEscalas ? '▲ Ocultar otras' : '▼ Ver todas las escalas'}
+                              + Pin
+                            </button>
+
+                            {compActivo.pads.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => eliminarPinDeComponente(compActivo.id, padActivo.id)}
+                                style={{
+                                  background: 'rgba(239, 68, 68, 0.15)',
+                                  border: '1px solid rgba(239, 68, 68, 0.4)',
+                                  color: '#f87171',
+                                  borderRadius: '4px',
+                                  padding: '2px 5px',
+                                  fontSize: '0.65rem',
+                                  cursor: 'pointer'
+                                }}
+                                title={`Eliminar el pin actual (${padActivo.id})`}
+                              >
+                                ✕
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Selector Avanzado de Tipo de Línea */}
+                    <div style={styles.formGroup}>
+                      <label style={styles.label}>Tipo de Línea (Categoría)</label>
+                      <SelectorTipoLinea
+                        valor={padActivo.netName || padActivo.tipo || 'DATA'}
+                        nombreComponente={compActivo?.nombre || ''}
+                        idPad={padActivo?.id || ''}
+                        onChange={(val, cat) => {
+                          actualizarPropiedadPad(padActivo.id, 'netName', val, cat);
+                        }}
+                        tiposCustom={tiposCustom}
+                        onAgregarTipo={(nuevo, cat) => {
+                          if (nuevo && nuevo.trim()) {
+                            agregarNetNamePersonalizado(nuevo, cat || 'custom');
+                          }
+                        }}
+                        onEliminarTipo={(tipoABorrar) => {
+                          if (setTiposCustom) {
+                            setTiposCustom(tiposCustom.filter(t => t !== tipoABorrar));
+                          }
+                        }}
+                      />
+                    </div>
+
+                    {/* Net Name (Línea Específica) + Gestor de Nombres */}
+                    <div style={styles.formGroup}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <label style={styles.label}>Net Name (Nombre de Pista / Señal)</label>
+                        <button
+                          type="button"
+                          onClick={() => setMostrarGestorNets(!mostrarGestorNets)}
+                          style={{ background: 'none', border: 'none', color: '#60a5fa', fontSize: '0.65rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}
+                        >
+                          <Tag size={11} /> {mostrarGestorNets ? 'Cerrar Gestor' : 'Gestionar Nets'}
+                        </button>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        <input
+                          type="text"
+                          list="netname-sugerencias-main"
+                          value={padActivo.netName}
+                          onChange={(e) => actualizarPropiedadPad(padActivo.id, 'netName', e.target.value)}
+                          placeholder="Ej: PP_VDD_MAIN"
+                          style={{ ...styles.inputDark, flex: 1, color: '#00ffff', fontWeight: 'bold' }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => agregarNetNamePersonalizado(padActivo.netName, padActivo.categoria || deducirCategoriaDeNet(padActivo.netName))}
+                          style={{ ...styles.btn, backgroundColor: '#374151', color: '#00ffff', padding: '4px 8px', fontSize: '0.7rem' }}
+                          title="Guardar este nombre en la lista de sugerencias de Net Names"
+                        >
+                          + Guardar Net
+                        </button>
+                      </div>
+
+                      <datalist id="netname-sugerencias-main">
+                        {netNamesCustom.map(n => <option key={n} value={n} />)}
+                      </datalist>
+
+                      {/* Popover / Desplegable del Gestor de Net Names con Categorías y Lista Vertical */}
+                      {mostrarGestorNets && (
+                        <div style={styles.gestorNetsCard}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                            <span style={{ fontSize: '0.72rem', fontWeight: 'bold', color: '#60a5fa' }}>Catálogo de Net Names</span>
+                            <span style={{ fontSize: '0.65rem', color: '#9ca3af' }}>{netsParaMostrar.length} redes</span>
+                          </div>
+
+                          {/* 1. Selector Combobox de Categoría (Reemplaza botones horizontales) */}
+                          <div style={{ marginBottom: '8px' }}>
+                            <select
+                              value={categoriaNetFiltro}
+                              onChange={(e) => setCategoriaNetFiltro(e.target.value)}
+                              style={{
+                                width: '100%',
+                                background: '#111827',
+                                color: '#38bdf8',
+                                border: '1px solid #3b82f6',
+                                borderRadius: '6px',
+                                padding: '5px 8px',
+                                fontSize: '0.74rem',
+                                fontWeight: 'bold',
+                                outline: 'none',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              {Object.keys(CATEGORIAS_NETS).map(k => (
+                                <option key={k} value={k}>{CATEGORIAS_NETS[k].label}</option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {/* 2. Formulario para guardar nueva red en la categoría activa */}
+                          <div style={{ display: 'flex', gap: '4px', marginBottom: '8px' }}>
+                            <input
+                              type="text"
+                              placeholder={`Nueva red (${CATEGORIAS_NETS[categoriaNetFiltro]?.label.split(' ')[1] || 'red'})...`}
+                              value={nuevoNetInput}
+                              onChange={(e) => setNuevoNetInput(e.target.value)}
+                              style={{ ...styles.inputDark, fontSize: '0.72rem', padding: '4px 6px', flex: 1 }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  agregarNetNamePersonalizado(nuevoNetInput, categoriaNetFiltro);
+                                }
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => agregarNetNamePersonalizado(nuevoNetInput, categoriaNetFiltro)}
+                              disabled={!nuevoNetInput.trim()}
+                              style={{
+                                ...styles.btn,
+                                backgroundColor: nuevoNetInput.trim() ? '#0284c7' : '#374151',
+                                color: 'white',
+                                padding: '4px 8px',
+                                fontSize: '0.68rem',
+                                whiteSpace: 'nowrap',
+                                cursor: nuevoNetInput.trim() ? 'pointer' : 'not-allowed'
+                              }}
+                              title="Guardar en esta categoría localmente para reusar siempre"
+                            >
+                              💾 Guardar
                             </button>
                           </div>
 
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', alignItems: 'center' }}>
-                            {/* Valor Sano Referencia */}
-                            <div>
-                              <label style={{ fontSize: '0.68rem', color: '#9ca3af', display: 'block', marginBottom: '4px' }}>
-                                Valor Sano ({cfgEscalaActiva.unidad}):
-                              </label>
-                              <input
-                                type="text"
-                                placeholder="---"
-                                value={valSano !== undefined && valSano !== '---' ? valSano : ''}
-                                onChange={(e) => actualizarPropiedadPad(padActivo.id, propSanoActivo, e.target.value)}
-                                style={{
-                                  width: '100%',
-                                  padding: '8px',
-                                  backgroundColor: '#111827',
-                                  border: `1px solid ${cfgEscalaActiva.border}`,
-                                  borderRadius: '6px',
-                                  color: '#fff',
-                                  fontWeight: 'bold',
-                                  fontSize: '0.95rem',
-                                  textAlign: 'center',
-                                  outline: 'none'
-                                }}
-                              />
+                          {/* 3. Lista VERTICAL de Net Names (1 columna vertical con scroll sin recortes horizontales) */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '150px', overflowY: 'auto', paddingRight: '2px', scrollbarWidth: 'thin' }}>
+                            {netsParaMostrar.length > 0 ? (
+                              netsParaMostrar.map((net) => {
+                                const isSelected = padActivo.netName === net;
+                                const esEstandar = Object.values(CATEGORIAS_NETS).some(c => c.items && c.items.includes(net));
+                                return (
+                                  <div
+                                    key={net}
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'space-between',
+                                      background: isSelected ? 'rgba(0,255,255,0.18)' : '#111827',
+                                      border: isSelected ? '1px solid #00ffff' : '1px solid #374151',
+                                      borderRadius: '5px',
+                                      padding: '5px 8px',
+                                      cursor: 'pointer',
+                                      transition: 'all 0.15s'
+                                    }}
+                                    onClick={() => {
+                                      const cat = (categoriaNetFiltro && categoriaNetFiltro !== 'todas') ? categoriaNetFiltro : deducirCategoriaDeNet(net);
+                                      actualizarPropiedadPad(padActivo.id, 'netName', net, cat);
+                                    }}
+                                    onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = '#1f2937'; }}
+                                    onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = '#111827'; }}
+                                  >
+                                    <span
+                                      style={{
+                                        fontWeight: 'bold',
+                                        fontSize: '0.74rem',
+                                        color: isSelected ? '#00ffff' : '#f3f4f6',
+                                        whiteSpace: 'nowrap',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis'
+                                      }}
+                                      title={`Asignar "${net}" a este pin`}
+                                    >
+                                      {net}
+                                    </span>
+                                    {!esEstandar && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          eliminarNetNamePersonalizado(net);
+                                        }}
+                                        style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', padding: '0 4px', fontSize: '0.7rem', fontWeight: 'bold' }}
+                                        title="Eliminar este Net Name de la lista personal"
+                                      >
+                                        ✕
+                                      </button>
+                                    )}
+                                  </div>
+                                );
+                              })
+                            ) : (
+                              <div style={{ fontSize: '0.72rem', color: '#64748b', textAlign: 'center', padding: '10px 0' }}>
+                                No hay redes en esta categoría.
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={styles.divider} />
+
+                    {/* Medición en vivo HUD Panel */}
+                    <div style={styles.liveRecordBox}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: ESCALAS_CONFIG.find(e => e.id === activeScale)?.border || '#60a5fa' }}>
+                          Captura ({activeScale.toUpperCase()})
+                        </span>
+                        <button
+                          onClick={() => setAutoHoldActivo(!autoHoldActivo)}
+                          style={{
+                            fontSize: '0.65rem',
+                            fontWeight: 'bold',
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            border: 'none',
+                            backgroundColor: autoHoldActivo ? '#10b981' : '#374151',
+                            color: '#fff',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {autoHoldActivo ? 'HOLD ACTIVO' : 'ACTIVAR HOLD'}
+                        </button>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button
+                          onClick={() => grabarMedicionActual(lecturaEnVivo)}
+                          disabled={lecturaEnVivo === '----'}
+                          style={{ ...styles.btn, flex: 1, backgroundColor: ESCALAS_CONFIG.find(e => e.id === activeScale)?.color || '#3b82f6', color: 'white' }}
+                          title={`Registrar valor en escala ${activeScale.toUpperCase()}`}
+                        >
+                          Grabar {activeScale.toUpperCase()}: {lecturaEnVivo}
+                        </button>
+
+                        <button
+                          onClick={() => grabarMedicionActual('OL')}
+                          style={{ ...styles.btn, backgroundColor: '#f97316', color: 'white' }}
+                        >
+                          OL
+                        </button>
+                      </div>
+                      <div style={{ fontSize: '0.6rem', color: '#9ca3af', marginTop: '6px', textAlign: 'center' }}>
+                        * Al grabar (o con AutoHold), avanza automáticamente al siguiente componente (saltando pines GND).
+                      </div>
+                    </div>
+
+                    {/* Panel de Valores: Enfocado en la Escala Activa */}
+                    {(() => {
+                      const cfgEscalaActiva = ESCALAS_CONFIG.find(e => e.id === activeScale) || ESCALAS_CONFIG[0];
+                      const getPropSano = (id) => id === 'diodo' ? 'valorSanoDiodo' : id === 'voltio' ? 'valorSanoVoltio' : id === 'ua' ? 'valorSanoUa' : 'valorSanoOhmio';
+                      const getPropActual = (id) => id === 'diodo' ? 'valorActualDiodo' : id === 'voltio' ? 'valorActualVoltio' : id === 'ua' ? 'valorActualUa' : 'valorActualOhmio';
+                      const propSanoActivo = getPropSano(activeScale);
+                      const propActualActivo = getPropActual(activeScale);
+                      const valActual = padActivo[propActualActivo];
+                      const valSano = padActivo[propSanoActivo];
+
+                      return (
+                        <div style={{ marginTop: '10px' }}>
+                          {/* Tarjeta Principal de la Escala Seleccionada */}
+                          <div style={{
+                            backgroundColor: '#0c0f18',
+                            border: `1px solid ${cfgEscalaActiva.color}55`,
+                            borderRadius: '10px',
+                            padding: '12px',
+                            boxShadow: `0 0 15px ${cfgEscalaActiva.color}15`
+                          }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                              <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: cfgEscalaActiva.border, display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                {cfgEscalaActiva.label}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setMostrarTodasEscalas(!mostrarTodasEscalas)}
+                                style={{ background: 'none', border: 'none', color: '#9ca3af', fontSize: '0.68rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}
+                                title="Ver o editar las demás escalas de este pad"
+                              >
+                                {mostrarTodasEscalas ? '▲ Ocultar otras' : '▼ Ver todas las escalas'}
+                              </button>
                             </div>
 
-                            {/* Medición Registrada Actual */}
-                            <div>
-                              <label style={{ fontSize: '0.68rem', color: '#9ca3af', display: 'block', marginBottom: '4px' }}>
-                                Medición Actual:
-                              </label>
-                              <div style={{
-                                padding: '8px',
-                                backgroundColor: '#111827',
-                                border: '1px solid #374151',
-                                borderRadius: '6px',
-                                textAlign: 'center',
-                                fontWeight: 'bold',
-                                fontSize: '0.95rem',
-                                color: obtenerColorDePad(padActivo, compActivo.id)
-                              }}>
-                                {valActual && valActual !== '---' ? `${valActual} ${cfgEscalaActiva.unidad}` : '---'}
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', alignItems: 'center' }}>
+                              {/* Valor Sano Referencia */}
+                              <div>
+                                <label style={{ fontSize: '0.68rem', color: '#9ca3af', display: 'block', marginBottom: '4px' }}>
+                                  Valor Sano ({cfgEscalaActiva.unidad}):
+                                </label>
+                                <input
+                                  type="text"
+                                  placeholder="---"
+                                  value={valSano !== undefined && valSano !== '---' ? valSano : ''}
+                                  onChange={(e) => actualizarPropiedadPad(padActivo.id, propSanoActivo, e.target.value)}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px',
+                                    backgroundColor: '#111827',
+                                    border: `1px solid ${cfgEscalaActiva.border}`,
+                                    borderRadius: '6px',
+                                    color: '#fff',
+                                    fontWeight: 'bold',
+                                    fontSize: '0.95rem',
+                                    textAlign: 'center',
+                                    outline: 'none'
+                                  }}
+                                />
+                              </div>
+
+                              {/* Medición Registrada Actual */}
+                              <div>
+                                <label style={{ fontSize: '0.68rem', color: '#9ca3af', display: 'block', marginBottom: '4px' }}>
+                                  Medición Actual:
+                                </label>
+                                <div style={{
+                                  padding: '8px',
+                                  backgroundColor: '#111827',
+                                  border: '1px solid #374151',
+                                  borderRadius: '6px',
+                                  textAlign: 'center',
+                                  fontWeight: 'bold',
+                                  fontSize: '0.95rem',
+                                  color: obtenerColorDePad(padActivo, compActivo.id)
+                                }}>
+                                  {valActual && valActual !== '---' ? `${valActual} ${cfgEscalaActiva.unidad}` : '---'}
+                                </div>
                               </div>
                             </div>
                           </div>
-                        </div>
 
-                        {/* Vista Expandible de Todas las Escalas Secundarias */}
-                        {mostrarTodasEscalas && (
-                          <div style={{ marginTop: '8px', padding: '10px', backgroundColor: '#0c0f18', borderRadius: '8px', border: '1px solid #1f2937', animation: 'fadeIn 0.2s' }}>
-                            <div style={{ fontSize: '0.68rem', color: '#9ca3af', fontWeight: 'bold', marginBottom: '6px' }}>
-                              Otras Escalas Secundarias
-                            </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
-                              {ESCALAS_CONFIG.filter(e => e.id !== activeScale).map(esc => {
-                                const propS = getPropSano(esc.id);
-                                const propA = getPropActual(esc.id);
-                                const vS = padActivo[propS];
-                                const vA = padActivo[propA];
+                          {/* Vista Expandible de Todas las Escalas Secundarias */}
+                          {mostrarTodasEscalas && (
+                            <div style={{ marginTop: '8px', padding: '10px', backgroundColor: '#0c0f18', borderRadius: '8px', border: '1px solid #1f2937', animation: 'fadeIn 0.2s' }}>
+                              <div style={{ fontSize: '0.68rem', color: '#9ca3af', fontWeight: 'bold', marginBottom: '6px' }}>
+                                Otras Escalas Secundarias
+                              </div>
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
+                                {ESCALAS_CONFIG.filter(e => e.id !== activeScale).map(esc => {
+                                  const propS = getPropSano(esc.id);
+                                  const propA = getPropActual(esc.id);
+                                  const vS = padActivo[propS];
+                                  const vA = padActivo[propA];
 
-                                return (
-                                  <div key={esc.id} style={{ backgroundColor: '#111827', padding: '6px', borderRadius: '6px', border: '1px solid #27303f' }}>
-                                    <div style={{ fontSize: '0.65rem', color: esc.border, fontWeight: 'bold' }}>{esc.label}</div>
-                                    <input
-                                      type="text"
-                                      placeholder="Ref Sano"
-                                      value={vS !== undefined && vS !== '---' ? vS : ''}
-                                      onChange={(e) => actualizarPropiedadPad(padActivo.id, propS, e.target.value)}
-                                      style={{ ...styles.smallInput, width: '100%', fontSize: '0.75rem', padding: '2px 4px', margin: '3px 0', textAlign: 'center' }}
-                                    />
-                                    <div style={{ fontSize: '0.65rem', color: '#9ca3af', textAlign: 'center', marginTop: '2px' }}>
-                                      Act: <strong style={{ color: vA && vA !== '---' ? esc.color : '#6b7280' }}>{vA || '---'}</strong>
+                                  return (
+                                    <div key={esc.id} style={{ backgroundColor: '#111827', padding: '6px', borderRadius: '6px', border: '1px solid #27303f' }}>
+                                      <div style={{ fontSize: '0.65rem', color: esc.border, fontWeight: 'bold' }}>{esc.label}</div>
+                                      <input
+                                        type="text"
+                                        placeholder="Ref Sano"
+                                        value={vS !== undefined && vS !== '---' ? vS : ''}
+                                        onChange={(e) => actualizarPropiedadPad(padActivo.id, propS, e.target.value)}
+                                        style={{ ...styles.smallInput, width: '100%', fontSize: '0.75rem', padding: '2px 4px', margin: '3px 0', textAlign: 'center' }}
+                                      />
+                                      <div style={{ fontSize: '0.65rem', color: '#9ca3af', textAlign: 'center', marginTop: '2px' }}>
+                                        Act: <strong style={{ color: vA && vA !== '---' ? esc.color : '#6b7280' }}>{vA || '---'}</strong>
+                                      </div>
                                     </div>
-                                  </div>
-                                );
-                              })}
+                                  );
+                                })}
+                              </div>
                             </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })()}
+                          )}
+                        </div>
+                      );
+                    })()}
+
+                  </div>
 
                 </div>
-
-              </div>
-            ) : (
-              <div style={{ color: '#9ca3af', fontSize: '0.8rem', textAlign: 'center', marginTop: '40px' }}>
-                <HelpCircle size={32} style={{ color: '#4b5563', margin: '0 auto 10px auto', display: 'block' }} />
-                Haz clic en un componente o pad para ver y editar sus propiedades.
-              </div>
-            )}
-          </div>
-
-          {/* Lista Resumen de Componentes en Orden de Creación (Filtrada por Cara Activa) */}
-          <div style={{ marginTop: 'auto', borderTop: '1px solid #374151', paddingTop: '12px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-              <h4 style={{ ...styles.sectionTitle }}>
-                {sectorPlaca === 'Placa Completa'
-                  ? `Cara ${caraPlaca} · 📐 Placa Completa (${componentesVisibles.length})`
-                  : `Cara ${caraPlaca} · 🔍 ${sectorPlaca} (${componentesVisibles.length})`}
-                <span style={{ fontSize: '0.65rem', color: '#6b7280', fontWeight: 'normal', marginLeft: '6px' }}>Total Sector: {componentes.length}</span>
-              </h4>
-              <span style={{ fontSize: '0.65rem', color: '#9ca3af' }}>Orden Creación</span>
-            </div>
-            <div style={styles.compListContainer}>
-              {componentesVisibles.map((c, idx) => (
-                <div 
-                  key={c.id} 
-                  onClick={() => { setSelectedCompId(c.id); setSelectedPadId('1'); }}
-                  style={{ 
-                    ...styles.compListItem, 
-                    backgroundColor: selectedCompId === c.id ? '#3b82f6' : '#111827',
-                    color: selectedCompId === c.id ? '#fff' : '#d1d5db'
-                  }}
-                >
-                  <span>#{idx + 1} {c.nombre}</span>
-                  <span style={{ fontSize: '0.65rem', opacity: 0.7 }}>{c.tipo}</span>
+              ) : (
+                <div style={{ color: '#9ca3af', fontSize: '0.8rem', textAlign: 'center', marginTop: '40px' }}>
+                  <HelpCircle size={32} style={{ color: '#4b5563', margin: '0 auto 10px auto', display: 'block' }} />
+                  Haz clic en un componente o pad para ver y editar sus propiedades.
                 </div>
-              ))}
+              )}
+            </div>
+
+            {/* Lista Resumen de Componentes en Orden de Creación (Filtrada por Cara Activa) */}
+            <div style={{ marginTop: 'auto', borderTop: '1px solid #374151', paddingTop: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                <h4 style={{ ...styles.sectionTitle }}>
+                  {sectorPlaca === 'Placa Completa'
+                    ? `Cara ${caraPlaca} · 📐 Placa Completa (${componentesVisibles.length})`
+                    : `Cara ${caraPlaca} · 🔍 ${sectorPlaca} (${componentesVisibles.length})`}
+                  <span style={{ fontSize: '0.65rem', color: '#6b7280', fontWeight: 'normal', marginLeft: '6px' }}>Total Sector: {componentes.length}</span>
+                </h4>
+                <span style={{ fontSize: '0.65rem', color: '#9ca3af' }}>Orden Creación</span>
+              </div>
+              <div style={styles.compListContainer}>
+                {componentesVisibles.map((c, idx) => (
+                  <div
+                    key={c.id}
+                    onClick={() => { setSelectedCompId(c.id); setSelectedPadId('1'); }}
+                    style={{
+                      ...styles.compListItem,
+                      backgroundColor: selectedCompId === c.id ? '#3b82f6' : '#111827',
+                      color: selectedCompId === c.id ? '#fff' : '#d1d5db'
+                    }}
+                  >
+                    <span>#{idx + 1} {c.nombre}</span>
+                    <span style={{ fontSize: '0.65rem', opacity: 0.7 }}>{c.tipo}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
         )}
 
       </div>
@@ -4978,7 +4978,7 @@ export default function VisorMapeoPCB({
               <span style={{ fontSize: '0.95rem', fontWeight: 'bold', color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Link size={18} /> {modalUrlConfig.tipo === 'placa' ? `URL Imagen: Cara ${caraPlaca} · ${sectorPlaca}` : `URL Esquema: ${sectorPlaca}`}
               </span>
-              <button 
+              <button
                 onClick={() => setModalUrlConfig({ abierto: false, tipo: 'placa', urlInput: '' })}
                 style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer' }}
               >
@@ -5019,9 +5019,9 @@ export default function VisorMapeoPCB({
             {modalUrlConfig.urlInput && (
               <div style={{ backgroundColor: '#0a0d16', borderRadius: '8px', padding: '8px', textAlign: 'center', border: '1px solid #1f2937' }}>
                 <div style={{ fontSize: '0.65rem', color: '#6b7280', marginBottom: '4px' }}>Previsualización:</div>
-                <img 
-                  src={modalUrlConfig.urlInput} 
-                  alt="Preview" 
+                <img
+                  src={modalUrlConfig.urlInput}
+                  alt="Preview"
                   style={{ maxHeight: '140px', maxWidth: '100%', objectFit: 'contain', borderRadius: '4px' }}
                   onError={(e) => { e.target.style.display = 'none'; }}
                 />
@@ -5108,7 +5108,7 @@ export default function VisorMapeoPCB({
 
             {/* Cuerpo del Explorador */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: '22px' }}>
-              
+
               {/* Sección 1: Sectores Disponibles / Guardados en este modelo */}
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
@@ -5147,12 +5147,12 @@ export default function VisorMapeoPCB({
                         </div>
                         <div style={{ display: 'flex', gap: '10px', fontSize: '0.72rem', color: '#9ca3af', flexWrap: 'wrap' }}>
                           <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <span style={{ color: sec.compsA > 0 ? '#60a5fa' : '#6b7280', fontWeight: 'bold' }}>🅰️ Cara A:</span> 
+                            <span style={{ color: sec.compsA > 0 ? '#60a5fa' : '#6b7280', fontWeight: 'bold' }}>🅰️ Cara A:</span>
                             {sec.compsA} SMD {sec.hasImgA ? '· 📷 Foto' : '· ✕ Sin foto'}
                           </span>
                           <span>•</span>
                           <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <span style={{ color: sec.compsB > 0 ? '#a78bfa' : '#6b7280', fontWeight: 'bold' }}>🅱️ Cara B:</span> 
+                            <span style={{ color: sec.compsB > 0 ? '#a78bfa' : '#6b7280', fontWeight: 'bold' }}>🅱️ Cara B:</span>
                             {sec.compsB} SMD {sec.hasImgB ? '· 📷 Foto' : '· ✕ Sin foto'}
                           </span>
                         </div>
