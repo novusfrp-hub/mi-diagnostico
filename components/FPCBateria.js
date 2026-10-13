@@ -15,29 +15,29 @@ export const PRESETS_BATERIA = [
     pines: [
       { id: 1, nombre: 'VBAT', tipo: 'VBAT', colorCustom: '#ef4444', grosor: 'grueso' },
       { id: 2, nombre: 'GND', tipo: 'GND', colorCustom: '#4b5563', grosor: 'grueso' },
-      { id: 3, nombre: 'BATT_ID', tipo: 'ID', colorCustom: '#3b82f6', grosor: 'delgado' },
-      { id: 4, nombre: 'BATT_NTC', tipo: 'NTC', colorCustom: '#10b981', grosor: 'delgado' },
+      { id: 3, nombre: 'BOARD_ID', tipo: 'BOARD_ID', colorCustom: '#3b82f6', grosor: 'delgado' },
+      { id: 4, nombre: 'CHG_THERM', tipo: 'CHG_THERM', colorCustom: '#06b6d4', grosor: 'delgado' },
       { id: 5, nombre: 'I2C_SDA', tipo: 'I2C_SDA', colorCustom: '#eab308', grosor: 'delgado' },
       { id: 6, nombre: 'I2C_SCL', tipo: 'I2C_SCL', colorCustom: '#a855f7', grosor: 'delgado' },
-      { id: 7, nombre: 'BATT_THERM', tipo: 'NTC', colorCustom: '#06b6d4', grosor: 'delgado' },
-      { id: 8, nombre: 'CELL_BAL', tipo: 'DATA', colorCustom: '#38bdf8', grosor: 'delgado' },
-      { id: 9, nombre: 'BATT_DET', tipo: 'DATA', colorCustom: '#f59e0b', grosor: 'delgado' },
+      { id: 7, nombre: 'USB_THERM', tipo: 'USB_THERM', colorCustom: '#06b6d4', grosor: 'delgado' },
+      { id: 8, nombre: 'BATT_ISENSE', tipo: 'BATT_ISENSE', colorCustom: '#06b6d4', grosor: 'delgado' },
+      { id: 9, nombre: 'JACK_DET', tipo: 'JACK_DET', colorCustom: '#f59e0b', grosor: 'delgado' },
       { id: 10, nombre: 'NC', tipo: 'NC', colorCustom: '#1e3a8a', grosor: 'delgado' }
     ]
   },
   {
     id: 'android_hibrido_8p',
     nombre: 'Android Híbrido Estándar (8P)',
-    desc: '2 Lugs de potencia laterales + 6 pines centrales delgados (ID, NTC, I2C SDA/SCL, DET, NC)',
+    desc: '2 Lugs de potencia laterales + 6 pines centrales delgados (BOARD_ID, CHG_THERM, I2C, USB_THERM, NC)',
     estilo: 'hibrido',
     pines: [
       { id: 1, nombre: 'VBAT', tipo: 'VBAT', colorCustom: '#ef4444', grosor: 'grueso' },
       { id: 2, nombre: 'GND', tipo: 'GND', colorCustom: '#4b5563', grosor: 'grueso' },
-      { id: 3, nombre: 'BATT_ID', tipo: 'ID', colorCustom: '#3b82f6', grosor: 'delgado' },
-      { id: 4, nombre: 'BATT_NTC', tipo: 'NTC', colorCustom: '#10b981', grosor: 'delgado' },
+      { id: 3, nombre: 'BOARD_ID', tipo: 'BOARD_ID', colorCustom: '#3b82f6', grosor: 'delgado' },
+      { id: 4, nombre: 'CHG_THERM', tipo: 'CHG_THERM', colorCustom: '#06b6d4', grosor: 'delgado' },
       { id: 5, nombre: 'I2C_SDA', tipo: 'I2C_SDA', colorCustom: '#eab308', grosor: 'delgado' },
       { id: 6, nombre: 'I2C_SCL', tipo: 'I2C_SCL', colorCustom: '#a855f7', grosor: 'delgado' },
-      { id: 7, nombre: 'BATT_DET', tipo: 'DATA', colorCustom: '#06b6d4', grosor: 'delgado' },
+      { id: 7, nombre: 'USB_THERM', tipo: 'USB_THERM', colorCustom: '#06b6d4', grosor: 'delgado' },
       { id: 8, nombre: 'NC', tipo: 'NC', colorCustom: '#1e3a8a', grosor: 'delgado' }
     ]
   },
@@ -306,6 +306,7 @@ export default function FPCBateria({
       if (pin.tipo === 'GND') return '#4b5563';
       if (pin.tipo === 'NC') return '#1e3a8a';
       if (pin.tipo === 'VCC' || pin.tipo === 'VBAT' || pin.tipo === 'PP_BATT') return '#ef4444';
+      if (/(THERM|SENSE|ISENSE|CSENSE|_ADC$|ADC_|JACK_DET|EAR_DET|BOARD_ID)/i.test(pin.tipo || '')) return pin.colorCustom || '#06b6d4';
       return colorBase;
     }
 
@@ -388,7 +389,22 @@ export default function FPCBateria({
       const pathD = isLeft
         ? "M 32 38 L 96 38 L 96 66 L 72 66 L 72 134 L 96 134 L 96 162 L 32 162 Z"
         : "M 488 38 L 424 38 L 424 66 L 448 66 L 448 134 L 424 134 L 424 162 L 488 162 Z";
-      const numX = isLeft ? 64 : 456;
+
+      // Centro del lomo vertical del Lug (donde hay 124px de altura continua)
+      const lugCenterX = isLeft ? 52 : 468;
+      const lugCenterY = 100;
+
+      // Determinación del texto a mostrar de forma vertical
+      let textoLug = nombreMostrar;
+      if (modoVista === 'valores') {
+        textoLug = textVal || nombreMostrar;
+      } else if (modoVista === 'ambos') {
+        if (textVal && textVal !== nombreMostrar) {
+          textoLug = `${nombreMostrar}  •  ${textVal}`;
+        } else {
+          textoLug = nombreMostrar;
+        }
+      }
 
       return (
         <g key={pin.id} style={{ cursor: 'pointer' }} onClick={() => setPinActivo(pin.id)}>
@@ -410,49 +426,26 @@ export default function FPCBateria({
             />
           )}
 
-          {/* Ranura decorativa de chapa doblada */}
-          <line
-            x1={isLeft ? 45 : 475}
-            y1="75"
-            x2={isLeft ? 45 : 475}
-            y2="125"
-            stroke="rgba(0,0,0,0.35)"
-            strokeWidth="3"
-            strokeLinecap="round"
-          />
-
-          {/* Etiqueta del Pin */}
-          <text x={numX} y="30" fill="#9ca3af" fontSize="9.5" fontWeight="bold" textAnchor="middle">
+          {/* Etiqueta superior del Pin */}
+          <text x={lugCenterX} y="28" fill={isAct ? '#00ffff' : '#9ca3af'} fontSize="9.5" fontWeight="bold" textAnchor="middle">
             PIN {pin.id}
           </text>
 
-          {/* Nombre de la línea dentro del Lug */}
+          {/* TEXTO VERTICAL DENTRO DEL LUG (GND / VBAT / VALOR) */}
           <text
-            x={numX}
-            y={modoVista === 'valores' ? 100 : 92}
+            x={lugCenterX}
+            y={lugCenterY}
+            transform={`rotate(-90 ${lugCenterX} ${lugCenterY})`}
             fill={pin.tipo === 'GND' || pin.tipo === 'NC' ? '#cbd5e1' : (isAct ? '#000' : '#fff')}
-            fontSize="10.5"
+            fontSize={textoLug.length > 11 ? "9.5" : "11"}
             fontWeight="900"
+            letterSpacing="0.8px"
             textAnchor="middle"
+            dominantBaseline="central"
             style={{ pointerEvents: 'none' }}
           >
-            {modoVista === 'valores' ? (textVal || nombreMostrar) : nombreMostrar}
+            {textoLug}
           </text>
-
-          {/* Valor de medición o referencia */}
-          {modoVista !== 'nombres' && textVal && textVal !== nombreMostrar && (
-            <text
-              x={numX}
-              y="114"
-              fill={isAct ? '#111' : '#f59e0b'}
-              fontSize="9"
-              fontWeight="bold"
-              textAnchor="middle"
-              style={{ pointerEvents: 'none' }}
-            >
-              {textVal}
-            </text>
-          )}
         </g>
       );
     };
