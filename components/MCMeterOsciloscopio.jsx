@@ -12,8 +12,10 @@ import {
   Sliders,
   Zap,
   Split,
-  Eye,
-  RefreshCw
+  BookmarkPlus,
+  Compass,
+  Layers,
+  X
 } from 'lucide-react';
 
 function calcularEscalaTipoTester(valores, canal = 'vbus', modoDinamico = true) {
@@ -70,7 +72,9 @@ export default function MCMeterOsciloscopio({
   mcMeter,
   onCerrarYVolverMini,
   modoAvanzado,
-  setModoAvanzado
+  setModoAvanzado,
+  modeloActivo,
+  onGuardarCurvaGolden
 }) {
   const {
     conectado,
@@ -92,18 +96,45 @@ export default function MCMeterOsciloscopio({
     toggleAutoTrigger
   } = mcMeter;
 
+  // 1. Perfil de Medición Especializado
+  // 'power': Secuencias de encendido (solo corriente IBUS a alta resolución temporal, t=0 al pulsar power)
+  // 'carga': Carga y negociación USB-C (Dual VBUS + IBUS + Pines D/CC)
+  // 'buck': Líneas Buck / Backlight / Consumos en placa
+  const [perfilMedicion, setPerfilMedicion] = useState('power');
+
+  // 2. Curva Golden de Referencia (Comparador Equipo Bueno vs. Equipo en Falla)
+  const [curvaGoldenSeleccionada, setCurvaGoldenSeleccionada] = useState(null);
+  const [modalGuardarGolden, setModalGuardarGolden] = useState(false);
+  const [formTituloGolden, setFormTituloGolden] = useState('');
+  const [formNotasGolden, setFormNotasGolden] = useState('');
+
   // Estados visuales y de interacción
   const [splitTracks, setSplitTracks] = useState(false);
   const [escalaDinamica, setEscalaDinamica] = useState(true);
   const [zoomSamples, setZoomSamples] = useState(400);
   const [viewEndIdx, setViewEndIdx] = useState(0);
 
-  // Canales visibles
-  const [showVbus, setShowVbus] = useState(true);
+  // Canales visibles (se auto-ajustan según perfil de medición)
+  const [showVbus, setShowVbus] = useState(perfilMedicion === 'carga');
   const [showIbus, setShowIbus] = useState(true);
   const [showDp, setShowDp] = useState(false);
   const [showDm, setShowDm] = useState(false);
   const [showCc, setShowCc] = useState(false);
+
+  // Auto-ajuste de canales al cambiar de perfil
+  useEffect(() => {
+    if (perfilMedicion === 'power' || perfilMedicion === 'buck') {
+      setShowVbus(false);
+      setShowDp(false);
+      setShowDm(false);
+      setShowCc(false);
+      setShowIbus(true);
+      setSplitTracks(false);
+    } else {
+      setShowVbus(true);
+      setShowIbus(true);
+    }
+  }, [perfilMedicion]);
 
   // Box-Zoom y Cursores Delta A-B
   const [markerAIdx, setMarkerAIdx] = useState(null);
@@ -302,7 +333,6 @@ export default function MCMeterOsciloscopio({
   // Manejadores del Ratón en el Canvas
   const handleMouseDown = (e) => {
     if (e.button === 0) {
-      // Clic izquierdo: iniciar posible Box-Zoom o Marca A
       const rect = canvasRef.current.getBoundingClientRect();
       const x = (e.clientX - rect.left) * (canvasRef.current.width / rect.width);
       const y = (e.clientY - rect.top) * (canvasRef.current.height / rect.height);
@@ -346,7 +376,6 @@ export default function MCMeterOsciloscopio({
       if (dx > 10 && dy > 10) {
         aplicarBoxZoom(startX, startY, endX, endY);
       } else {
-        // Clic simple: fijar Marca A
         const idx = pixelXToGlobalIdx(endX);
         if (idx !== null) {
           setMarkerAIdx(idx);
@@ -359,7 +388,6 @@ export default function MCMeterOsciloscopio({
     e.preventDefault();
     const rect = canvasRef.current.getBoundingClientRect();
     const x = (e.clientX - rect.left) * (canvasRef.current.width / rect.width);
-    // Clic derecho: fijar Marca B
     const idx = pixelXToGlobalIdx(x);
     if (idx !== null) {
       setMarkerBIdx(idx);
@@ -446,15 +474,14 @@ export default function MCMeterOsciloscopio({
         maxI
       };
 
-      // 2. Geometría de carriles (Superpuestos vs Split View de 2 Carriles)
+      // 2. Geometría de carriles
       let vTop, vBot, iTop, iBot;
-      if (!splitTracks) {
+      if (!splitTracks || perfilMedicion === 'power') {
         vTop = padT;
         vBot = h - padB;
         iTop = padT;
         iBot = h - padB;
 
-        // Rejilla horizontal y escalas
         const divisiones = 3;
         ctx.font = 'bold 10px Consolas, monospace';
         for (let step = 0; step <= divisiones; step++) {
@@ -466,15 +493,17 @@ export default function MCMeterOsciloscopio({
           ctx.lineTo(w - padR, y);
           ctx.stroke();
 
-          // Escala VBUS Izquierda (Rojo)
-          ctx.fillStyle = '#ff4444';
-          ctx.textAlign = 'right';
-          ctx.fillText((minV + frac * spanV).toFixed(2), padL - 8, y + 4);
+          // En modo power solo mostramos escala de corriente
+          if (showVbus) {
+            ctx.fillStyle = '#ff4444';
+            ctx.textAlign = 'right';
+            ctx.fillText((minV + frac * spanV).toFixed(2), padL - 8, y + 4);
+          }
 
-          // Escala IBUS Derecha (Amarillo)
           ctx.fillStyle = '#facc15';
-          ctx.textAlign = 'left';
-          ctx.fillText((minI + frac * spanI).toFixed(2), w - padR + 8, y + 4);
+          ctx.textAlign = showVbus ? 'left' : 'right';
+          const xText = showVbus ? w - padR + 8 : padL - 8;
+          ctx.fillText(`${(minI + frac * spanI).toFixed(3)}A`, xText, y + 4);
         }
       } else {
         const midY = padT + Math.floor(plotH / 2);
@@ -485,7 +514,6 @@ export default function MCMeterOsciloscopio({
         const vH = Math.max(10, vBot - vTop);
         const iH = Math.max(10, iBot - iTop);
 
-        // Línea divisoria central
         ctx.strokeStyle = '#334155';
         ctx.lineWidth = 2;
         ctx.beginPath();
@@ -520,18 +548,50 @@ export default function MCMeterOsciloscopio({
 
       // Encabezados de ejes
       ctx.font = 'bold 8px Consolas, monospace';
-      ctx.fillStyle = '#ff4444';
-      ctx.textAlign = 'right';
-      ctx.fillText('━ VBUS (V)', padL - 8, padT - 10);
+      if (showVbus) {
+        ctx.fillStyle = '#ff4444';
+        ctx.textAlign = 'right';
+        ctx.fillText('━ VBUS (V)', padL - 8, padT - 10);
+      }
       ctx.fillStyle = '#facc15';
-      ctx.textAlign = 'left';
-      ctx.fillText('━ IBUS (A)', w - padR + 8, padT - 10);
+      ctx.textAlign = showVbus ? 'left' : 'right';
+      ctx.fillText(perfilMedicion === 'power' ? '━ CORRIENTE ARRANQUE (A)' : '━ IBUS (A)', showVbus ? w - padR + 8 : padL - 8, padT - 10);
+
+      // 3. CAPA DE FONDO: CURVA GOLDEN DE REFERENCIA (CIAN OPACO 38%)
+      if (curvaGoldenSeleccionada && curvaGoldenSeleccionada.curvaPuntos?.length >= 2) {
+        const gPts = curvaGoldenSeleccionada.curvaPuntos;
+        const nG = gPts.length;
+        const iTrackH = iBot - iTop;
+
+        ctx.save();
+        ctx.strokeStyle = 'rgba(0, 229, 255, 0.40)';
+        ctx.lineWidth = 2.8;
+        ctx.lineJoin = 'round';
+        ctx.setLineDash([4, 2]);
+        ctx.beginPath();
+
+        for (let idx = 0; idx < nG; idx++) {
+          const x = padL + (idx / (nG - 1)) * plotW;
+          const valG = gPts[idx];
+          const yG = Math.max(iTop, Math.min(iBot, iBot - ((valG - minI) / spanI) * iTrackH));
+          if (idx === 0) ctx.moveTo(x, yG);
+          else ctx.lineTo(x, yG);
+        }
+        ctx.stroke();
+        ctx.restore();
+
+        // Insignia Golden en la esquina superior
+        ctx.fillStyle = '#00ffff';
+        ctx.font = 'bold 10px Consolas, monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText(`★ GOLDEN REFERENCIA: ${curvaGoldenSeleccionada.titulo} (Fondo Cian Opaco)`, padL + 12, padT + 18);
+      }
 
       if (n < 2) {
         ctx.fillStyle = '#64748b';
         ctx.font = 'bold 12px Consolas, monospace';
         ctx.textAlign = 'center';
-        ctx.fillText('Esperando lecturas en vivo...', w / 2, h / 2);
+        ctx.fillText(perfilMedicion === 'power' ? '⚡ Esperando pulso de arranque (>15mA)...' : 'Esperando lecturas en vivo...', w / 2, h / 2);
       } else {
         const tIni = ventana[0][0];
         const tFin = ventana[n - 1][0];
@@ -559,7 +619,6 @@ export default function MCMeterOsciloscopio({
         const vTrackH = vBot - vTop;
         const iTrackH = iBot - iTop;
 
-        // 3. Trazado de señales
         const renderizarLinea = (puntos, color, ancho) => {
           if (puntos.length < 2) return;
           ctx.strokeStyle = color;
@@ -597,9 +656,11 @@ export default function MCMeterOsciloscopio({
         if (showDm) renderizarLinea(ptsDm, '#38bdf8', 1.5);
         if (showCc) renderizarLinea(ptsCc, '#c084fc', 1.5);
         if (showVbus) renderizarLinea(ptsV, '#ff3b3b', 2.2);
-        if (showIbus) renderizarLinea(ptsI, '#facc15', 2.2);
 
-        // 4. Marcas Delta A y B
+        // Curva en vivo de corriente en amarillo neón brillante
+        if (showIbus) renderizarLinea(ptsI, '#facc15', 2.6);
+
+        // Marcas Delta A y B
         const dibujarMarca = (mIdx, color, nombre) => {
           if (mIdx !== null && mIdx >= startIdx && mIdx < startIdx + n) {
             const localI = mIdx - startIdx;
@@ -623,7 +684,7 @@ export default function MCMeterOsciloscopio({
         dibujarMarca(markerAIdx, '#22d3ee', 'A');
         dibujarMarca(markerBIdx, '#e879f9', 'B');
 
-        // 5. Rectángulo de selección Box-Zoom activo
+        // Rectángulo de selección Box-Zoom activo
         const box = boxSelectionRef.current;
         if (box.dragging && box.startX !== null && box.currX !== null) {
           const rx = Math.min(box.startX, box.currX);
@@ -639,7 +700,7 @@ export default function MCMeterOsciloscopio({
           }
         }
 
-        // 6. Tooltip Dual Unificado al pasar el puntero
+        // Tooltip Dual / Comparativo al pasar el puntero
         const hover = hoverPosRef.current;
         if (hover.x !== null && hover.x >= padL && hover.x <= w - padR) {
           const fracX = (hover.x - padL) / plotW;
@@ -650,7 +711,6 @@ export default function MCMeterOsciloscopio({
           const cyV = Math.max(vTop, Math.min(vBot, vBot - ((ptH[1] - minV) / spanV) * vTrackH));
           const cyI = Math.max(iTop, Math.min(iBot, iBot - ((ptH[2] - minI) / spanI) * iTrackH));
 
-          // Línea guía vertical
           ctx.strokeStyle = '#64748b';
           ctx.lineWidth = 1;
           ctx.setLineDash([2, 2]);
@@ -660,7 +720,6 @@ export default function MCMeterOsciloscopio({
           ctx.stroke();
           ctx.setLineDash([]);
 
-          // Círculos concéntricos en ambas curvas
           if (showVbus) {
             ctx.fillStyle = '#ff3b3b';
             ctx.beginPath();
@@ -684,9 +743,15 @@ export default function MCMeterOsciloscopio({
           const pwrS = vS * iS;
           const tBackCursor = tFin - tS;
 
-          // Cajita flotante
-          const boxW = 215;
-          const boxH = 92;
+          // Datos Golden en este punto X si existe curva activa
+          let valGoldenAtX = null;
+          if (curvaGoldenSeleccionada && curvaGoldenSeleccionada.curvaPuntos?.length > 0) {
+            const gIdx = Math.min(curvaGoldenSeleccionada.curvaPuntos.length - 1, Math.round(fracX * (curvaGoldenSeleccionada.curvaPuntos.length - 1)));
+            valGoldenAtX = curvaGoldenSeleccionada.curvaPuntos[gIdx];
+          }
+
+          const boxW = 240;
+          const boxH = valGoldenAtX !== null ? 105 : (showVbus ? 92 : 65);
           let tx = cx + 14 + boxW < w - padR ? cx + 14 : cx - boxW - 14;
           let ty = Math.max(padT + 6, Math.min(h - padB - boxH - 6, (hover.y || h / 2) - boxH / 2));
 
@@ -702,22 +767,26 @@ export default function MCMeterOsciloscopio({
           ctx.fillText(`⏱ t = -${tBackCursor.toFixed(3)}s (${tS.toFixed(2)}s)`, tx + 8, ty + 14);
 
           ctx.font = 'bold 9px Consolas, monospace';
-          ctx.fillStyle = '#ff4444';
-          ctx.fillText(`🔴 VBUS: ${fmtVbus(vS)}`, tx + 8, ty + 32);
+          if (showVbus) {
+            ctx.fillStyle = '#ff4444';
+            ctx.fillText(`🔴 VBUS: ${fmtVbus(vS)}`, tx + 8, ty + 30);
+          }
 
           ctx.fillStyle = '#facc15';
-          ctx.fillText(`🟡 IBUS: ${fmtIbus(iS)} (${(iS * 1000).toFixed(0)}mA)`, tx + 8, ty + 50);
+          const yPosIbus = showVbus ? ty + 46 : ty + 30;
+          ctx.fillText(`🟡 EN VIVO (I): ${fmtIbus(iS)} (${(iS * 1000).toFixed(0)}mA)`, tx + 8, yPosIbus);
 
-          ctx.font = 'bold 8px Consolas, monospace';
-          ctx.fillStyle = '#38bdf8';
-          ctx.fillText(`🔵 PWR : ${fmtWatts(pwrS)}`, tx + 8, ty + 67);
-
-          ctx.fillStyle = '#10b981';
-          ctx.fillText(
-            `D+:${dpS.toFixed(2)}V D-:${dmS.toFixed(2)}V CC:${Math.max(cc1S, cc2S).toFixed(2)}V`,
-            tx + 8,
-            ty + 82
-          );
+          if (valGoldenAtX !== null) {
+            const diffA = iS - valGoldenAtX;
+            ctx.fillStyle = '#00e5ff';
+            ctx.fillText(`★ GOLDEN (I) : ${valGoldenAtX.toFixed(3)}A (${(valGoldenAtX * 1000).toFixed(0)}mA)`, tx + 8, yPosIbus + 16);
+            ctx.fillStyle = Math.abs(diffA) > 0.1 ? '#ef4444' : '#10b981';
+            ctx.fillText(`Δ DIFERENCIA : ${diffA >= 0 ? '+' : ''}${(diffA * 1000).toFixed(0)} mA`, tx + 8, yPosIbus + 32);
+          } else if (showVbus) {
+            ctx.font = 'bold 8px Consolas, monospace';
+            ctx.fillStyle = '#38bdf8';
+            ctx.fillText(`🔵 PWR: ${fmtWatts(pwrS)} | D+:${dpS.toFixed(2)}V CC:${Math.max(cc1S, cc2S).toFixed(2)}V`, tx + 8, ty + 64);
+          }
         }
       }
 
@@ -739,7 +808,9 @@ export default function MCMeterOsciloscopio({
     showCc,
     markerAIdx,
     markerBIdx,
-    modoAvanzado
+    modoAvanzado,
+    perfilMedicion,
+    curvaGoldenSeleccionada
   ]);
 
   // Exportar Captura PNG 100% en el Navegador
@@ -747,7 +818,7 @@ export default function MCMeterOsciloscopio({
     const canvas = canvasRef.current;
     if (!canvas) return;
     const link = document.createElement('a');
-    link.download = `Marshall_Oscilograma_${new Date().toISOString().replace(/[:.]/g, '-')}.png`;
+    link.download = `Marshall_Oscilograma_${perfilMedicion.toUpperCase()}_${new Date().toISOString().replace(/[:.]/g, '-')}.png`;
     link.href = canvas.toDataURL('image/png');
     link.click();
   };
@@ -779,7 +850,7 @@ export default function MCMeterOsciloscopio({
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `Marshall_Video_Oscilograma_${new Date().toISOString().replace(/[:.]/g, '-')}.webm`;
+        a.download = `Marshall_Video_${perfilMedicion.toUpperCase()}_${new Date().toISOString().replace(/[:.]/g, '-')}.webm`;
         a.click();
         URL.revokeObjectURL(url);
         setGrabandoVideo(false);
@@ -846,17 +917,62 @@ export default function MCMeterOsciloscopio({
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `Marshall_MCMeter_${new Date().toISOString().replace(/[:.]/g, '-')}.csv`);
+    link.setAttribute('download', `Marshall_MCMeter_${perfilMedicion.toUpperCase()}_${new Date().toISOString().replace(/[:.]/g, '-')}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
-  const cc1Activo = conectado && cc1 > 0.25 && cc1 >= cc2;
-  const cc2Activo = conectado && cc2 > 0.25 && cc2 > cc1;
+  // Guardar Curva de Referencia Golden
+  const handleGuardarCurvaGolden = () => {
+    const { ventana } = obtenerVentanaDatos();
+    if (ventana.length < 10) {
+      alert('No hay suficientes muestras en pantalla para capturar una curva de referencia.');
+      return;
+    }
+
+    // Downsample a 250 puntos para optimizar almacenamiento en Firestore
+    const targetPoints = 250;
+    const step = Math.max(1, Math.floor(ventana.length / targetPoints));
+    const puntosDownsampled = [];
+    for (let i = 0; i < ventana.length; i += step) {
+      puntosDownsampled.push(parseFloat(ventana[i][2].toFixed(4)));
+    }
+
+    const tIni = ventana[0][0];
+    const tFin = ventana[ventana.length - 1][0];
+    const durMs = Math.round((tFin - tIni) * 1000);
+    const maxA = Math.max(...ventana.map((pt) => pt[2]));
+    const avgA = ventana.reduce((acc, pt) => acc + pt[2], 0) / ventana.length;
+
+    const nuevaCurva = {
+      id: `golden_${Date.now()}`,
+      titulo: formTituloGolden || `Secuencia ${perfilMedicion.toUpperCase()} (${new Date().toLocaleDateString()})`,
+      perfil: perfilMedicion,
+      fecha: new Date().toISOString(),
+      duracionMs: durMs,
+      picoMaxA: parseFloat(maxA.toFixed(4)),
+      iPromedioA: parseFloat(avgA.toFixed(4)),
+      notas: formNotasGolden || '',
+      curvaPuntos: puntosDownsampled
+    };
+
+    if (onGuardarCurvaGolden) {
+      onGuardarCurvaGolden(nuevaCurva);
+    }
+
+    setCurvaGoldenSeleccionada(nuevaCurva);
+    setModalGuardarGolden(false);
+    setFormTituloGolden('');
+    setFormNotasGolden('');
+    alert(`¡Curva de referencia "${nuevaCurva.titulo}" guardada para ${modeloActivo?.nombre || 'el modelo'}!`);
+  };
+
   const snapTotal = pausado
     ? (pausedSnapshotRef.current || []).length
     : historyBufferRef.current.size;
+
+  const curvasDisponibles = modeloActivo?.oscilogramasReferencia || [];
 
   return (
     <div
@@ -874,7 +990,7 @@ export default function MCMeterOsciloscopio({
         userSelect: 'none'
       }}
     >
-      {/* 1. BARRA SUPERIOR: TELEMETRÍA EN VIVO Y EXPORTACIÓN */}
+      {/* 1. BARRA SUPERIOR: TELEMETRÍA, SELECTOR DE PERFILES Y EXPORTACIÓN */}
       <div
         style={{
           display: 'flex',
@@ -887,7 +1003,7 @@ export default function MCMeterOsciloscopio({
           gap: '10px'
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
           {/* Botón Volver al Mini-HUD (Exclusión Mutua) */}
           <button
             onClick={onCerrarYVolverMini}
@@ -908,18 +1024,75 @@ export default function MCMeterOsciloscopio({
             <Minimize2 size={15} /> 🗕 Mini-HUD
           </button>
 
-          {/* Lecturas en Negrita y Colores Propios */}
-          <span style={{ color: '#ff4444', fontWeight: 800, fontSize: '1.05rem' }}>
-            VBUS: {fmtVbus(vbus)}
-          </span>
+          {/* SELECTOR DE PERFIL DE ANÁLISIS */}
+          <div style={{ display: 'flex', backgroundColor: '#070b12', padding: '3px', borderRadius: '8px', border: '1px solid #1e293b' }}>
+            <button
+              onClick={() => setPerfilMedicion('power')}
+              style={{
+                backgroundColor: perfilMedicion === 'power' ? '#eab308' : 'transparent',
+                color: perfilMedicion === 'power' ? '#000000' : '#cbd5e1',
+                border: 'none',
+                borderRadius: '6px',
+                padding: '4px 10px',
+                fontWeight: 800,
+                fontSize: '0.75rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+            >
+              🚀 Power (1s / Arranque)
+            </button>
+            <button
+              onClick={() => setPerfilMedicion('carga')}
+              style={{
+                backgroundColor: perfilMedicion === 'carga' ? '#0284c7' : 'transparent',
+                color: perfilMedicion === 'carga' ? '#ffffff' : '#cbd5e1',
+                border: 'none',
+                borderRadius: '6px',
+                padding: '4px 10px',
+                fontWeight: 800,
+                fontSize: '0.75rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+            >
+              ⚡ Carga USB-C
+            </button>
+            <button
+              onClick={() => setPerfilMedicion('buck')}
+              style={{
+                backgroundColor: perfilMedicion === 'buck' ? '#8b5cf6' : 'transparent',
+                color: perfilMedicion === 'buck' ? '#ffffff' : '#cbd5e1',
+                border: 'none',
+                borderRadius: '6px',
+                padding: '4px 10px',
+                fontWeight: 800,
+                fontSize: '0.75rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+            >
+              💡 Buck / Backlight
+            </button>
+          </div>
+
+          {/* Lecturas Vivas */}
+          {showVbus && (
+            <span style={{ color: '#ff4444', fontWeight: 800, fontSize: '1rem' }}>
+              VBUS: {fmtVbus(vbus)}
+            </span>
+          )}
           <span style={{ color: '#facc15', fontWeight: 800, fontSize: '1.05rem' }}>
-            IBUS: {fmtIbus(ibus)}
+            IBUS: {fmtIbus(ibus)} ({(ibus * 1000).toFixed(0)}mA)
           </span>
-          <span style={{ color: '#38bdf8', fontWeight: 800, fontSize: '1.05rem' }}>
-            PWR: {fmtWatts(watts)}
-          </span>
-          <span style={{ color: '#10b981', fontWeight: 800, fontSize: '1.05rem' }}>
-            PEAK: {peakIbus.toFixed(3)}A
+          <span style={{ color: '#10b981', fontWeight: 800, fontSize: '0.95rem' }}>
+            PICO: {peakIbus.toFixed(3)}A
           </span>
           <span
             style={{
@@ -928,7 +1101,7 @@ export default function MCMeterOsciloscopio({
               padding: '2px 8px',
               borderRadius: '4px',
               fontWeight: 800,
-              fontSize: '0.8rem'
+              fontSize: '0.75rem'
             }}
           >
             {sps}
@@ -946,8 +1119,7 @@ export default function MCMeterOsciloscopio({
                 backgroundColor: 'rgba(239, 68, 68, 0.15)',
                 padding: '4px 8px',
                 borderRadius: '4px',
-                border: '1px solid #ef4444',
-                animation: 'pulse 1s infinite'
+                border: '1px solid #ef4444'
               }}
             >
               🔴 {tiempoRestanteVideo !== null ? `REC: ${tiempoRestanteVideo.toFixed(1)}s` : `REC LIBRE: ${tiempoTranscurridoVideo.toFixed(1)}s`}
@@ -955,12 +1127,12 @@ export default function MCMeterOsciloscopio({
           )}
 
           <button
-            onClick={guardarCapturaPNG}
+            onClick={() => setModalGuardarGolden(true)}
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '5px',
-              backgroundColor: '#0284c7',
+              gap: '4px',
+              backgroundColor: '#059669',
               color: '#ffffff',
               border: 'none',
               borderRadius: '6px',
@@ -970,47 +1142,45 @@ export default function MCMeterOsciloscopio({
               fontSize: '0.8rem'
             }}
           >
-            <Camera size={14} /> 📸 PNG
+            <BookmarkPlus size={14} /> 💾 Guardar Curva Golden
+          </button>
+
+          <button
+            onClick={guardarCapturaPNG}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              backgroundColor: '#0284c7',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '6px',
+              padding: '6px 10px',
+              fontWeight: 800,
+              cursor: 'pointer',
+              fontSize: '0.8rem'
+            }}
+          >
+            <Camera size={14} /> PNG
           </button>
 
           <button
             onClick={() => iniciarGrabacionVideo(10)}
-            disabled={grabandoVideo && tiempoRestanteVideo === null}
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '4px',
+              gap: '3px',
               backgroundColor: '#1e293b',
               color: '#fca5a5',
               border: '1px solid #334155',
               borderRadius: '6px',
-              padding: '6px 10px',
+              padding: '6px 9px',
               fontWeight: 800,
               cursor: 'pointer',
-              fontSize: '0.8rem'
+              fontSize: '0.78rem'
             }}
           >
-            <Video size={14} /> 🎥 10s
-          </button>
-
-          <button
-            onClick={() => iniciarGrabacionVideo(30)}
-            disabled={grabandoVideo && tiempoRestanteVideo === null}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-              backgroundColor: '#1e293b',
-              color: '#fca5a5',
-              border: '1px solid #334155',
-              borderRadius: '6px',
-              padding: '6px 10px',
-              fontWeight: 800,
-              cursor: 'pointer',
-              fontSize: '0.8rem'
-            }}
-          >
-            <Video size={14} /> 🎥 30s
+            <Video size={13} /> 10s
           </button>
 
           <button
@@ -1018,18 +1188,18 @@ export default function MCMeterOsciloscopio({
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '4px',
+              gap: '3px',
               backgroundColor: grabandoVideo ? '#ef4444' : '#1e293b',
               color: grabandoVideo ? '#ffffff' : '#fca5a5',
               border: '1px solid #334155',
               borderRadius: '6px',
-              padding: '6px 10px',
+              padding: '6px 9px',
               fontWeight: 800,
               cursor: 'pointer',
-              fontSize: '0.8rem'
+              fontSize: '0.78rem'
             }}
           >
-            <Video size={14} /> {grabandoVideo ? '⏹ Parar' : '🎥 Libre'}
+            <Video size={13} /> {grabandoVideo ? '⏹ Parar' : '🎥 Libre'}
           </button>
 
           <button
@@ -1037,23 +1207,23 @@ export default function MCMeterOsciloscopio({
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '4px',
+              gap: '3px',
               backgroundColor: '#1e293b',
               color: '#10b981',
               border: '1px solid #334155',
               borderRadius: '6px',
-              padding: '6px 10px',
+              padding: '6px 9px',
               fontWeight: 800,
               cursor: 'pointer',
-              fontSize: '0.8rem'
+              fontSize: '0.78rem'
             }}
           >
-            <FileSpreadsheet size={14} /> 📊 CSV
+            <FileSpreadsheet size={13} /> CSV
           </button>
         </div>
       </div>
 
-      {/* 2. SEGUNDA BARRA: PINES USB-C + GUÍA BOX-ZOOM + DELTA (A-B) */}
+      {/* 2. BARRA DE COMPARACIÓN GOLDEN SAMPLE Y PROTOCOLOS */}
       <div
         style={{
           display: 'flex',
@@ -1066,40 +1236,70 @@ export default function MCMeterOsciloscopio({
           gap: '8px'
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
-          <span style={{ color: '#10b981', fontWeight: 800, fontSize: '0.88rem' }}>D+: {fmtPin(dp)}</span>
-          <span style={{ color: '#eab308', fontWeight: 800, fontSize: '0.88rem' }}>D-: {fmtPin(dm)}</span>
-          <span
+        {/* Selector de Curva de Referencia Golden Sample */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <Layers size={14} color="#00ffff" />
+          <span style={{ color: '#00ffff', fontWeight: 800, fontSize: '0.8rem' }}>
+            COMPARADOR GOLDEN:
+          </span>
+          <select
+            value={curvaGoldenSeleccionada?.id || ''}
+            onChange={(e) => {
+              const encontrada = curvasDisponibles.find((c) => c.id === e.target.value);
+              setCurvaGoldenSeleccionada(encontrada || null);
+            }}
             style={{
-              color: cc1Activo ? '#10b981' : '#38bdf8',
-              fontWeight: 800,
-              fontSize: '0.88rem',
-              border: cc1Activo ? '1px solid #10b981' : 'none',
-              padding: cc1Activo ? '1px 6px' : '0',
-              borderRadius: '4px'
+              backgroundColor: '#1e293b',
+              color: '#ffffff',
+              border: '1px solid #00e5ff',
+              borderRadius: '6px',
+              padding: '3px 8px',
+              fontSize: '0.75rem',
+              outline: 'none',
+              cursor: 'pointer'
             }}
           >
-            {cc1Activo ? `[CC1: ${fmtPin(cc1)}]` : `CC1: ${fmtPin(cc1)}`}
-          </span>
-          <span
-            style={{
-              color: cc2Activo ? '#10b981' : '#c084fc',
-              fontWeight: 800,
-              fontSize: '0.88rem',
-              border: cc2Activo ? '1px solid #10b981' : 'none',
-              padding: cc2Activo ? '1px 6px' : '0',
-              borderRadius: '4px'
-            }}
-          >
-            {cc2Activo ? `[CC2: ${fmtPin(cc2)}]` : `CC2: ${fmtPin(cc2)}`}
-          </span>
+            <option value="">-- Sin Curva de Referencia --</option>
+            {curvasDisponibles.map((c) => (
+              <option key={c.id} value={c.id}>
+                ★ {c.titulo} ({c.duracionMs}ms | Pico: {c.picoMaxA}A)
+              </option>
+            ))}
+          </select>
 
-          <span style={{ color: '#94a3b8', fontSize: '0.8rem', marginLeft: '10px' }}>
-            🔲 Arrastra Clic Izq = Box-Zoom | Clic Izq = Marca A | Clic Der = Marca B
-          </span>
+          {curvaGoldenSeleccionada && (
+            <button
+              onClick={() => setCurvaGoldenSeleccionada(null)}
+              title="Quitar Curva de Referencia"
+              style={{
+                background: 'rgba(239, 68, 68, 0.2)',
+                border: 'none',
+                color: '#ef4444',
+                padding: '2px 6px',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '0.7rem'
+              }}
+            >
+              Quitar
+            </button>
+          )}
+
+          {perfilMedicion === 'carga' && (
+            <div style={{ display: 'flex', gap: '10px', marginLeft: '10px' }}>
+              <span style={{ color: '#10b981', fontSize: '0.8rem', fontWeight: 'bold' }}>D+: {fmtPin(dp)}</span>
+              <span style={{ color: '#eab308', fontSize: '0.8rem', fontWeight: 'bold' }}>D-: {fmtPin(dm)}</span>
+              <span style={{ color: cc1 > 0.25 ? '#10b981' : '#38bdf8', fontSize: '0.8rem', fontWeight: 'bold' }}>
+                CC1: {fmtPin(cc1)}
+              </span>
+              <span style={{ color: cc2 > 0.25 ? '#10b981' : '#c084fc', fontSize: '0.8rem', fontWeight: 'bold' }}>
+                CC2: {fmtPin(cc2)}
+              </span>
+            </div>
+          )}
         </div>
 
-        <span style={{ color: '#c084fc', fontWeight: 800, fontSize: '0.85rem' }}>
+        <span style={{ color: '#c084fc', fontWeight: 800, fontSize: '0.82rem' }}>
           {calcularInfoDelta()}
         </span>
       </div>
@@ -1139,7 +1339,7 @@ export default function MCMeterOsciloscopio({
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-          {/* Botón Pausa / Reanudar */}
+          {/* Pausa / Reanudar */}
           <button
             onClick={togglePausa}
             style={{
@@ -1160,66 +1360,7 @@ export default function MCMeterOsciloscopio({
             {pausado ? '▶ REANUDAR EN VIVO' : '⏸ PAUSAR Y ANALIZAR'}
           </button>
 
-          {/* Botón Split View (2 Carriles Separados) */}
-          <button
-            onClick={() => setSplitTracks(!splitTracks)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '5px',
-              backgroundColor: splitTracks ? '#7c3aed' : '#1e293b',
-              color: '#ffffff',
-              border: '1px solid #334155',
-              borderRadius: '6px',
-              padding: '6px 12px',
-              fontWeight: 800,
-              cursor: 'pointer',
-              fontSize: '0.8rem'
-            }}
-          >
-            <Split size={14} />
-            {splitTracks ? '🔀 Vista: 2 Carriles (V / I)' : '🔀 Vista: Superpuesta'}
-          </button>
-
-          {/* Botón Modo Avanzado 🔬 */}
-          <button
-            onClick={() => setModoAvanzado(!modoAvanzado)}
-            style={{
-              backgroundColor: modoAvanzado ? '#1e3a8a' : '#1e293b',
-              color: modoAvanzado ? '#00e5ff' : '#94a3b8',
-              border: '1px solid #334155',
-              borderRadius: '6px',
-              padding: '6px 10px',
-              fontWeight: 800,
-              cursor: 'pointer',
-              fontSize: '0.8rem'
-            }}
-          >
-            🔬 {modoAvanzado ? 'Avanzado: ON' : 'Avanzado: OFF'}
-          </button>
-
-          {/* Botón Escala Tester */}
-          <button
-            onClick={() => setEscalaDinamica(!escalaDinamica)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-              backgroundColor: '#1e293b',
-              color: '#38bdf8',
-              border: '1px solid #334155',
-              borderRadius: '6px',
-              padding: '6px 10px',
-              fontWeight: 800,
-              cursor: 'pointer',
-              fontSize: '0.8rem'
-            }}
-          >
-            <Sliders size={14} />
-            {escalaDinamica ? 'Escala: Tester' : 'Escala: Desde 0'}
-          </button>
-
-          {/* Auto-Trigger (>15 mA) */}
+          {/* Auto-Trigger (>15 mA) para arranque exacto en t=0 */}
           <button
             onClick={toggleAutoTrigger}
             style={{
@@ -1237,7 +1378,47 @@ export default function MCMeterOsciloscopio({
             }}
           >
             <Zap size={14} />
-            {autoTriggerArmed ? '⚡ ESPERANDO PULSO (>15mA)...' : '⚡ Auto-Trig (>15mA)'}
+            {autoTriggerArmed ? '⚡ ESPERANDO BOTÓN POWER (>15mA)...' : '⚡ Auto-Trigger Power (>15mA)'}
+          </button>
+
+          {/* Split View (Solo activo en Carga) */}
+          {perfilMedicion === 'carga' && (
+            <button
+              onClick={() => setSplitTracks(!splitTracks)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                backgroundColor: splitTracks ? '#7c3aed' : '#1e293b',
+                color: '#ffffff',
+                border: '1px solid #334155',
+                borderRadius: '6px',
+                padding: '6px 10px',
+                fontWeight: 800,
+                cursor: 'pointer',
+                fontSize: '0.8rem'
+              }}
+            >
+              <Split size={14} />
+              {splitTracks ? '2 Carriles (V / I)' : 'Superpuesta'}
+            </button>
+          )}
+
+          {/* Modo Avanzado 🔬 */}
+          <button
+            onClick={() => setModoAvanzado(!modoAvanzado)}
+            style={{
+              backgroundColor: modoAvanzado ? '#1e3a8a' : '#1e293b',
+              color: modoAvanzado ? '#00e5ff' : '#94a3b8',
+              border: '1px solid #334155',
+              borderRadius: '6px',
+              padding: '6px 10px',
+              fontWeight: 800,
+              cursor: 'pointer',
+              fontSize: '0.8rem'
+            }}
+          >
+            🔬 {modoAvanzado ? '6 Dígitos' : '3 Dígitos'}
           </button>
 
           {/* Zoom Controles */}
@@ -1308,30 +1489,36 @@ export default function MCMeterOsciloscopio({
 
         {/* Toggles de Canales */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-          <label style={{ color: '#ff4444', fontWeight: 700, fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer' }}>
-            <input type="checkbox" checked={showVbus} onChange={(e) => setShowVbus(e.target.checked)} />
-            VBUS
-          </label>
+          {perfilMedicion === 'carga' && (
+            <label style={{ color: '#ff4444', fontWeight: 700, fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer' }}>
+              <input type="checkbox" checked={showVbus} onChange={(e) => setShowVbus(e.target.checked)} />
+              VBUS
+            </label>
+          )}
           <label style={{ color: '#facc15', fontWeight: 700, fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer' }}>
             <input type="checkbox" checked={showIbus} onChange={(e) => setShowIbus(e.target.checked)} />
-            IBUS
+            CORRIENTE (IBUS)
           </label>
-          <label style={{ color: '#10b981', fontWeight: 700, fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer' }}>
-            <input type="checkbox" checked={showDp} onChange={(e) => setShowDp(e.target.checked)} />
-            D+
-          </label>
-          <label style={{ color: '#38bdf8', fontWeight: 700, fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer' }}>
-            <input type="checkbox" checked={showDm} onChange={(e) => setShowDm(e.target.checked)} />
-            D-
-          </label>
-          <label style={{ color: '#c084fc', fontWeight: 700, fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer' }}>
-            <input type="checkbox" checked={showCc} onChange={(e) => setShowCc(e.target.checked)} />
-            CC
-          </label>
+          {perfilMedicion === 'carga' && (
+            <>
+              <label style={{ color: '#10b981', fontWeight: 700, fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer' }}>
+                <input type="checkbox" checked={showDp} onChange={(e) => setShowDp(e.target.checked)} />
+                D+
+              </label>
+              <label style={{ color: '#38bdf8', fontWeight: 700, fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer' }}>
+                <input type="checkbox" checked={showDm} onChange={(e) => setShowDm(e.target.checked)} />
+                D-
+              </label>
+              <label style={{ color: '#c084fc', fontWeight: 700, fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer' }}>
+                <input type="checkbox" checked={showCc} onChange={(e) => setShowCc(e.target.checked)} />
+                CC
+              </label>
+            </>
+          )}
         </div>
       </div>
 
-      {/* 5. SLIDER DE LÍNEA DE TIEMPO (TIME-SCRUBBING SOBRE BUFFER DE 60,000 MUESTRAS) */}
+      {/* 5. SLIDER DE LÍNEA DE TIEMPO (BUFFER DE 60,000 MUESTRAS) */}
       <div
         style={{
           display: 'flex',
@@ -1343,7 +1530,7 @@ export default function MCMeterOsciloscopio({
         }}
       >
         <span style={{ color: '#94a3b8', fontSize: '0.75rem', fontWeight: 700, whiteSpace: 'nowrap' }}>
-          ⏪ LÍNEA DE TIEMPO (BUFFER {snapTotal.toLocaleString()} PTS):
+          ⏪ LÍNEA DE TIEMPO ({snapTotal.toLocaleString()} PTS):
         </span>
         <input
           type="range"
@@ -1364,6 +1551,132 @@ export default function MCMeterOsciloscopio({
           {viewEndIdx || snapTotal} / {snapTotal}
         </span>
       </div>
+
+      {/* MODAL PARA GUARDAR CURVA GOLDEN DE REFERENCIA */}
+      {modalGuardarGolden && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            zIndex: 100000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#0f172a',
+              border: '2px solid #00e5ff',
+              borderRadius: '14px',
+              padding: '24px',
+              width: '90%',
+              maxWidth: '460px',
+              boxShadow: '0 0 30px rgba(0, 229, 255, 0.3)'
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ color: '#00e5ff', margin: 0, fontSize: '1.1rem', fontWeight: 800 }}>
+                ★ Guardar Curva Golden de Referencia
+              </h3>
+              <button
+                onClick={() => setModalGuardarGolden(false)}
+                style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <p style={{ color: '#94a3b8', fontSize: '0.8rem', marginBottom: '14px' }}>
+              Se guardará la ventana activa del oscilograma para el modelo{' '}
+              <strong style={{ color: '#ffffff' }}>{modeloActivo?.nombre || 'actual'}</strong>. Esta curva se proyectará
+              de fondo en cian opaco para comparar futuros equipos en falla.
+            </p>
+
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ color: '#cbd5e1', fontSize: '0.78rem', fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>
+                Título de la Secuencia:
+              </label>
+              <input
+                type="text"
+                value={formTituloGolden}
+                onChange={(e) => setFormTituloGolden(e.target.value)}
+                placeholder="Ej. Encendido Normal Power 1s (Placa Sana)"
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  backgroundColor: '#1e293b',
+                  border: '1px solid #334155',
+                  borderRadius: '6px',
+                  color: '#ffffff',
+                  fontSize: '0.85rem',
+                  outline: 'none'
+                }}
+              />
+            </div>
+
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ color: '#cbd5e1', fontSize: '0.78rem', fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>
+                Notas Técnicas (Opcional):
+              </label>
+              <textarea
+                value={formNotasGolden}
+                onChange={(e) => setFormNotasGolden(e.target.value)}
+                placeholder="Ej. Pico máximo 850mA, estabiliza en 420mA a los 2.2 segundos..."
+                rows={3}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  backgroundColor: '#1e293b',
+                  border: '1px solid #334155',
+                  borderRadius: '6px',
+                  color: '#ffffff',
+                  fontSize: '0.82rem',
+                  outline: 'none',
+                  resize: 'none'
+                }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button
+                onClick={() => setModalGuardarGolden(false)}
+                style={{
+                  backgroundColor: '#1e293b',
+                  color: '#94a3b8',
+                  border: 'none',
+                  borderRadius: '6px',
+                  padding: '8px 16px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  fontSize: '0.8rem'
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleGuardarCurvaGolden}
+                style={{
+                  backgroundColor: '#00e5ff',
+                  color: '#000000',
+                  border: 'none',
+                  borderRadius: '6px',
+                  padding: '8px 18px',
+                  cursor: 'pointer',
+                  fontWeight: 800,
+                  fontSize: '0.85rem'
+                }}
+              >
+                Guardar en Firestore
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

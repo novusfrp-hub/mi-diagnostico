@@ -1,215 +1,261 @@
-# Plan de Implementación Integral: Integración Marshall MC-Meter Pro (KM003C USB HID)
+# Plan Maestro de Implementación Definitivo: Integración Marshall MC-Meter Pro (KM003C 100% WebHID)
+
 **Proyecto:** `mi-diagnostico` (Marshall Cell Diagnostic Platform)  
-**Stack Tecnológico:** Next.js 16.2, React 19.2 (JSX), Framer Motion, Lucide React, HTML5 Canvas, Firebase Firestore, Python (hidapi, asyncio, websockets).  
-**Autor:** Senior Hardware USB HID & Frontend Architect  
+**Stack Tecnológico:** Next.js 16.2, React 19.2 (JSX), WebHID API (`navigator.hid`), Framer Motion, Lucide React, HTML5 Canvas 60 FPS, Firebase Firestore.  
+**Estado:** ✅ **Completado e Implementado 100% en Producción**  
 **Fecha:** Octubre 2026  
 
 ---
 
-## 1. Resumen Ejecutivo y Objetivos
+## 1. Resumen Ejecutivo y Arquitectura General
 
-El objetivo de esta integración es incorporar el tester USB **KM003C** (denominado en la aplicación **Marshall MC-Meter Pro** para fines de marca propia) dentro de la plataforma web de diagnóstico técnico `mi-diagnostico`. 
+La plataforma **Marshall Cell Diagnostic Platform** (`mi-diagnostico`) incorpora el tester USB-C de alta velocidad **KM003C** bajo la denominación de marca propia **Marshall MC-Meter Pro**.
 
-Esta integración sustituye la función previa del oscilograma monocanal del multímetro UNI-T UT61E+ (limitado por hardware a 2–4 Hz) por un **Analizador Oscilograma X-Y de Alta Resolución y 1000 Hz (1 Ksps)** con capacidad de análisis de consumo dual (VBUS + IBUS), detección de protocolos en pines USB-C (D+, D-, CC1, CC2), inspección mediante Box-Zoom, cursores Delta A-B, grabación de video, y captura instantánea directa hacia la base de datos de **Dock Test** en Firebase Firestore.
-
-> [!IMPORTANT]
-> **Integridad de Funciones Existentes:** Todas las funcionalidades operativas del multímetro UNI-T UT61E+ (medición de diodo en FPC e IC, escala de $\mu\text{A}$, ohmios, voltios, auto-hold con avance mágico de pin y síntesis de voz) **se mantienen 100% intactas**. Solo se desacopla y reemplaza la visualización del oscilograma.
-
----
-
-## 2. Especificaciones Técnicas del Protocolo USB HID (KM003C)
-
-El dispositivo es un instrumento USB HID compuesto. No se debe inventar ni alterar la parametrización decodificada:
-
-* **Identificadores USB:**
-  * **VID (Vendor ID):** `0x5FC9`
-  * **PID (Product ID):** `0x0063`
-  * **Interfaz de Comunicación ADC:** `Interface = 3` (`MI_03`)
-* **Comando de Solicitud de Muestras (Polling):**
-  * Longitud: 65 bytes (1 byte Report ID `0x00` + 64 bytes payload).
-  * Estructura del Payload: `[0x00, 0x0C, seq_id, 0x02, 0x00] + [0x00] * 60`
-  * `seq_id`: Contador incremental de 8 bits (`0` a `255`, con desbordamiento `(seq_id + 1) & 0xFF`).
-  * Frecuencia de envío: Bucle continuo sin bloqueo con `timeout_ms = 12` (~1000 consultas por segundo).
-* **Decodificación de la Respuesta (Trama de 64 bytes en Little-Endian):**
-  * `Bytes 8..11` (`<i`, int32 signed): **VBUS instantáneo en microvoltios ($\mu\text{V}$)**.  
-    $$\text{VBUS (V)} = \frac{|\text{vbus\_uv}|}{1\,000\,000.0}$$
-  * `Bytes 12..15` (`<i`, int32 signed): **IBUS instantáneo en microamperios ($\mu\text{A}$)**.  
-    $$\text{IBUS (A)} = \frac{|\text{ibus\_ua}|}{1\,000\,000.0}$$
-  * `Bytes 16..23` (`<ii`, dos int32): VBUS e IBUS promediados por hardware.
-  * `Bytes 34..41` (`<HHHH`, cuatro uint16): **Pines CC1, CC2, D+, D-** en décimas de milivoltio ($0.1\text{ mV}$).  
-    $$\text{Voltaje (V)} = \frac{\text{raw\_uint16}}{10\,000.0}$$
-* **Detección Automática de SPS Físico (Samples Per Second):**
-  * Se compara la ventana de bytes `b[8:16]` con la lectura previa. Cada cambio incrementa un acumulador en una ventana de 1 segundo:
-    * $\le 5$ cambios/s $\rightarrow$ `"2 SPS"`
-    * $\le 16$ cambios/s $\rightarrow$ `"10 SPS"`
-    * $\le 110$ cambios/s $\rightarrow$ `"50 SPS"`
-    * $> 110$ cambios/s $\rightarrow$ `"1Ksps"`
-* **Filtrado de Señal:**
-  * Filtro de mediana de 3 muestras consecutivas (`mediana_3(a, b, c)`) para eliminar picos erráticos de 1 muestra de ruido ADC sin introducir retardo de fase ni amortiguar transitorios reales.
+Esta integración cumple con los siguientes principios rectores inquebrantables:
+1. **100% Nativo en el Navegador (WebHID API):** Cero scripts externos de Python, cero servidores locales de WebSocket, cero daemons en segundo plano. La comunicación se realiza de forma directa entre Chrome/Edge y el hardware USB mediante `navigator.hid`.
+2. **Aislamiento Absoluto de Datos (Zero Interference):** Las lecturas del multímetro UNI-T UT61E+ (caídas de tensión en frío en escala de diodo, resistencia en ohmios y corriente en $\mu\text{A}$) y las mediciones dinámicas del Marshall MC-Meter Pro (VBUS, IBUS, potencia y negociación de pines USB-C) están **estrictamente separadas**. El tester USB jamás toca, modifica ni sobreescribe `docktestDiodo` ni ningún otro campo del multímetro.
+3. **Distribución 50% / 50% en MARSHALL HARDWARE SUITE:** Ambos instrumentos coexisten simétricamente en el panel superior de mediciones de cada modelo (`nivelDb === 'mediciones'`).
+4. **Bahía de Re-acoplamiento Inteligente:** Al pulsar `🗗 Desacoplar`, el panel se convierte en una bahía con borde cian punteado y telemetría resumida (`🔗 Re-Acoplar Instrumento Aquí`), mientras que el instrumento flota como Mini-HUD por la pantalla. Al cerrarlo (`✕`) o pulsar re-acoplar, vuelve automáticamente a su posición original del 50%.
+5. **Especialización en Secuencias de Encendido (Power Sequences) y Muestras Golden (Golden Sample Comparator):** El oscilograma no solo analiza carga USB, sino que diagnostica anomalías de arranque (pulsación del botón Power de 1s, PMIC buck rails, fugas secundarias y bootloops), permitiendo superponer curvas de referencia de equipos sanos guardadas en la nube.
 
 ---
 
-## 3. Arquitectura de Conexión del Sistema (100% Nativa WebHID)
+## 2. Diagrama de Arquitectura 100% WebHID
 
 ```mermaid
 flowchart TB
-    subgraph Hardware ["Capa de Instrumentos USB"]
+    subgraph Hardware ["Instrumentación USB de Laboratorio"]
         KM["Marshall MC-Meter Pro\n(KM003C VID:0x5FC9 PID:0x0063 MI_03)"]
         UT["Multímetro UNI-T UT61E+\n(VID:0x1A86 PID:0xE429)"]
     end
 
-    subgraph Browser ["Navegador Web (Chrome / Edge / Brave)"]
-        subgraph WebAPIs ["APIs Nativas del Navegador"]
-            WebHID["WebHID API (navigator.hid)\n• VID: 0x5FC9, PID: 0x0063 (MI_03)\n• Chain-Polling sendReport(0x00, payload)\n• inputreport Little-Endian DataView"]
-            CanvasStream["Canvas Stream & MediaRecorder\n• canvas.captureStream(30)\n• canvas.toDataURL('image/png')\n• Blob CSV Client-Side"]
+    subgraph Browser ["Navegador Web (Chrome / Edge / Opera)"]
+        subgraph WebAPIs ["APIs Nativas del Navegador (Sin Python)"]
+            WebHID["WebHID API (navigator.hid)\n• VID: 0x5FC9, PID: 0x0063\n• Interfaz 3 (MI_03 ADC 1000 Hz)\n• sendReport(0x00, payload 64B)\n• inputreport Little-Endian DataView"]
+            CanvasEngine["HTML5 Canvas Engine (60 FPS)\n• Mediana 3 muestras\n• Buffer circular 60,000 pts\n• Auto-Trigger >15mA a t=0"]
+            MediaTools["Exportadores en Cliente\n• Canvas toDataURL (PNG 1280x720)\n• captureStream(30) + MediaRecorder (WebM)\n• Blob URL (CSV)"]
         end
 
-        Hook["hooks/useMCMeter.js\n• Conexión Nativa WebHID Directa\n• Filtro Mediana 3 Muestras\n• Buffer Circular 60,000 Muestras\n• Conteo SPS (2 SPS .. 1Ksps)\n• Auto-Trigger >15mA"]
+        subgraph ReactApp ["Aplicación Next.js / React 19"]
+            Hook["hooks/useMCMeter.js\n(Gestor central de estado WebHID)"]
 
-        HeaderWidget["Header Navbar Widget\n(Junto a lectura UT61E+)"]
-        MiniHUD["components/MCMeterMiniHUD.jsx\n• Compacto VBUS/IBUS\n• Desplegable Pines D+/D-/CC\n• Modo Avanzado 6 decimales 🔬\n• Exclusión Mutua con botón 🗗"]
-        Osciloscopio["components/MCMeterOsciloscopio.jsx\n• Canvas HTML5 60 FPS X-Y\n• VBUS Rojo (#ff3b3b) + IBUS Amarillo (#facc15)\n• Escala Tester Cuantizada & Split View\n• Box-Zoom con ratón\n• Cursores Delta A-B & Auto-Trigger\n• Exportación 100% Web: PNG / Video WebM / CSV"]
-        DockTest["Integración Dock Test\n• Inyección 1-Click a Firebase"]
+            subgraph SuiteLayout ["MARSHALL HARDWARE SUITE (50% / 50%)"]
+                SlotIzq["50% Izquierda: Multímetro UNI-T UT61E+\n(Diodo, uA, Avance Mágico, Voz)"]
+                SlotDer["50% Derecha: MCMeterDockPanel.jsx\n(VBUS, IBUS, Pines CC/D, Modo 🔬, Desacoplar)"]
+                Bahia["Bahía de Re-acoplamiento\n(Placeholder cian si está desacoplado)"]
+            end
+
+            MiniHUD["components/MCMeterMiniHUD.jsx\n(Ventana flotante desacoplada Draggable)"]
+            Osciloscopio["components/MCMeterOsciloscopio.jsx\n• Perfil Power (Solo Amperios, t=0)\n• Comparador Golden Sample (Cian translúcido)\n• Box-Zoom con ratón\n• Cursores Delta A-B"]
+
+            subgraph Tabs ["Pestañas de la Librería de Hardware"]
+                TabDocktest["Pestaña 'Docktest'\n(Exclusiva Multímetro: docktestDiodo)"]
+                TabMCMeter["Pestaña 'MC Meter'\n1. Panel Carga USB-C (mcMeterData)\n2. Banco Golden Samples (oscilogramasReferencia)"]
+            end
+        end
     end
 
-    KM -->|WebHID Directo navigator.hid| WebHID
-    UT -->|WebHID Directo navigator.hid| Browser
+    subgraph Cloud ["Persistencia Firebase Firestore"]
+        FSDoc["hardware_db / {marca} / modelos / {modeloId}\n• docktestDiodo: { 1..5: valor } (Multímetro)\n• mcMeterData: { vbus, ibus, watts, ... } (USB-C)\n• oscilogramasReferencia: [ { curvaPuntos... } ] (Golden)"]
+    end
+
+    KM -->|USB HID nativo| WebHID
+    UT -->|USB HID nativo| SlotIzq
     WebHID --> Hook
-    Hook --> HeaderWidget
+    Hook --> SlotDer
     Hook --> MiniHUD
     Hook --> Osciloscopio
-    Hook --> DockTest
-    Osciloscopio --> CanvasStream
-    DockTest -->|Firestore setDoc| Firebase[(Firebase hardware_db)]
+    Hook --> TabMCMeter
+    Osciloscopio --> MediaTools
+    TabDocktest -->|Sin interferencia| FSDoc
+    TabMCMeter -->|Guardar mcMeterData| FSDoc
+    Osciloscopio -->|Guardar Curva Golden| FSDoc
 ```
 
-### Ventajas de la Arquitectura 100% Nativa en Navegador:
-1. **Cero Instalación / Cero Python:** No requiere tener instalado Python, ni dependencias de `hidapi`, `opencv-python`, `pillow` o servidores WebSocket locales en el taller. Todo se ejecuta directamente en la pestaña de Chrome o Edge.
-2. **Acceso Seguro y Directo a Interface 3 (MI_03):** El hook `useMCMeter.js` filtra por `vendorId: 0x5FC9` y `productId: 0x0063`, localiza la interfaz correspondiente y establece un bucle de **Chain-Polling** mediante `device.sendReport(0x00, payloadUint8Array)` escuchando el evento `inputreport`.
-3. **Decodificación en Tiempo Real:** El evento `inputreport` recibe un `DataView` nativo y decodifica Little-Endian directamente:
-   - `vbus = Math.abs(dataView.getInt32(8, true)) / 1_000_000.0`
-   - `ibus = Math.abs(dataView.getInt32(12, true)) / 1_000_000.0`
-   - `cc1 = dataView.getUint16(34, true) / 10_000.0`
-   - `cc2 = dataView.getUint16(36, true) / 10_000.0`
-   - `dp = dataView.getUint16(38, true) / 10_000.0`
-   - `dm = dataView.getUint16(40, true) / 10_000.0`
-4. **Exportaciones 100% Web:**
-   - **PNG:** `canvas.toDataURL('image/png')` con descarga automática.
-   - **Video:** `canvas.captureStream(30)` con `MediaRecorder` para generar archivos `.webm` (10s, 30s o Libre).
-   - **CSV:** Generación y descarga directa como Blob en el cliente.
+---
+
+## 3. Especificaciones Técnicas del Protocolo WebHID (KM003C)
+
+El tester USB **KM003C** expone múltiples interfaces HID. Para leer el convertidor analógico-digital (ADC) de alta velocidad (hasta 1000 Hz) se utiliza **únicamente la Interfaz 3 (`MI_03`)**:
+
+* **Vendor ID (VID):** `0x5FC9`
+* **Product ID (PID):** `0x0063`
+* **Selección de Interfaz en `useMCMeter.js`:**
+  ```javascript
+  const devices = await navigator.hid.requestDevice({
+    filters: [{ vendorId: 0x5FC9, productId: 0x0063 }]
+  });
+  // Se identifica la colección correspondiente a Interface 3
+  const targetDevice = devices.find(d => 
+    d.collections?.some(c => c.usagePage === 0xFF00 || c.usage === 0x01)
+  ) || devices[0];
+  await targetDevice.open();
+  ```
+* **Polling sin bloqueo (Send Report):**
+  Se despacha continuamente un reporte de 64 bytes (`Report ID 0x00`):
+  $$\text{Payload} = [0x0C, \text{seq\_id}, 0x02, 0x00, \dots 0x00 \times 60]$$
+  Donde $\text{seq\_id} = (\text{seq\_id} + 1) \& 0xFF$.
+* **Decodificación Little-Endian (`inputreport` DataView):**
+  * **VBUS:** `Math.abs(dataView.getInt32(8, true)) / 1_000_000.0` (Voltios).
+  * **IBUS:** `Math.abs(dataView.getInt32(12, true)) / 1_000_000.0` (Amperios).
+  * **CC1:** `dataView.getUint16(34, true) / 10_000.0` (Voltios).
+  * **CC2:** `dataView.getUint16(36, true) / 10_000.0` (Voltios).
+  * **D+:** `dataView.getUint16(38, true) / 10_000.0` (Voltios).
+  * **D-:** `dataView.getUint16(40, true) / 10_000.0` (Voltios).
+* **Filtro Digital:** Mediana de 3 muestras sucesivas para neutralizar transitorios de ruido ADC sin latencia perceptible.
+* **Auto-Detección de SPS:** Conteo por ventana de 1 segundo de transiciones en los bytes 8..16 (`2 SPS`, `10 SPS`, `50 SPS`, `1Ksps`).
 
 ---
 
-## 4. Distribución en la Interfaz de Usuario y Flujo de Interacción
+## 4. Distribución en Pantalla: MARSHALL HARDWARE SUITE (50% / 50%)
 
-### 4.1. Header / Navbar Superior (Junto a la Ventana del Multímetro)
-En [`pages/index.js`](file:///d:/programacion/mi-diagnostico/pages/index.js#L2009-L2014), el widget del multímetro UT61E+ permanece intacto. A su lado derecho inmediato, se ubica el **Widget del Marshall MC-Meter Pro**:
-* **Contenedor:** Fondo `#0a0a0a`, borde `#374151` (o `#10b981` al estar conectado).
-* **Indicador LED:** Punto `●` verde o rojo titilante.
-* **Muestra de Datos:** `VBUS: 5.120V` (en `#ff4444`) y `IBUS: 1.450A` (en `#facc15`).
-* **Etiqueta SPS:** Insignia compacta con el muestreo (`1Ksps`, `50 SPS`, etc.).
-* **Acción al Clic:** Conecta/desconecta el dispositivo o despliega/enfoca el Mini-HUD flotante.
+En [`pages/index.js`](file:///d:/programacion/mi-diagnostico/pages/index.js), dentro de la vista de mediciones del modelo (`nivelDb === 'mediciones'`), el panel superior de instrumentos se divide de forma balanceada:
 
----
+### 4.1. Lado Izquierdo (50%): Multímetro UNI-T UT61E+ (`VisorHUD.jsx`)
+* Muestra la lectura principal del multímetro (`V`, `mV`, `Ω`, `kΩ`, `μA`, `mA`, `A`).
+* Botones de conexión USB, Auto-Hold, sintetizador de voz y avance mágico de pines para conectores FPC e ICs.
+* **Intacto y protegido:** Su oscilograma monocanal antiguo de 2-4 Hz fue retirado en favor del oscilograma dedicado del MC-Meter Pro.
 
-### 4.2. Mini-HUD Flotante Desacoplado (`MCMeterMiniHUD.jsx`)
-* **Ventana flotante compacta:** Arrastrable libremente por la pantalla sobre cualquier sección.
-* **Barra de control superior:**
-  * Indicador `●`, título `MC-METER PRO`.
-  * Badge de SPS detectado automáticamente (`-- SPS`, `1Ksps`).
-  * Botón `🔬`: Alterna entre **Modo Estándar** (3 decimales: `5.120V`, `1.450A`) y **Modo Avanzado** (6 decimales divididos con micro-dígitos: `5.120 193 V`, `1.450 423 A`).
-  * Botón `📈`: Despliega u oculta el mini-gráfico sparkline integrado (180 muestras).
-  * Botón `▾`: Despliega el panel de **Potencia** (Watts en `#38bdf8`) y los **Pines de Carga**:
-    * `D+` en `#10b981`, `D-` en `#eab308`.
-    * `CC1` en `#38bdf8`, `CC2` en `#c084fc`.
-    * **Enmarcado Inteligente:** El pin CC que detecta conexión activa ($> 0.25\text{V}$) se resalta automáticamente con un borde verde esmeralda brillante (`#10b981`) de 2px.
-  * Botón `🗗` (Maximizar Analizador): **Aplica la exclusión mutua estricta**. Al presionarlo, el Mini-HUD se oculta instantáneamente y se abre la ventana completa del **Analizador Oscilograma X-Y**. Al cerrar el analizador grande, el Mini-HUD reaparece en su posición previa.
-
----
-
-### 4.3. Analizador Oscilograma X-Y Pantalla Grande (`MCMeterOsciloscopio.jsx`)
-Construido sobre **HTML5 Canvas** con renderizado a 60 FPS:
-
-1. **Codificación de Colores y Escalas Numéricas:**
-   * **VBUS:** Trazo en **Rojo brillante (`#ff3b3b`)**, con escala numérica dedicada en el eje Y izquierdo.
-   * **IBUS:** Trazo en **Amarillo neón (`#facc15`)**, con escala numérica dedicada en el eje Y derecho.
-   * Canales auxiliares opcionales conmutables por checkbox: `D+` (verde), `D-` (azul cielo), `CC` (violeta).
-2. **Escala Dinámica Cuantizada Tipo Tester:**
-   * Utiliza el algoritmo de pasos redondos (`0.02, 0.05, 0.10, 0.20, 0.50, 1.00, 2.00, 5.00...`).
-   * Por defecto ubica VBUS en el tercio superior e IBUS en el tercio inferior para una lectura limpia de oscilaciones.
-3. **Botón Split View (Vista en 2 Carriles Separados):**
-   * Divide el canvas horizontalmente con una línea central: carril superior exclusivo para Voltaje y carril inferior exclusivo para Corriente, garantizando que nunca se superpongan ni saturen visualmente durante variaciones bruscas.
-4. **Box-Zoom (Zoom por Selección de Rectángulo con Ratón):**
-   * Al hacer clic izquierdo y arrastrar el cursor sobre cualquier pico o transitorio, se dibuja un recuadro de selección cian punteado (`#00e5ff`).
-   * Al soltar el clic, el sistema calcula de inmediato la ventana temporal encerrada (X) y el rango exacto de voltaje y corriente (Y), aplicando el zoom sobre ese evento.
-   * Un botón `🔄 Reset Zoom` o doble clic derecho restaura la escala automática original.
-5. **Pausa, Time-Scrubbing y Buffer Circular:**
-   * Botón `⏸ PAUSAR Y ANALIZAR`: Congela la captura en vivo sin perder datos.
-   * Línea de tiempo inferior (Slider horizontal) que permite retroceder fluidamente a lo largo de las hasta **60,000 muestras en memoria**.
-6. **Cursores de Medición Delta (A - B):**
-   * Clic izquierdo simple = fija el Cursor A (`#22d3ee`).
-   * Clic derecho simple = fija el Cursor B (`#e879f9`).
-   * Cálculo en tiempo real de:
-     $$\Delta t = (t_B - t_A) \times 1000\text{ ms}$$
-     junto a la corriente promedio ($I_{\text{prom}}$) y corriente pico ($I_{\text{pico}}$) dentro de ese intervalo.
-7. **Auto-Trigger (> 15 mA):**
-   * Permite armar el osciloscopio en espera de consumo. En cuanto la corriente supera los $15\text{ mA}$ (ej. al conectar el cable o presionar el botón de encendido del móvil), dispara la captura automáticamente.
-8. **Tooltip Dual Flotante Unificado:**
-   * Al mover el puntero sobre la gráfica, se proyecta una línea guía vertical con dos círculos sobre las curvas y una tarjeta flotante de alta legibilidad que muestra: tiempo relativo respecto al final ($t = -0.320\text{s}$), VBUS con sus micro-dígitos, IBUS en amperios y miliamperios, Potencia en Watts y estado de pines D+/D-/CC.
-9. **Exportación y Grabación:**
-   * **Captura PNG:** Exporta la gráfica a resolución 1280x720 con fondo oscuro, escalas, métricas actuales y membrete de Marshall Cell.
-   * **Grabación de Video:** Modos de 10s, 30s o Libre (WebM vía MediaRecorder o MP4 mediante el Bridge).
-   * **Exportación CSV:** Descarga un archivo `.csv` con todas las columnas (`tiempo_s`, `vbus_v`, `ibus_a`, `watts_w`, `dp_v`, `dm_v`, `cc1_v`, `cc2_v`).
+### 4.2. Lado Derecho (50%): Marshall MC-Meter Pro (`MCMeterDockPanel.jsx`)
+* **Estado Acoplado (por defecto):**
+  * Indicador LED de enlace USB (`●` verde/rojo) y selector de conexión WebHID.
+  * Muestras gigantes de **VBUS** (`#ff4444`) e **IBUS** (`#facc15`).
+  * Potencia calculada en Watts (`#38bdf8`) y badge de muestreo (`1Ksps`).
+  * Monitor de pines: `D+` (verde), `D-` (amarillo), `CC1` (azul), `CC2` (morado). El pin CC activo ($>0.25\text{V}$) se resalta con borde verde esmeralda.
+  * Botón `🔬`: Alterna entre 3 decimales (`5.120 V`) y 6 decimales con micro-dígitos (`5.120 194 V`).
+  * Botón `🗗 Desacoplar`: Convierte el panel en ventana flotante.
+  * Botón `📈 Analizador Oscilograma`: Abre el analizador de pantalla completa.
+* **Estado Desacoplado (Bahía de Re-acoplamiento):**
+  * Para evitar que la mitad derecha quede vacía o deforme la interfaz, se renderiza una tarjeta con **borde punteado cian (`#00e5ff`)**.
+  * Informa al técnico que el instrumento está flotando.
+  * Muestra un resumen de telemetría en vivo (V, A, SPS).
+  * Incluye el botón interactivo: **`🔗 Re-Acoplar Instrumento Aquí`**, que restaura el instrumento al panel inmediatamente.
+  * Si el usuario cierra el Mini-HUD flotante (`✕`) o cierra el oscilograma grande, el sistema **lo re-acopla automáticamente a su lugar de origen**.
 
 ---
 
-### 4.4. Integración en la Sección "Dock Test" (Librería de Modelos)
-En [`pages/index.js`](file:///d:/programacion/mi-diagnostico/pages/index.js#L2639-L2670):
-* Cuando el usuario ingresa a un modelo de la librería (`nivelDb === 'mediciones'`) y selecciona la pestaña **Docktest**:
-  * Aparece una nueva tarjeta de control: **"Auto-Captura Marshall MC-Meter Pro"**.
-  * Si el tester está conectado, muestra en vivo los valores medidos en el puerto USB-C (`VBUS`, `D+`, `D-`, `CC1`, `CC2`, `IBUS`).
-  * Incluye el botón principal: **"📥 Capturar Estado USB-C en Vivo"**.
-  * Al hacer clic, vuelca instantáneamente las lecturas en los campos `modeloActivo.docktestVoltio` (o la escala activa) y permite persistirlos directamente en Firestore llamando a `guardarDocktestAhora()`.
+## 5. Nueva Pestaña y Almacenamiento Aislado en Base de Datos
+
+Se agregó el botón de sección **"MC Meter"** junto a *Docktest*, *Planos FPC*, *FPC Batería*, *Planos IC*, *RFFE* y *Boardview PCB*.
+
+### 5.1. Reglas Estrictas de Aislamiento
+* **Docktest:** Exclusivo para el multímetro UNI-T UT61E+. Almacena las caídas de tensión de diodo en frío en `modeloActivo.docktestDiodo: { 1: 0.650, 2: 0.720, ... }`.
+* **MC Meter:** Exclusivo para el USB Tester. Almacena:
+  1. **`mcMeterData`:** Parámetros de carga activa, protocolo detectado (5V Estándar, QC/PD 9V, PD 12V, PD 15V, PD 20V EPR) y voltajes de pines Type-C.
+  2. **`oscilogramasReferencia`:** Array de curvas patrón de arranque del modelo.
+
+### 5.2. Estructura del Documento en Firestore (`hardware_db`)
+```json
+{
+  "marca": "Apple",
+  "nombre": "iPhone 15 Pro",
+  "docktestDiodo": {
+    "1": "0.642",
+    "2": "0.718",
+    "3": "OL",
+    "4": "0.582",
+    "5": "0.000"
+  },
+  "mcMeterData": {
+    "vbus": "5.182",
+    "ibus": "1.485",
+    "watts": "7.695",
+    "dp": "2.712",
+    "dm": "2.708",
+    "cc1": "1.654",
+    "cc2": "0.021",
+    "protocolo": "QC / PD 9V",
+    "fechaCaptura": "2026-10-15T18:00:00.000Z"
+  },
+  "oscilogramasReferencia": [
+    {
+      "id": "golden_1729012345678",
+      "titulo": "iPhone 15 Pro - Boot OK Normal (Power 1s)",
+      "perfil": "power",
+      "fecha": "15/10/2026, 17:30:00",
+      "duracionMs": 1050,
+      "picoMaxA": 0.485,
+      "iPromedioA": 0.182,
+      "notas": "Pulsación corta de encendido. Escala PMIC estable.",
+      "curvaPuntos": [
+        [0.0, 0.02],
+        [0.05, 0.08],
+        [0.15, 0.22],
+        [0.45, 0.485],
+        [1.05, 0.15]
+      ]
+    }
+  ]
+}
+```
 
 ---
 
-## 5. Plan Paso a Paso de Archivos a Crear y Modificar
+## 6. Motor Especializado de Secuencias de Encendido (Power) y Comparador Golden Sample
 
-| Paso | Archivo | Acción | Descripción |
-| :--- | :--- | :--- | :--- |
-| **Paso 1** | `mc_meter_bridge.py` | **Crear** | Servicio Python con `hidapi`, asyncio y WebSocket (`localhost:8765`), hilo a 1000 Hz, filtro de mediana de 3 muestras y buffer de 60,000 pts. |
-| **Paso 2** | `hooks/useMCMeter.js` | **Crear** | Hook React para conexión WebSocket (y fallback WebHID), telemetría reactiva, buffer circular y disparador de eventos. |
-| **Paso 3** | `components/MCMeterMiniHUD.jsx` | **Crear** | Componente Mini-HUD flotante arrastrable con exclusión mutua, modo avanzado 🔬, desplegable de pines CC/D y botón de maximizado. |
-| **Paso 4** | `components/MCMeterOsciloscopio.jsx` | **Crear** | Analizador X-Y en Canvas HTML5 a 60 FPS con VBUS rojo, IBUS amarillo, Box-Zoom, Split View, Delta A-B, Scrubbing y exportaciones. |
-| **Paso 5** | `pages/index.js` | **Modificar** | 1. Añadir Widget del Tester en el Header al lado del multímetro.<br>2. Sustituir el renderizado del oscilograma antiguo por el nuevo `MCMeterOsciloscopio`.<br>3. Agregar botón de inyección automática en la pestaña **Docktest** para guardar en Firebase. |
-| **Paso 6** | `package.json` | **Verificar** | Asegurar dependencias (`lucide-react`, `framer-motion`, etc., ya instaladas y compatibles con React 19). |
+El analizador osciloscópico de corriente (`components/MCMeterOsciloscopio.jsx`) fue diseñado específicamente para la diagnosis de **fallas de encendido a nivel de microelectrónica móvil**:
 
----
+### 6.1. Perfiles de Medición
+1. **🚀 Power (1s / Arranque - Secuencia PMIC):**
+   * **Modo de Señal Limpia:** Oculta automáticamente las líneas de VBUS, D+, D- y CC para no saturar la pantalla con señales innecesarias.
+   * **Visualización 100% Corriente (IBUS):** Escala en miliamperios ($0\dots 800\text{ mA}$) o amperios según el consumo.
+   * **Disparador $t = 0$ (Auto-Trigger):** Al superar el umbral de arranque ($>15\text{ mA}$ al presionar la tecla Power), alinea el origen temporal a $t = 0.000\text{ s}$ para estudiar las etapas del PMIC (standby, reloj 32 kHz, reset a 120 mA, kernel boot a 450 mA).
+2. **⚡ Carga USB-C:**
+   * Muestra simultáneamente VBUS (rojo `#ff4444`) e IBUS (amarillo `#facc15`), junto al estado de pines D+/D- y CC.
+3. **💡 Buck / Backlight:**
+   * Optimizado para transitorios rápidos en líneas elevadas o inductores de pantalla.
 
-## 6. Procedimiento de Verificación y Pruebas
+### 6.2. Comparador Golden Sample (Curva de Referencia en Tiempo Real)
+* Permite seleccionar en el desplegable superior cualquier curva de referencia sana previamente guardada para el modelo activo.
+* **Superposición Gráfica:** La curva Golden se dibuja en el fondo con un trazo **Cian translúcido (`rgba(0, 255, 255, 0.40)`) y 2.5px de grosor**.
+* **Diagnóstico Inmediato:** El técnico ve en tiempo real la curva viva amarilla de la placa averiada dibujándose directamente sobre la silueta cian del teléfono funcionando. Si la corriente se dispara a 800 mA de golpe o cae a cero en 100 ms, el diagnóstico de fuga o corto en riel secundario es inmediato.
 
-1. **Prueba de Enlace USB HID (1000 Hz):**
-   * Conectar el KM003C al puerto USB del PC.
-   * Ejecutar `python mc_meter_bridge.py` y validar la detección del dispositivo `Interface 3` sin errores de permisos.
-   * Verificar en la aplicación web que el indicador cambie a verde y reporte `"1Ksps"`.
-2. **Prueba de Exclusión Mutua de Vistas:**
-   * Verificar que el Mini-HUD se visualice correctamente en estado compacto.
-   * Pulsar el botón `🗗`: verificar que el Mini-HUD se oculte y aparezca el Analizador Oscilograma X-Y a pantalla completa.
-   * Cerrar la pantalla grande y verificar que el Mini-HUD reaparezca de forma inmediata.
-3. **Prueba de Fidelidad de Señales y Box-Zoom:**
-   * Conectar un smartphone o carga al puerto de salida del tester USB.
-   * Verificar que la curva de VBUS se dibuje en rojo (`#ff3b3b`) con escala izquierda y la curva de IBUS en amarillo (`#facc15`) con escala derecha.
-   * Arrastrar con el clic izquierdo sobre un pico de corriente: comprobar que el Box-Zoom aísle ese fragmento en milisegundos.
-   * Medir con los cursores Delta A (izquierdo) y Delta B (derecho) la duración del pico.
-4. **Prueba de Captura en Dock Test y Firebase:**
-   * Abrir la Librería de Modelos, elegir un dispositivo y entrar a **Docktest**.
-   * Pulsar **"📥 Capturar Estado USB-C en Vivo"**: verificar que se rellenen los 5 campos (`vbus`, `dp`, `dm`, `cc1`, `cc2`).
-   * Pulsar **"Guardar Docktest"** y corroborar en la consola y en Firestore que el registro quede actualizado.
-5. **Prueba de No-Regresión del Multímetro:**
-   * Encender y conectar el multímetro UNI-T UT61E+ mediante su botón en el header.
-   * Probar medición de diodo en un conector FPC y avance mágico con voz.
-   * Confirmar que el multímetro funcione con absoluta normalidad e independencia.
+### 6.3. Guardado en la Nube de Curvas Golden
+* Al presionar **`💾 Guardar Curva Golden`**, el sistema:
+  1. Extrae el fragmento en memoria correspondiente al evento de arranque.
+  2. Aplica un algoritmo de **Downsampling Cuantizado a 250 puntos** para optimizar el tamaño en Firestore sin perder fidelidad en los picos.
+  3. Calcula automáticamente la duración ($\Delta t\text{ ms}$), el pico máximo de corriente ($I_{\text{pico}}$) y la corriente promedio ($I_{\text{prom}}$).
+  4. Abre un modal para asignar un título descriptivo y notas técnicas.
+  5. Lo persiste en `modeloActivo.oscilogramasReferencia` en Firebase Firestore.
+
+### 6.4. Herramientas de Análisis y Exportación
+* **Box-Zoom:** Arrastrar con clic izquierdo para hacer zoom rectangular sobre cualquier milisegundo de la secuencia.
+* **Cursores Delta A-B:** Clic izquierdo (Marca A) y clic derecho (Marca B) calculan instantáneamente $\Delta t$, $I_{\text{prom}}$ e $I_{\text{pico}}$.
+* **Exportación 100% en Navegador:**
+  * 📸 **Captura PNG:** Con fondo negro de alta fidelidad, membrete y marcas.
+  * 🎥 **Grabación WebM:** Vídeo fluido a 30 FPS capturado directamente del Canvas con `MediaRecorder`.
+  * 📊 **CSV Export:** Registro de todas las muestras para análisis en Excel o Python.
 
 ---
 
-Este plan describe en su totalidad la arquitectura técnica requerida para la integración sin fisuras de tu instrumento de medición.
+## 7. Mapa de Archivos del Proyecto
+
+| Archivo | Rol en el Sistema | Estado |
+| :--- | :--- | :--- |
+| [`hooks/useMCMeter.js`](file:///d:/programacion/mi-diagnostico/hooks/useMCMeter.js) | Driver nativo WebHID (`navigator.hid`), filtro de mediana, circular buffer 60k pts, auto-trigger. | ✅ Implementado |
+| [`components/MCMeterDockPanel.jsx`](file:///d:/programacion/mi-diagnostico/components/MCMeterDockPanel.jsx) | Panel simétrico al 50% para MARSHALL HARDWARE SUITE con VBUS, IBUS, pines, modo 🔬 y desacoplar. | ✅ Implementado |
+| [`components/MCMeterMiniHUD.jsx`](file:///d:/programacion/mi-diagnostico/components/MCMeterMiniHUD.jsx) | Mini-HUD flotante desacoplado con soporte de auto-reacoplamiento al cerrarse. | ✅ Implementado |
+| [`components/MCMeterOsciloscopio.jsx`](file:///d:/programacion/mi-diagnostico/components/MCMeterOsciloscopio.jsx) | Analizador Canvas 60 FPS con perfiles Power/Carga, comparador Golden Sample cian y guardado en la nube. | ✅ Implementado |
+| [`pages/index.js`](file:///d:/programacion/mi-diagnostico/pages/index.js) | Coordinador principal: Layout 50/50, bahía de re-acoplamiento, pestaña MC Meter aislada y persistencia Firestore. | ✅ Implementado |
+
+---
+
+## 8. Guía de Uso Rápido para el Técnico en Taller
+
+1. **Conexión Inicial:**
+   * Conectar el Marshall MC-Meter Pro al puerto USB del ordenador.
+   * En la barra superior o en el panel de MARSHALL HARDWARE SUITE, hacer clic en `🔌 Conectar MC-Meter`.
+   * El navegador solicitará permisos USB una sola vez: seleccionar el dispositivo y confirmar. El indicador pasará a verde con la lectura de `1Ksps`.
+2. **Uso Acoplado vs Desacoplado:**
+   * Por defecto, el tester comparte el 50% de la pantalla con el multímetro.
+   * Si se necesita ver los planos FPC o Boardview mientras se mide, pulsar `🗗 Desacoplar`: el Mini-HUD flotará por encima y la bahía mostrará `📌 INSTRUMENTO DESACOPLADO`.
+   * Para volver a acoplarlo, basta con hacer clic en `🔗 Re-Acoplar Instrumento Aquí` o cerrar la ventanita con la `✕`.
+3. **Diagnóstico de una Secuencia de Encendido:**
+   * Conectar la placa o teléfono al tester y pulsar `📈 Analizador Oscilograma`.
+   * En el perfil superior, seleccionar **`🚀 Power (1s / Arranque)`**.
+   * Si existe una curva Golden para ese modelo, seleccionarla en el selector `Comparar con Curva Golden`: aparecerá la silueta cian de referencia.
+   * Presionar el botón de encendido del móvil: el auto-trigger capturará la curva viva amarilla sobre la silueta cian.
+   * Si se desea guardar la curva de un equipo sano nuevo, pulsar `💾 Guardar Curva Golden`.
+4. **Verificación de Carga USB-C en la Librería:**
+   * Acceder a la pestaña **MC Meter**.
+   * Pulsar `📥 Capturar Estado USB-C en Vivo` y luego `💾 Guardar en Firestore`. Los valores quedan almacenados permanentemente sin interferir con las mediciones de diodo del multímetro.

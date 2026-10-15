@@ -22,6 +22,7 @@ import { sanitizarYMigrarModeloAStorage, deduplicarImagenesModelo, rehidratarIma
 import { useMCMeter } from '../hooks/useMCMeter';
 import MCMeterMiniHUD from '../components/MCMeterMiniHUD';
 import MCMeterOsciloscopio from '../components/MCMeterOsciloscopio';
+import MCMeterDockPanel from '../components/MCMeterDockPanel';
 
 const LETRAS_FILAS = [
   'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K', 'L', 'M', 'N', 'P', 'R', 'T', 'U', 'V', 'W', 'Y',
@@ -840,33 +841,98 @@ export default function AppDiagnostico() {
   const mcMeter = useMCMeter();
   const [mostrarOsciloscopioGrande, setMostrarOsciloscopioGrande] = useState(false);
   const [modoAvanzadoMc, setModoAvanzadoMc] = useState(false);
+  const [mcMeterDesacoplado, setMcMeterDesacoplado] = useState(false);
 
-  // Auto-captura instantánea de pines de carga en Docktest
-  const autoCapturarDocktestConMCMeter = () => {
+  // Captura aislada e independiente para Marshall MC-Meter Pro (JAMÁS toca docktestDiodo ni multímetro)
+  const capturarMcMeterDataEnModelo = () => {
     if (!mcMeter.conectado) {
-      alert("Conecta el Marshall MC-Meter Pro en el botón superior o en el Mini-HUD para capturar los pines en vivo.");
+      alert("Por favor conecta primero el Marshall MC-Meter Pro.");
       return;
     }
     if (!modeloActivo) return;
 
-    const nuevo = {
+    let protocolo = "5V Estándar";
+    if (mcMeter.vbus > 8.0 && mcMeter.vbus < 10.5) protocolo = "QC / PD 9V";
+    else if (mcMeter.vbus >= 10.5 && mcMeter.vbus < 14.5) protocolo = "PD 12V";
+    else if (mcMeter.vbus >= 14.5 && mcMeter.vbus < 18.0) protocolo = "PD 15V";
+    else if (mcMeter.vbus >= 18.0) protocolo = "PD 20V / EPR";
+
+    const nuevoMcData = {
       vbus: mcMeter.vbus.toFixed(3),
+      ibus: mcMeter.ibus.toFixed(3),
+      watts: mcMeter.watts.toFixed(3),
       dp: mcMeter.dp.toFixed(3),
       dm: mcMeter.dm.toFixed(3),
       cc1: mcMeter.cc1.toFixed(3),
-      cc2: mcMeter.cc2.toFixed(3)
+      cc2: mcMeter.cc2.toFixed(3),
+      protocolo,
+      fechaCaptura: new Date().toISOString()
     };
 
-    setModeloActivo(prev => {
-      const act = { ...prev };
-      if (escalaFpc === 'ua') act.docktestUa = { ...(act.docktestUa || {}), ...nuevo };
-      else if (escalaFpc === 'voltio') act.docktestVoltio = { ...(act.docktestVoltio || {}), ...nuevo };
-      else if (escalaFpc === 'ohmio') act.docktestOhmio = { ...(act.docktestOhmio || {}), ...nuevo };
-      else if (escalaFpc === 'amperio') act.docktestAmperio = { ...(act.docktestAmperio || {}), ...nuevo };
-      else act.docktestDiodo = { ...(act.docktestDiodo || {}), ...nuevo };
-      return act;
-    });
+    setModeloActivo(prev => ({
+      ...prev,
+      mcMeterData: nuevoMcData
+    }));
     setCambiosPendientesDocktest(true);
+  };
+
+  const guardarMcMeterDataAhora = async () => {
+    if (!modeloActivo) return;
+    setGuardandoDocktest(true);
+    try {
+      const modeloSanitizado = sanitizarObjetoParaFirestore(modeloActivo);
+      await setDoc(doc(db, "hardware_db", modeloActivo.id), modeloSanitizado);
+      alert("¡Mediciones de carga del MC-Meter Pro guardadas en Firestore!");
+      setCambiosPendientesDocktest(false);
+      await cargarLibreriaDB();
+    } catch (error) {
+      console.error("Error al guardar MC-Meter Data:", error);
+      alert("❌ Error al guardar datos del MC-Meter: " + (error.message || error));
+    } finally {
+      setGuardandoDocktest(false);
+    }
+  };
+
+  const guardarCurvaGoldenEnModelo = async (nuevaCurva) => {
+    if (!modeloActivo) return;
+    const curvasActuales = modeloActivo.oscilogramasReferencia || [];
+    const actualizadas = [nuevaCurva, ...curvasActuales.filter(c => c.id !== nuevaCurva.id)];
+
+    const modeloActualizado = {
+      ...modeloActivo,
+      oscilogramasReferencia: actualizadas
+    };
+
+    setModeloActivo(modeloActualizado);
+
+    try {
+      const modeloSanitizado = sanitizarObjetoParaFirestore(modeloActualizado);
+      await setDoc(doc(db, "hardware_db", modeloActivo.id), modeloSanitizado);
+      await cargarLibreriaDB();
+    } catch (err) {
+      console.error("Error al persistir curva Golden en Firestore:", err);
+    }
+  };
+
+  const eliminarCurvaGoldenDeModelo = async (curvaId) => {
+    if (!modeloActivo) return;
+    if (!confirm("¿Deseas eliminar esta curva de referencia Golden?")) return;
+
+    const actualizadas = (modeloActivo.oscilogramasReferencia || []).filter(c => c.id !== curvaId);
+    const modeloActualizado = {
+      ...modeloActivo,
+      oscilogramasReferencia: actualizadas
+    };
+
+    setModeloActivo(modeloActualizado);
+
+    try {
+      const modeloSanitizado = sanitizarObjetoParaFirestore(modeloActualizado);
+      await setDoc(doc(db, "hardware_db", modeloActivo.id), modeloSanitizado);
+      await cargarLibreriaDB();
+    } catch (err) {
+      console.error("Error al eliminar curva Golden:", err);
+    }
   };
 
   // MODALES GLOBALES
@@ -2640,38 +2706,113 @@ export default function AppDiagnostico() {
                 {/* NIVEL 3: VISTA DE MEDICIONES DEL MODELO ACTIVO */}
                 {nivelDb === 'mediciones' && modeloActivo && (
                   <>
+                    {/* ÁREA DE INSTRUMENTOS EN MARSHALL HARDWARE SUITE: 50% MULTÍMETRO / 50% MC-METER PRO */}
                     <div style={{ padding: '15px 20px', borderBottom: '1px solid #374151', flexShrink: 0 }}>
-                      <VisorHUD
-                        valor={lecturaUsb.valor}
-                        unidad={lecturaUsb.unidad}
-                        conectado={usbConectado}
-                        conectarFn={conectarMultimetroUSB}
-                        desconectarFn={desconectarMultimetroUSB}
-                        vozActiva={vozActiva}
-                        toggleVozFn={toggleVoz}
-                        autoHoldActivo={autoHoldActivo}
-                        toggleAutoHoldFn={() => setAutoHoldActivo(!autoHoldActivo)}
-                        capturarFn={modeloActivo ? avanzarPinMagico : null}
-                        escalaActiva={
-                          modeloActivo
-                            ? (seccionLibreria === 'ic'
-                              ? escalaIc
-                              : (seccionLibreria === 'fpc_bateria'
-                                ? escalaFpcBateria
-                                : escalaFpc))
-                            : 'amperio'
-                        }
-                        oscilogramaActivo={mostrarOsciloscopioGrande}
-                        toggleOscilogramaFn={() => {
-                          setMostrarOsciloscopioGrande(!mostrarOsciloscopioGrande);
-                        }}
-                        mostrarOscilogramaBtn={true}
-                      />
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))',
+                        gap: '15px',
+                        alignItems: 'stretch'
+                      }}>
+                        {/* 50% IZQUIERDA: MULTÍMETRO UNI-T UT61E+ (INTACTO) */}
+                        <VisorHUD
+                          valor={lecturaUsb.valor}
+                          unidad={lecturaUsb.unidad}
+                          conectado={usbConectado}
+                          conectarFn={conectarMultimetroUSB}
+                          desconectarFn={desconectarMultimetroUSB}
+                          vozActiva={vozActiva}
+                          toggleVozFn={toggleVoz}
+                          autoHoldActivo={autoHoldActivo}
+                          toggleAutoHoldFn={() => setAutoHoldActivo(!autoHoldActivo)}
+                          capturarFn={modeloActivo ? avanzarPinMagico : null}
+                          escalaActiva={
+                            modeloActivo
+                              ? (seccionLibreria === 'ic'
+                                ? escalaIc
+                                : (seccionLibreria === 'fpc_bateria'
+                                  ? escalaFpcBateria
+                                  : escalaFpc))
+                              : 'amperio'
+                          }
+                          oscilogramaActivo={false}
+                          toggleOscilogramaFn={null}
+                          mostrarOscilogramaBtn={false}
+                        />
+
+                        {/* 50% DERECHA: MARSHALL MC-METER PRO (ACOPLADO O BAHÍA DE RE-ACOPLAMIENTO) */}
+                        {!mcMeterDesacoplado ? (
+                          <MCMeterDockPanel
+                            mcMeter={mcMeter}
+                            onDesacoplar={() => setMcMeterDesacoplado(true)}
+                            onAbrirOscilograma={() => setMostrarOsciloscopioGrande(true)}
+                            modoAvanzado={modoAvanzadoMc}
+                            setModoAvanzado={setModoAvanzadoMc}
+                          />
+                        ) : (
+                          <div
+                            style={{
+                              backgroundColor: '#1a1a1a',
+                              border: '2px dashed #00e5ff',
+                              borderRadius: '15px',
+                              padding: '20px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              textAlign: 'center',
+                              marginBottom: '15px',
+                              gap: '8px'
+                            }}
+                          >
+                            <span style={{ color: '#00e5ff', fontWeight: 'bold', fontSize: '0.95rem' }}>
+                              📌 INSTRUMENTO DESACOPLADO
+                            </span>
+                            <p style={{ color: '#94a3b8', fontSize: '0.78rem', margin: 0, maxWidth: '320px' }}>
+                              Marshall MC-Meter Pro está operando en ventana flotante independiente.
+                            </p>
+                            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', margin: '4px 0' }}>
+                              <span style={{ color: mcMeter.conectado ? '#10b981' : '#ef4444', fontSize: '11px' }}>●</span>
+                              <span style={{ color: '#ff4444', fontWeight: 'bold', fontSize: '0.95rem' }}>
+                                {mcMeter.conectado ? `${mcMeter.vbus.toFixed(2)}V` : '-- V'}
+                              </span>
+                              <span style={{ color: '#facc15', fontWeight: 'bold', fontSize: '0.95rem' }}>
+                                {mcMeter.conectado ? `${mcMeter.ibus.toFixed(3)}A` : '-- A'}
+                              </span>
+                              <span style={{ color: '#fbbf24', fontSize: '0.65rem', backgroundColor: '#172554', padding: '1px 5px', borderRadius: '4px' }}>
+                                {mcMeter.sps}
+                              </span>
+                            </div>
+                            <button
+                              onClick={() => {
+                                setMcMeterDesacoplado(false);
+                                setMostrarOsciloscopioGrande(false);
+                              }}
+                              style={{
+                                background: 'rgba(0, 229, 255, 0.15)',
+                                border: '1px solid #00e5ff',
+                                color: '#00e5ff',
+                                padding: '6px 16px',
+                                borderRadius: '20px',
+                                fontWeight: 'bold',
+                                fontSize: '0.75rem',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px'
+                              }}
+                            >
+                              🔗 Re-Acoplar Instrumento Aquí
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     <div style={{ flex: 1, overflowY: 'auto', padding: '15px' }}>
                       <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
                         <button onClick={() => cambiarSeccionLibreria('docktest')} style={{ padding: '10px 15px', borderRadius: '8px', border: 'none', background: seccionLibreria === 'docktest' ? '#3b82f6' : '#1f2937', color: 'white', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>Docktest</button>
+                        <button onClick={() => cambiarSeccionLibreria('mc_meter')} style={{ padding: '10px 15px', borderRadius: '8px', border: 'none', background: seccionLibreria === 'mc_meter' ? '#00e5ff' : '#1f2937', color: seccionLibreria === 'mc_meter' ? '#000000' : 'white', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>MC Meter</button>
                         <button onClick={() => cambiarSeccionLibreria('fpc')} style={{ padding: '10px 15px', borderRadius: '8px', border: 'none', background: seccionLibreria === 'fpc' ? '#8b5cf6' : '#1f2937', color: 'white', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>Planos FPC</button>
                         <button onClick={() => cambiarSeccionLibreria('fpc_bateria')} style={{ padding: '10px 15px', borderRadius: '8px', border: 'none', background: seccionLibreria === 'fpc_bateria' ? '#f59e0b' : '#1f2937', color: 'white', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>FPC Batería</button>
                         <button onClick={() => cambiarSeccionLibreria('ic')} style={{ padding: '10px 15px', borderRadius: '8px', border: 'none', background: seccionLibreria === 'ic' ? '#ec4899' : '#1f2937', color: 'white', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>Planos IC / BGA</button>
@@ -2683,7 +2824,12 @@ export default function AppDiagnostico() {
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                         <div style={{ backgroundColor: '#000', padding: '20px', borderRadius: '15px', border: '1px solid #333' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px', flexWrap: 'wrap', gap: '10px' }}>
-                            <h3 style={{ color: '#3b82f6', margin: 0 }}>Captura de Docktest</h3>
+                            <div>
+                              <h3 style={{ color: '#3b82f6', margin: 0 }}>Captura de Docktest (Multímetro)</h3>
+                              <p style={{ color: '#9ca3af', fontSize: '0.78rem', margin: '4px 0 0 0' }}>
+                                Mediciones de caída de tensión en frío tomadas exclusivamente con el multímetro UNI-T UT61E+.
+                              </p>
+                            </div>
                             <div style={{ display: 'flex', gap: '5px', backgroundColor: '#1a1a1a', padding: '4px', borderRadius: '8px', flexWrap: 'wrap' }}>
                               <button onClick={() => setEscalaFpc('diodo')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: escalaFpc === 'diodo' ? '#3b82f6' : 'transparent', color: escalaFpc === 'diodo' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}>Diodo</button>
                               <button onClick={() => setEscalaFpc('ua')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: escalaFpc === 'ua' ? '#10b981' : 'transparent', color: escalaFpc === 'ua' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}>uA</button>
@@ -2692,56 +2838,6 @@ export default function AppDiagnostico() {
                             </div>
                           </div>
 
-                          {/* AUTO-CAPTURA MARSHALL MC-METER PRO (KM003C) */}
-                          <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            backgroundColor: '#0c1424',
-                            border: `1px solid ${mcMeter.conectado ? '#00e5ff' : '#1e293b'}`,
-                            padding: '10px 14px',
-                            borderRadius: '10px',
-                            marginBottom: '15px',
-                            flexWrap: 'wrap',
-                            gap: '10px'
-                          }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                              <span style={{ color: mcMeter.conectado ? '#10b981' : '#ef4444', fontSize: '12px' }}>●</span>
-                              <span style={{ color: '#00e5ff', fontWeight: 'bold', fontSize: '0.85rem' }}>MC-METER PRO:</span>
-                              {mcMeter.conectado ? (
-                                <>
-                                  <span style={{ color: '#ff4444', fontWeight: 'bold', fontSize: '0.88rem' }}>VBUS: {mcMeter.vbus.toFixed(3)}V</span>
-                                  <span style={{ color: '#facc15', fontWeight: 'bold', fontSize: '0.88rem' }}>IBUS: {mcMeter.ibus.toFixed(3)}A</span>
-                                  <span style={{ color: '#10b981', fontSize: '0.82rem' }}>D+: {mcMeter.dp.toFixed(2)}V</span>
-                                  <span style={{ color: '#eab308', fontSize: '0.82rem' }}>D-: {mcMeter.dm.toFixed(2)}V</span>
-                                  <span style={{ color: '#38bdf8', fontSize: '0.82rem' }}>CC1: {mcMeter.cc1.toFixed(2)}V</span>
-                                  <span style={{ color: '#c084fc', fontSize: '0.82rem' }}>CC2: {mcMeter.cc2.toFixed(2)}V</span>
-                                </>
-                              ) : (
-                                <span style={{ color: '#94a3b8', fontSize: '0.8rem' }}>Tester no conectado (haz clic en conectar en la barra superior o Mini-HUD)</span>
-                              )}
-                            </div>
-                            <button
-                              onClick={autoCapturarDocktestConMCMeter}
-                              disabled={!mcMeter.conectado}
-                              style={{
-                                backgroundColor: mcMeter.conectado ? '#0284c7' : '#1e293b',
-                                color: mcMeter.conectado ? '#ffffff' : '#64748b',
-                                border: 'none',
-                                padding: '8px 16px',
-                                borderRadius: '8px',
-                                fontWeight: 'bold',
-                                fontSize: '0.8rem',
-                                cursor: mcMeter.conectado ? 'pointer' : 'not-allowed',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '6px',
-                                boxShadow: mcMeter.conectado ? '0 0 10px rgba(2, 132, 199, 0.4)' : 'none'
-                              }}
-                            >
-                              📥 Capturar Pines USB-C en Vivo
-                            </button>
-                          </div>
                           <div className="grid-dock" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '15px' }}>
                             {ordenCamposDock.map(c => {
                               let valuesObj = modeloActivo.docktestDiodo;
@@ -2758,6 +2854,241 @@ export default function AppDiagnostico() {
                                 </div>
                               )
                             })}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* SECCIÓN DEDICADA E INDEPENDIENTE: MC METER (USB TESTER & POWER SEQUENCING) */}
+                    {seccionLibreria === 'mc_meter' && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                        {/* 1. PANEL DE CARGA Y PROTOCOLOS TYPE-C */}
+                        <div style={{ backgroundColor: '#070b12', padding: '20px', borderRadius: '15px', border: '1px solid #1e3a5f' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+                            <div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span style={{ color: mcMeter.conectado ? '#10b981' : '#ef4444', fontSize: '14px' }}>●</span>
+                                <h3 style={{ color: '#00e5ff', margin: 0, fontSize: '1.15rem' }}>
+                                  Mediciones de Carga y Protocolos Type-C (MC-Meter Pro)
+                                </h3>
+                              </div>
+                              <p style={{ color: '#94a3b8', fontSize: '0.8rem', margin: '4px 0 0 0' }}>
+                                Parámetros de negociación y potencia activa en el puerto USB-C. Se almacenan de forma independiente sin tocar las mediciones del multímetro.
+                              </p>
+                            </div>
+
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                              <button
+                                onClick={capturarMcMeterDataEnModelo}
+                                disabled={!mcMeter.conectado}
+                                style={{
+                                  backgroundColor: mcMeter.conectado ? '#0284c7' : '#1e293b',
+                                  color: mcMeter.conectado ? '#ffffff' : '#64748b',
+                                  border: 'none',
+                                  padding: '8px 16px',
+                                  borderRadius: '8px',
+                                  fontWeight: 'bold',
+                                  fontSize: '0.82rem',
+                                  cursor: mcMeter.conectado ? 'pointer' : 'not-allowed',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  boxShadow: mcMeter.conectado ? '0 0 10px rgba(2, 132, 199, 0.4)' : 'none'
+                                }}
+                              >
+                                📥 Capturar Estado USB-C en Vivo
+                              </button>
+
+                              <button
+                                onClick={guardarMcMeterDataAhora}
+                                style={{
+                                  backgroundColor: '#10b981',
+                                  color: '#ffffff',
+                                  border: 'none',
+                                  padding: '8px 16px',
+                                  borderRadius: '8px',
+                                  fontWeight: 'bold',
+                                  fontSize: '0.82rem',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '6px'
+                                }}
+                              >
+                                💾 Guardar en Firestore
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* GRILLA DE VALORES ALMACENADOS PARA EL MODELO */}
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '12px' }}>
+                            <div style={{ backgroundColor: '#0c1424', border: '1px solid #1e293b', borderRadius: '8px', padding: '12px', textAlign: 'center' }}>
+                              <span style={{ color: '#fca5a5', fontSize: '0.75rem', fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>VBUS (V)</span>
+                              <span style={{ color: '#ff4444', fontSize: '1.3rem', fontWeight: 800, fontFamily: 'Consolas' }}>
+                                {modeloActivo.mcMeterData?.vbus || '---'}
+                              </span>
+                            </div>
+
+                            <div style={{ backgroundColor: '#0c1424', border: '1px solid #1e293b', borderRadius: '8px', padding: '12px', textAlign: 'center' }}>
+                              <span style={{ color: '#fde047', fontSize: '0.75rem', fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>IBUS (A)</span>
+                              <span style={{ color: '#facc15', fontSize: '1.3rem', fontWeight: 800, fontFamily: 'Consolas' }}>
+                                {modeloActivo.mcMeterData?.ibus || '---'}
+                              </span>
+                            </div>
+
+                            <div style={{ backgroundColor: '#0c1424', border: '1px solid #1e293b', borderRadius: '8px', padding: '12px', textAlign: 'center' }}>
+                              <span style={{ color: '#38bdf8', fontSize: '0.75rem', fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>POTENCIA (W)</span>
+                              <span style={{ color: '#38bdf8', fontSize: '1.3rem', fontWeight: 800, fontFamily: 'Consolas' }}>
+                                {modeloActivo.mcMeterData?.watts || '---'}
+                              </span>
+                            </div>
+
+                            <div style={{ backgroundColor: '#0c1424', border: '1px solid #1e293b', borderRadius: '8px', padding: '12px', textAlign: 'center' }}>
+                              <span style={{ color: '#94a3b8', fontSize: '0.75rem', fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>D+ (V)</span>
+                              <span style={{ color: '#10b981', fontSize: '1.15rem', fontWeight: 800, fontFamily: 'Consolas' }}>
+                                {modeloActivo.mcMeterData?.dp || '---'}
+                              </span>
+                            </div>
+
+                            <div style={{ backgroundColor: '#0c1424', border: '1px solid #1e293b', borderRadius: '8px', padding: '12px', textAlign: 'center' }}>
+                              <span style={{ color: '#94a3b8', fontSize: '0.75rem', fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>D- (V)</span>
+                              <span style={{ color: '#eab308', fontSize: '1.15rem', fontWeight: 800, fontFamily: 'Consolas' }}>
+                                {modeloActivo.mcMeterData?.dm || '---'}
+                              </span>
+                            </div>
+
+                            <div style={{ backgroundColor: '#0c1424', border: '1px solid #1e293b', borderRadius: '8px', padding: '12px', textAlign: 'center' }}>
+                              <span style={{ color: '#94a3b8', fontSize: '0.75rem', fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>CC1 (V)</span>
+                              <span style={{ color: '#38bdf8', fontSize: '1.15rem', fontWeight: 800, fontFamily: 'Consolas' }}>
+                                {modeloActivo.mcMeterData?.cc1 || '---'}
+                              </span>
+                            </div>
+
+                            <div style={{ backgroundColor: '#0c1424', border: '1px solid #1e293b', borderRadius: '8px', padding: '12px', textAlign: 'center' }}>
+                              <span style={{ color: '#94a3b8', fontSize: '0.75rem', fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>CC2 (V)</span>
+                              <span style={{ color: '#c084fc', fontSize: '1.15rem', fontWeight: 800, fontFamily: 'Consolas' }}>
+                                {modeloActivo.mcMeterData?.cc2 || '---'}
+                              </span>
+                            </div>
+
+                            <div style={{ backgroundColor: '#0c1424', border: '1px solid #1e293b', borderRadius: '8px', padding: '12px', textAlign: 'center' }}>
+                              <span style={{ color: '#fbbf24', fontSize: '0.75rem', fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>PROTOCOLO</span>
+                              <span style={{ color: '#fbbf24', fontSize: '0.95rem', fontWeight: 800 }}>
+                                {modeloActivo.mcMeterData?.protocolo || '---'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 2. PANEL DE SECUENCIAS DE POWER & COMPARADOR GOLDEN SAMPLE */}
+                        <div style={{ backgroundColor: '#070b12', padding: '20px', borderRadius: '15px', border: '1px solid #1e3a5f' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
+                            <div>
+                              <h3 style={{ color: '#eab308', margin: 0, fontSize: '1.15rem' }}>
+                                🚀 Banco de Secuencias de Encendido (Golden Samples)
+                              </h3>
+                              <p style={{ color: '#94a3b8', fontSize: '0.8rem', margin: '4px 0 0 0' }}>
+                                Oscilogramas de referencia de equipos sanos. Permite comparar la corriente de arranque contra equipos con fallas de boot o cortos secundarios.
+                              </p>
+                            </div>
+
+                            <button
+                              onClick={() => setMostrarOsciloscopioGrande(true)}
+                              style={{
+                                backgroundColor: '#eab308',
+                                color: '#000000',
+                                border: 'none',
+                                padding: '8px 18px',
+                                borderRadius: '8px',
+                                fontWeight: 800,
+                                fontSize: '0.82rem',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                boxShadow: '0 0 12px rgba(234, 179, 8, 0.4)'
+                              }}
+                            >
+                              📈 Abrir Analizador de Secuencias
+                            </button>
+                          </div>
+
+                          {/* LISTA DE CURVAS GOLDEN GUARDADAS */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            {(modeloActivo.oscilogramasReferencia || []).length > 0 ? (
+                              modeloActivo.oscilogramasReferencia.map((curva) => (
+                                <div
+                                  key={curva.id}
+                                  style={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    backgroundColor: '#0c1424',
+                                    border: '1px solid #1e293b',
+                                    padding: '12px 16px',
+                                    borderRadius: '10px',
+                                    flexWrap: 'wrap',
+                                    gap: '10px'
+                                  }}
+                                >
+                                  <div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                      <span style={{ color: '#00ffff', fontWeight: 800, fontSize: '0.95rem' }}>
+                                        ★ {curva.titulo}
+                                      </span>
+                                      <span style={{ backgroundColor: '#1e3a8a', color: '#00e5ff', fontSize: '0.65rem', padding: '1px 6px', borderRadius: '4px', fontWeight: 'bold' }}>
+                                        {curva.perfil?.toUpperCase() || 'POWER'}
+                                      </span>
+                                    </div>
+                                    <p style={{ color: '#94a3b8', fontSize: '0.75rem', margin: '3px 0 0 0' }}>
+                                      Duración: {curva.duracionMs}ms | Pico máx: <strong style={{ color: '#facc15' }}>{curva.picoMaxA}A</strong> | Promedio: {curva.iPromedioA}A {curva.notas ? `| Notas: ${curva.notas}` : ''}
+                                    </p>
+                                  </div>
+
+                                  <div style={{ display: 'flex', gap: '8px' }}>
+                                    <button
+                                      onClick={() => setMostrarOsciloscopioGrande(true)}
+                                      style={{
+                                        backgroundColor: '#0284c7',
+                                        color: '#ffffff',
+                                        border: 'none',
+                                        padding: '6px 12px',
+                                        borderRadius: '6px',
+                                        fontSize: '0.78rem',
+                                        fontWeight: 'bold',
+                                        cursor: 'pointer'
+                                      }}
+                                    >
+                                      🔍 Comparar en Vivo
+                                    </button>
+                                    <button
+                                      onClick={() => eliminarCurvaGoldenDeModelo(curva.id)}
+                                      style={{
+                                        backgroundColor: 'rgba(239, 68, 68, 0.2)',
+                                        color: '#ef4444',
+                                        border: '1px solid rgba(239, 68, 68, 0.4)',
+                                        padding: '6px 10px',
+                                        borderRadius: '6px',
+                                        fontSize: '0.78rem',
+                                        fontWeight: 'bold',
+                                        cursor: 'pointer'
+                                      }}
+                                    >
+                                      Eliminar
+                                    </button>
+                                  </div>
+                                </div>
+                              ))
+                            ) : (
+                              <div style={{ textAlign: 'center', padding: '24px', backgroundColor: '#0c1424', borderRadius: '10px', border: '1px dashed #1e293b' }}>
+                                <p style={{ color: '#94a3b8', fontSize: '0.85rem', margin: '0 0 8px 0' }}>
+                                  No hay curvas de referencia registradas para este modelo.
+                                </p>
+                                <p style={{ color: '#64748b', fontSize: '0.75rem', margin: 0 }}>
+                                  Conecta un equipo sano, abre el analizador y pulsa <strong>"💾 Guardar Curva Golden"</strong> para guardarlo en la nube.
+                                </p>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -3874,17 +4205,25 @@ export default function AppDiagnostico() {
       />
 
       {/* --- MÓDULOS MARSHALL MC-METER PRO: EXCLUSIÓN MUTUA DE VISTAS --- */}
-      {mostrarOsciloscopioGrande ? (
+      {mostrarOsciloscopioGrande && (
         <MCMeterOsciloscopio
           mcMeter={mcMeter}
-          onCerrarYVolverMini={() => setMostrarOsciloscopioGrande(false)}
+          onCerrarYVolverMini={() => {
+            setMostrarOsciloscopioGrande(false);
+          }}
           modoAvanzado={modoAvanzadoMc}
           setModoAvanzado={setModoAvanzadoMc}
+          modeloActivo={modeloActivo}
+          onGuardarCurvaGolden={guardarCurvaGoldenEnModelo}
         />
-      ) : (
+      )}
+
+      {/* MINI-HUD FLOTANTE: SOLO SE MUESTRA SI ESTÁ DESACOPLADO Y NO ESTÁ EN PANTALLA GRANDE */}
+      {mcMeterDesacoplado && !mostrarOsciloscopioGrande && (
         <MCMeterMiniHUD
           mcMeter={mcMeter}
           onAbrirGrande={() => setMostrarOsciloscopioGrande(true)}
+          onReacoplar={() => setMcMeterDesacoplado(false)}
           modoAvanzado={modoAvanzadoMc}
           setModoAvanzado={setModoAvanzadoMc}
         />

@@ -5,6 +5,7 @@ import { Maximize2, X, ChevronDown, ChevronUp, Activity, Pin, PinOff, RotateCcw 
 export default function MCMeterMiniHUD({
   mcMeter,
   onAbrirGrande,
+  onReacoplar,
   modoAvanzado,
   setModoAvanzado
 }) {
@@ -215,6 +216,29 @@ export default function MCMeterMiniHUD({
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          {/* Botón Re-Acoplar a Hardware Suite 🔗 */}
+          {onReacoplar && (
+            <button
+              onClick={onReacoplar}
+              title="Re-acoplar en Marshall Hardware Suite"
+              style={{
+                background: '#1e293b',
+                border: '1px solid #00e5ff',
+                borderRadius: '4px',
+                color: '#00e5ff',
+                padding: '3px 6px',
+                cursor: 'pointer',
+                fontSize: '10px',
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '2px'
+              }}
+            >
+              🔗 Acoplar
+            </button>
+          )}
+
           {/* Botón Anclar */}
           <button
             onClick={() => setAnclado(!anclado)}
@@ -306,15 +330,15 @@ export default function MCMeterMiniHUD({
             {expandido ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
           </button>
 
-          {/* Botón Conectar / Desconectar o Cerrar */}
+          {/* Botón Cerrar / Reacoplar */}
           <button
-            onClick={conectado ? desconectar : conectar}
-            title={conectado ? 'Desconectar MC-Meter' : 'Conectar MC-Meter'}
+            onClick={onReacoplar || (conectado ? desconectar : conectar)}
+            title={onReacoplar ? "Cerrar ventana flotante y re-acoplar a la Suite" : (conectado ? 'Desconectar MC-Meter' : 'Conectar MC-Meter')}
             style={{
-              background: conectado ? 'rgba(239, 68, 68, 0.2)' : '#10b981',
+              background: 'rgba(239, 68, 68, 0.2)',
               border: 'none',
               borderRadius: '4px',
-              color: conectado ? '#ef4444' : '#ffffff',
+              color: '#ef4444',
               padding: '3px 6px',
               cursor: 'pointer',
               display: 'flex',
@@ -323,7 +347,7 @@ export default function MCMeterMiniHUD({
               fontSize: '11px'
             }}
           >
-            {conectado ? <X size={12} /> : 'USB'}
+            <X size={12} />
           </button>
         </div>
       </div>
