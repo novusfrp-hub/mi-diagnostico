@@ -19,6 +19,9 @@ import ModalEstadoUsuario from '../components/ModalEstadoUsuario.js';
 import { toPng } from 'html-to-image';
 import useAutoSave from '../hooks/useAutoSave';
 import { sanitizarYMigrarModeloAStorage, deduplicarImagenesModelo, rehidratarImagenesModelo } from '../lib/storageHelper';
+import { useMCMeter } from '../hooks/useMCMeter';
+import MCMeterMiniHUD from '../components/MCMeterMiniHUD';
+import MCMeterOsciloscopio from '../components/MCMeterOsciloscopio';
 
 const LETRAS_FILAS = [
   'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K', 'L', 'M', 'N', 'P', 'R', 'T', 'U', 'V', 'W', 'Y',
@@ -832,6 +835,39 @@ export default function AppDiagnostico() {
   }, [mostrarOscilograma]);
   const [cambiosPendientesDocktest, setCambiosPendientesDocktest] = useState(false);
   const [guardandoDocktest, setGuardandoDocktest] = useState(false);
+
+  // ESTADOS Y HOOK MARSHALL MC-METER PRO (KM003C 100% WEBHID)
+  const mcMeter = useMCMeter();
+  const [mostrarOsciloscopioGrande, setMostrarOsciloscopioGrande] = useState(false);
+  const [modoAvanzadoMc, setModoAvanzadoMc] = useState(false);
+
+  // Auto-captura instantánea de pines de carga en Docktest
+  const autoCapturarDocktestConMCMeter = () => {
+    if (!mcMeter.conectado) {
+      alert("Conecta el Marshall MC-Meter Pro en el botón superior o en el Mini-HUD para capturar los pines en vivo.");
+      return;
+    }
+    if (!modeloActivo) return;
+
+    const nuevo = {
+      vbus: mcMeter.vbus.toFixed(3),
+      dp: mcMeter.dp.toFixed(3),
+      dm: mcMeter.dm.toFixed(3),
+      cc1: mcMeter.cc1.toFixed(3),
+      cc2: mcMeter.cc2.toFixed(3)
+    };
+
+    setModeloActivo(prev => {
+      const act = { ...prev };
+      if (escalaFpc === 'ua') act.docktestUa = { ...(act.docktestUa || {}), ...nuevo };
+      else if (escalaFpc === 'voltio') act.docktestVoltio = { ...(act.docktestVoltio || {}), ...nuevo };
+      else if (escalaFpc === 'ohmio') act.docktestOhmio = { ...(act.docktestOhmio || {}), ...nuevo };
+      else if (escalaFpc === 'amperio') act.docktestAmperio = { ...(act.docktestAmperio || {}), ...nuevo };
+      else act.docktestDiodo = { ...(act.docktestDiodo || {}), ...nuevo };
+      return act;
+    });
+    setCambiosPendientesDocktest(true);
+  };
 
   // MODALES GLOBALES
   const [mostrarAdmin, setMostrarAdmin] = useState(false); const [vistaAdmin, setVistaAdmin] = useState('login');
@@ -2007,9 +2043,41 @@ export default function AppDiagnostico() {
               <button onClick={handleInstallClick} style={{ ...estilos.btnHeader, backgroundColor: '#f97316', color: 'white', border: 'none', boxShadow: '0 0 10px rgba(249, 115, 22, 0.4)' }}><Smartphone size={16} /> <span style={{ fontSize: '0.7rem', fontWeight: 'bold' }} className="hide-on-mobile">INSTALAR APP</span></button>
             )}
             {!mostrarAdmin && !libreriaVisible && (
-              <div onClick={usbConectado ? desconectarMultimetroUSB : conectarMultimetroUSB} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 10px', backgroundColor: '#0a0a0a', borderRadius: '10px', border: `2px solid ${usbConectado ? 'rgba(239, 68, 68, 0.4)' : '#374151'}`, cursor: 'pointer' }}>
+              <div onClick={usbConectado ? desconectarMultimetroUSB : conectarMultimetroUSB} title="Multímetro UNI-T UT61E+ (Clic para conectar/desconectar)" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 10px', backgroundColor: '#0a0a0a', borderRadius: '10px', border: `2px solid ${usbConectado ? 'rgba(239, 68, 68, 0.4)' : '#374151'}`, cursor: 'pointer' }}>
                 <Link size={16} color={usbConectado ? '#ef4444' : '#6b7280'} />
                 <span style={{ color: lecturaUsb.valor === 'OL' ? '#ff0000' : (usbConectado ? '#00ffff' : '#6b7280'), fontFamily: 'Consolas, monospace', fontWeight: 'bold', fontSize: '1.2rem' }}>{usbConectado ? lecturaUsb.valor : 'USB'}</span>
+              </div>
+            )}
+            {!mostrarAdmin && !libreriaVisible && (
+              <div
+                onClick={mcMeter.conectado ? mcMeter.desconectar : mcMeter.conectar}
+                title={mcMeter.conectado ? "Marshall MC-Meter Pro (Tester USB Conectado - Clic para desconectar)" : "Conectar Marshall MC-Meter Pro (KM003C USB HID)"}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '4px 10px',
+                  backgroundColor: '#0a0a0a',
+                  borderRadius: '10px',
+                  border: `2px solid ${mcMeter.conectado ? 'rgba(16, 185, 129, 0.5)' : '#374151'}`,
+                  cursor: 'pointer',
+                  boxShadow: mcMeter.conectado ? '0 0 10px rgba(16, 185, 129, 0.2)' : 'none'
+                }}
+              >
+                <span style={{ color: mcMeter.conectado ? '#10b981' : '#6b7280', fontSize: '12px' }}>●</span>
+                <span style={{ color: mcMeter.conectado ? '#ff4444' : '#6b7280', fontFamily: 'Consolas, monospace', fontWeight: 'bold', fontSize: '1.05rem' }}>
+                  {mcMeter.conectado ? `${mcMeter.vbus.toFixed(2)}V` : 'MC-METER'}
+                </span>
+                {mcMeter.conectado && (
+                  <span style={{ color: '#facc15', fontFamily: 'Consolas, monospace', fontWeight: 'bold', fontSize: '1.05rem' }}>
+                    {`${mcMeter.ibus.toFixed(3)}A`}
+                  </span>
+                )}
+                {mcMeter.conectado && (
+                  <span style={{ color: '#fbbf24', fontSize: '0.65rem', backgroundColor: '#172554', padding: '1px 5px', borderRadius: '4px', fontWeight: 'bold' }}>
+                    {mcMeter.sps}
+                  </span>
+                )}
               </div>
             )}
             <button onClick={abrirLibreria} style={{ ...estilos.btnHeader, backgroundColor: '#8b5cf6', color: 'white', border: 'none' }}><Cpu size={16} /> <span style={{ fontSize: '0.7rem', fontWeight: 'bold' }}>LIBRERÍA MODELOS</span></button>
@@ -2593,37 +2661,12 @@ export default function AppDiagnostico() {
                                 : escalaFpc))
                             : 'amperio'
                         }
-                        oscilogramaActivo={mostrarOscilograma}
+                        oscilogramaActivo={mostrarOsciloscopioGrande}
                         toggleOscilogramaFn={() => {
-                          const nuevoEstado = !mostrarOscilograma;
-                          setMostrarOscilograma(nuevoEstado);
-                          if (nuevoEstado) {
-                            if (modeloActivo) {
-                              if (seccionLibreria === 'ic') {
-                                setEscalaIc('amperio');
-                              } else if (seccionLibreria === 'fpc_bateria') {
-                                setEscalaFpcBateria('diodo');
-                              } else {
-                                setEscalaFpc('amperio');
-                              }
-                            }
-                          }
+                          setMostrarOsciloscopioGrande(!mostrarOsciloscopioGrande);
                         }}
                         mostrarOscilogramaBtn={true}
                       />
-                      {mostrarOscilograma && (
-                        <OscilogramaPanel
-                          valor={lecturaUsb.valor}
-                          unidad={lecturaUsb.unidad}
-                          escalaActiva={
-                            modeloActivo
-                              ? (seccionLibreria === 'ic' ? escalaIc : escalaFpc)
-                              : 'amperio'
-                          }
-                          tick={lecturaUsb.tick}
-                          onClose={() => setMostrarOscilograma(false)}
-                        />
-                      )}
                     </div>
 
                     <div style={{ flex: 1, overflowY: 'auto', padding: '15px' }}>
@@ -2647,6 +2690,57 @@ export default function AppDiagnostico() {
                               <button onClick={() => setEscalaFpc('voltio')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: escalaFpc === 'voltio' ? '#ef4444' : 'transparent', color: escalaFpc === 'voltio' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}>Voltios</button>
                               <button onClick={() => setEscalaFpc('ohmio')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: escalaFpc === 'ohmio' ? '#a855f7' : 'transparent', color: escalaFpc === 'ohmio' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}>Ohmios</button>
                             </div>
+                          </div>
+
+                          {/* AUTO-CAPTURA MARSHALL MC-METER PRO (KM003C) */}
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            backgroundColor: '#0c1424',
+                            border: `1px solid ${mcMeter.conectado ? '#00e5ff' : '#1e293b'}`,
+                            padding: '10px 14px',
+                            borderRadius: '10px',
+                            marginBottom: '15px',
+                            flexWrap: 'wrap',
+                            gap: '10px'
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                              <span style={{ color: mcMeter.conectado ? '#10b981' : '#ef4444', fontSize: '12px' }}>●</span>
+                              <span style={{ color: '#00e5ff', fontWeight: 'bold', fontSize: '0.85rem' }}>MC-METER PRO:</span>
+                              {mcMeter.conectado ? (
+                                <>
+                                  <span style={{ color: '#ff4444', fontWeight: 'bold', fontSize: '0.88rem' }}>VBUS: {mcMeter.vbus.toFixed(3)}V</span>
+                                  <span style={{ color: '#facc15', fontWeight: 'bold', fontSize: '0.88rem' }}>IBUS: {mcMeter.ibus.toFixed(3)}A</span>
+                                  <span style={{ color: '#10b981', fontSize: '0.82rem' }}>D+: {mcMeter.dp.toFixed(2)}V</span>
+                                  <span style={{ color: '#eab308', fontSize: '0.82rem' }}>D-: {mcMeter.dm.toFixed(2)}V</span>
+                                  <span style={{ color: '#38bdf8', fontSize: '0.82rem' }}>CC1: {mcMeter.cc1.toFixed(2)}V</span>
+                                  <span style={{ color: '#c084fc', fontSize: '0.82rem' }}>CC2: {mcMeter.cc2.toFixed(2)}V</span>
+                                </>
+                              ) : (
+                                <span style={{ color: '#94a3b8', fontSize: '0.8rem' }}>Tester no conectado (haz clic en conectar en la barra superior o Mini-HUD)</span>
+                              )}
+                            </div>
+                            <button
+                              onClick={autoCapturarDocktestConMCMeter}
+                              disabled={!mcMeter.conectado}
+                              style={{
+                                backgroundColor: mcMeter.conectado ? '#0284c7' : '#1e293b',
+                                color: mcMeter.conectado ? '#ffffff' : '#64748b',
+                                border: 'none',
+                                padding: '8px 16px',
+                                borderRadius: '8px',
+                                fontWeight: 'bold',
+                                fontSize: '0.8rem',
+                                cursor: mcMeter.conectado ? 'pointer' : 'not-allowed',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                boxShadow: mcMeter.conectado ? '0 0 10px rgba(2, 132, 199, 0.4)' : 'none'
+                              }}
+                            >
+                              📥 Capturar Pines USB-C en Vivo
+                            </button>
                           </div>
                           <div className="grid-dock" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '15px' }}>
                             {ordenCamposDock.map(c => {
@@ -3778,6 +3872,23 @@ export default function AppDiagnostico() {
         perfil={perfilUsuario}
         onRecargarPerfil={recargarPerfilActual}
       />
+
+      {/* --- MÓDULOS MARSHALL MC-METER PRO: EXCLUSIÓN MUTUA DE VISTAS --- */}
+      {mostrarOsciloscopioGrande ? (
+        <MCMeterOsciloscopio
+          mcMeter={mcMeter}
+          onCerrarYVolverMini={() => setMostrarOsciloscopioGrande(false)}
+          modoAvanzado={modoAvanzadoMc}
+          setModoAvanzado={setModoAvanzadoMc}
+        />
+      ) : (
+        <MCMeterMiniHUD
+          mcMeter={mcMeter}
+          onAbrirGrande={() => setMostrarOsciloscopioGrande(true)}
+          modoAvanzado={modoAvanzadoMc}
+          setModoAvanzado={setModoAvanzadoMc}
+        />
+      )}
     </div>
   );
 }
