@@ -117,10 +117,12 @@ export function useMCMeter() {
   const bufIRef = useRef([0.0, 0.0, 0.0]);
   const sampleCountRef = useRef(0);
 
-  // Auto-detección de SPS
+  // Auto-detección de SPS y tasa física
   const lastAdcBlockRef = useRef(null);
   const adcChangesInSecRef = useRef(0);
+  const reportsInSecRef = useRef(0);
   const lastSpsCalcTRef = useRef(performance.now());
+  const lastUiUpdateTRef = useRef(performance.now());
   const peakIbusRef = useRef(0.0);
 
   // Snapshot congelado al pausar
@@ -157,6 +159,8 @@ export function useMCMeter() {
     if (!data || data.byteLength < 42) return;
 
     try {
+      reportsInSecRef.current++;
+
       // Bytes 8..11 (int32): VBUS instantáneo en microvoltios (uV)
       const vbusUv = data.getInt32(8, true);
       // Bytes 12..15 (int32): IBUS instantáneo en microamperios (uA)
@@ -175,7 +179,7 @@ export function useMCMeter() {
       const dpVal = dpRaw / 10000.0;
       const dmVal = dmRaw / 10000.0;
 
-      // Detección de SPS contando cambios en bytes 8..15
+      // Detección de cambios físicos en ADC
       const b0 = data.getUint32(8, true);
       const b1 = data.getUint32(12, true);
       const bloqueActual = `${b0}_${b1}`;
@@ -183,50 +187,54 @@ export function useMCMeter() {
       if (bloqueActual !== lastAdcBlockRef.current) {
         adcChangesInSecRef.current++;
         lastAdcBlockRef.current = bloqueActual;
+      }
 
-        // Filtro de mediana de 3 muestras
-        bufVRef.current.push(vRaw);
-        if (bufVRef.current.length > 3) bufVRef.current.shift();
-        bufIRef.current.push(iRaw);
-        if (bufIRef.current.length > 3) bufIRef.current.shift();
-        sampleCountRef.current++;
+      // Filtro de mediana de 3 muestras
+      bufVRef.current.push(vRaw);
+      if (bufVRef.current.length > 3) bufVRef.current.shift();
+      bufIRef.current.push(iRaw);
+      if (bufIRef.current.length > 3) bufIRef.current.shift();
+      sampleCountRef.current++;
 
-        const vFiltrado =
-          sampleCountRef.current >= 3
-            ? mediana3(bufVRef.current[0], bufVRef.current[1], bufVRef.current[2])
-            : vRaw;
-        const iFiltrado =
-          sampleCountRef.current >= 3
-            ? mediana3(bufIRef.current[0], bufIRef.current[1], bufIRef.current[2])
-            : iRaw;
+      const vFiltrado =
+        sampleCountRef.current >= 3
+          ? mediana3(bufVRef.current[0], bufVRef.current[1], bufVRef.current[2])
+          : vRaw;
+      const iFiltrado =
+        sampleCountRef.current >= 3
+          ? mediana3(bufIRef.current[0], bufIRef.current[1], bufIRef.current[2])
+          : iRaw;
 
-        // Auto-Trigger por corriente (>15 mA)
-        if (autoTriggerArmedRef.current && iRaw >= triggerThreshold) {
-          setAutoTriggerArmed(false);
-          setPausado(false);
-          historyBufferRef.current.clear();
-          sessionStartTRef.current = performance.now();
-        }
+      // Auto-Trigger por corriente (>15 mA)
+      if (autoTriggerArmedRef.current && iRaw >= triggerThreshold) {
+        setAutoTriggerArmed(false);
+        setPausado(false);
+        historyBufferRef.current.clear();
+        sessionStartTRef.current = performance.now();
+      }
 
-        const tRel = (performance.now() - sessionStartTRef.current) / 1000.0;
+      const tRel = (performance.now() - sessionStartTRef.current) / 1000.0;
 
-        // Almacenar en el buffer de 60,000 muestras
-        historyBufferRef.current.push([tRel, vFiltrado, iFiltrado, dpVal, dmVal, cc1Val, cc2Val]);
+      // Almacenar TODAS las muestras en el buffer circular de 60,000 muestras a máxima velocidad
+      historyBufferRef.current.push([tRel, vFiltrado, iFiltrado, dpVal, dmVal, cc1Val, cc2Val]);
 
-        // Actualizar mini-buffer
-        if (!pausadoRef.current) {
-          miniVbusRef.current.push(vFiltrado);
-          if (miniVbusRef.current.length > 180) miniVbusRef.current.shift();
-          miniIbusRef.current.push(iFiltrado);
-          if (miniIbusRef.current.length > 180) miniIbusRef.current.shift();
-        }
+      // Actualizar mini-buffer
+      if (!pausadoRef.current) {
+        miniVbusRef.current.push(vFiltrado);
+        if (miniVbusRef.current.length > 180) miniVbusRef.current.shift();
+        miniIbusRef.current.push(iFiltrado);
+        if (miniIbusRef.current.length > 180) miniIbusRef.current.shift();
+      }
 
-        if (iRaw > peakIbusRef.current) {
-          peakIbusRef.current = iRaw;
-          setPeakIbus(iRaw);
-        }
+      if (iRaw > peakIbusRef.current) {
+        peakIbusRef.current = iRaw;
+        setPeakIbus(iRaw);
+      }
 
-        // Actualizar estados reactivos
+      // Throttling reactivo para la UI (~35 FPS) para no saturar el event loop mientras el canvas dibuja a 60 FPS
+      const now = performance.now();
+      if (now - lastUiUpdateTRef.current >= 28.0) {
+        lastUiUpdateTRef.current = now;
         setVbus(vRaw);
         setIbus(iRaw);
         setWatts(vRaw * iRaw);
@@ -237,17 +245,26 @@ export function useMCMeter() {
         setTick((prev) => (prev + 1) & 0x7fffffff);
       }
 
-      // Cálculo de frecuencia de muestreo (SPS) cada 1 segundo
-      const now = performance.now();
+      // Cálculo de frecuencia de muestreo física respetando los 4 modos oficiales del KM003C
       if (now - lastSpsCalcTRef.current >= 1000.0) {
         const c = adcChangesInSecRef.current;
+        const total = reportsInSecRef.current;
         let etiqueta = '-- SPS';
-        if (c <= 5) etiqueta = '2 SPS';
-        else if (c <= 16) etiqueta = '10 SPS';
-        else if (c <= 110) etiqueta = '50 SPS';
-        else etiqueta = '1Ksps';
+        
+        if (total === 0) {
+          etiqueta = '-- SPS';
+        } else if (c <= 5 && total <= 8) {
+          etiqueta = '2 SPS';
+        } else if (c <= 16 && total <= 30) {
+          etiqueta = '10 SPS';
+        } else if (c <= 110 && total <= 250) {
+          etiqueta = '50 SPS';
+        } else {
+          etiqueta = '1Ksps';
+        }
 
         setSps(etiqueta);
+        reportsInSecRef.current = 0;
         adcChangesInSecRef.current = 0;
         lastSpsCalcTRef.current = now;
       }

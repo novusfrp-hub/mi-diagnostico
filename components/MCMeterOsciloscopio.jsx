@@ -15,7 +15,8 @@ import {
   BookmarkPlus,
   Compass,
   Layers,
-  X
+  X,
+  Crosshair
 } from 'lucide-react';
 
 function calcularEscalaTipoTester(valores, canal = 'vbus', modoDinamico = true) {
@@ -31,12 +32,15 @@ function calcularEscalaTipoTester(valores, canal = 'vbus', modoDinamico = true) 
   }
 
   if (!modoDinamico) {
-    const tope = Math.max(0.3, Math.ceil(vmax * 10.0) / 10.0 + 0.1);
+    const tope = Math.max(0.02, Math.ceil(vmax * 10.0) / 10.0 + 0.1);
     return [0.0, tope];
   }
 
-  const span = vmax - vmin;
-  const pasosValidos = [0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.8, 1.0, 1.5, 2.0, 2.5, 3.0, 5.0, 10.0];
+  const span = Math.max(1e-5, vmax - vmin);
+  const pasosValidos = [
+    0.001, 0.002, 0.005, 0.010, 0.020, 0.050, 0.10, 0.20, 0.30, 0.40, 0.50,
+    0.80, 1.00, 1.50, 2.00, 2.50, 3.00, 5.00, 10.0, 15.0, 20.0, 25.0, 35.0
+  ];
   let paso = 0.1;
   for (const p of pasosValidos) {
     if (p * 2.4 >= span) {
@@ -65,7 +69,7 @@ function calcularEscalaTipoTester(valores, canal = 'vbus', modoDinamico = true) 
     }
   }
 
-  return [parseFloat(piso.toFixed(3)), parseFloat(techo.toFixed(3))];
+  return [parseFloat(piso.toFixed(4)), parseFloat(techo.toFixed(4))];
 }
 
 export default function MCMeterOsciloscopio({
@@ -97,10 +101,20 @@ export default function MCMeterOsciloscopio({
   } = mcMeter;
 
   // 1. Perfil de Medición Especializado
-  // 'power': Secuencias de encendido (solo corriente IBUS a alta resolución temporal, t=0 al pulsar power)
+  // 'power': Secuencias de encendido PMIC (Voltaje MAIN + Corriente IBUS con auto-trigger t=0)
   // 'carga': Carga y negociación USB-C (Dual VBUS + IBUS + Pines D/CC)
-  // 'buck': Líneas Buck / Backlight / Consumos en placa
+  // 'buck': Líneas Buck / Backlight (Voltaje BUCK/MAIN + Corriente para evitar inyectar tensión incorrecta)
   const [perfilMedicion, setPerfilMedicion] = useState('power');
+
+  // Nomenclatura coherente según el perfil de prueba
+  const isPower = perfilMedicion === 'power';
+  const isBuck = perfilMedicion === 'buck';
+  const isCarga = perfilMedicion === 'carga';
+
+  const labelVoltaje = isCarga ? 'VBUS' : (isBuck ? 'BUCK / MAIN' : 'MAIN');
+  const labelVoltajeEje = isCarga ? '━ VBUS (V)' : (isBuck ? '━ VOLTAJE BUCK / MAIN (V)' : '━ VOLTAJE MAIN (V)');
+  const labelCorriente = isPower ? 'IBUS' : (isBuck ? 'CONSUMO' : 'IBUS');
+  const labelCorrienteEje = isPower ? '━ CORRIENTE ARRANQUE (A)' : (isBuck ? '━ CONSUMO (A)' : '━ IBUS (A)');
 
   // 2. Curva Golden de Referencia (Comparador Equipo Bueno vs. Equipo en Falla)
   const [curvaGoldenSeleccionada, setCurvaGoldenSeleccionada] = useState(null);
@@ -114,27 +128,49 @@ export default function MCMeterOsciloscopio({
   const [zoomSamples, setZoomSamples] = useState(400);
   const [viewEndIdx, setViewEndIdx] = useState(0);
 
-  // Canales visibles (se auto-ajustan según perfil de medición)
-  const [showVbus, setShowVbus] = useState(perfilMedicion === 'carga');
+  // Canales visibles (activos por defecto para ver siempre voltaje y corriente)
+  const [showVbus, setShowVbus] = useState(true);
   const [showIbus, setShowIbus] = useState(true);
   const [showDp, setShowDp] = useState(false);
   const [showDm, setShowDm] = useState(false);
   const [showCc, setShowCc] = useState(false);
+  const [mostrarTooltipCursor, setMostrarTooltipCursor] = useState(true);
 
   // Auto-ajuste de canales al cambiar de perfil
   useEffect(() => {
-    if (perfilMedicion === 'power' || perfilMedicion === 'buck') {
-      setShowVbus(false);
+    setShowVbus(true);
+    setShowIbus(true);
+    if (perfilMedicion !== 'carga') {
       setShowDp(false);
       setShowDm(false);
       setShowCc(false);
-      setShowIbus(true);
-      setSplitTracks(false);
-    } else {
-      setShowVbus(true);
-      setShowIbus(true);
     }
   }, [perfilMedicion]);
+
+  // Atajos de teclado en el osciloscopio:
+  // H: Ocultar / Mostrar recuadro flotante en cursor (HUD Cursor)
+  // Espacio: Pausar / Reanudar captura en vivo
+  // R: Resetear Zoom
+  // S: Alternar Split View (2 Carriles V / I vs Superpuesta)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT')) return;
+      
+      const key = e.key.toLowerCase();
+      if (key === 'h') {
+        setMostrarTooltipCursor((prev) => !prev);
+      } else if (e.code === 'Space') {
+        e.preventDefault();
+        togglePausa();
+      } else if (key === 'r') {
+        resetearZoom();
+      } else if (key === 's') {
+        setSplitTracks((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [togglePausa]);
 
   // Box-Zoom y Cursores Delta A-B
   const [markerAIdx, setMarkerAIdx] = useState(null);
@@ -434,9 +470,9 @@ export default function MCMeterOsciloscopio({
       ctx.fillStyle = '#04070d';
       ctx.fillRect(0, 0, w, h);
 
-      const padL = 76;
-      const padR = 80;
-      const padT = 24;
+      const padL = 84;
+      const padR = 85;
+      const padT = 26;
       const padB = 34;
       const plotW = w - padL - padR;
       const plotH = h - padT - padB;
@@ -474,16 +510,16 @@ export default function MCMeterOsciloscopio({
         maxI
       };
 
-      // 2. Geometría de carriles
+      // 2. Geometría de carriles (Superpuestos vs Split View de 2 Carriles)
       let vTop, vBot, iTop, iBot;
-      if (!splitTracks || perfilMedicion === 'power') {
+      if (!splitTracks) {
         vTop = padT;
         vBot = h - padB;
         iTop = padT;
         iBot = h - padB;
 
         const divisiones = 3;
-        ctx.font = 'bold 10px Consolas, monospace';
+        ctx.font = 'bold 9.5px Consolas, monospace';
         for (let step = 0; step <= divisiones; step++) {
           const frac = step / divisiones;
           const y = vBot - frac * plotH;
@@ -493,17 +529,20 @@ export default function MCMeterOsciloscopio({
           ctx.lineTo(w - padR, y);
           ctx.stroke();
 
-          // En modo power solo mostramos escala de corriente
           if (showVbus) {
             ctx.fillStyle = '#ff4444';
             ctx.textAlign = 'right';
-            ctx.fillText((minV + frac * spanV).toFixed(2), padL - 8, y + 4);
+            ctx.fillText(`${(minV + frac * spanV).toFixed(2)}V`, padL - 8, y + 4);
           }
 
-          ctx.fillStyle = '#facc15';
-          ctx.textAlign = showVbus ? 'left' : 'right';
-          const xText = showVbus ? w - padR + 8 : padL - 8;
-          ctx.fillText(`${(minI + frac * spanI).toFixed(3)}A`, xText, y + 4);
+          if (showIbus) {
+            ctx.fillStyle = '#facc15';
+            ctx.textAlign = showVbus ? 'left' : 'right';
+            const xText = showVbus ? w - padR + 8 : padL - 8;
+            const valI = minI + frac * spanI;
+            const txtI = valI < 0.1 && valI > 0 ? `${(valI * 1000).toFixed(1)}mA` : `${valI.toFixed(3)}A`;
+            ctx.fillText(txtI, xText, y + 4);
+          }
         }
       } else {
         const midY = padT + Math.floor(plotH / 2);
@@ -536,26 +575,35 @@ export default function MCMeterOsciloscopio({
           ctx.lineTo(w - padR, yi);
           ctx.stroke();
 
-          ctx.fillStyle = '#ff4444';
-          ctx.textAlign = 'right';
-          ctx.fillText(`${(minV + frac * spanV).toFixed(2)}V`, padL - 8, yv + 3);
+          if (showVbus) {
+            ctx.fillStyle = '#ff4444';
+            ctx.textAlign = 'right';
+            ctx.fillText(`${(minV + frac * spanV).toFixed(2)}V`, padL - 8, yv + 3);
+          }
 
-          ctx.fillStyle = '#facc15';
-          ctx.textAlign = 'left';
-          ctx.fillText(`${(minI + frac * spanI).toFixed(2)}A`, w - padR + 8, yi + 3);
+          if (showIbus) {
+            ctx.fillStyle = '#facc15';
+            ctx.textAlign = 'left';
+            const valI = minI + frac * spanI;
+            const txtI = valI < 0.1 && valI > 0 ? `${(valI * 1000).toFixed(1)}mA` : `${valI.toFixed(3)}A`;
+            ctx.fillText(txtI, w - padR + 8, yi + 3);
+          }
         }
       }
 
       // Encabezados de ejes
-      ctx.font = 'bold 8px Consolas, monospace';
+      ctx.font = 'bold 8.5px Consolas, monospace';
       if (showVbus) {
         ctx.fillStyle = '#ff4444';
         ctx.textAlign = 'right';
-        ctx.fillText('━ VBUS (V)', padL - 8, padT - 10);
+        ctx.fillText(labelVoltajeEje, padL - 8, padT - 10);
       }
-      ctx.fillStyle = '#facc15';
-      ctx.textAlign = showVbus ? 'left' : 'right';
-      ctx.fillText(perfilMedicion === 'power' ? '━ CORRIENTE ARRANQUE (A)' : '━ IBUS (A)', showVbus ? w - padR + 8 : padL - 8, padT - 10);
+      if (showIbus) {
+        ctx.fillStyle = '#facc15';
+        ctx.textAlign = showVbus ? 'left' : 'right';
+        const xHeader = showVbus ? w - padR + 8 : padL - 8;
+        ctx.fillText(labelCorrienteEje, xHeader, padT - 10);
+      }
 
       // 3. CAPA DE FONDO: CURVA GOLDEN DE REFERENCIA (CIAN OPACO 38%)
       if (curvaGoldenSeleccionada && curvaGoldenSeleccionada.curvaPuntos?.length >= 2) {
@@ -750,42 +798,44 @@ export default function MCMeterOsciloscopio({
             valGoldenAtX = curvaGoldenSeleccionada.curvaPuntos[gIdx];
           }
 
-          const boxW = 240;
-          const boxH = valGoldenAtX !== null ? 105 : (showVbus ? 92 : 65);
-          let tx = cx + 14 + boxW < w - padR ? cx + 14 : cx - boxW - 14;
-          let ty = Math.max(padT + 6, Math.min(h - padB - boxH - 6, (hover.y || h / 2) - boxH / 2));
+          if (mostrarTooltipCursor) {
+            const boxW = 240;
+            const boxH = valGoldenAtX !== null ? 105 : (showVbus ? 92 : 65);
+            let tx = cx + 14 + boxW < w - padR ? cx + 14 : cx - boxW - 14;
+            let ty = Math.max(padT + 6, Math.min(h - padB - boxH - 6, (hover.y || h / 2) - boxH / 2));
 
-          ctx.fillStyle = 'rgba(11, 19, 36, 0.95)';
-          ctx.strokeStyle = '#00e5ff';
-          ctx.lineWidth = 1.2;
-          ctx.fillRect(tx, ty, boxW, boxH);
-          ctx.strokeRect(tx, ty, boxW, boxH);
+            ctx.fillStyle = 'rgba(11, 19, 36, 0.95)';
+            ctx.strokeStyle = '#00e5ff';
+            ctx.lineWidth = 1.2;
+            ctx.fillRect(tx, ty, boxW, boxH);
+            ctx.strokeRect(tx, ty, boxW, boxH);
 
-          ctx.textAlign = 'left';
-          ctx.font = 'bold 8px Consolas, monospace';
-          ctx.fillStyle = '#cbd5e1';
-          ctx.fillText(`⏱ t = -${tBackCursor.toFixed(3)}s (${tS.toFixed(2)}s)`, tx + 8, ty + 14);
-
-          ctx.font = 'bold 9px Consolas, monospace';
-          if (showVbus) {
-            ctx.fillStyle = '#ff4444';
-            ctx.fillText(`🔴 VBUS: ${fmtVbus(vS)}`, tx + 8, ty + 30);
-          }
-
-          ctx.fillStyle = '#facc15';
-          const yPosIbus = showVbus ? ty + 46 : ty + 30;
-          ctx.fillText(`🟡 EN VIVO (I): ${fmtIbus(iS)} (${(iS * 1000).toFixed(0)}mA)`, tx + 8, yPosIbus);
-
-          if (valGoldenAtX !== null) {
-            const diffA = iS - valGoldenAtX;
-            ctx.fillStyle = '#00e5ff';
-            ctx.fillText(`★ GOLDEN (I) : ${valGoldenAtX.toFixed(3)}A (${(valGoldenAtX * 1000).toFixed(0)}mA)`, tx + 8, yPosIbus + 16);
-            ctx.fillStyle = Math.abs(diffA) > 0.1 ? '#ef4444' : '#10b981';
-            ctx.fillText(`Δ DIFERENCIA : ${diffA >= 0 ? '+' : ''}${(diffA * 1000).toFixed(0)} mA`, tx + 8, yPosIbus + 32);
-          } else if (showVbus) {
+            ctx.textAlign = 'left';
             ctx.font = 'bold 8px Consolas, monospace';
-            ctx.fillStyle = '#38bdf8';
-            ctx.fillText(`🔵 PWR: ${fmtWatts(pwrS)} | D+:${dpS.toFixed(2)}V CC:${Math.max(cc1S, cc2S).toFixed(2)}V`, tx + 8, ty + 64);
+            ctx.fillStyle = '#cbd5e1';
+            ctx.fillText(`⏱ t = -${tBackCursor.toFixed(3)}s (${tS.toFixed(2)}s)`, tx + 8, ty + 14);
+
+            ctx.font = 'bold 9px Consolas, monospace';
+            if (showVbus) {
+              ctx.fillStyle = '#ff4444';
+              ctx.fillText(`🔴 ${labelVoltaje}: ${fmtVbus(vS)}`, tx + 8, ty + 30);
+            }
+
+            ctx.fillStyle = '#facc15';
+            const yPosIbus = showVbus ? ty + 46 : ty + 30;
+            ctx.fillText(`🟡 EN VIVO (${labelCorriente}): ${fmtIbus(iS)} (${(iS * 1000).toFixed(0)}mA)`, tx + 8, yPosIbus);
+
+            if (valGoldenAtX !== null) {
+              const diffA = iS - valGoldenAtX;
+              ctx.fillStyle = '#00e5ff';
+              ctx.fillText(`★ GOLDEN (${labelCorriente}) : ${valGoldenAtX.toFixed(3)}A (${(valGoldenAtX * 1000).toFixed(0)}mA)`, tx + 8, yPosIbus + 16);
+              ctx.fillStyle = Math.abs(diffA) > 0.1 ? '#ef4444' : '#10b981';
+              ctx.fillText(`Δ DIFERENCIA : ${diffA >= 0 ? '+' : ''}${(diffA * 1000).toFixed(0)} mA`, tx + 8, yPosIbus + 32);
+            } else if (showVbus) {
+              ctx.font = 'bold 8px Consolas, monospace';
+              ctx.fillStyle = '#38bdf8';
+              ctx.fillText(`🔵 PWR: ${fmtWatts(pwrS)} | D+:${dpS.toFixed(2)}V CC:${Math.max(cc1S, cc2S).toFixed(2)}V`, tx + 8, ty + 64);
+            }
           }
         }
       }
@@ -810,7 +860,8 @@ export default function MCMeterOsciloscopio({
     markerBIdx,
     modoAvanzado,
     perfilMedicion,
-    curvaGoldenSeleccionada
+    curvaGoldenSeleccionada,
+    mostrarTooltipCursor
   ]);
 
   // Exportar Captura PNG 100% en el Navegador
@@ -1084,12 +1135,12 @@ export default function MCMeterOsciloscopio({
 
           {/* Lecturas Vivas */}
           {showVbus && (
-            <span style={{ color: '#ff4444', fontWeight: 800, fontSize: '1rem' }}>
-              VBUS: {fmtVbus(vbus)}
+            <span style={{ color: '#ff4444', fontWeight: 800, fontSize: '1.05rem' }}>
+              {labelVoltaje}: {fmtVbus(vbus)}
             </span>
           )}
           <span style={{ color: '#facc15', fontWeight: 800, fontSize: '1.05rem' }}>
-            IBUS: {fmtIbus(ibus)} ({(ibus * 1000).toFixed(0)}mA)
+            {labelCorriente}: {fmtIbus(ibus)} ({(ibus * 1000).toFixed(0)}mA)
           </span>
           <span style={{ color: '#10b981', fontWeight: 800, fontSize: '0.95rem' }}>
             PICO: {peakIbus.toFixed(3)}A
@@ -1299,9 +1350,33 @@ export default function MCMeterOsciloscopio({
           )}
         </div>
 
-        <span style={{ color: '#c084fc', fontWeight: 800, fontSize: '0.82rem' }}>
-          {calcularInfoDelta()}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {/* Botón rápido para activar/desactivar recuadro flotante en cualquier perfil */}
+          <button
+            onClick={() => setMostrarTooltipCursor(!mostrarTooltipCursor)}
+            title="Activar / Desactivar recuadro flotante con datos al pasar el ratón (Atajo rápido: Tecla H)"
+            style={{
+              backgroundColor: mostrarTooltipCursor ? 'rgba(56, 189, 248, 0.15)' : '#1e293b',
+              color: mostrarTooltipCursor ? '#38bdf8' : '#64748b',
+              border: '1px solid ' + (mostrarTooltipCursor ? '#38bdf8' : '#334155'),
+              borderRadius: '4px',
+              padding: '3px 8px',
+              fontSize: '0.75rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+          >
+            <Crosshair size={12} />
+            {mostrarTooltipCursor ? '🎯 HUD Cursor: ON [H]' : '🎯 HUD Cursor: OFF [H]'}
+          </button>
+
+          <span style={{ color: '#c084fc', fontWeight: 800, fontSize: '0.82rem' }}>
+            {calcularInfoDelta()}
+          </span>
+        </div>
       </div>
 
       {/* 3. LIENZO HTML5 CANVAS PRINCIPAL */}
@@ -1381,28 +1456,49 @@ export default function MCMeterOsciloscopio({
             {autoTriggerArmed ? '⚡ ESPERANDO BOTÓN POWER (>15mA)...' : '⚡ Auto-Trigger Power (>15mA)'}
           </button>
 
-          {/* Split View (Solo activo en Carga) */}
-          {perfilMedicion === 'carga' && (
-            <button
-              onClick={() => setSplitTracks(!splitTracks)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px',
-                backgroundColor: splitTracks ? '#7c3aed' : '#1e293b',
-                color: '#ffffff',
-                border: '1px solid #334155',
-                borderRadius: '6px',
-                padding: '6px 10px',
-                fontWeight: 800,
-                cursor: 'pointer',
-                fontSize: '0.8rem'
-              }}
-            >
-              <Split size={14} />
-              {splitTracks ? '2 Carriles (V / I)' : 'Superpuesta'}
-            </button>
-          )}
+          {/* Split View (2 Carriles Separados V / I) */}
+          <button
+            onClick={() => setSplitTracks(!splitTracks)}
+            title="Separar Voltaje en carril superior y Corriente en carril inferior para que nunca se superpongan"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px',
+              backgroundColor: splitTracks ? '#7c3aed' : '#1e293b',
+              color: '#ffffff',
+              border: '1px solid #334155',
+              borderRadius: '6px',
+              padding: '6px 10px',
+              fontWeight: 800,
+              cursor: 'pointer',
+              fontSize: '0.8rem'
+            }}
+          >
+            <Split size={14} />
+            {splitTracks ? '2 Carriles (V / I)' : 'Superpuesta'}
+          </button>
+
+          {/* Activar / Desactivar Tooltip Cursor Flotante (Audio 1) */}
+          <button
+            onClick={() => setMostrarTooltipCursor(!mostrarTooltipCursor)}
+            title="Activar / Desactivar recuadro flotante de telemetría en cursor al pasar el ratón (Atajo de teclado: Tecla H)"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px',
+              backgroundColor: mostrarTooltipCursor ? '#1e3a8a' : '#1e293b',
+              color: mostrarTooltipCursor ? '#38bdf8' : '#94a3b8',
+              border: '1px solid ' + (mostrarTooltipCursor ? '#38bdf8' : '#334155'),
+              borderRadius: '6px',
+              padding: '6px 10px',
+              fontWeight: 800,
+              cursor: 'pointer',
+              fontSize: '0.8rem'
+            }}
+          >
+            <Crosshair size={14} />
+            {mostrarTooltipCursor ? '🎯 HUD Cursor: ON' : '🎯 HUD Cursor: OFF'}
+          </button>
 
           {/* Modo Avanzado 🔬 */}
           <button
@@ -1489,15 +1585,13 @@ export default function MCMeterOsciloscopio({
 
         {/* Toggles de Canales */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-          {perfilMedicion === 'carga' && (
-            <label style={{ color: '#ff4444', fontWeight: 700, fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer' }}>
-              <input type="checkbox" checked={showVbus} onChange={(e) => setShowVbus(e.target.checked)} />
-              VBUS
-            </label>
-          )}
+          <label style={{ color: '#ff4444', fontWeight: 700, fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer' }}>
+            <input type="checkbox" checked={showVbus} onChange={(e) => setShowVbus(e.target.checked)} />
+            VOLTAJE ({labelVoltaje})
+          </label>
           <label style={{ color: '#facc15', fontWeight: 700, fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer' }}>
             <input type="checkbox" checked={showIbus} onChange={(e) => setShowIbus(e.target.checked)} />
-            CORRIENTE (IBUS)
+            CORRIENTE ({labelCorriente})
           </label>
           {perfilMedicion === 'carga' && (
             <>
