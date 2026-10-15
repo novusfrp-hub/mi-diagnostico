@@ -123,6 +123,8 @@ export function useMCMeter() {
   const reportsInSecRef = useRef(0);
   const lastSpsCalcTRef = useRef(performance.now());
   const lastUiUpdateTRef = useRef(performance.now());
+  const lastSamplePushTRef = useRef(performance.now());
+  const hasInitialSpsRef = useRef(false);
   const peakIbusRef = useRef(0.0);
 
   // Snapshot congelado al pausar
@@ -179,51 +181,61 @@ export function useMCMeter() {
       const dpVal = dpRaw / 10000.0;
       const dmVal = dmRaw / 10000.0;
 
-      // Detección de cambios físicos en ADC
+      // Detección de cambios físicos en el bloque ADC (bytes 8..15)
       const b0 = data.getUint32(8, true);
       const b1 = data.getUint32(12, true);
       const bloqueActual = `${b0}_${b1}`;
+      const isNewAdcSample = bloqueActual !== lastAdcBlockRef.current;
 
-      if (bloqueActual !== lastAdcBlockRef.current) {
+      if (isNewAdcSample) {
         adcChangesInSecRef.current++;
         lastAdcBlockRef.current = bloqueActual;
       }
 
-      // Filtro de mediana de 3 muestras
-      bufVRef.current.push(vRaw);
-      if (bufVRef.current.length > 3) bufVRef.current.shift();
-      bufIRef.current.push(iRaw);
-      if (bufIRef.current.length > 3) bufIRef.current.shift();
-      sampleCountRef.current++;
+      const now = performance.now();
+      const timeSinceLastSample = now - lastSamplePushTRef.current;
 
-      const vFiltrado =
-        sampleCountRef.current >= 3
-          ? mediana3(bufVRef.current[0], bufVRef.current[1], bufVRef.current[2])
-          : vRaw;
-      const iFiltrado =
-        sampleCountRef.current >= 3
-          ? mediana3(bufIRef.current[0], bufIRef.current[1], bufIRef.current[2])
-          : iRaw;
+      // Ingesta de datos al buffer al ritmo real del ADC físico (idéntico a Python: bloque_actual != ultimo_bloque_adc)
+      // Con un límite de latido preventivo de 400ms para mantener el canvas vivo si la señal es perfectamente plana
+      if (isNewAdcSample || timeSinceLastSample >= 400) {
+        lastSamplePushTRef.current = now;
 
-      // Auto-Trigger por corriente (>15 mA)
-      if (autoTriggerArmedRef.current && iRaw >= triggerThreshold) {
-        setAutoTriggerArmed(false);
-        setPausado(false);
-        historyBufferRef.current.clear();
-        sessionStartTRef.current = performance.now();
-      }
+        // Filtro de mediana de 3 muestras
+        bufVRef.current.push(vRaw);
+        if (bufVRef.current.length > 3) bufVRef.current.shift();
+        bufIRef.current.push(iRaw);
+        if (bufIRef.current.length > 3) bufIRef.current.shift();
+        sampleCountRef.current++;
 
-      const tRel = (performance.now() - sessionStartTRef.current) / 1000.0;
+        const vFiltrado =
+          sampleCountRef.current >= 3
+            ? mediana3(bufVRef.current[0], bufVRef.current[1], bufVRef.current[2])
+            : vRaw;
+        const iFiltrado =
+          sampleCountRef.current >= 3
+            ? mediana3(bufIRef.current[0], bufIRef.current[1], bufIRef.current[2])
+            : iRaw;
 
-      // Almacenar TODAS las muestras en el buffer circular de 60,000 muestras a máxima velocidad
-      historyBufferRef.current.push([tRel, vFiltrado, iFiltrado, dpVal, dmVal, cc1Val, cc2Val]);
+        // Auto-Trigger por corriente (>15 mA)
+        if (autoTriggerArmedRef.current && iRaw >= triggerThreshold) {
+          setAutoTriggerArmed(false);
+          setPausado(false);
+          historyBufferRef.current.clear();
+          sessionStartTRef.current = performance.now();
+        }
 
-      // Actualizar mini-buffer
-      if (!pausadoRef.current) {
-        miniVbusRef.current.push(vFiltrado);
-        if (miniVbusRef.current.length > 180) miniVbusRef.current.shift();
-        miniIbusRef.current.push(iFiltrado);
-        if (miniIbusRef.current.length > 180) miniIbusRef.current.shift();
+        const tRel = (now - sessionStartTRef.current) / 1000.0;
+
+        // Almacenar en el buffer circular de 60,000 muestras
+        historyBufferRef.current.push([tRel, vFiltrado, iFiltrado, dpVal, dmVal, cc1Val, cc2Val]);
+
+        // Actualizar mini-buffer
+        if (!pausadoRef.current) {
+          miniVbusRef.current.push(vFiltrado);
+          if (miniVbusRef.current.length > 180) miniVbusRef.current.shift();
+          miniIbusRef.current.push(iFiltrado);
+          if (miniIbusRef.current.length > 180) miniIbusRef.current.shift();
+        }
       }
 
       if (iRaw > peakIbusRef.current) {
@@ -232,7 +244,6 @@ export function useMCMeter() {
       }
 
       // Throttling reactivo para la UI (~35 FPS) para no saturar el event loop mientras el canvas dibuja a 60 FPS
-      const now = performance.now();
       if (now - lastUiUpdateTRef.current >= 28.0) {
         lastUiUpdateTRef.current = now;
         setVbus(vRaw);
@@ -245,28 +256,50 @@ export function useMCMeter() {
         setTick((prev) => (prev + 1) & 0x7fffffff);
       }
 
-      // Cálculo de frecuencia de muestreo física respetando los 4 modos oficiales del KM003C
-      if (now - lastSpsCalcTRef.current >= 1000.0) {
+      // Auto-detección fiel de la tasa SPS física del hardware KM003C (2 SPS, 10 SPS, 50 SPS, 1Ksps)
+      const elapsedSps = (now - lastSpsCalcTRef.current) / 1000.0;
+
+      // 1. Detección rápida preliminar a los ~350ms para no esperar 1 segundo completo al conectar
+      if (!hasInitialSpsRef.current && elapsedSps >= 0.35) {
+        const cProj = adcChangesInSecRef.current / elapsedSps;
+        let preEtiqueta = '-- SPS';
+        if (cProj <= 5) {
+          preEtiqueta = '2 SPS';
+        } else if (cProj <= 22) {
+          preEtiqueta = '10 SPS';
+        } else if (cProj <= 150) {
+          preEtiqueta = '50 SPS';
+        } else {
+          preEtiqueta = '1Ksps';
+        }
+        setSps(preEtiqueta);
+        hasInitialSpsRef.current = true;
+      }
+
+      // 2. Ventana de 1.0 segundo exacto replicando fielmente el script de Python:
+      // if c <= 5: "2 SPS"
+      // elif c <= 16: "10 SPS"
+      // elif c <= 110: "50 SPS"
+      // else: "1Ksps"
+      if (elapsedSps >= 1.0) {
         const c = adcChangesInSecRef.current;
-        const total = reportsInSecRef.current;
         let etiqueta = '-- SPS';
-        
-        if (total === 0) {
-          etiqueta = '-- SPS';
-        } else if (c <= 5 && total <= 8) {
+
+        if (c <= 5) {
           etiqueta = '2 SPS';
-        } else if (c <= 16 && total <= 30) {
+        } else if (c <= 16) {
           etiqueta = '10 SPS';
-        } else if (c <= 110 && total <= 250) {
+        } else if (c <= 110) {
           etiqueta = '50 SPS';
         } else {
           etiqueta = '1Ksps';
         }
 
         setSps(etiqueta);
-        reportsInSecRef.current = 0;
         adcChangesInSecRef.current = 0;
+        reportsInSecRef.current = 0;
         lastSpsCalcTRef.current = now;
+        hasInitialSpsRef.current = true;
       }
     } catch (e) {
       console.error('Error al decodificar reporte MC-Meter:', e);
@@ -319,10 +352,14 @@ export function useMCMeter() {
       keepRunningRef.current = true;
       sessionStartTRef.current = performance.now();
       lastSpsCalcTRef.current = performance.now();
+      lastSamplePushTRef.current = performance.now();
+      lastAdcBlockRef.current = null;
       adcChangesInSecRef.current = 0;
+      hasInitialSpsRef.current = false;
       peakIbusRef.current = 0.0;
 
       setConectado(true);
+      setSps('Detectando...');
 
       // Iniciar el ciclo de polling continuo
       enviarPoll();
@@ -366,6 +403,8 @@ export function useMCMeter() {
       }
       deviceRef.current = null;
     }
+    hasInitialSpsRef.current = false;
+    lastAdcBlockRef.current = null;
     setConectado(false);
     setSps('-- SPS');
     setVbus(0.0);

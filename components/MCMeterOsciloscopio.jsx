@@ -262,8 +262,9 @@ export default function MCMeterOsciloscopio({
     (pixelX) => {
       const canvas = canvasRef.current;
       if (!canvas) return null;
-      const padL = 76;
-      const padR = 80;
+      const b = scaleBoundsRef.current;
+      const padL = b?.padL || 84;
+      const padR = b?.padR || 85;
       const plotW = canvas.width - padL - padR;
       if (pixelX < padL || pixelX > canvas.width - padR) return null;
 
@@ -1142,9 +1143,27 @@ export default function MCMeterOsciloscopio({
           <span style={{ color: '#facc15', fontWeight: 800, fontSize: '1.05rem' }}>
             {labelCorriente}: {fmtIbus(ibus)} ({(ibus * 1000).toFixed(0)}mA)
           </span>
-          <span style={{ color: '#10b981', fontWeight: 800, fontSize: '0.95rem' }}>
-            PICO: {peakIbus.toFixed(3)}A
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <span style={{ color: '#10b981', fontWeight: 800, fontSize: '0.95rem' }}>
+              PICO: {peakIbus.toFixed(3)}A
+            </span>
+            <button
+              onClick={mcMeter.resetPeak}
+              title="Resetear pico de corriente (RST)"
+              style={{
+                backgroundColor: '#1e293b',
+                color: '#cbd5e1',
+                border: 'none',
+                borderRadius: '3px',
+                padding: '1px 5px',
+                fontSize: '0.65rem',
+                fontWeight: 800,
+                cursor: 'pointer'
+              }}
+            >
+              RST
+            </button>
+          </div>
           <span
             style={{
               backgroundColor: '#172554',
