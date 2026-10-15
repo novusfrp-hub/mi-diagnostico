@@ -607,7 +607,8 @@ export default function MCMeterOsciloscopio({
       }
 
       // 3. CAPA DE FONDO: CURVA GOLDEN DE REFERENCIA (CIAN OPACO 38%)
-      if (curvaGoldenSeleccionada && curvaGoldenSeleccionada.curvaPuntos?.length >= 2) {
+      // El comparador Golden es exclusivo del perfil 'power' (Arranque / PMIC)
+      if (isPower && curvaGoldenSeleccionada && curvaGoldenSeleccionada.curvaPuntos?.length >= 2) {
         const gPts = curvaGoldenSeleccionada.curvaPuntos;
         const nG = gPts.length;
         const iTrackH = iBot - iTop;
@@ -1196,24 +1197,26 @@ export default function MCMeterOsciloscopio({
             </span>
           )}
 
-          <button
-            onClick={() => setModalGuardarGolden(true)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-              backgroundColor: '#059669',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '6px',
-              padding: '6px 12px',
-              fontWeight: 800,
-              cursor: 'pointer',
-              fontSize: '0.8rem'
-            }}
-          >
-            <BookmarkPlus size={14} /> 💾 Guardar Curva Golden
-          </button>
+          {isPower && (
+            <button
+              onClick={() => setModalGuardarGolden(true)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                backgroundColor: '#059669',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '6px',
+                padding: '6px 12px',
+                fontWeight: 800,
+                cursor: 'pointer',
+                fontSize: '0.8rem'
+              }}
+            >
+              <BookmarkPlus size={14} /> 💾 Guardar Curva Golden
+            </button>
+          )}
 
           <button
             onClick={guardarCapturaPNG}
@@ -1306,57 +1309,64 @@ export default function MCMeterOsciloscopio({
           gap: '8px'
         }}
       >
-        {/* Selector de Curva de Referencia Golden Sample */}
+        {/* Controles contextuales según el perfil activo */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-          <Layers size={14} color="#00ffff" />
-          <span style={{ color: '#00ffff', fontWeight: 800, fontSize: '0.8rem' }}>
-            COMPARADOR GOLDEN:
-          </span>
-          <select
-            value={curvaGoldenSeleccionada?.id || ''}
-            onChange={(e) => {
-              const encontrada = curvasDisponibles.find((c) => c.id === e.target.value);
-              setCurvaGoldenSeleccionada(encontrada || null);
-            }}
-            style={{
-              backgroundColor: '#1e293b',
-              color: '#ffffff',
-              border: '1px solid #00e5ff',
-              borderRadius: '6px',
-              padding: '3px 8px',
-              fontSize: '0.75rem',
-              outline: 'none',
-              cursor: 'pointer'
-            }}
-          >
-            <option value="">-- Sin Curva de Referencia --</option>
-            {curvasDisponibles.map((c) => (
-              <option key={c.id} value={c.id}>
-                ★ {c.titulo} ({c.duracionMs}ms | Pico: {c.picoMaxA}A)
-              </option>
-            ))}
-          </select>
+          {isPower && (
+            <>
+              <Layers size={14} color="#00ffff" />
+              <span style={{ color: '#00ffff', fontWeight: 800, fontSize: '0.8rem' }}>
+                COMPARADOR GOLDEN:
+              </span>
+              <select
+                value={curvaGoldenSeleccionada?.id || ''}
+                onChange={(e) => {
+                  const encontrada = curvasDisponibles.find((c) => c.id === e.target.value);
+                  setCurvaGoldenSeleccionada(encontrada || null);
+                }}
+                style={{
+                  backgroundColor: '#1e293b',
+                  color: '#ffffff',
+                  border: '1px solid #00e5ff',
+                  borderRadius: '6px',
+                  padding: '3px 8px',
+                  fontSize: '0.75rem',
+                  outline: 'none',
+                  cursor: 'pointer'
+                }}
+              >
+                <option value="">-- Sin Curva de Referencia --</option>
+                {curvasDisponibles.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    ★ {c.titulo} ({c.duracionMs}ms | Pico: {c.picoMaxA}A)
+                  </option>
+                ))}
+              </select>
 
-          {curvaGoldenSeleccionada && (
-            <button
-              onClick={() => setCurvaGoldenSeleccionada(null)}
-              title="Quitar Curva de Referencia"
-              style={{
-                background: 'rgba(239, 68, 68, 0.2)',
-                border: 'none',
-                color: '#ef4444',
-                padding: '2px 6px',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '0.7rem'
-              }}
-            >
-              Quitar
-            </button>
+              {curvaGoldenSeleccionada && (
+                <button
+                  onClick={() => setCurvaGoldenSeleccionada(null)}
+                  title="Quitar Curva de Referencia"
+                  style={{
+                    background: 'rgba(239, 68, 68, 0.2)',
+                    border: 'none',
+                    color: '#ef4444',
+                    padding: '2px 6px',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '0.7rem'
+                  }}
+                >
+                  Quitar
+                </button>
+              )}
+            </>
           )}
 
-          {perfilMedicion === 'carga' && (
-            <div style={{ display: 'flex', gap: '10px', marginLeft: '10px' }}>
+          {isCarga && (
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <span style={{ color: '#38bdf8', fontSize: '0.8rem', fontWeight: 800 }}>
+                ⚡ PROTOCOLO USB-C:
+              </span>
               <span style={{ color: '#10b981', fontSize: '0.8rem', fontWeight: 'bold' }}>D+: {fmtPin(dp)}</span>
               <span style={{ color: '#eab308', fontSize: '0.8rem', fontWeight: 'bold' }}>D-: {fmtPin(dm)}</span>
               <span style={{ color: cc1 > 0.25 ? '#10b981' : '#38bdf8', fontSize: '0.8rem', fontWeight: 'bold' }}>
@@ -1364,6 +1374,17 @@ export default function MCMeterOsciloscopio({
               </span>
               <span style={{ color: cc2 > 0.25 ? '#10b981' : '#c084fc', fontSize: '0.8rem', fontWeight: 'bold' }}>
                 CC2: {fmtPin(cc2)}
+              </span>
+            </div>
+          )}
+
+          {isBuck && (
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <span style={{ color: '#c084fc', fontSize: '0.8rem', fontWeight: 800 }}>
+                💡 DIAGNÓSTICO BUCK / BACKLIGHT:
+              </span>
+              <span style={{ color: '#cbd5e1', fontSize: '0.75rem' }}>
+                Supervisión de tensión inyectada y consumo reactivo en bobinas
               </span>
             </div>
           )}
@@ -1472,7 +1493,9 @@ export default function MCMeterOsciloscopio({
             }}
           >
             <Zap size={14} />
-            {autoTriggerArmed ? '⚡ ESPERANDO BOTÓN POWER (>15mA)...' : '⚡ Auto-Trigger Power (>15mA)'}
+            {autoTriggerArmed
+              ? (isPower ? '⚡ ESPERANDO BOTÓN POWER (>15mA)...' : '⚡ ESPERANDO PULSO (>15mA)...')
+              : (isPower ? '⚡ Auto-Trigger Power (>15mA)' : '⚡ Auto-Trigger (>15mA)')}
           </button>
 
           {/* Split View (2 Carriles Separados V / I) */}

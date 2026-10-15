@@ -1,24 +1,24 @@
-# Manual de Operación y Atajos de Teclado: Marshall MC-Meter Pro (KM003C)
+# Manual de Operación y Referencia de Funciones: Marshall MC-Meter Pro (KM003C)
 
 **Instrumento:** Marshall MC-Meter Pro (USB HID Tester KM003C)  
 **Plataforma:** `mi-diagnostico` (Marshall Cell Diagnostic Platform)  
-**Tipo de Integración:** 100% Nativa en Navegador (`WebHID API` - Cero Python)  
+**Tipo de Integración:** 100% Nativa en Navegador (`WebHID API` - Cero dependencias de Python)  
 
 ---
 
 ## 1. Atajos de Teclado (Osciloscopio Pantalla Completa)
 
-Cuando la ventana del **Analizador Oscilograma** está abierta, puedes usar los siguientes atajos rápidos desde el teclado:
+Cuando la ventana del **Analizador Oscilograma** está abierta, puedes utilizar los siguientes atajos rápidos directamente desde el teclado:
 
 | Tecla | Función | Descripción |
 | :---: | :--- | :--- |
-| <kbd>H</kbd> | **Alternar HUD Cursor (ON / OFF)** | Muestra u oculta el recuadro flotante cian con las lecturas en vivo que sigue el ratón. Al desactivarlo, la pantalla queda 100% limpia para ver las trazas sin obstáculos. Aplica en **todos los perfiles** (*Power*, *Carga USB-C*, *Buck*). |
+| <kbd>H</kbd> | **Alternar HUD Cursor (ON / OFF)** | Muestra u oculta el recuadro flotante con lecturas en vivo que acompaña al ratón. Al desactivarlo, la pantalla queda 100% limpia para inspeccionar trazas y anomalías sin obstáculos. Aplica en **todos los perfiles** (*Power*, *Carga USB-C*, *Buck*). |
 | <kbd>Espacio</kbd> | **Pausar / Reanudar en Vivo** | Congela la señal en pantalla instantáneamente para inspección minuciosa sin perder datos en memoria. Al volver a pulsar reanuda la transmisión en tiempo real. |
 | <kbd>R</kbd> | **Resetear Zoom (Escala Original)** | Restaura inmediatamente el zoom horizontal y vertical a la escala automática completa calculada por el tester. |
-| <kbd>S</kbd> | **Conmutar Split View (2 Carriles)** | Alterna entre vista de trazos superpuestos y **2 carriles separados**: Carril superior para Voltaje (`MAIN` / `VBUS` en rojo) y Carril inferior para Corriente (`IBUS` en amarillo). |
+| <kbd>S</kbd> | **Conmutar Split View (2 Carriles)** | Alterna entre vista de trazos superpuestos y **2 carriles separados**: Carril superior para Voltaje (`MAIN` / `VBUS` en rojo) y Carril inferior para Corriente (`IBUS` / `CONSUMO` en amarillo). |
 
 > [!TIP]
-> Los atajos funcionan en cualquier momento, siempre que no tengas el cursor dentro de una caja de texto o formulario.
+> Los atajos funcionan en cualquier momento, siempre que el foco no esté dentro de un campo de texto o menú desplegable.
 
 ---
 
@@ -26,10 +26,10 @@ Cuando la ventana del **Analizador Oscilograma** está abierta, puedes usar los 
 
 | Acción del Ratón | Resultado en Pantalla |
 | :--- | :--- |
-| **Clic Izquierdo y Arrastrar (Box-Zoom)** | Dibuja un recuadro rectangular punteado cian sobre cualquier pico o transitorio. Al soltar, el oscilograma aísla y amplía ese fragmento exacto en tiempo y amplitud. |
-| **Clic Izquierdo Simple** | Fija el **Cursor / Marca A** (`#22d3ee`). |
-| **Clic Derecho Simple** | Fija el **Cursor / Marca B** (`#e879f9`). |
-| **Medición Delta Automática (A - B)** | Con ambas marcas colocadas, la barra superior calcula en tiempo real:<br>• $\Delta t$: Intervalo de tiempo transcurrido en milisegundos.<br>• $I_{\text{prom}}$: Corriente promedio en ese lapso.<br>• $I_{\text{pico}}$: Corriente máxima alcanzada. |
+| **Clic Izquierdo y Arrastrar (Box-Zoom)** | Dibuja un recuadro rectangular punteado cian sobre cualquier pico o transitorio. Al soltar, el oscilograma aísla y amplía ese fragmento exacto en tiempo (eje X) y amplitud (eje Y). |
+| **Clic Izquierdo Simple** | Fija el **Cursor / Marca A** (`#22d3ee` cian). |
+| **Clic Derecho Simple** | Fija el **Cursor / Marca B** (`#e879f9` magenta). |
+| **Medición Delta Automática (A - B)** | Con ambas marcas colocadas, la barra superior calcula en tiempo real:<br>• $\Delta t$: Intervalo de tiempo transcurrido en milisegundos.<br>• $I_{\text{prom}}$: Corriente promedio en ese lapso exacto.<br>• $I_{\text{pico}}$: Corriente máxima alcanzada dentro del tramo delimitado. |
 | **Rueda del Ratón (Scroll Wheel)** | Amplía o reduce el zoom horizontal temporalmente, centrado en el punto del puntero. |
 | **Doble Clic (Izquierdo o Derecho)** | Restablece el zoom original por defecto (equivalente a pulsar <kbd>R</kbd> o el botón `🔄 Reset Zoom`). |
 
@@ -50,57 +50,110 @@ El hardware físico del tester **KM003C** cuenta con un botón en su lateral que
 | **`50 SPS`** | 50 muestras/s | Detección de protocolos de carga rápida (QC, PD) y transitorios moderados. |
 | **`1Ksps`** | 1000 muestras/s | **Modo Diagnóstico de Microelectrónica:** Permite capturar secuencias de arranque (**Power 1s**), picos de inicialización del PMIC, líneas Buck de CPU y elevadores de Backlight a 1 milisegundo de resolución temporal. |
 
-*La plataforma en el navegador detecta automáticamente cuál de estos 4 modos está seleccionado en el aparato y lo indica en la insignia superior de telemetría.*
+*La plataforma en el navegador detecta automáticamente cuál de estos 4 modos está seleccionado en el aparato mediante el análisis de cambios en los registros de tensión y corriente del ADC, indicándolo en la insignia superior de telemetría sin retrasos.*
 
 ---
 
-## 4. Perfiles de Diagnóstico Especializados
+## 4. Guía Exhaustiva de Botones y Funciones por Vista
 
-En la barra superior del oscilograma puedes alternar entre 3 perfiles con un clic:
+### A. Panel Acoplado (`MCMeterDockPanel.jsx`) — 50% en Marshall Hardware Suite
+Ubicado junto al multímetro UT61E+ en la vista de mediciones del modelo:
 
-### A. 🚀 Power (1s / Arranque)
-* **Objetivo:** Diagnóstico de encendido en placas móviles y fallas de PMIC.
-* **Nomenclatura de Voltaje:** **`MAIN`** (representa de forma universal VBAT, VPH_PWR, VDD_MAIN o entrada de batería).
-* **Nomenclatura de Corriente:** **`CORRIENTE ARRANQUE (A / mA)`**.
-* **Disparador Automático ($t = 0$):** Al pulsar `⚡ Auto-Trigger Power (>15mA)`, el oscilograma espera en silencio y dispara la captura en cuanto se presiona el botón Power del móvil, anclando el inicio a $t = 0.000\text{ s}$.
-
-### B. ⚡ Carga USB-C
-* **Objetivo:** Análisis de potencia y protocolos en el puerto Type-C.
-* **Nomenclatura de Voltaje:** **`VBUS`** (5V, 9V, 12V, 15V, 20V EPR).
-* **Pines Activos:** Monitor de `D+` (verde), `D-` (amarillo), `CC1` (azul) y `CC2` (morado). El pin de orientación activo ($>0.25\text{V}$) se enmarca con borde esmeralda.
-
-### C. 💡 Buck / Backlight
-* **Objetivo:** Inyección de tensión en rieles secundarios y diagnóstico de circuitos booster de pantalla.
-* **Nomenclatura de Voltaje:** **`BUCK / MAIN`** (permite verificar si la línea está en su tensión nominal de 0.8V, 1.2V, 1.8V, o si el circuito elevador de Backlight alcanza 18V–35V).
-* **Nomenclatura de Corriente:** **`CONSUMO (A / mA)`**.
-
----
-
-## 5. Recuadro Flotante del Cursor (HUD Cursor)
-
-Al mover el ratón sobre el gráfico, se proyecta una línea vertical y un recuadro de telemetría con los valores instantáneos de ese milisegundo.
-
-* **Cómo activarlo o desactivarlo:**
-  * **Método 1:** Presionar la tecla <kbd>H</kbd>.
-  * **Método 2:** Clic en el botón **`🎯 HUD Cursor: ON [H]`** ubicado en la barra superior secundaria (junto a Delta).
-  * **Método 3:** Clic en el botón **`🎯 HUD Cursor: ON`** de la barra inferior de controles.
-* **Alcance:** Funciona y se desactiva exactamente igual en los 3 perfiles (*Power*, *Carga USB-C*, *Buck*).
+1. **`● Indicador LED de Conexión`**:
+   * **Verde brillante:** Conectado mediante WebHID nativo y transmitiendo datos activamente.
+   * **Rojo:** Desconectado o en espera de conexión.
+2. **`Insignia SPS`**: Muestra la frecuencia física real del ADC (`2 SPS`, `10 SPS`, `50 SPS`, `1Ksps`).
+3. **`CONECTAR USB / DESCONECTAR`**: Abre el selector de dispositivos USB WebHID del navegador filtrando por Vendor ID `0x5FC9` y Product ID `0x0063`.
+4. **`🔬 6 DIG / 3 DIG` (Modo Avanzado)**: Alterna entre resolución estándar de 3 decimales y resolución de laboratorio de 6 decimales (con micro-dígitos en subíndice visual).
+5. **`📈 OSCILOGRAMA`**: Despliega la ventana de pantalla completa del osciloscopio analizador con motor gráfico Canvas a 60 FPS.
+6. **`🗗 DESACOPLAR`**: Extrae el panel hacia una ventana flotante arrastrable (Mini-HUD), dejando en su lugar la **Bahía de Re-acoplamiento**.
+7. **`Cajas Principales VBUS e IBUS`**: Números de gran escala (2.2rem) para visualización clara a distancia en el banco de trabajo.
+8. **`Fila de Potencia y Pines USB-C`**:
+   * **`PWR`**: Potencia instantánea calculada en Watts ($P = V \times I$).
+   * **`PEAK`**: Corriente máxima absoluta registrada durante la sesión.
+   * **Botón `RST` (flecha circular)**: Restablece el valor de pico a `0.000A`.
+   * **`D+ / D- / CC1 / CC2`**: Monitoreo de tensión en líneas de datos y canales de configuración Type-C. El pin de orientación activo ($>0.25\text{V}$) se enmarca con borde verde esmeralda.
 
 ---
 
-## 6. Acoplamiento Simétrico (50% / 50%) en MARSHALL HARDWARE SUITE
+### B. Mini-HUD Flotante (`MCMeterMiniHUD.jsx`)
+Ventana compacta flotante que acompaña al técnico mientras navega por los diagramas esquemáticos o la vista de placa (Boardview):
 
-Dentro de cada modelo de la librería (`nivelDb === 'mediciones'`):
-* **Lado Izquierdo (50%):** Multímetro UNI-T UT61E+ (Diodo, uA, Avance Mágico, Voz).
-* **Lado Derecho (50%):** Marshall MC-Meter Pro (`MCMeterDockPanel.jsx`).
-* **Botón `🗗 Desacoplar`:** Convierte el panel en un Mini-HUD flotante arrastrable para poder navegar por Planos FPC o Boardview PCB mientras mides.
-* **Bahía de Re-acoplamiento:** Su espacio original no queda vacío; muestra una tarjeta cian con telemetría en vivo y el botón **`🔗 Re-Acoplar Instrumento Aquí`**.
-* **Auto-Restauración:** Si cierras el Mini-HUD flotante con la `✕` o cierras el oscilograma grande, el instrumento **vuelve automáticamente a su posición original del 50%**.
+1. **Barra de Título Arrastrable**: Permite reposicionar la ventana en cualquier parte de la pantalla.
+2. **`📌 Anclar / Desanclar`**: Mantiene el Mini-HUD flotando sobre los diagramas.
+3. **`📈 Mini-Gráfico`**: Despliega un mini oscilograma sparkline de 180 muestras en tiempo real integrado en la tarjeta.
+4. **`▾ / ▴ Expandir / Colapsar`**: Muestra u oculta el bloque extendido de potencia, pines USB-C y exportación.
+5. **`🗗 ABRIR GRANDE`**: Maximiza inmediatamente hacia el osciloscopio completo de pantalla completa.
+6. **`🔴 Grabar CSV / ⏹ Guardar CSV`**: Inicia y detiene la grabación continua de mediciones directamente en un archivo de texto `.csv`.
+7. **`✕ Cerrar y Re-acoplar`**: Cierra la ventana flotante y devuelve automáticamente el instrumento a su posición simétrica del 50% en la Suite.
 
 ---
 
-## 7. Banco de Muestras Golden (Comparador de Curvas)
+### C. Osciloscopio Analizador Grande (`MCMeterOsciloscopio.jsx`)
 
-* **¿Qué es una Curva Golden?** Es el oscilograma de encendido grabado de un equipo sano idéntico.
-* **Cómo guardarla:** Con el equipo sano encendiendo en pantalla, pulsa **`💾 Guardar Curva Golden`**. Se optimiza a 250 puntos y se almacena en la nube (Firestore) vinculada al modelo.
-* **Cómo comparar:** Al diagnosticar un equipo averiado del mismo modelo, abre el desplegable **`COMPARADOR GOLDEN`** y elige la curva sana: aparecerá la silueta cian translúcida (`rgba(0, 255, 255, 0.40)`) en el fondo. La curva viva amarilla del teléfono roto se dibujará encima, haciendo evidente cualquier consumo excesivo, fuga previa o caída prematura de PMIC.
+#### 1. Barra Superior (Telemetría, Perfiles y Exportación)
+* **`🗕 Mini-HUD`**: Cierra la pantalla completa y regresa al panel acoplado o mini-HUD sin interrumpir la adquisición de datos.
+* **Selector de Perfiles**:
+  * **`🚀 Power (1s / Arranque)`**: Diagnóstico de secuencias de encendido y arranque PMIC.
+  * **`⚡ Carga USB-C`**: Diagnóstico de negociación de potencia y líneas Type-C.
+  * **`💡 Buck / Backlight`**: Supervisión de líneas secundarias, inyección de tensión y bobinas de luz.
+* **Lecturas Vivas en Negrita**: Muestra la tensión del perfil activo (`MAIN`, `VBUS`, `BUCK/MAIN`), la corriente (`IBUS`, `CONSUMO`), la potencia en Watts y el pico registrado.
+* **`PICO: X.XXXA` + Botón `RST`**: Botón dedicado para reiniciar el pico de corriente instantáneamente durante pruebas de arranque repetidas.
+* **Insignia `SPS`**: Indicador de la tasa física del hardware.
+* **`💾 Guardar Curva Golden`**: *(Exclusivo del perfil Power)* Captura el oscilograma del arranque, lo normaliza a 250 puntos y lo guarda en Firestore como curva de referencia del modelo.
+* **`📸 PNG`**: Descarga inmediata de una captura gráfica en resolución 1300x680 con fondo oscuro y calibración de ejes.
+* **`🎥 10s / 🎥 30s / 🎥 Libre`**: Grabación nativa de video `.webm` a 30 FPS generada directamente desde el Canvas sin requerir software externo de grabación de pantalla.
+* **`📊 CSV`**: Descarga un volcado en formato tabular de todas las muestras almacenadas en el buffer de memoria.
+
+#### 2. Barra Secundaria Contextual (Comparador Golden y Delta)
+* **`COMPARADOR GOLDEN:`** *(Exclusivo del perfil 🚀 Power)*:
+  * Menú desplegable con las curvas de encendido grabadas de equipos sanos guardadas para el modelo activo.
+  * Al seleccionar una curva, se dibuja su silueta translúcida en color cian (`rgba(0, 229, 255, 0.40)`) en el fondo del gráfico.
+  * Botón **`Quitar`**: Remueve la curva de referencia de la pantalla.
+  * **Comportamiento automático:** Al cambiar a *Carga USB-C* o *Buck / Backlight*, este comparador y la curva de fondo se ocultan automáticamente para mantener la pantalla despejada.
+* **`⚡ PROTOCOLO USB-C:`** *(Exclusivo del perfil Carga USB-C)*: Muestra en tiempo real las tensiones de los 4 pines auxiliares (`D+`, `D-`, `CC1`, `CC2`).
+* **`💡 DIAGNÓSTICO BUCK / BACKLIGHT:`** *(Exclusivo del perfil Buck)*: Mensaje informativo de supervisión de rieles secundarios y bobinas.
+* **`🎯 HUD Cursor: ON / OFF [H]`**: Botón con acceso directo para ocultar o mostrar el recuadro interactivo del puntero.
+* **Medición Delta `📏 Delta (A - B)`**: Lectura viva de $\Delta t$, corriente promedio y corriente máxima entre los cursores A y B fijados en el gráfico.
+
+#### 3. Barra Inferior de Controles del Gráfico
+* **`⏸ PAUSAR Y ANALIZAR / ▶ REANUDAR EN VIVO`** (<kbd>Espacio</kbd>): Congela el oscilograma y transfiere los datos a la memoria de inspección sin detener la adquisición en segundo plano.
+* **`⚡ Auto-Trigger Power (>15mA)` / `⚡ Auto-Trigger (>15mA)`**: Arma el disparador automático. El gráfico entra en pausa esperando a que la corriente supere los 15mA (presión del botón de encendido o conexión de carga). Al dispararse, ancla el inicio exactamente en $t = 0.000\text{ s}$.
+* **`🔀 Vista: 2 Carriles (V / I) / Superpuesta`** (<kbd>S</kbd>):
+  * **2 Carriles:** Divide el área de dibujo horizontalmente con una línea central. El carril superior grafica exclusivamente Voltaje (`MAIN` / `VBUS`) y el carril inferior grafica Corriente (`IBUS` / `CONSUMO`).
+  * **Superpuesta:** Ambos trazos comparten la altura total con escalas independientes a la izquierda y derecha.
+* **`🔬 Modo Avanzado: ON / OFF`**: Conmuta la precisión numérica entre 3 y 6 decimales.
+* **`📏 Escala: Auto (Tester) / Completa (Desde 0)`**:
+  * **Auto (Tester):** Ajusta los techos y pisos automáticamente según los escalones redondos oficiales del instrumento (0.02V, 0.05V, 0.10V, 0.50V, 1.00V, etc.).
+  * **Completa:** Fija el piso en 0.00V / 0.00A para ver la amplitud absoluta desde el reposo.
+* **`🔍+ / 🔍-`**: Modifica la cantidad de muestras visibles en el ancho de la pantalla (desde 15 muestras para ver transitorios milimétricos hasta 20,000 muestras para ver minutos de encendido).
+* **`🔄 Reset Zoom`** (<kbd>R</kbd> o Doble Clic): Restablece la vista a 400 muestras y devuelve las escalas verticales a automático.
+* **`🧹 Limpiar`**: Vacía el buffer de memoria y reinicia el oscilograma a $t = 0$.
+* **Casillas de Canales (`VBUS`/`MAIN`, `IBUS`/`CONSUMO`, `D+`, `D-`, `CC`)**: Permiten encender o apagar trazas individuales para concentrarse en una señal específica.
+* **Línea de Tiempo (Timeline Scrubber Slider)**: Control deslizante horizontal inferior que permite recorrer el tiempo grabado de extremo a extremo mientras la señal está pausada.
+
+---
+
+## 5. Perfiles de Diagnóstico Especializados
+
+| Perfil | Nomenclatura Voltaje | Nomenclatura Corriente | Herramientas Activas | Objetivo Técnico |
+| :--- | :--- | :--- | :--- | :--- |
+| **🚀 Power (1s / Arranque)** | **`MAIN`** (VBAT / VPH_PWR / VDD_MAIN) | **`CORRIENTE ARRANQUE (A)`** | Auto-Trigger en $t=0$, **Comparador Golden Sample**, Guardar Curva Golden. | Diagnosticar consumo de encendido, fallas de PMIC primario/secundario, cortos en rieles de arranque y reinicios cíclicos (boot loop). |
+| **⚡ Carga USB-C** | **`VBUS`** (5V, 9V, 12V, 15V, 20V) | **`IBUS`** | Monitor de pines `D+`, `D-`, `CC1`, `CC2` con detección de orientación. | Verificar negociaciones de Power Delivery (PD), Quick Charge (QC), cables tipo C dañados o fallas en controladores de carga (Tristar / Hydra / Tigris / OVP). |
+| **💡 Buck / Backlight** | **`BUCK / MAIN`** | **`CONSUMO (A)`** | Supervisión de tensión con protección visual y auto-escala micro-cuantizada (hasta 35V). | Inyección de tensión en rieles de baja impedancia (0.8V–1.8V en CPU/GPU) y medición de circuitos elevadores de alta tensión de pantalla (18V–35V en Backlight/OLED). |
+
+---
+
+## 6. Banco de Muestras Golden (Comparador de Curvas)
+
+* **¿Qué es una Curva Golden?** Es el oscilograma de encendido grabado de un equipo sano idéntico del mismo modelo.
+* **Ámbito de uso:** Es **exclusiva del perfil 🚀 Power (1s / Arranque)**. Al cambiar a *Carga USB-C* o *Buck*, el selector y la curva de fondo se ocultan automáticamente.
+* **Cómo guardarla:**
+  1. Selecciona el perfil **`🚀 Power`**.
+  2. Pulsa **`⚡ Auto-Trigger Power (>15mA)`**.
+  3. Enciende el equipo sano con el botón Power: la señal se registrará y pausará en pantalla con el arranque completo.
+  4. Pulsa **`💾 Guardar Curva Golden`**, asigna un título (ejemplo: *Arranque Normal iOS 17*) y guarda. La curva queda almacenada en Firestore vinculada permanentemente al modelo.
+* **Cómo comparar:**
+  1. Al conectar un equipo con falla del mismo modelo en el perfil **`🚀 Power`**, abre el desplegable **`COMPARADOR GOLDEN:`** y elige la curva guardada.
+  2. Aparecerá en el fondo la silueta cian translúcida (`rgba(0, 229, 255, 0.40)`).
+  3. La curva amarilla en vivo del equipo averiado se graficará encima. Cualquier pico anormal, sobreconsumo en una fase de encendido o caída a cero por apagado del PMIC resaltará de forma inmediata por contraste visual.
