@@ -66,7 +66,7 @@ Ubicado junto al multímetro UT61E+ en la vista de mediciones del modelo:
 3. **`CONECTAR USB / DESCONECTAR`**: Abre el selector de dispositivos USB WebHID del navegador filtrando por Vendor ID `0x5FC9` y Product ID `0x0063`.
 4. **`🔬 6 DIG / 3 DIG` (Modo Avanzado)**: Alterna entre resolución estándar de 3 decimales y resolución de laboratorio de 6 decimales (con micro-dígitos en subíndice visual).
 5. **`📈 OSCILOGRAMA`**: Despliega la ventana de pantalla completa del osciloscopio analizador con motor gráfico Canvas a 60 FPS.
-6. **`🗗 DESACOPLAR`**: Extrae el panel hacia una ventana flotante arrastrable (Mini-HUD), dejando en su lugar la **Bahía de Re-acoplamiento**.
+6. **`🗗 DESACOPLAR (OBS)`**: Abre una **Ventana Pop-out Nativa del Sistema Operativo** (`window.open`). Esta ventana cuenta con su propio identificador de ventana (`HWND`) en Windows, permitiendo que **OBS Studio la reconozca directamente en la lista desplegable de "Captura de Ventana"**.
 7. **`Cajas Principales VBUS e IBUS`**: Números de gran escala (2.2rem) para visualización clara a distancia en el banco de trabajo.
 8. **`Fila de Potencia y Pines USB-C`**:
    * **`PWR`**: Potencia instantánea calculada en Watts ($P = V \times I$).
@@ -76,16 +76,24 @@ Ubicado junto al multímetro UT61E+ en la vista de mediciones del modelo:
 
 ---
 
-### B. Mini-HUD Flotante (`MCMeterMiniHUD.jsx`)
-Ventana compacta flotante que acompaña al técnico mientras navega por los diagramas esquemáticos o la vista de placa (Boardview):
+### B. Ventana Pop-out / Mini-HUD para OBS Studio (`MCMeterPopoutWindow.jsx` + `MCMeterMiniHUD.jsx`)
+Ventana externa independiente del Sistema Operativo especialmente diseñada para streaming y grabación de reparaciones con microscopio en OBS Studio:
 
-1. **Barra de Título Arrastrable**: Permite reposicionar la ventana en cualquier parte de la pantalla.
-2. **`📌 Anclar / Desanclar`**: Mantiene el Mini-HUD flotando sobre los diagramas.
-3. **`📈 Mini-Gráfico`**: Despliega un mini oscilograma sparkline de 180 muestras en tiempo real integrado en la tarjeta.
-4. **`▾ / ▴ Expandir / Colapsar`**: Muestra u oculta el bloque extendido de potencia, pines USB-C y exportación.
-5. **`🗗 ABRIR GRANDE`**: Maximiza inmediatamente hacia el osciloscopio completo de pantalla completa.
-6. **`🔴 Grabar CSV / ⏹ Guardar CSV`**: Inicia y detiene la grabación continua de mediciones directamente en un archivo de texto `.csv`.
-7. **`✕ Cerrar y Re-acoplar`**: Cierra la ventana flotante y devuelve automáticamente el instrumento a su posición simétrica del 50% en la Suite.
+1. **Reconocimiento en OBS Studio**:
+   * En OBS, añade una fuente **`Captura de Ventana (Window Capture)`**.
+   * En el desplegable "Ventana", selecciona:  
+     `[chrome.exe]: Marshall MC-Meter Pro — Mini HUD (OBS)`.
+   * **No requiere recortes manuales con Alt:** OBS captura de forma limpia únicamente el instrumento. Puedes mover la plataforma `mi-diagnostico`, cambiar de pestaña o minimizarla en otro monitor sin que la captura de OBS se mueva o pierda señal.
+2. **Selector de Fondo para Transparencia en OBS (`🎨 Fondo`)**:
+   * **`DARK` (`#070b12`):** Fondo oscuro premium para mostrar la tarjeta flotante completa con bordes estilizados.
+   * **`NEGRO` (`#000000`):** Fondo negro puro. En OBS puedes aplicar el modo de fusión *Pantalla (Screen)* o el filtro *Color Key* en negro para que el fondo se vuelva 100% transparente y los dígitos de tensión y corriente queden flotando directamente sobre la imagen de la placa bajo el microscopio.
+   * **`CHROMA` (`#00ff00`):** Fondo verde croma para eliminar con el filtro *Chroma Key* estándar de OBS.
+3. **`📈 Mini-Gráfico Sparkline`**: Oscilograma en tiempo real de 180 muestras para ver picos y fluctuaciones de corriente en vivo durante el streaming.
+4. **`▾ / ▴ Expandir / Colapsar`**: Muestra u oculta la fila de potencia (W) y los pines USB-C.
+5. **`🔬 Modo Avanzado`**: Conmuta entre 3 y 6 decimales de precisión.
+6. **`🗗 ABRIR GRANDE`**: Maximiza inmediatamente hacia el osciloscopio completo de pantalla completa en la ventana principal.
+7. **`🔴 Grabar CSV / ⏹ Guardar CSV`**: Inicia y detiene la grabación continua de mediciones a archivo local.
+8. **`🔗 Acoplar / ✕ Cerrar`**: Cierra la ventana emergente y devuelve automáticamente el instrumento a su posición del 50% en la Suite.
 
 ---
 

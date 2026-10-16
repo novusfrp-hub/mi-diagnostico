@@ -7,7 +7,8 @@ export default function MCMeterMiniHUD({
   onAbrirGrande,
   onReacoplar,
   modoAvanzado,
-  setModoAvanzado
+  setModoAvanzado,
+  isPopout = false
 }) {
   const {
     conectado,
@@ -30,6 +31,7 @@ export default function MCMeterMiniHUD({
   const [expandido, setExpandido] = useState(false);
   const [mostrarMiniGrafico, setMostrarMiniGrafico] = useState(false);
   const [anclado, setAnclado] = useState(false);
+  const [colorFondoObs, setColorFondoObs] = useState('dark'); // 'dark' (#070b12), 'black' (#000000), 'green' (#00ff00)
 
   const canvasRef = useRef(null);
 
@@ -152,28 +154,28 @@ export default function MCMeterMiniHUD({
     return () => cancelAnimationFrame(animId);
   }, [mostrarMiniGrafico, miniVbusRef, miniIbusRef]);
 
-  return (
-    <motion.div
-      drag={!anclado}
-      dragMomentum={false}
-      initial={{ opacity: 0, scale: 0.95, y: -20 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.95 }}
+  const bgActual =
+    colorFondoObs === 'green'
+      ? '#00ff00'
+      : colorFondoObs === 'black'
+      ? '#000000'
+      : '#070b12';
+
+  const hudCardContent = (
+    <div
       style={{
-        position: 'fixed',
-        top: '75px',
-        right: '25px',
-        zIndex: 9990,
-        width: '320px',
-        backgroundColor: '#070b12',
-        border: '1px solid #1e3a5f',
-        borderRadius: '12px',
-        boxShadow: conectado
+        width: isPopout ? '100%' : '320px',
+        minHeight: isPopout ? '100vh' : 'auto',
+        backgroundColor: bgActual,
+        border: isPopout ? 'none' : '1px solid #1e3a5f',
+        borderRadius: isPopout ? '0px' : '12px',
+        boxShadow: !isPopout && conectado
           ? '0 10px 30px rgba(0, 229, 255, 0.2), 0 0 15px rgba(2, 132, 199, 0.3)'
-          : '0 10px 30px rgba(0, 0, 0, 0.7)',
+          : (!isPopout ? '0 10px 30px rgba(0, 0, 0, 0.7)' : 'none'),
         overflow: 'hidden',
         userSelect: 'none',
-        fontFamily: 'Consolas, monospace'
+        fontFamily: 'Consolas, monospace',
+        padding: isPopout ? '4px' : '0'
       }}
     >
       {/* BARRA SUPERIOR CON CONTROLES */}
@@ -185,7 +187,7 @@ export default function MCMeterMiniHUD({
           backgroundColor: '#0f172a',
           padding: '6px 10px',
           borderBottom: '1px solid #1e293b',
-          cursor: anclado ? 'default' : 'grab'
+          cursor: isPopout || anclado ? 'default' : 'grab'
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -213,9 +215,46 @@ export default function MCMeterMiniHUD({
           >
             {sps}
           </span>
+          {isPopout && (
+            <span
+              style={{
+                backgroundColor: '#3b0764',
+                color: '#c084fc',
+                fontSize: '0.6rem',
+                fontWeight: 800,
+                padding: '1px 4px',
+                borderRadius: '3px',
+                border: '1px solid #9333ea'
+              }}
+            >
+              OBS
+            </span>
+          )}
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          {/* Selector de Fondo para Chroma Key en OBS */}
+          {isPopout && (
+            <button
+              onClick={() => {
+                setColorFondoObs((prev) => (prev === 'dark' ? 'black' : (prev === 'black' ? 'green' : 'dark')));
+              }}
+              title="Fondo para OBS: Oscuro / Negro Puro (Screen / Color Key) / Verde Chroma"
+              style={{
+                background: colorFondoObs === 'green' ? '#00ff00' : (colorFondoObs === 'black' ? '#000000' : '#1e293b'),
+                color: colorFondoObs === 'green' ? '#000000' : '#38bdf8',
+                border: '1px solid #38bdf8',
+                borderRadius: '4px',
+                padding: '3px 6px',
+                cursor: 'pointer',
+                fontSize: '10px',
+                fontWeight: 800
+              }}
+            >
+              🎨 {colorFondoObs === 'green' ? 'CHROMA' : (colorFondoObs === 'black' ? 'NEGRO' : 'DARK')}
+            </button>
+          )}
+
           {/* Botón Re-Acoplar a Hardware Suite 🔗 */}
           {onReacoplar && (
             <button
@@ -239,23 +278,25 @@ export default function MCMeterMiniHUD({
             </button>
           )}
 
-          {/* Botón Anclar */}
-          <button
-            onClick={() => setAnclado(!anclado)}
-            title={anclado ? 'Desanclar (Arrastrable)' : 'Anclar (Fijo)'}
-            style={{
-              background: '#1e293b',
-              border: 'none',
-              borderRadius: '4px',
-              color: anclado ? '#10b981' : '#64748b',
-              padding: '3px 6px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center'
-            }}
-          >
-            {anclado ? <Pin size={12} /> : <PinOff size={12} />}
-          </button>
+          {/* Botón Anclar (solo en modo In-App) */}
+          {!isPopout && (
+            <button
+              onClick={() => setAnclado(!anclado)}
+              title={anclado ? 'Desanclar (Arrastrable)' : 'Anclar (Fijo)'}
+              style={{
+                background: '#1e293b',
+                border: 'none',
+                borderRadius: '4px',
+                color: anclado ? '#10b981' : '#64748b',
+                padding: '3px 6px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center'
+              }}
+            >
+              {anclado ? <Pin size={12} /> : <PinOff size={12} />}
+            </button>
+          )}
 
           {/* Botón Modo Avanzado 🔬 */}
           <button
@@ -580,6 +621,28 @@ export default function MCMeterMiniHUD({
           </div>
         </div>
       )}
+    </div>
+  );
+
+  if (isPopout) {
+    return hudCardContent;
+  }
+
+  return (
+    <motion.div
+      drag={!anclado}
+      dragMomentum={false}
+      initial={{ opacity: 0, scale: 0.95, y: -20 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      style={{
+        position: 'fixed',
+        top: '75px',
+        right: '25px',
+        zIndex: 9990
+      }}
+    >
+      {hudCardContent}
     </motion.div>
   );
 }
