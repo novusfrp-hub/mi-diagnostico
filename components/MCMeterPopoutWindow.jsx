@@ -1,70 +1,78 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom';
 
 /**
  * Componente Portal para Ventana Pop-out Nativa del Sistema Operativo.
- * Abre una ventana independiente mediante `window.open` para que OBS Studio
+ * Abre una ventana externa independiente mediante `window.open` para que OBS Studio
  * la reconozca directamente en su lista desplegable de "Captura de Ventana".
+ *
+ * Diseñado con ciclo de vida inmutable (monta una sola vez, sin bucles de re-render).
  */
 export default function MCMeterPopoutWindow({
   children,
   onClose,
   title = 'Marshall MC-Meter Pro — Mini HUD (OBS)'
 }) {
-  const [containerEl] = useState(() => {
-    if (typeof document !== 'undefined') {
-      const el = document.createElement('div');
-      el.id = 'marshall-popout-root';
-      el.style.width = '100%';
-      el.style.minHeight = '100vh';
-      return el;
-    }
-    return null;
-  });
+  const [targetNode, setTargetNode] = useState(null);
+  const popupRef = useRef(null);
 
-  const [externalWindow, setExternalWindow] = useState(null);
+  // Mantener referencia actualizada de onClose sin provocar re-ejecución del effect
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    // Dimensiones óptimas para overlay de streaming en OBS
+    // Dimensiones óptimas para overlay en OBS
     const ancho = 340;
-    const alto = 540;
-    const left = window.screen.availWidth ? window.screen.availWidth - ancho - 80 : 120;
+    const alto = 560;
+    const left = window.screen.availWidth ? Math.max(10, window.screen.availWidth - ancho - 80) : 120;
     const top = 120;
 
-    const popup = window.open(
-      '',
-      'MarshallMCMeterPopout',
-      `width=${ancho},height=${alto},left=${left},top=${top},menubar=no,toolbar=no,location=no,status=no,resizable=yes`
-    );
+    let popup = null;
+    try {
+      popup = window.open(
+        '',
+        'MarshallMCMeterPopout',
+        `width=${ancho},height=${alto},left=${left},top=${top},menubar=no,toolbar=no,location=no,status=no,resizable=yes`
+      );
+    } catch (e) {
+      console.error('Error al abrir ventana emergente:', e);
+    }
 
     if (!popup) {
       alert(
         'El navegador bloqueó la ventana emergente.\nPor favor habilita las "Ventanas Emergentes (Pop-ups)" en la barra de direcciones para usar la ventana independiente de OBS.'
       );
-      if (onClose) onClose();
+      onCloseRef.current?.();
       return;
     }
 
-    // Configuración del documento de la ventana externa
+    popupRef.current = popup;
+
+    // Configurar documento de la ventana externa
     popup.document.title = title;
     popup.document.body.style.margin = '0';
     popup.document.body.style.padding = '0';
     popup.document.body.style.backgroundColor = '#070b12';
-    popup.document.body.style.overflowX = 'hidden';
+    popup.document.body.style.overflow = 'hidden';
 
-    // Inyectar estilos base e iconos
+    // Inyectar estilos base e iconos limpios
     const styleEl = popup.document.createElement('style');
     styleEl.textContent = `
       * { box-sizing: border-box; }
-      body {
+      html, body {
         margin: 0;
         padding: 0;
+        width: 100%;
+        height: 100%;
         background-color: #070b12;
         font-family: Consolas, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
         color: #ffffff;
         user-select: none;
+        overflow-x: hidden;
       }
       ::-webkit-scrollbar { width: 6px; height: 6px; }
       ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
@@ -76,7 +84,7 @@ export default function MCMeterPopoutWindow({
     `;
     popup.document.head.appendChild(styleEl);
 
-    // Clonar hojas de estilo de la ventana principal para conservar fuentes y utilidades
+    // Clonar hojas de estilo para mantener fuentes y utilidades visuales
     Array.from(document.styleSheets).forEach((styleSheet) => {
       try {
         if (styleSheet.href) {
@@ -92,31 +100,36 @@ export default function MCMeterPopoutWindow({
           popup.document.head.appendChild(newStyle);
         }
       } catch (e) {
-        // Ignorar restricciones CORS de hojas de estilo externas
+        // Ignorar restricciones CORS de estilos externos
       }
     });
 
-    popup.document.body.appendChild(containerEl);
-    setExternalWindow(popup);
+    // Crear el nodo contenedor DENTRO del documento de la ventana externa
+    const container = popup.document.createElement('div');
+    container.id = 'marshall-popout-mount';
+    container.style.width = '100%';
+    container.style.minHeight = '100vh';
+    popup.document.body.appendChild(container);
 
-    // Manejador de cierre cuando el técnico cierra la ventana externa en Windows
-    const handleClose = () => {
-      if (onClose) onClose();
-    };
+    setTargetNode(container);
 
-    popup.addEventListener('beforeunload', handleClose);
-    popup.addEventListener('pagehide', handleClose);
+    // Monitoreo estándar con intervalo para detectar cuando el usuario cierra la ventana nativa
+    const timer = setInterval(() => {
+      if (!popup || popup.closed) {
+        clearInterval(timer);
+        onCloseRef.current?.();
+      }
+    }, 350);
 
     return () => {
-      popup.removeEventListener('beforeunload', handleClose);
-      popup.removeEventListener('pagehide', handleClose);
-      if (!popup.closed) {
+      clearInterval(timer);
+      if (popup && !popup.closed) {
         popup.close();
       }
     };
-  }, [containerEl, onClose, title]);
+  }, []); // Dependencias vacías: abre la ventana UNA SOLA VEZ y nunca entra en bucle
 
-  if (!externalWindow || !containerEl) return null;
+  if (!targetNode) return null;
 
-  return ReactDOM.createPortal(children, containerEl);
+  return ReactDOM.createPortal(children, targetNode);
 }

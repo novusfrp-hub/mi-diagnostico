@@ -178,7 +178,28 @@ export default function MCMeterDockPanel({
             <Activity size={12} /> OSCILOGRAMA
           </button>
 
-          {/* Botón Desacoplar 🗗 (Ventana Externa para OBS Studio) */}
+          {/* Botón Desacoplar Flotante In-App 🗗 */}
+          <button
+            onClick={() => onDesacoplar && onDesacoplar('inapp')}
+            title="Desacoplar a tarjeta flotante arrastrable dentro de la plataforma"
+            style={{
+              background: '#1e293b',
+              color: '#38bdf8',
+              border: '1px solid #0284c7',
+              padding: '6px 10px',
+              borderRadius: '20px',
+              fontSize: '0.7rem',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+          >
+            <Maximize2 size={12} /> FLOTANTE
+          </button>
+
+          {/* Botón Ventana Externa OBS 🎥 */}
           <button
             onClick={() => onDesacoplar && onDesacoplar('popout')}
             title="Abrir ventana externa independiente del Sistema Operativo para capturar directamente en OBS Studio ('Captura de Ventana')"
@@ -186,7 +207,7 @@ export default function MCMeterDockPanel({
               background: '#0284c7',
               color: '#ffffff',
               border: 'none',
-              padding: '6px 11px',
+              padding: '6px 10px',
               borderRadius: '20px',
               fontSize: '0.7rem',
               fontWeight: 'bold',
@@ -194,10 +215,10 @@ export default function MCMeterDockPanel({
               display: 'flex',
               alignItems: 'center',
               gap: '4px',
-              boxShadow: '0 0 10px rgba(2, 132, 199, 0.35)'
+              boxShadow: '0 0 10px rgba(2, 132, 199, 0.4)'
             }}
           >
-            <Maximize2 size={12} /> DESACOPLAR (OBS)
+            🎥 OBS
           </button>
         </div>
       </div>
