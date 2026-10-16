@@ -79,21 +79,29 @@ Ubicado junto al multímetro UT61E+ en la vista de mediciones del modelo:
 ### B. Ventana Pop-out / Mini-HUD para OBS Studio (`MCMeterPopoutWindow.jsx` + `MCMeterMiniHUD.jsx`)
 Ventana externa independiente del Sistema Operativo especialmente diseñada para streaming y grabación de reparaciones con microscopio en OBS Studio:
 
-1. **Reconocimiento en OBS Studio**:
-   * En OBS, añade una fuente **`Captura de Ventana (Window Capture)`**.
-   * En el desplegable "Ventana", selecciona:  
-     `[chrome.exe]: Marshall MC-Meter Pro — Mini HUD (OBS)`.
-   * **No requiere recortes manuales con Alt:** OBS captura de forma limpia únicamente el instrumento. Puedes mover la plataforma `mi-diagnostico`, cambiar de pestaña o minimizarla en otro monitor sin que la captura de OBS se mueva o pierda señal.
-2. **Selector de Fondo para Transparencia en OBS (`🎨 Fondo`)**:
+1. **Reconocimiento y Dimensiones Adaptables**:
+   * **Ancho holgado de 450px:** Brinda espacio cómodo a todos los controles e indicadores sin recortes.
+   * **Auto-Ajuste Dinámico al Contenido (Sin espacio negro vacío):** La ventana externa ajusta su altura automáticamente al milímetro según lo que tengas activado:
+     - **Modo Compacto (Dígitos VBUS/IBUS):** Altura ultracompacta (~150px) para ocupar el mínimo espacio en tu monitor.
+     - **Con Mini-Gráfico Activo:** La ventana se expande automáticamente hacia abajo para alojar el oscilograma Canvas de 430px de resolución.
+     - **Con Panel Expandido (Pines y Potencia):** La ventana se expande hacia abajo para mostrar los pines Type-C.
+     - Al desactivarlos, la ventana se contrae de inmediato hacia su tamaño compacto original.
+2. **Consejos para Captura Sin Bordes ("Borderless") en OBS**:
+   * Por políticas de seguridad de Chromium/Windows (anti-phishing), las ventanas emergentes del navegador conservan la barra superior del SO (`_ □ ✕`). Para eliminarla en OBS:
+     - **Opción A (Recomendada en OBS):** En las propiedades de la fuente *Captura de Ventana* en OBS, marca la casilla **`Área del cliente` (Client Area)**. OBS recortará automáticamente la barra de Windows y capturará exclusivamente el interior de la herramienta.
+     - **Opción B (Recorte rápido en OBS):** En el lienzo de OBS, mantén presionada la tecla <kbd>Alt</kbd> y arrastra el borde superior rojo de la fuente unos píxeles hacia abajo para ocultar la barra de título.
+     - **Opción C (Modo 100% Borderless Nativo):** Si deseas tener el widget flotando sobre tu pantalla sin ninguna barra de Windows, presiona el botón **`🗗 FLOTANTE`** en lugar de `🎥 OBS`. Es un widget arrastrable 100% sin bordes.
+3. **Modo Limpio OBS (`👁️ Ocultar Barra`)**:
+   * En la ventana externa dispones del botón **`👁️`** que colapsa la barra superior de herramientas en una tira mínima, dejando únicamente los dígitos de telemetría y el gráfico para una estética ultra-limpia en tus transmisiones.
+4. **Selector de Fondo para Transparencia en OBS (`🎨 Fondo`)**:
    * **`DARK` (`#070b12`):** Fondo oscuro premium para mostrar la tarjeta flotante completa con bordes estilizados.
    * **`NEGRO` (`#000000`):** Fondo negro puro. En OBS puedes aplicar el modo de fusión *Pantalla (Screen)* o el filtro *Color Key* en negro para que el fondo se vuelva 100% transparente y los dígitos de tensión y corriente queden flotando directamente sobre la imagen de la placa bajo el microscopio.
    * **`CHROMA` (`#00ff00`):** Fondo verde croma para eliminar con el filtro *Chroma Key* estándar de OBS.
-3. **`📈 Mini-Gráfico Sparkline`**: Oscilograma en tiempo real de 180 muestras para ver picos y fluctuaciones de corriente en vivo durante el streaming.
-4. **`▾ / ▴ Expandir / Colapsar`**: Muestra u oculta la fila de potencia (W) y los pines USB-C.
-5. **`🔬 Modo Avanzado`**: Conmuta entre 3 y 6 decimales de precisión.
-6. **`🗗 ABRIR GRANDE`**: Maximiza inmediatamente hacia el osciloscopio completo de pantalla completa en la ventana principal.
-7. **`🔴 Grabar CSV / ⏹ Guardar CSV`**: Inicia y detiene la grabación continua de mediciones a archivo local.
-8. **`🔗 Acoplar / ✕ Cerrar`**: Cierra la ventana emergente y devuelve automáticamente el instrumento a su posición del 50% en la Suite.
+5. **`📈 Mini-Gráfico Sparkline`**: Oscilograma en tiempo real de 180 muestras a resolución 430px para ver picos y fluctuaciones de corriente en vivo.
+6. **`▾ / ▴ Expandir / Colapsar`**: Muestra u oculta la fila de potencia (W) y los pines USB-C.
+7. **`🔬 Modo Avanzado`**: Conmuta entre 3 y 6 decimales de precisión.
+8. **`🗗 ABRIR GRANDE`**: Maximiza inmediatamente hacia el osciloscopio completo de pantalla completa en la ventana principal.
+9. **`🔗 Acoplar`**: Devuelve de inmediato el instrumento a su panel acoplado dentro de Marshall Hardware Suite.
 
 ---
 

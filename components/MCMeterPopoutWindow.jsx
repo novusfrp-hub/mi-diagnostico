@@ -25,9 +25,9 @@ export default function MCMeterPopoutWindow({
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    // Dimensiones óptimas para overlay en OBS
-    const ancho = 340;
-    const alto = 560;
+    // Dimensiones iniciales: ancho más holgado (450px) y altura inicial compacta (150px)
+    const ancho = 450;
+    const alto = 150;
     const left = window.screen.availWidth ? Math.max(10, window.screen.availWidth - ancho - 80) : 120;
     const top = 120;
 
@@ -50,12 +50,19 @@ export default function MCMeterPopoutWindow({
       return;
     }
 
+    // Forzar redimensionamiento inicial inmediato en caso de que Chrome haya recordado un alto previo
+    try {
+      popup.resizeTo(ancho, alto);
+    } catch (e) {}
+
     popupRef.current = popup;
 
     // Configurar documento de la ventana externa
     popup.document.title = title;
     popup.document.body.style.margin = '0';
     popup.document.body.style.padding = '0';
+    popup.document.body.style.height = 'auto';
+    popup.document.body.style.minHeight = 'auto';
     popup.document.body.style.backgroundColor = '#070b12';
     popup.document.body.style.overflow = 'hidden';
 
@@ -67,12 +74,13 @@ export default function MCMeterPopoutWindow({
         margin: 0;
         padding: 0;
         width: 100%;
-        height: 100%;
+        height: auto;
+        min-height: auto;
         background-color: #070b12;
         font-family: Consolas, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
         color: #ffffff;
         user-select: none;
-        overflow-x: hidden;
+        overflow: hidden;
       }
       ::-webkit-scrollbar { width: 6px; height: 6px; }
       ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
@@ -104,11 +112,12 @@ export default function MCMeterPopoutWindow({
       }
     });
 
-    // Crear el nodo contenedor DENTRO del documento de la ventana externa
+    // Crear el nodo contenedor DENTRO del documento de la ventana externa (auto-ajustable al contenido)
     const container = popup.document.createElement('div');
     container.id = 'marshall-popout-mount';
     container.style.width = '100%';
-    container.style.minHeight = '100vh';
+    container.style.height = 'auto';
+    container.style.minHeight = 'auto';
     popup.document.body.appendChild(container);
 
     setTargetNode(container);

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Maximize2, X, ChevronDown, ChevronUp, Activity, Pin, PinOff, RotateCcw } from 'lucide-react';
+import { Maximize2, X, ChevronDown, ChevronUp, Activity, Pin, PinOff, RotateCcw, Eye, EyeOff } from 'lucide-react';
 
 export default function MCMeterMiniHUD({
   mcMeter,
@@ -32,8 +32,10 @@ export default function MCMeterMiniHUD({
   const [mostrarMiniGrafico, setMostrarMiniGrafico] = useState(false);
   const [anclado, setAnclado] = useState(false);
   const [colorFondoObs, setColorFondoObs] = useState('dark'); // 'dark' (#070b12), 'black' (#000000), 'green' (#00ff00)
+  const [ocultarBarra, setOcultarBarra] = useState(false); // Modo limpio para captura de pantalla / OBS
 
   const canvasRef = useRef(null);
+  const containerRef = useRef(null);
 
   // Formateadores numéricos
   const fmtVbus = (val) => {
@@ -161,11 +163,38 @@ export default function MCMeterMiniHUD({
       ? '#000000'
       : '#070b12';
 
+  // Auto-ajuste dinámico de altura para la ventana externa de OBS (elimina todo espacio negro vacío)
+  useEffect(() => {
+    if (!isPopout || !containerRef.current) return;
+    const targetWin = containerRef.current.ownerDocument?.defaultView;
+    if (!targetWin || targetWin === window || typeof targetWin.resizeTo !== 'function') return;
+
+    const timer = setTimeout(() => {
+      if (!containerRef.current || targetWin.closed) return;
+      try {
+        const contentHeight = containerRef.current.offsetHeight || containerRef.current.scrollHeight;
+        const osChromeHeight = Math.max(0, targetWin.outerHeight - targetWin.innerHeight) || 38;
+        const osChromeWidth = Math.max(0, targetWin.outerWidth - targetWin.innerWidth) || 16;
+
+        const targetW = 450 + osChromeWidth;
+        const targetH = contentHeight + osChromeHeight + 4;
+
+        targetWin.resizeTo(targetW, targetH);
+      } catch (e) {
+        // Ignorar restricciones si el navegador previene resizeTo
+      }
+    }, 50);
+
+    return () => clearTimeout(timer);
+  }, [isPopout, mostrarMiniGrafico, expandido, ocultarBarra, conectado]);
+
   const hudCardContent = (
     <div
+      ref={containerRef}
       style={{
-        width: isPopout ? '100%' : '320px',
-        minHeight: isPopout ? '100vh' : 'auto',
+        width: isPopout ? '100%' : '340px',
+        height: 'auto',
+        minHeight: 'auto',
         backgroundColor: bgActual,
         border: isPopout ? 'none' : '1px solid #1e3a5f',
         borderRadius: isPopout ? '0px' : '12px',
@@ -179,219 +208,281 @@ export default function MCMeterMiniHUD({
       }}
     >
       {/* BARRA SUPERIOR CON CONTROLES */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          backgroundColor: '#0f172a',
-          padding: '6px 10px',
-          borderBottom: '1px solid #1e293b',
-          cursor: isPopout || anclado ? 'default' : 'grab'
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span
+      {isPopout && ocultarBarra ? (
+        /* Barra ultra-compacta (Modo Limpio OBS: sólo telemetría) */
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            backgroundColor: '#0a0f1d',
+            padding: '3px 8px',
+            borderBottom: '1px solid #1e293b'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ color: conectado ? '#10b981' : '#ef4444', fontSize: '10px' }}>●</span>
+            <span style={{ color: '#00e5ff', fontSize: '0.72rem', fontWeight: 800 }}>MC-METER PRO</span>
+            <span style={{ color: '#fbbf24', fontSize: '0.65rem', fontWeight: 700 }}>{sps}</span>
+          </div>
+          <button
+            onClick={() => setOcultarBarra(false)}
+            title="Mostrar Barra de Herramientas"
             style={{
-              color: conectado ? '#10b981' : '#ef4444',
-              fontSize: '12px',
-              animation: conectado ? 'pulse 2s infinite' : 'none'
-            }}
-          >
-            ●
-          </span>
-          <span style={{ color: '#00e5ff', fontWeight: 800, fontSize: '0.8rem', letterSpacing: '0.5px' }}>
-            MC-METER PRO
-          </span>
-          <span
-            style={{
-              backgroundColor: '#172554',
-              color: '#fbbf24',
-              fontSize: '0.65rem',
+              background: '#1e293b',
+              border: '1px solid #334155',
+              borderRadius: '4px',
+              color: '#38bdf8',
+              padding: '2px 6px',
+              fontSize: '10px',
               fontWeight: 700,
-              padding: '1px 5px',
-              borderRadius: '4px'
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
             }}
           >
-            {sps}
-          </span>
-          {isPopout && (
+            <Eye size={11} /> Herramientas
+          </button>
+        </div>
+      ) : (
+        /* Barra de herramientas completa */
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            backgroundColor: '#0f172a',
+            padding: '6px 10px',
+            borderBottom: '1px solid #1e293b',
+            cursor: isPopout || anclado ? 'default' : 'grab'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span
               style={{
-                backgroundColor: '#3b0764',
-                color: '#c084fc',
-                fontSize: '0.6rem',
-                fontWeight: 800,
-                padding: '1px 4px',
-                borderRadius: '3px',
-                border: '1px solid #9333ea'
+                color: conectado ? '#10b981' : '#ef4444',
+                fontSize: '12px',
+                animation: conectado ? 'pulse 2s infinite' : 'none'
               }}
             >
-              OBS
+              ●
             </span>
-          )}
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-          {/* Selector de Fondo para Chroma Key en OBS */}
-          {isPopout && (
-            <button
-              onClick={() => {
-                setColorFondoObs((prev) => (prev === 'dark' ? 'black' : (prev === 'black' ? 'green' : 'dark')));
-              }}
-              title="Fondo para OBS: Oscuro / Negro Puro (Screen / Color Key) / Verde Chroma"
+            <span style={{ color: '#00e5ff', fontWeight: 800, fontSize: '0.8rem', letterSpacing: '0.5px' }}>
+              MC-METER PRO
+            </span>
+            <span
               style={{
-                background: colorFondoObs === 'green' ? '#00ff00' : (colorFondoObs === 'black' ? '#000000' : '#1e293b'),
-                color: colorFondoObs === 'green' ? '#000000' : '#38bdf8',
-                border: '1px solid #38bdf8',
-                borderRadius: '4px',
-                padding: '3px 6px',
-                cursor: 'pointer',
-                fontSize: '10px',
-                fontWeight: 800
-              }}
-            >
-              🎨 {colorFondoObs === 'green' ? 'CHROMA' : (colorFondoObs === 'black' ? 'NEGRO' : 'DARK')}
-            </button>
-          )}
-
-          {/* Botón Re-Acoplar a Hardware Suite 🔗 */}
-          {onReacoplar && (
-            <button
-              onClick={onReacoplar}
-              title="Re-acoplar en Marshall Hardware Suite"
-              style={{
-                background: '#1e293b',
-                border: '1px solid #00e5ff',
-                borderRadius: '4px',
-                color: '#00e5ff',
-                padding: '3px 6px',
-                cursor: 'pointer',
-                fontSize: '10px',
+                backgroundColor: '#172554',
+                color: '#fbbf24',
+                fontSize: '0.65rem',
                 fontWeight: 700,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '2px'
+                padding: '1px 5px',
+                borderRadius: '4px'
               }}
             >
-              🔗 Acoplar
-            </button>
-          )}
+              {sps}
+            </span>
+            {isPopout && (
+              <span
+                style={{
+                  backgroundColor: '#3b0764',
+                  color: '#c084fc',
+                  fontSize: '0.6rem',
+                  fontWeight: 800,
+                  padding: '1px 4px',
+                  borderRadius: '3px',
+                  border: '1px solid #9333ea'
+                }}
+              >
+                OBS
+              </span>
+            )}
+          </div>
 
-          {/* Botón Anclar (solo en modo In-App) */}
-          {!isPopout && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            {/* Selector de Fondo para Chroma Key en OBS */}
+            {isPopout && (
+              <button
+                onClick={() => {
+                  setColorFondoObs((prev) => (prev === 'dark' ? 'black' : (prev === 'black' ? 'green' : 'dark')));
+                }}
+                title="Fondo para OBS: Oscuro / Negro Puro (Screen / Color Key) / Verde Chroma"
+                style={{
+                  background: colorFondoObs === 'green' ? '#00ff00' : (colorFondoObs === 'black' ? '#000000' : '#1e293b'),
+                  color: colorFondoObs === 'green' ? '#000000' : '#38bdf8',
+                  border: '1px solid #38bdf8',
+                  borderRadius: '4px',
+                  padding: '3px 6px',
+                  cursor: 'pointer',
+                  fontSize: '10px',
+                  fontWeight: 800
+                }}
+              >
+                🎨 {colorFondoObs === 'green' ? 'CHROMA' : (colorFondoObs === 'black' ? 'NEGRO' : 'DARK')}
+              </button>
+            )}
+
+            {/* Botón Re-Acoplar a Hardware Suite 🔗 */}
+            {onReacoplar && (
+              <button
+                onClick={onReacoplar}
+                title="Re-acoplar en Marshall Hardware Suite"
+                style={{
+                  background: '#1e293b',
+                  border: '1px solid #00e5ff',
+                  borderRadius: '4px',
+                  color: '#00e5ff',
+                  padding: '3px 6px',
+                  cursor: 'pointer',
+                  fontSize: '10px',
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '2px'
+                }}
+              >
+                🔗 Acoplar
+              </button>
+            )}
+
+            {/* Botón Anclar (solo en modo In-App) */}
+            {!isPopout && (
+              <button
+                onClick={() => setAnclado(!anclado)}
+                title={anclado ? 'Desanclar (Arrastrable)' : 'Anclar (Fijo)'}
+                style={{
+                  background: '#1e293b',
+                  border: 'none',
+                  borderRadius: '4px',
+                  color: anclado ? '#10b981' : '#64748b',
+                  padding: '3px 6px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center'
+                }}
+              >
+                {anclado ? <Pin size={12} /> : <PinOff size={12} />}
+              </button>
+            )}
+
+            {/* Botón Modo Avanzado 🔬 */}
             <button
-              onClick={() => setAnclado(!anclado)}
-              title={anclado ? 'Desanclar (Arrastrable)' : 'Anclar (Fijo)'}
+              onClick={() => setModoAvanzado(!modoAvanzado)}
+              title="Alternar Modo Avanzado (Micro-dígitos de 6 decimales)"
               style={{
-                background: '#1e293b',
+                background: modoAvanzado ? '#1e3a8a' : '#1e293b',
                 border: 'none',
                 borderRadius: '4px',
-                color: anclado ? '#10b981' : '#64748b',
+                color: modoAvanzado ? '#00e5ff' : '#64748b',
+                padding: '3px 6px',
+                cursor: 'pointer',
+                fontSize: '11px',
+                fontWeight: 700
+              }}
+            >
+              🔬
+            </button>
+
+            {/* Botón Sparkline 📈 */}
+            <button
+              onClick={() => setMostrarMiniGrafico(!mostrarMiniGrafico)}
+              title="Mini-Gráfico Sparkline integrado"
+              style={{
+                background: mostrarMiniGrafico ? '#1e3a8a' : '#1e293b',
+                border: 'none',
+                borderRadius: '4px',
+                color: mostrarMiniGrafico ? '#00e5ff' : '#94a3b8',
                 padding: '3px 6px',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center'
               }}
             >
-              {anclado ? <Pin size={12} /> : <PinOff size={12} />}
+              <Activity size={12} />
             </button>
-          )}
 
-          {/* Botón Modo Avanzado 🔬 */}
-          <button
-            onClick={() => setModoAvanzado(!modoAvanzado)}
-            title="Alternar Modo Avanzado (Micro-dígitos de 6 decimales)"
-            style={{
-              background: modoAvanzado ? '#1e3a8a' : '#1e293b',
-              border: 'none',
-              borderRadius: '4px',
-              color: modoAvanzado ? '#00e5ff' : '#64748b',
-              padding: '3px 6px',
-              cursor: 'pointer',
-              fontSize: '11px',
-              fontWeight: 700
-            }}
-          >
-            🔬
-          </button>
+            {/* Botón 🗗 ABRIR GRANDE (EXCLUSIÓN MUTUA) */}
+            <button
+              onClick={onAbrirGrande}
+              title="Abrir Analizador Oscilograma X-Y a Pantalla Grande"
+              style={{
+                background: '#0284c7',
+                border: 'none',
+                borderRadius: '4px',
+                color: '#ffffff',
+                padding: '3px 6px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                fontWeight: 700
+              }}
+            >
+              <Maximize2 size={12} />
+            </button>
 
-          {/* Botón Sparkline 📈 */}
-          <button
-            onClick={() => setMostrarMiniGrafico(!mostrarMiniGrafico)}
-            title="Mini-Gráfico Sparkline"
-            style={{
-              background: mostrarMiniGrafico ? '#1e3a8a' : '#1e293b',
-              border: 'none',
-              borderRadius: '4px',
-              color: mostrarMiniGrafico ? '#00e5ff' : '#94a3b8',
-              padding: '3px 6px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center'
-            }}
-          >
-            <Activity size={12} />
-          </button>
+            {/* Botón Desplegar Panel ▾ */}
+            <button
+              onClick={() => setExpandido(!expandido)}
+              title="Expandir / Contraer Pines y Potencia"
+              style={{
+                background: '#1e293b',
+                border: 'none',
+                borderRadius: '4px',
+                color: '#00e5ff',
+                padding: '3px 6px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center'
+              }}
+            >
+              {expandido ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+            </button>
 
-          {/* Botón 🗗 ABRIR GRANDE (EXCLUSIÓN MUTUA) */}
-          <button
-            onClick={onAbrirGrande}
-            title="Abrir Analizador Oscilograma X-Y a Pantalla Grande (Oculta este Mini-HUD)"
-            style={{
-              background: '#0284c7',
-              border: 'none',
-              borderRadius: '4px',
-              color: '#ffffff',
-              padding: '3px 6px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              fontWeight: 700
-            }}
-          >
-            <Maximize2 size={12} />
-          </button>
+            {/* Botón Ocultar Barra (solo en Popout para OBS limpio) */}
+            {isPopout && (
+              <button
+                onClick={() => setOcultarBarra(true)}
+                title="Ocultar barra de herramientas para captura 100% limpia en OBS"
+                style={{
+                  background: '#1e293b',
+                  border: 'none',
+                  borderRadius: '4px',
+                  color: '#94a3b8',
+                  padding: '3px 6px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center'
+                }}
+              >
+                <EyeOff size={12} />
+              </button>
+            )}
 
-          {/* Botón Desplegar Panel ▾ */}
-          <button
-            onClick={() => setExpandido(!expandido)}
-            title="Expandir / Contraer Pines y Potencia"
-            style={{
-              background: '#1e293b',
-              border: 'none',
-              borderRadius: '4px',
-              color: '#00e5ff',
-              padding: '3px 6px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center'
-            }}
-          >
-            {expandido ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-          </button>
-
-          {/* Botón Cerrar / Reacoplar */}
-          <button
-            onClick={onReacoplar || (conectado ? desconectar : conectar)}
-            title={onReacoplar ? "Cerrar ventana flotante y re-acoplar a la Suite" : (conectado ? 'Desconectar MC-Meter' : 'Conectar MC-Meter')}
-            style={{
-              background: 'rgba(239, 68, 68, 0.2)',
-              border: 'none',
-              borderRadius: '4px',
-              color: '#ef4444',
-              padding: '3px 6px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              fontWeight: 800,
-              fontSize: '11px'
-            }}
-          >
-            <X size={12} />
-          </button>
+            {/* Botón Cerrar (solo en modo In-App, para evitar doble 'X' en la ventana del SO) */}
+            {!isPopout && (
+              <button
+                onClick={onReacoplar || (conectado ? desconectar : conectar)}
+                title={onReacoplar ? "Cerrar ventana flotante y re-acoplar a la Suite" : (conectado ? 'Desconectar MC-Meter' : 'Conectar MC-Meter')}
+                style={{
+                  background: 'rgba(239, 68, 68, 0.2)',
+                  border: 'none',
+                  borderRadius: '4px',
+                  color: '#ef4444',
+                  padding: '3px 6px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  fontWeight: 800,
+                  fontSize: '11px'
+                }}
+              >
+                <X size={12} />
+              </button>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* CUERPO PRINCIPAL: VBUS E IBUS */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', padding: '8px 10px' }}>
@@ -505,7 +596,7 @@ export default function MCMeterMiniHUD({
           </div>
           <canvas
             ref={canvasRef}
-            width={300}
+            width={430}
             height={85}
             style={{
               display: 'block',
