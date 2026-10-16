@@ -843,7 +843,7 @@ export default function AppDiagnostico() {
   const [mostrarOsciloscopioGrande, setMostrarOsciloscopioGrande] = useState(false);
   const [modoAvanzadoMc, setModoAvanzadoMc] = useState(false);
   const [mcMeterDesacoplado, setMcMeterDesacoplado] = useState(false);
-  const [mcMeterPopoutObs, setMcMeterPopoutObs] = useState(true);
+  const [mcMeterModoDesacoplado, setMcMeterModoDesacoplado] = useState('pip'); // 'pip' | 'popout' | 'inapp'
 
   // Captura aislada e independiente para Marshall MC-Meter Pro (JAMÁS toca docktestDiodo ni multímetro)
   const capturarMcMeterDataEnModelo = () => {
@@ -2746,8 +2746,8 @@ export default function AppDiagnostico() {
                         {!mcMeterDesacoplado ? (
                           <MCMeterDockPanel
                             mcMeter={mcMeter}
-                            onDesacoplar={(modo = 'popout') => {
-                              setMcMeterPopoutObs(modo === 'popout');
+                            onDesacoplar={(modo = 'pip') => {
+                              setMcMeterModoDesacoplado(modo);
                               setMcMeterDesacoplado(true);
                             }}
                             onAbrirOscilograma={() => setMostrarOsciloscopioGrande(true)}
@@ -2771,12 +2771,14 @@ export default function AppDiagnostico() {
                             }}
                           >
                             <span style={{ color: '#00e5ff', fontWeight: 'bold', fontSize: '0.95rem' }}>
-                              📌 INSTRUMENTO DESACOPLADO {mcMeterPopoutObs ? '(OBS STUDIO)' : ''}
+                              📌 INSTRUMENTO DESACOPLADO {mcMeterModoDesacoplado === 'pip' ? '(ESCRITORIO PIP)' : (mcMeterModoDesacoplado === 'popout' ? '(OBS STUDIO)' : '(FLOTANTE)')}
                             </span>
                             <p style={{ color: '#94a3b8', fontSize: '0.78rem', margin: 0, maxWidth: '340px' }}>
-                              {mcMeterPopoutObs
-                                ? 'Marshall MC-Meter Pro está operando en ventana externa independiente para OBS Studio.'
-                                : 'Marshall MC-Meter Pro está operando en ventana flotante sobre la interfaz.'}
+                              {mcMeterModoDesacoplado === 'pip'
+                                ? 'Marshall MC-Meter Pro está operando como widget en el Escritorio (Siempre Visible / Always-on-Top).'
+                                : (mcMeterModoDesacoplado === 'popout'
+                                  ? 'Marshall MC-Meter Pro está operando en ventana externa independiente para OBS Studio.'
+                                  : 'Marshall MC-Meter Pro está operando en tarjeta flotante sobre la interfaz.')}
                             </p>
                             <div style={{ display: 'flex', gap: '10px', alignItems: 'center', margin: '4px 0' }}>
                               <span style={{ color: mcMeter.conectado ? '#10b981' : '#ef4444', fontSize: '11px' }}>●</span>
@@ -4225,31 +4227,34 @@ export default function AppDiagnostico() {
         />
       )}
 
-      {/* MINI-HUD FLOTANTE / POPOUT OBS: SOLO SE MUESTRA SI ESTÁ DESACOPLADO Y NO ESTÁ EN PANTALLA GRANDE */}
+      {/* MINI-HUD FLOTANTE / POPOUT OBS / PIP ESCRITORIO */}
       {mcMeterDesacoplado && !mostrarOsciloscopioGrande && (
-        mcMeterPopoutObs ? (
+        mcMeterModoDesacoplado === 'inapp' ? (
+          <MCMeterMiniHUD
+            mcMeter={mcMeter}
+            isPopout={false}
+            isPip={false}
+            onAbrirGrande={() => setMostrarOsciloscopioGrande(true)}
+            onReacoplar={() => setMcMeterDesacoplado(false)}
+            modoAvanzado={modoAvanzadoMc}
+            setModoAvanzado={setModoAvanzadoMc}
+          />
+        ) : (
           <MCMeterPopoutWindow
+            mode={mcMeterModoDesacoplado === 'pip' ? 'pip' : 'window'}
             onClose={() => setMcMeterDesacoplado(false)}
-            title="Marshall MC-Meter Pro — Mini HUD (OBS)"
+            title={mcMeterModoDesacoplado === 'pip' ? 'Marshall MC-Meter Pro — Escritorio (PiP)' : 'Marshall MC-Meter Pro — Mini HUD (OBS)'}
           >
             <MCMeterMiniHUD
               mcMeter={mcMeter}
               isPopout={true}
+              isPip={mcMeterModoDesacoplado === 'pip'}
               onAbrirGrande={() => setMostrarOsciloscopioGrande(true)}
               onReacoplar={() => setMcMeterDesacoplado(false)}
               modoAvanzado={modoAvanzadoMc}
               setModoAvanzado={setModoAvanzadoMc}
             />
           </MCMeterPopoutWindow>
-        ) : (
-          <MCMeterMiniHUD
-            mcMeter={mcMeter}
-            isPopout={false}
-            onAbrirGrande={() => setMostrarOsciloscopioGrande(true)}
-            onReacoplar={() => setMcMeterDesacoplado(false)}
-            modoAvanzado={modoAvanzadoMc}
-            setModoAvanzado={setModoAvanzadoMc}
-          />
         )
       )}
     </div>

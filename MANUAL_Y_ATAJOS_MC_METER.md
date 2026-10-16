@@ -59,14 +59,18 @@ El hardware físico del tester **KM003C** cuenta con un botón en su lateral que
 ### A. Panel Acoplado (`MCMeterDockPanel.jsx`) — 50% en Marshall Hardware Suite
 Ubicado junto al multímetro UT61E+ en la vista de mediciones del modelo:
 
-1. **`● Indicador LED de Conexión`**:
-   * **Verde brillante:** Conectado mediante WebHID nativo y transmitiendo datos activamente.
-   * **Rojo:** Desconectado o en espera de conexión.
+1. **`● Indicador LED de Conexión`**: Verde brillante cuando está transmitiendo por WebHID y rojo si está desconectado.
 2. **`Insignia SPS`**: Muestra la frecuencia física real del ADC (`2 SPS`, `10 SPS`, `50 SPS`, `1Ksps`).
-3. **`CONECTAR USB / DESCONECTAR`**: Abre el selector de dispositivos USB WebHID del navegador filtrando por Vendor ID `0x5FC9` y Product ID `0x0063`.
-4. **`🔬 6 DIG / 3 DIG` (Modo Avanzado)**: Alterna entre resolución estándar de 3 decimales y resolución de laboratorio de 6 decimales (con micro-dígitos en subíndice visual).
-5. **`📈 OSCILOGRAMA`**: Despliega la ventana de pantalla completa del osciloscopio analizador con motor gráfico Canvas a 60 FPS.
-6. **`🗗 DESACOPLAR (OBS)`**: Abre una **Ventana Pop-out Nativa del Sistema Operativo** (`window.open`). Esta ventana cuenta con su propio identificador de ventana (`HWND`) en Windows, permitiendo que **OBS Studio la reconozca directamente en la lista desplegable de "Captura de Ventana"**.
+3. **`CONECTAR USB / DESCONECTAR`**: Abre el selector de dispositivos USB WebHID del navegador.
+4. **`🔬 6 DIG / 3 DIG` (Modo Avanzado)**: Alterna entre resolución de 3 y 6 decimales.
+5. **`📈 OSCILOGRAMA`**: Despliega la pantalla completa del osciloscopio analizador a 60 FPS.
+6. **Modalidades de Desacople del Instrumento**:
+   * **`📌 ESCRITORIO (Picture-in-Picture / Always-on-Top)`**:  
+     Abre una ventana flotante de escritorio nativa del sistema operativo que **PERMANECE VISIBLE EN EL ESCRITORIO INCLUSO SI MINIMIZAS EL NAVEGADOR**. Cuenta con diseño oscuro "normal" de la suite (sin croma verde) y se mantiene fija encima de programas como ZXW Tools, Borneo Schematics, visor de esquemáticos en PDF o cámaras de microscopio.
+   * **`🎥 OBS`**:  
+     Abre una ventana emergente del sistema operativo diseñada especialmente para **captura de ventana en OBS Studio**, con selector de fondos para croma key transparente (`CHROMA`, `NEGRO`, `DARK`).
+   * **`🗗 FLOTANTE`**:  
+     Tarjeta flotante arrastrable dentro de la propia pestaña de la plataforma.
 7. **`Cajas Principales VBUS e IBUS`**: Números de gran escala (2.2rem) para visualización clara a distancia en el banco de trabajo.
 8. **`Fila de Potencia y Pines USB-C`**:
    * **`PWR`**: Potencia instantánea calculada en Watts ($P = V \times I$).
@@ -76,27 +80,24 @@ Ubicado junto al multímetro UT61E+ en la vista de mediciones del modelo:
 
 ---
 
-### B. Ventana Pop-out / Mini-HUD para OBS Studio (`MCMeterPopoutWindow.jsx` + `MCMeterMiniHUD.jsx`)
-Ventana externa independiente del Sistema Operativo especialmente diseñada para streaming y grabación de reparaciones con microscopio en OBS Studio:
+### B. Ventana Pop-out / Mini-HUD para OBS Studio y Escritorio PiP (`MCMeterPopoutWindow.jsx` + `MCMeterMiniHUD.jsx`)
+Ventana externa independiente del Sistema Operativo especialmente diseñada para streaming en OBS Studio y trabajo técnico con esquemáticos:
 
-1. **Reconocimiento y Dimensiones Adaptables**:
-   * **Ancho holgado de 450px:** Brinda espacio cómodo a todos los controles e indicadores sin recortes.
-   * **Auto-Ajuste Dinámico al Contenido (Sin espacio negro vacío):** La ventana externa ajusta su altura automáticamente al milímetro según lo que tengas activado:
-     - **Modo Compacto (Dígitos VBUS/IBUS):** Altura ultracompacta (~150px) para ocupar el mínimo espacio en tu monitor.
-     - **Con Mini-Gráfico Activo:** La ventana se expande automáticamente hacia abajo para alojar el oscilograma Canvas de 430px de resolución.
-     - **Con Panel Expandido (Pines y Potencia):** La ventana se expande hacia abajo para mostrar los pines Type-C.
-     - Al desactivarlos, la ventana se contrae de inmediato hacia su tamaño compacto original.
-2. **Consejos para Captura Sin Bordes ("Borderless") en OBS**:
-   * Por políticas de seguridad de Chromium/Windows (anti-phishing), las ventanas emergentes del navegador conservan la barra superior del SO (`_ □ ✕`). Para eliminarla en OBS:
-     - **Opción A (Recomendada en OBS):** En las propiedades de la fuente *Captura de Ventana* en OBS, marca la casilla **`Área del cliente` (Client Area)**. OBS recortará automáticamente la barra de Windows y capturará exclusivamente el interior de la herramienta.
-     - **Opción B (Recorte rápido en OBS):** En el lienzo de OBS, mantén presionada la tecla <kbd>Alt</kbd> y arrastra el borde superior rojo de la fuente unos píxeles hacia abajo para ocultar la barra de título.
-     - **Opción C (Modo 100% Borderless Nativo):** Si deseas tener el widget flotando sobre tu pantalla sin ninguna barra de Windows, presiona el botón **`🗗 FLOTANTE`** en lugar de `🎥 OBS`. Es un widget arrastrable 100% sin bordes.
+1. **Eliminación Total del Bloque Negro (Sincronización Cromática 100%)**:
+   * El fondo completo del documento de la ventana (`body` y `html`) se sincroniza en tiempo real con el modo de fondo seleccionado (`bgActual`).
+   * Al seleccionar **`CHROMA`**, **el 100% de la ventana es verde puro (`#00ff00`) de borde a borde**, eliminando cualquier bloque negro sobrante y garantizando que el filtro *Chroma Key* de OBS recorte la ventana limpiamente sin bandas oscuras.
+   * La tarjeta interna se adapta con `minHeight: 100vh` para que no existan cortes horizontales.
+2. **Auto-Ajuste Dinámico al Contenido (`ResizeObserver` / `resizeTo`)**:
+   * **Modo Compacto (Dígitos VBUS/IBUS):** La ventana mide la altura exacta de los controles y se ajusta automáticamente al mínimo tamaño posible en Windows.
+   * **Con Mini-Gráfico Activo:** La ventana se expande automáticamente hacia abajo para alojar el oscilograma Canvas de 430px de resolución.
+   * **Con Panel Expandido (Pines y Potencia):** La ventana se expande hacia abajo para mostrar los pines Type-C.
+   * Al desactivarlos, la ventana se contrae de inmediato hacia su tamaño compacto original.
 3. **Modo Limpio OBS (`👁️ Ocultar Barra`)**:
    * En la ventana externa dispones del botón **`👁️`** que colapsa la barra superior de herramientas en una tira mínima, dejando únicamente los dígitos de telemetría y el gráfico para una estética ultra-limpia en tus transmisiones.
 4. **Selector de Fondo para Transparencia en OBS (`🎨 Fondo`)**:
    * **`DARK` (`#070b12`):** Fondo oscuro premium para mostrar la tarjeta flotante completa con bordes estilizados.
-   * **`NEGRO` (`#000000`):** Fondo negro puro. En OBS puedes aplicar el modo de fusión *Pantalla (Screen)* o el filtro *Color Key* en negro para que el fondo se vuelva 100% transparente y los dígitos de tensión y corriente queden flotando directamente sobre la imagen de la placa bajo el microscopio.
-   * **`CHROMA` (`#00ff00`):** Fondo verde croma para eliminar con el filtro *Chroma Key* estándar de OBS.
+   * **`NEGRO` (`#000000`):** Fondo negro puro para modo *Screen* o *Color Key*.
+   * **`CHROMA` (`#00ff00`):** Fondo verde croma para eliminar con el filtro *Chroma Key* de OBS sin dejar bordes negros.
 5. **`📈 Mini-Gráfico Sparkline`**: Oscilograma en tiempo real de 180 muestras a resolución 430px para ver picos y fluctuaciones de corriente en vivo.
 6. **`▾ / ▴ Expandir / Colapsar`**: Muestra u oculta la fila de potencia (W) y los pines USB-C.
 7. **`🔬 Modo Avanzado`**: Conmuta entre 3 y 6 decimales de precisión.

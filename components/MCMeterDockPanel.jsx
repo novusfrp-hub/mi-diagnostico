@@ -1,5 +1,5 @@
 import React from 'react';
-import { Maximize2, Activity, Zap, RotateCcw, Link as LinkIcon, X } from 'lucide-react';
+import { Maximize2, Activity, Zap, RotateCcw, Link as LinkIcon, X, Pin } from 'lucide-react';
 
 export default function MCMeterDockPanel({
   mcMeter,
@@ -178,31 +178,32 @@ export default function MCMeterDockPanel({
             <Activity size={12} /> OSCILOGRAMA
           </button>
 
-          {/* Botón Desacoplar Flotante In-App 🗗 */}
+          {/* Botón Escritorio Persistente (Picture-in-Picture) 📌 */}
           <button
-            onClick={() => onDesacoplar && onDesacoplar('inapp')}
-            title="Desacoplar a tarjeta flotante arrastrable dentro de la plataforma"
+            onClick={() => onDesacoplar && onDesacoplar('pip')}
+            title="Ventana en el Escritorio (Siempre Visible / Always-on-Top). Permanece abierta y visible sobre tus esquemáticos (ZXW/Borneo) aunque minimices la plataforma."
             style={{
-              background: '#1e293b',
-              color: '#38bdf8',
-              border: '1px solid #0284c7',
-              padding: '6px 10px',
+              background: '#065f46',
+              color: '#34d399',
+              border: '1px solid #10b981',
+              padding: '6px 11px',
               borderRadius: '20px',
               fontSize: '0.7rem',
               fontWeight: 'bold',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: '4px'
+              gap: '4px',
+              boxShadow: '0 0 10px rgba(16, 185, 129, 0.3)'
             }}
           >
-            <Maximize2 size={12} /> FLOTANTE
+            <Pin size={12} /> ESCRITORIO
           </button>
 
           {/* Botón Ventana Externa OBS 🎥 */}
           <button
             onClick={() => onDesacoplar && onDesacoplar('popout')}
-            title="Abrir ventana externa independiente del Sistema Operativo para capturar directamente en OBS Studio ('Captura de Ventana')"
+            title="Abrir ventana externa para streaming / grabación con fondos Croma y Transparencia en OBS Studio ('Captura de Ventana')"
             style={{
               background: '#0284c7',
               color: '#ffffff',
@@ -219,6 +220,27 @@ export default function MCMeterDockPanel({
             }}
           >
             🎥 OBS
+          </button>
+
+          {/* Botón Desacoplar Flotante In-App 🗗 */}
+          <button
+            onClick={() => onDesacoplar && onDesacoplar('inapp')}
+            title="Desacoplar a tarjeta flotante arrastrable dentro de esta pestaña"
+            style={{
+              background: '#1e293b',
+              color: '#38bdf8',
+              border: '1px solid #0284c7',
+              padding: '6px 9px',
+              borderRadius: '20px',
+              fontSize: '0.7rem',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+          >
+            <Maximize2 size={12} /> FLOTANTE
           </button>
         </div>
       </div>

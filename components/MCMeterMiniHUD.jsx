@@ -8,7 +8,8 @@ export default function MCMeterMiniHUD({
   onReacoplar,
   modoAvanzado,
   setModoAvanzado,
-  isPopout = false
+  isPopout = false,
+  isPip = false
 }) {
   const {
     conectado,
@@ -36,6 +37,7 @@ export default function MCMeterMiniHUD({
 
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
+  const contentInnerRef = useRef(null);
 
   // Formateadores numéricos
   const fmtVbus = (val) => {
@@ -163,27 +165,37 @@ export default function MCMeterMiniHUD({
       ? '#000000'
       : '#070b12';
 
-  // Auto-ajuste dinámico de altura para la ventana externa de OBS (elimina todo espacio negro vacío)
+  // Sincronizar dinámicamente el fondo de body y html de la ventana externa para eliminar todo espacio en negro
   useEffect(() => {
     if (!isPopout || !containerRef.current) return;
-    const targetWin = containerRef.current.ownerDocument?.defaultView;
+    const doc = containerRef.current.ownerDocument;
+    if (doc) {
+      if (doc.body) doc.body.style.backgroundColor = bgActual;
+      if (doc.documentElement) doc.documentElement.style.backgroundColor = bgActual;
+    }
+  }, [isPopout, bgActual]);
+
+  // Auto-ajuste dinámico de altura para la ventana externa de OBS / PiP (elimina todo espacio negro vacío)
+  useEffect(() => {
+    if (!isPopout || !contentInnerRef.current) return;
+    const targetWin = contentInnerRef.current.ownerDocument?.defaultView;
     if (!targetWin || targetWin === window || typeof targetWin.resizeTo !== 'function') return;
 
     const timer = setTimeout(() => {
-      if (!containerRef.current || targetWin.closed) return;
+      if (!contentInnerRef.current || targetWin.closed) return;
       try {
-        const contentHeight = containerRef.current.offsetHeight || containerRef.current.scrollHeight;
+        const naturalHeight = Math.ceil(contentInnerRef.current.getBoundingClientRect().height);
         const osChromeHeight = Math.max(0, targetWin.outerHeight - targetWin.innerHeight) || 38;
         const osChromeWidth = Math.max(0, targetWin.outerWidth - targetWin.innerWidth) || 16;
 
         const targetW = 450 + osChromeWidth;
-        const targetH = contentHeight + osChromeHeight + 4;
+        const targetH = naturalHeight + osChromeHeight + 4;
 
         targetWin.resizeTo(targetW, targetH);
       } catch (e) {
         // Ignorar restricciones si el navegador previene resizeTo
       }
-    }, 50);
+    }, 40);
 
     return () => clearTimeout(timer);
   }, [isPopout, mostrarMiniGrafico, expandido, ocultarBarra, conectado]);
@@ -193,8 +205,8 @@ export default function MCMeterMiniHUD({
       ref={containerRef}
       style={{
         width: isPopout ? '100%' : '340px',
-        height: 'auto',
-        minHeight: 'auto',
+        minHeight: isPopout ? '100vh' : 'auto',
+        height: isPopout ? '100%' : 'auto',
         backgroundColor: bgActual,
         border: isPopout ? 'none' : '1px solid #1e3a5f',
         borderRadius: isPopout ? '0px' : '12px',
@@ -204,9 +216,13 @@ export default function MCMeterMiniHUD({
         overflow: 'hidden',
         userSelect: 'none',
         fontFamily: 'Consolas, monospace',
-        padding: isPopout ? '4px' : '0'
+        padding: isPopout ? '4px' : '0',
+        display: 'flex',
+        flexDirection: 'column',
+        boxSizing: 'border-box'
       }}
     >
+      <div ref={contentInnerRef} style={{ width: '100%' }}>
       {/* BARRA SUPERIOR CON CONTROLES */}
       {isPopout && ocultarBarra ? (
         /* Barra ultra-compacta (Modo Limpio OBS: sólo telemetría) */
@@ -286,16 +302,16 @@ export default function MCMeterMiniHUD({
             {isPopout && (
               <span
                 style={{
-                  backgroundColor: '#3b0764',
-                  color: '#c084fc',
+                  backgroundColor: isPip ? '#065f46' : '#3b0764',
+                  color: isPip ? '#6ee7b7' : '#c084fc',
                   fontSize: '0.6rem',
                   fontWeight: 800,
                   padding: '1px 4px',
                   borderRadius: '3px',
-                  border: '1px solid #9333ea'
+                  border: isPip ? '1px solid #10b981' : '1px solid #9333ea'
                 }}
               >
-                OBS
+                {isPip ? '📌 ESCRITORIO' : 'OBS'}
               </span>
             )}
           </div>
@@ -712,6 +728,7 @@ export default function MCMeterMiniHUD({
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 
