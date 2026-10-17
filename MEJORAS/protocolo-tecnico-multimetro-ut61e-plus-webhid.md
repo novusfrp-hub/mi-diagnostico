@@ -58,16 +58,16 @@ await device.sendReport(0x00, pollCmd);
 
 Cada respuesta del multímetro llega a través del evento `inputreport` con un array de bytes (`Uint8Array` / `DataView`) de al menos 14 bytes útiles:
 
-| Posición Byte | Nombre de Campo | Tipo de Dato | Descripción |
+| Posición en Trama (`syncIdx`) | Nombre de Campo | Tipo de Dato | Descripción |
 | :---: | :--- | :---: | :--- |
-| **Byte 0** | Longitud de trama | Máscara `dat[0] & 0x3F` | Indica el tamaño del paquete recibido (típicamente `0x0E` = 14 bytes). |
-| **Byte 1** | Cabecera Sync 1 | HEX (`0xAB`) | Primer byte de sincronización de trama legítima UNI-T. |
-| **Byte 2** | Cabecera Sync 2 | HEX (`0xCD`) | Segundo byte de sincronización de trama legítima UNI-T. |
-| **Byte 3** | **Modo / Posición Perilla** | **HEX (`0x00` - `0x1A`)** | **Posición física de la perilla y submodo activo.** |
-| **Byte 4** | **Rango / Escala** | **ASCII (`'0'` - `'7'`)** | Escala de medición (`r = Byte4 - 0x30`). Define el punto decimal. |
-| **Bytes 5 a 11** | **Lectura LCD (7 bytes)** | **ASCII Puro** | Cadena exacta visible en el display físico del multímetro. |
-| **Byte 12** | Flags 1 | HEX Bitmask | Indicadores de Auto-Range, Hold, etc. |
-| **Byte 13** | Flags 2 | HEX Bitmask | Batería baja, polaridad, advertencias. |
+| `syncIdx + 0` | Cabecera Sync 1 | HEX (`0xAB`) | Primer byte de sincronización de trama legítima UNI-T. |
+| `syncIdx + 1` | Cabecera Sync 2 | HEX (`0xCD`) | Segundo byte de sincronización de trama legítima UNI-T. |
+| `syncIdx + 2` | Longitud Payload | HEX (`0x10` = 16) | Longitud de la carga útil del paquete UNI-T. |
+| **`syncIdx + 3`** | **Modo / Posición Perilla** | **HEX (`0x00` - `0x1A`)** | **Posición física de la perilla y submodo activo.** |
+| **`syncIdx + 4`** | **Rango / Escala** | **ASCII (`'0'` - `'7'`)** | Escala de medición (`r = Byte - 0x30`). Define el punto decimal. |
+| **`syncIdx + 5` a `11`** | **Lectura LCD (7 bytes)** | **ASCII Puro** | Cadena exacta visible en el display físico del multímetro. |
+| `syncIdx + 12` | Flags 1 | HEX Bitmask | Indicadores de Auto-Range, Hold, etc. |
+| `syncIdx + 13` | Flags 2 | HEX Bitmask | Batería baja, polaridad, advertencias. |
 
 ---
 
@@ -202,13 +202,13 @@ export function procesarTramaUT61EPlus(dataView) {
       }
     }
 
-    if (syncIdx !== -1 && syncIdx + 13 < raw.length) {
-      const modoByte = raw[syncIdx + 2];
-      const rangoByte = raw[syncIdx + 3];
+    if (syncIdx !== -1 && syncIdx + 11 < raw.length) {
+      const modoByte = raw[syncIdx + 3];
+      const rangoByte = raw[syncIdx + 4];
 
-      // Extraer 7 caracteres LCD (bytes syncIdx+4 a syncIdx+10)
+      // Extraer 7 caracteres LCD (bytes syncIdx+5 a syncIdx+11)
       let displayStr = '';
-      for (let j = syncIdx + 4; j <= syncIdx + 10; j++) {
+      for (let j = syncIdx + 5; j <= syncIdx + 11; j++) {
         const b = raw[j];
         if (b >= 32 && b <= 126) displayStr += String.fromCharCode(b);
       }

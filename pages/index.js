@@ -2714,6 +2714,7 @@ export default function AppDiagnostico() {
           <div style={{ maxWidth: '720px', width: '100%' }}>
             <MarshallSuiteDualHUD
               lecturaUsb={obsLecturaUsb}
+              enviarCmdDmmFn={(cmd) => enviarComandoDMM(dispositivoUsb, cmd)}
               usbConectado={obsUsbConectado}
               conectarMultimetroFn={conectarMultimetroUSB}
               desconectarMultimetroFn={desconectarMultimetroUSB}
@@ -2738,6 +2739,9 @@ export default function AppDiagnostico() {
             <MultimetroMiniHUD
               valor={obsLecturaUsb.valor}
               unidad={obsLecturaUsb.unidad}
+              prefijo={obsLecturaUsb.prefijo}
+              modoKey={obsLecturaUsb.modoKey}
+              enviarCmdDmmFn={(cmd) => enviarComandoDMM(dispositivoUsb, cmd)}
               conectado={obsUsbConectado}
               conectarFn={conectarMultimetroUSB}
               desconectarFn={desconectarMultimetroUSB}
