@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Maximize2, X, ChevronDown, ChevronUp, Activity, Pin, PinOff, RotateCcw, Eye, EyeOff } from 'lucide-react';
+import { Maximize2, X, ChevronDown, ChevronUp, Activity, Pin, PinOff, RotateCcw, Eye, EyeOff, Copy, Check } from 'lucide-react';
 
 export default function MCMeterMiniHUD({
   mcMeter,
@@ -9,7 +9,8 @@ export default function MCMeterMiniHUD({
   modoAvanzado,
   setModoAvanzado,
   isPopout = false,
-  isPip = false
+  isPip = false,
+  colorFondoObs: colorFondoProp
 }) {
   const {
     conectado,
@@ -32,8 +33,18 @@ export default function MCMeterMiniHUD({
   const [expandido, setExpandido] = useState(false);
   const [mostrarMiniGrafico, setMostrarMiniGrafico] = useState(false);
   const [anclado, setAnclado] = useState(false);
-  const [colorFondoObs, setColorFondoObs] = useState('dark'); // 'dark' (#070b12), 'black' (#000000), 'green' (#00ff00)
+  const [colorFondoObs, setColorFondoObs] = useState(colorFondoProp || 'dark'); // 'transparent', 'dark' (#070b12), 'black' (#000000), 'green' (#00ff00)
   const [ocultarBarra, setOcultarBarra] = useState(false); // Modo limpio para captura de pantalla / OBS
+  const [copiadoObs, setCopiadoObs] = useState(false);
+
+  const copiarLinkObsMc = () => {
+    if (typeof window !== 'undefined') {
+      const url = `${window.location.origin}/?obs=mcmeter`;
+      navigator.clipboard.writeText(url);
+      setCopiadoObs(true);
+      setTimeout(() => setCopiadoObs(false), 2000);
+    }
+  };
 
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
@@ -159,7 +170,9 @@ export default function MCMeterMiniHUD({
   }, [mostrarMiniGrafico, miniVbusRef, miniIbusRef]);
 
   const bgActual =
-    colorFondoObs === 'green'
+    colorFondoObs === 'transparent'
+      ? 'transparent'
+      : colorFondoObs === 'green'
       ? '#00ff00'
       : colorFondoObs === 'black'
       ? '#000000'
@@ -317,26 +330,49 @@ export default function MCMeterMiniHUD({
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            {/* Selector de Fondo para Chroma Key en OBS */}
+            {/* Selector de Fondo para Chroma Key / Transparencia en OBS */}
             {isPopout && (
-              <button
-                onClick={() => {
-                  setColorFondoObs((prev) => (prev === 'dark' ? 'black' : (prev === 'black' ? 'green' : 'dark')));
-                }}
-                title="Fondo para OBS: Oscuro / Negro Puro (Screen / Color Key) / Verde Chroma"
-                style={{
-                  background: colorFondoObs === 'green' ? '#00ff00' : (colorFondoObs === 'black' ? '#000000' : '#1e293b'),
-                  color: colorFondoObs === 'green' ? '#000000' : '#38bdf8',
-                  border: '1px solid #38bdf8',
-                  borderRadius: '4px',
-                  padding: '3px 6px',
-                  cursor: 'pointer',
-                  fontSize: '10px',
-                  fontWeight: 800
-                }}
-              >
-                🎨 {colorFondoObs === 'green' ? 'CHROMA' : (colorFondoObs === 'black' ? 'NEGRO' : 'DARK')}
-              </button>
+              <>
+                <button
+                  onClick={() => {
+                    setColorFondoObs((prev) => (prev === 'transparent' ? 'dark' : (prev === 'dark' ? 'black' : (prev === 'black' ? 'green' : 'transparent'))));
+                  }}
+                  title="Fondo para OBS: 100% Transparente / Oscuro / Negro Puro / Verde Chroma"
+                  style={{
+                    background: colorFondoObs === 'transparent' ? 'transparent' : (colorFondoObs === 'green' ? '#00ff00' : (colorFondoObs === 'black' ? '#000000' : '#1e293b')),
+                    color: colorFondoObs === 'green' ? '#000000' : (colorFondoObs === 'transparent' ? '#34d399' : '#38bdf8'),
+                    border: colorFondoObs === 'transparent' ? '1px dashed #34d399' : '1px solid #38bdf8',
+                    borderRadius: '4px',
+                    padding: '3px 6px',
+                    cursor: 'pointer',
+                    fontSize: '10px',
+                    fontWeight: 800
+                  }}
+                >
+                  🎨 {colorFondoObs === 'transparent' ? 'TRANSP' : (colorFondoObs === 'green' ? 'CHROMA' : (colorFondoObs === 'black' ? 'NEGRO' : 'DARK'))}
+                </button>
+
+                <button
+                  onClick={copiarLinkObsMc}
+                  title="Copiar URL para Fuente Navegador en OBS Studio (Transparencia 100% Nativa)"
+                  style={{
+                    background: copiadoObs ? '#065f46' : '#1e293b',
+                    color: copiadoObs ? '#34d399' : '#38bdf8',
+                    border: '1px solid #334155',
+                    borderRadius: '4px',
+                    padding: '3px 6px',
+                    cursor: 'pointer',
+                    fontSize: '10px',
+                    fontWeight: 700,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '3px'
+                  }}
+                >
+                  {copiadoObs ? <Check size={11} color="#34d399" /> : <Copy size={11} />}
+                  {copiadoObs ? 'COPIADO' : 'OBS URL'}
+                </button>
+              </>
             )}
 
             {/* Botón Re-Acoplar a Hardware Suite 🔗 */}

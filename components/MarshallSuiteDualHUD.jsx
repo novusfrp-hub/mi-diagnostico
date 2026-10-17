@@ -1,0 +1,226 @@
+import React, { useState } from 'react';
+import { Zap, RotateCcw, Copy, Check, Activity, Pin } from 'lucide-react';
+import MultimetroMiniHUD from './MultimetroMiniHUD';
+
+/**
+ * Componente Suite Dual Unificada (Multímetro UNI-T + Marshall MC-Meter Pro).
+ * Condensado a ~1/3 del tamaño de pantalla para streaming en OBS Studio (fondo transparente real)
+ * o widget flotante en escritorio (Always-on-Top vía Document PiP).
+ */
+export default function MarshallSuiteDualHUD({
+  // Props Multímetro
+  lecturaUsb = { valor: '----', unidad: '---', tick: 0 },
+  usbConectado = false,
+  conectarMultimetroFn,
+  desconectarMultimetroFn,
+  escalaActiva = 'diodo',
+  setEscalaFn,
+  autoHoldActivo = false,
+  toggleAutoHoldFn,
+  maxVal = null,
+  minVal = null,
+  resetMaxMinFn,
+
+  // Props MC-Meter Pro
+  mcMeter,
+  onAbrirOscilograma,
+  modoAvanzado = false,
+  setModoAvanzado,
+
+  // Control general
+  onReacoplar,
+  isPopout = false,
+  isPip = false
+}) {
+  const [colorFondo, setColorFondo] = useState('transparent');
+  const [copiado, setCopiado] = useState(false);
+
+  // Copiar link OBS para fuente navegador 100% transparente
+  const copiarLinkObsDual = () => {
+    if (typeof window !== 'undefined') {
+      const url = `${window.location.origin}/?obs=hud`;
+      navigator.clipboard.writeText(url);
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2000);
+    }
+  };
+
+  const {
+    conectado: mcConectado,
+    sps,
+    vbus,
+    ibus,
+    watts,
+    dp,
+    dm,
+    cc1,
+    cc2,
+    conectar: conectarMc,
+    desconectar: desconectarMc
+  } = mcMeter || {};
+
+  const cc1Activo = mcConectado && cc1 > 0.25 && cc1 >= cc2;
+  const cc2Activo = mcConectado && cc2 > 0.25 && cc2 > cc1;
+
+  const bgStyle = colorFondo === 'transparent'
+    ? 'transparent'
+    : (colorFondo === 'black' ? '#000000' : (colorFondo === 'green' ? '#00ff00' : '#070b12'));
+
+  return (
+    <div
+      style={{
+        width: '100%',
+        minWidth: '560px',
+        maxWidth: '720px',
+        backgroundColor: bgStyle,
+        border: colorFondo === 'transparent' ? 'none' : '1px solid rgba(255,255,255,0.12)',
+        borderRadius: isPopout ? '0' : '14px',
+        padding: '10px 14px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '8px',
+        fontFamily: 'Consolas, monospace',
+        color: '#ffffff',
+        userSelect: 'none',
+        boxSizing: 'border-box'
+      }}
+    >
+      {/* CABECERA SUITE UNIFICADA */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '6px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '0.8rem', fontWeight: '900', color: '#00e5ff', letterSpacing: '0.5px' }}>
+            ⚡ MARSHALL HARDWARE SUITE (DUAL HUD)
+          </span>
+          <span style={{ fontSize: '0.65rem', background: '#1e293b', color: '#94a3b8', padding: '1px 6px', borderRadius: '4px' }}>
+            1/3 COMPACT
+          </span>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          {/* Botón copiar URL OBS */}
+          <button
+            onClick={copiarLinkObsDual}
+            title="Copiar URL para OBS Studio (Fuente Navegador con transparencia real)"
+            style={{
+              background: copiado ? '#065f46' : '#1e293b',
+              color: copiado ? '#34d399' : '#38bdf8',
+              border: 'none',
+              padding: '3px 8px',
+              borderRadius: '6px',
+              fontSize: '0.65rem',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+          >
+            {copiado ? <Check size={11} color="#34d399" /> : <Copy size={11} />}
+            {copiado ? 'COPIADO' : 'OBS URL (HUD)'}
+          </button>
+
+          {/* Selectores de Fondo Croma en Popout */}
+          {isPopout && (
+            <div style={{ display: 'flex', gap: '2px', background: '#0f172a', padding: '2px', borderRadius: '4px' }}>
+              <button onClick={() => setColorFondo('transparent')} title="Transparente" style={{ width: '13px', height: '13px', borderRadius: '2px', background: 'transparent', border: '1px dashed #64748b', cursor: 'pointer' }} />
+              <button onClick={() => setColorFondo('black')} title="Negro" style={{ width: '13px', height: '13px', borderRadius: '2px', background: '#000000', border: '1px solid #334155', cursor: 'pointer' }} />
+              <button onClick={() => setColorFondo('green')} title="Verde Croma" style={{ width: '13px', height: '13px', borderRadius: '2px', background: '#00ff00', border: 'none', cursor: 'pointer' }} />
+            </div>
+          )}
+
+          {/* Botón Re-acoplar */}
+          {onReacoplar && (
+            <button
+              onClick={onReacoplar}
+              title="Volver a la vista dividida 50%/50% en la plataforma"
+              style={{
+                background: '#1e3a8a',
+                color: '#60a5fa',
+                border: 'none',
+                padding: '3px 8px',
+                borderRadius: '6px',
+                fontSize: '0.65rem',
+                fontWeight: 'bold',
+                cursor: 'pointer'
+              }}
+            >
+              🔗 ACOPLAR
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* CUERPO DUAL DIVIDIDO: MULTÍMETRO (IZQ) / MC-METER PRO (DER) */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr', gap: '12px', alignItems: 'stretch' }}>
+        {/* PANEL IZQUIERDO: MULTÍMETRO */}
+        <div style={{ background: 'rgba(17, 24, 39, 0.4)', borderRadius: '10px', padding: '6px 10px', border: '1px solid rgba(255,255,255,0.05)' }}>
+          <MultimetroMiniHUD
+            valor={lecturaUsb.valor}
+            unidad={lecturaUsb.unidad}
+            conectado={usbConectado}
+            conectarFn={conectarMultimetroFn}
+            desconectarFn={desconectarMultimetroFn}
+            escalaActiva={escalaActiva}
+            setEscalaFn={setEscalaFn}
+            autoHoldActivo={autoHoldActivo}
+            toggleAutoHoldFn={toggleAutoHoldFn}
+            maxVal={maxVal}
+            minVal={minVal}
+            resetMaxMinFn={resetMaxMinFn}
+            isPopout={isPopout}
+            isPip={isPip}
+            colorFondo="transparent"
+          />
+        </div>
+
+        {/* PANEL DERECHO: MARSHALL MC-METER PRO */}
+        <div style={{ background: 'rgba(17, 24, 39, 0.4)', borderRadius: '10px', padding: '8px 10px', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+          {/* Header MC-Meter */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <span style={{ color: mcConectado ? '#10b981' : '#ef4444', fontSize: '11px' }}>●</span>
+              <span style={{ fontSize: '0.72rem', fontWeight: 'bold', color: '#00e5ff' }}>MC-METER PRO</span>
+              <span style={{ fontSize: '0.6rem', color: '#fbbf24', background: '#172554', padding: '1px 4px', borderRadius: '3px' }}>{sps || '-- SPS'}</span>
+            </div>
+            {onAbrirOscilograma && (
+              <button
+                onClick={onAbrirOscilograma}
+                title="Abrir oscilograma completo"
+                style={{ background: 'rgba(6, 182, 212, 0.2)', color: '#06b6d4', border: 'none', padding: '2px 6px', borderRadius: '4px', fontSize: '0.62rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}
+              >
+                <Activity size={10} /> OSC
+              </button>
+            )}
+          </div>
+
+          {/* Valores VBUS e IBUS */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', margin: '4px 0' }}>
+            <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '6px', padding: '4px 6px' }}>
+              <div style={{ fontSize: '0.6rem', color: '#f87171', fontWeight: 'bold' }}>VBUS</div>
+              <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#ff3b3b', lineHeight: 1.1 }}>
+                {mcConectado ? vbus.toFixed(3) : '0.000'}<span style={{ fontSize: '0.75rem', marginLeft: '2px' }}>V</span>
+              </div>
+            </div>
+            <div style={{ background: 'rgba(234, 179, 8, 0.1)', border: '1px solid rgba(234, 179, 8, 0.3)', borderRadius: '6px', padding: '4px 6px' }}>
+              <div style={{ fontSize: '0.6rem', color: '#fde047', fontWeight: 'bold' }}>IBUS</div>
+              <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#facc15', lineHeight: 1.1 }}>
+                {mcConectado ? ibus.toFixed(3) : '0.000'}<span style={{ fontSize: '0.75rem', marginLeft: '2px' }}>A</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Watts y Pines USB-C */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.7rem' }}>
+            <span style={{ color: '#e2e8f0', fontWeight: 'bold' }}>
+              ⚡ {mcConectado ? `${watts.toFixed(2)} W` : '0.00 W'}
+            </span>
+            <div style={{ display: 'flex', gap: '6px', fontSize: '0.62rem', color: '#94a3b8' }}>
+              <span style={{ color: cc1Activo ? '#10b981' : '#64748b' }}>CC1: {mcConectado ? cc1.toFixed(2) : '0.0'}V</span>
+              <span style={{ color: cc2Activo ? '#10b981' : '#64748b' }}>CC2: {mcConectado ? cc2.toFixed(2) : '0.0'}V</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

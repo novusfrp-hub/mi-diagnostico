@@ -12,7 +12,10 @@ export default function MCMeterPopoutWindow({
   children,
   onClose,
   title = 'Marshall MC-Meter Pro — Mini HUD',
-  mode = 'window' // 'pip' (Siempre en escritorio) o 'window' (OBS Studio)
+  mode = 'window', // 'pip' (Siempre en escritorio) o 'window' (OBS Studio)
+  width,
+  height,
+  transparent = false
 }) {
   const [targetNode, setTargetNode] = useState(null);
   const popupRef = useRef(null);
@@ -31,9 +34,9 @@ export default function MCMeterPopoutWindow({
     let cleanupFns = [];
 
     const init = async () => {
-      // Dimensiones iniciales: ancho holgado (450px) y altura inicial compacta (150px)
-      const ancho = 450;
-      const alto = 150;
+      // Dimensiones iniciales configurables
+      const ancho = width || 450;
+      const alto = height || 150;
 
       // 1. Intentar modo Picture-in-Picture (PiP) nativo de Chromium para que NO se minimice al minimizar la web
       if (mode === 'pip' && 'documentPictureInPicture' in window) {
@@ -90,7 +93,7 @@ export default function MCMeterPopoutWindow({
       popup.document.body.style.width = '100%';
       popup.document.body.style.height = '100%';
       popup.document.body.style.minHeight = '100vh';
-      popup.document.body.style.backgroundColor = '#070b12';
+      popup.document.body.style.backgroundColor = transparent ? 'transparent' : '#070b12';
       popup.document.body.style.overflow = 'hidden';
 
       // Inyectar estilos base e iconos limpios
@@ -103,7 +106,7 @@ export default function MCMeterPopoutWindow({
           width: 100%;
           height: 100%;
           min-height: 100vh;
-          background-color: #070b12;
+          background-color: ${transparent ? 'transparent' : '#070b12'};
           font-family: Consolas, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
           color: #ffffff;
           user-select: none;

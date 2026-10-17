@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { doc, setDoc, addDoc, collection, getDocs, deleteDoc, updateDoc, getDoc, onSnapshot } from 'firebase/firestore';
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
 import { db, auth } from '../firebase';
-import { Sun, Moon, ArrowLeft, RefreshCcw, RefreshCw, Zap, Smartphone, AlertTriangle, ChevronRight, Home, ShieldCheck, Camera, CheckCircle2, XCircle, Settings, Plus, Save, X, Trash2, Edit, ChevronDown, CornerDownRight, LogOut, Lightbulb, Usb, Map, Play, Flame, ClipboardList, History, Printer, FileText, MessageCircle, Link, Monitor, Mic, MicOff, Cpu, Image as ImageIcon, Maximize2, Search, User, Users, Lock } from 'lucide-react';
+import { Sun, Moon, ArrowLeft, RefreshCcw, RefreshCw, Zap, Smartphone, AlertTriangle, ChevronRight, Home, ShieldCheck, Camera, CheckCircle2, XCircle, Settings, Plus, Save, X, Trash2, Edit, ChevronDown, CornerDownRight, LogOut, Lightbulb, Usb, Map, Play, Flame, ClipboardList, History, Printer, FileText, MessageCircle, Link, Monitor, Mic, MicOff, Cpu, Image as ImageIcon, Maximize2, Search, User, Users, Lock, Pin, RotateCcw, Copy, Check } from 'lucide-react';
 
 import FPCInteligente from '../components/FPCInteligente.js';
 import ICInteligente from '../components/ICInteligente.js';
@@ -24,6 +24,8 @@ import MCMeterMiniHUD from '../components/MCMeterMiniHUD';
 import MCMeterOsciloscopio from '../components/MCMeterOsciloscopio';
 import MCMeterDockPanel from '../components/MCMeterDockPanel';
 import MCMeterPopoutWindow from '../components/MCMeterPopoutWindow';
+import MultimetroMiniHUD from '../components/MultimetroMiniHUD';
+import MarshallSuiteDualHUD from '../components/MarshallSuiteDualHUD';
 
 const LETRAS_FILAS = [
   'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K', 'L', 'M', 'N', 'P', 'R', 'T', 'U', 'V', 'W', 'Y',
@@ -33,54 +35,154 @@ const LETRAS_FILAS = [
 
 const obtenerUrlVideo = (url) => { if (!url) return ''; let v = ''; if (url.includes('youtu.be/')) v = url.split('youtu.be/')[1].split('?')[0]; else if (url.includes('youtube.com/watch')) v = new URLSearchParams(url.split('?')[1]).get('v'); else if (url.includes('youtube.com/embed/')) return url; return v ? `https://www.youtube.com/embed/${v}` : url; };
 
-const VisorHUD = ({ valor, unidad, conectado, conectarFn, desconectarFn, vozActiva, toggleVozFn, autoHoldActivo, toggleAutoHoldFn, capturarFn, escalaActiva, oscilogramaActivo, toggleOscilogramaFn, mostrarOscilogramaBtn = false }) => {
-  const esIncorrecta = conectado && (
+const VisorHUD = ({
+  valor,
+  unidad,
+  conectado,
+  conectarFn,
+  desconectarFn,
+  vozActiva,
+  toggleVozFn,
+  autoHoldActivo,
+  toggleAutoHoldFn,
+  capturarFn,
+  escalaActiva,
+  setEscalaFn,
+  onDesacoplarFn,
+  onDesacoplarDualFn,
+  maxVal,
+  minVal,
+  resetMaxMinFn,
+  oscilogramaActivo,
+  toggleOscilogramaFn,
+  mostrarOscilogramaBtn = false
+}) => {
+  const [copiado, setCopiado] = useState(false);
+
+  const copiarLinkObsDmm = () => {
+    if (typeof window !== 'undefined') {
+      const url = `${window.location.origin}/?obs=multimetro`;
+      navigator.clipboard.writeText(url);
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2000);
+    }
+  };
+
+  const esIncorrecta = conectado && escalaActiva !== 'libre' && (
     (escalaActiva === 'diodo' && (unidad === 'uA' || unidad === 'mA' || unidad === 'A')) ||
     (escalaActiva === 'ua' && (unidad === 'V' || unidad === 'Diod' || unidad === 'Ω'))
   );
 
+  const valNum = parseFloat(valor);
+  const esOl = valor === 'OL' || String(valor).includes('?0');
+
+  // Bargraph dinámico de 46 segmentos
+  let pctBargraph = 0;
+  if (!isNaN(valNum) && !esOl) {
+    if (escalaActiva === 'diodo') pctBargraph = Math.min(100, Math.max(0, (valNum / 2.5) * 100));
+    else if (escalaActiva === 'voltio') pctBargraph = Math.min(100, Math.max(0, (valNum / 20.0) * 100));
+    else if (escalaActiva === 'ua') pctBargraph = Math.min(100, Math.max(0, (valNum / 100.0) * 100));
+    else if (escalaActiva === 'amperio') pctBargraph = Math.min(100, Math.max(0, (valNum / 5.0) * 100));
+    else if (escalaActiva === 'ohmio') pctBargraph = Math.min(100, Math.max(0, (Math.log10(Math.max(1, valNum)) / 6) * 100));
+    else pctBargraph = Math.min(100, Math.max(0, valNum * 20));
+  } else if (esOl) {
+    pctBargraph = 100;
+  }
+  const numSegs = 46;
+  const segsActivos = Math.round((pctBargraph / 100) * numSegs);
+
+  const ESCALAS = [
+    { id: 'diodo', label: 'DIODO', color: '#3b82f6', icon: '⚡' },
+    { id: 'voltio', label: 'VOLTIOS', color: '#ef4444', icon: 'V' },
+    { id: 'ohmio', label: 'OHMIOS', color: '#a855f7', icon: 'Ω' },
+    { id: 'ua', label: 'µA', color: '#10b981', icon: 'µ' },
+    { id: 'amperio', label: 'AMPERIOS', color: '#f59e0b', icon: 'A' },
+    { id: 'libre', label: 'LIBRE / AUTO', color: '#06b6d4', icon: '🌐' }
+  ];
+
   return (
     <div style={{
       backgroundColor: '#1a1a1a',
-      border: esIncorrecta ? '2px solid #ef4444' : '2px solid #333333',
+      border: esIncorrecta ? '2px solid #ef4444' : (conectado ? '2px solid rgba(0, 255, 255, 0.4)' : '2px solid #333333'),
       borderRadius: '15px',
-      padding: '15px',
+      padding: '14px 18px',
       display: 'flex',
       flexDirection: 'column',
-      alignItems: 'center',
+      justifyContent: 'space-between',
       marginBottom: '15px',
       position: 'relative',
       overflow: 'hidden',
-      boxShadow: esIncorrecta ? '0 0 25px rgba(239, 68, 68, 0.8)' : (conectado ? '0 0 20px rgba(0, 255, 255, 0.2)' : 'none')
+      boxShadow: esIncorrecta ? '0 0 25px rgba(239, 68, 68, 0.8)' : (conectado ? '0 0 20px rgba(0, 255, 255, 0.15)' : 'none'),
+      fontFamily: 'Consolas, monospace'
     }}>
-      <div className="tools-row" style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
-        <span style={{ color: '#555', fontSize: '0.8rem', fontWeight: 'bold' }} className="hide-on-mobile">UT61E+ ANALYZER</span>
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center', width: '100%' }}>
-          <button onClick={conectado ? desconectarFn : conectarFn} style={{ background: conectado ? 'rgba(239, 68, 68, 0.2)' : '#333', color: conectado ? '#ef4444' : 'white', border: 'none', padding: '8px 15px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}><Link size={14} /> {conectado ? 'DESCONECTAR' : 'CONECTAR USB'}</button>
-          <button onClick={toggleVozFn} style={{ background: vozActiva ? 'rgba(234, 179, 8, 0.2)' : '#333', color: vozActiva ? '#eab308' : 'white', border: 'none', padding: '8px 15px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', boxShadow: vozActiva ? '0 0 10px rgba(234,179,8,0.5)' : 'none' }}>{vozActiva ? <Mic size={14} /> : <MicOff size={14} />} VOZ</button>
-          <button onClick={toggleAutoHoldFn} style={{ background: autoHoldActivo ? 'rgba(16, 185, 129, 0.2)' : '#333', color: autoHoldActivo ? '#10b981' : 'white', border: 'none', padding: '8px 15px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', boxShadow: autoHoldActivo ? '0 0 10px rgba(16,185,129,0.5)' : 'none' }}><Zap size={14} /> {autoHoldActivo ? 'HOLD ON' : 'HOLD'}</button>
-          {mostrarOscilogramaBtn && (
+      {/* 1. BARRA SUPERIOR DE HERRAMIENTAS */}
+      <div className="tools-row" style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span style={{ color: conectado ? '#10b981' : '#ef4444', fontSize: '12px' }}>●</span>
+          <span style={{ color: '#00ffff', fontSize: '0.8rem', fontWeight: 'bold' }}>UT61E+ ANALYZER</span>
+          <span style={{ fontSize: '0.62rem', backgroundColor: '#172554', color: '#38bdf8', padding: '1px 6px', borderRadius: '4px', fontWeight: 'bold' }}>9600 8N1</span>
+        </div>
+
+        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+          {/* Conectar / Desconectar */}
+          <button onClick={conectado ? desconectarFn : conectarFn} style={{ background: conectado ? 'rgba(239, 68, 68, 0.2)' : '#333', color: conectado ? '#ef4444' : 'white', border: 'none', padding: '6px 12px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <Link size={12} /> {conectado ? 'DESCONECTAR' : 'CONECTAR USB'}
+          </button>
+
+          {/* Voz */}
+          <button onClick={toggleVozFn} style={{ background: vozActiva ? 'rgba(234, 179, 8, 0.2)' : '#333', color: vozActiva ? '#eab308' : 'white', border: 'none', padding: '6px 10px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', boxShadow: vozActiva ? '0 0 10px rgba(234,179,8,0.5)' : 'none' }}>
+            {vozActiva ? <Mic size={12} /> : <MicOff size={12} />} VOZ
+          </button>
+
+          {/* AutoHold */}
+          <button onClick={toggleAutoHoldFn} style={{ background: autoHoldActivo ? '#065f46' : '#333', color: autoHoldActivo ? '#34d399' : 'white', border: 'none', padding: '6px 10px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', boxShadow: autoHoldActivo ? '0 0 10px rgba(16,185,129,0.5)' : 'none' }}>
+            <Zap size={12} /> {autoHoldActivo ? 'HOLD ON' : 'HOLD'}
+          </button>
+
+          {/* Botón Escritorio Persistente (PiP) 📌 */}
+          {onDesacoplarFn && (
             <button
-              onClick={toggleOscilogramaFn}
-              style={{
-                background: oscilogramaActivo ? 'rgba(6, 182, 212, 0.2)' : '#333',
-                color: oscilogramaActivo ? '#06b6d4' : 'white',
-                border: 'none',
-                padding: '8px 15px',
-                borderRadius: '20px',
-                fontSize: '0.7rem',
-                fontWeight: 'bold',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px',
-                boxShadow: oscilogramaActivo ? '0 0 10px rgba(6,182,212,0.5)' : 'none',
-                transition: 'all 0.2s ease-in-out'
-              }}
+              onClick={() => onDesacoplarFn('pip')}
+              title="Ventana del Multímetro en el Escritorio (Always-on-Top / PiP). Flota sobre esquemáticos aunque minimices la plataforma."
+              style={{ background: '#065f46', color: '#34d399', border: '1px solid #10b981', padding: '6px 10px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', boxShadow: '0 0 10px rgba(16, 185, 129, 0.3)' }}
             >
-              <Monitor size={14} /> OSCILOGRAMA AMPERIOS
+              <Pin size={12} /> ESCRITORIO
             </button>
           )}
+
+          {/* Botón Ventana Externa OBS 🎥 */}
+          {onDesacoplarFn && (
+            <button
+              onClick={() => onDesacoplarFn('popout')}
+              title="Abrir ventana externa transparente para OBS Studio ('Captura de Ventana')"
+              style={{ background: '#0284c7', color: '#ffffff', border: 'none', padding: '6px 10px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+            >
+              <Monitor size={12} /> OBS
+            </button>
+          )}
+
+          {/* Botón Desacoplar Suite Dual ⚡ (Multímetro + MC-Meter juntos en 1/3) */}
+          {onDesacoplarDualFn && (
+            <button
+              onClick={() => onDesacoplarDualFn('pip')}
+              title="Desacoplar ambos instrumentos (Multímetro + MC-Meter Pro) unidos en una sola ventana compacta de 1/3 de tamaño para escritorio o streaming"
+              style={{ background: '#7c3aed', color: '#ffffff', border: '1px solid #a855f7', padding: '6px 11px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', boxShadow: '0 0 12px rgba(124, 58, 237, 0.4)' }}
+            >
+              <Zap size={12} color="#fbbf24" /> SUITE DUAL (1/3)
+            </button>
+          )}
+
+          {/* Copiar enlace OBS Browser Source */}
+          <button
+            onClick={copiarLinkObsDmm}
+            title="Copiar URL para Fuente Navegador en OBS Studio (Transparencia Real 100%)"
+            style={{ background: copiado ? '#065f46' : '#1e293b', color: copiado ? '#34d399' : '#94a3b8', border: '1px solid #334155', padding: '6px 10px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+          >
+            {copiado ? <Check size={12} color="#34d399" /> : <Copy size={12} />}
+            {copiado ? 'COPIADO' : 'OBS URL'}
+          </button>
+
+          {/* Capturar Pin Mágico */}
           {conectado && capturarFn && (
             <button
               onClick={esIncorrecta ? null : capturarFn}
@@ -89,29 +191,113 @@ const VisorHUD = ({ valor, unidad, conectado, conectarFn, desconectarFn, vozActi
                 background: esIncorrecta ? '#4b5563' : '#3b82f6',
                 color: esIncorrecta ? '#9ca3af' : 'white',
                 border: 'none',
-                padding: '8px 15px',
+                padding: '6px 12px',
                 borderRadius: '20px',
                 fontSize: '0.7rem',
                 fontWeight: 'bold',
                 cursor: esIncorrecta ? 'not-allowed' : 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '5px',
-                boxShadow: esIncorrecta ? 'none' : '0 0 12px rgba(59,130,246,0.6)',
-                transition: 'transform 0.1s'
+                gap: '4px',
+                boxShadow: esIncorrecta ? 'none' : '0 0 12px rgba(59,130,246,0.6)'
               }}
-              onMouseDown={(e) => !esIncorrecta && (e.currentTarget.style.transform = 'scale(0.95)')}
-              onMouseUp={(e) => !esIncorrecta && (e.currentTarget.style.transform = 'scale(1)')}
             >
-              <ChevronRight size={14} /> CAPTURAR / SIGUIENTE
+              <ChevronRight size={13} /> SIGUIENTE
             </button>
           )}
         </div>
       </div>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', marginTop: '10px' }}>
-        <span className="hud-valor-text" style={{ color: valor === 'OL' ? '#ff0000' : '#00ffff', fontSize: '4rem', fontWeight: 'bold', fontFamily: 'Consolas, monospace', textShadow: valor === 'OL' ? '0 0 15px rgba(255,0,0,0.5)' : '0 0 15px rgba(0,255,255,0.4)', lineHeight: '1' }}>{valor}</span>
-        <span style={{ color: 'gray', fontSize: '1.2rem', fontWeight: 'bold' }}>{unidad}</span>
+
+      {/* 2. SELECTOR DE ESCALAS INTERACTIVO TIPO PÍLDORAS */}
+      {setEscalaFn && (
+        <div style={{ width: '100%', display: 'flex', gap: '6px', margin: '4px 0 8px 0', flexWrap: 'wrap' }}>
+          {ESCALAS.map((esc) => {
+            const activa = escalaActiva === esc.id;
+            return (
+              <button
+                key={esc.id}
+                onClick={() => setEscalaFn(esc.id)}
+                style={{
+                  background: activa ? esc.color : '#111827',
+                  color: activa ? '#ffffff' : '#94a3b8',
+                  border: `1px solid ${activa ? esc.color : '#374151'}`,
+                  padding: '4px 10px',
+                  borderRadius: '12px',
+                  fontSize: '0.72rem',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  boxShadow: activa ? `0 0 10px ${esc.color}66` : 'none',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <span>{esc.icon}</span> {esc.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* 3. PANTALLA DIGITAL GIGANTE Y TELEMETRÍA MAX/MIN */}
+      <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', margin: '4px 0' }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px' }}>
+          <span className="hud-valor-text" style={{ color: valor === 'OL' ? '#ff0000' : '#00ffff', fontSize: '3.8rem', fontWeight: '900', fontFamily: 'Consolas, monospace', textShadow: valor === 'OL' ? '0 0 15px rgba(255,0,0,0.5)' : '0 0 15px rgba(0,255,255,0.4)', lineHeight: '1' }}>
+            {valor}
+          </span>
+          <span style={{ color: '#94a3b8', fontSize: '1.4rem', fontWeight: 'bold' }}>
+            {unidad}
+          </span>
+        </div>
+
+        {/* Bloque MAX / MIN */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <span style={{ fontSize: '0.68rem', color: '#ef4444', fontWeight: 'bold' }}>MAX:</span>
+            <span style={{ fontSize: '0.82rem', color: '#fca5a5', fontWeight: 'bold' }}>
+              {maxVal !== null ? `${maxVal.toFixed(3)}` : '----'}
+            </span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <span style={{ fontSize: '0.68rem', color: '#3b82f6', fontWeight: 'bold' }}>MIN:</span>
+            <span style={{ fontSize: '0.82rem', color: '#93c5fd', fontWeight: 'bold' }}>
+              {minVal !== null ? `${minVal.toFixed(3)}` : '----'}
+            </span>
+            {resetMaxMinFn && (
+              <button onClick={resetMaxMinFn} title="Reiniciar picos MAX/MIN" style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', padding: 0 }}>
+                <RotateCcw size={11} />
+              </button>
+            )}
+          </div>
+        </div>
       </div>
+
+      {/* 4. BARGRAPH ANALÓGICO DINÁMICO DE 46 SEGMENTOS */}
+      <div style={{ width: '100%', marginTop: '6px' }}>
+        <div style={{ display: 'flex', gap: '2px', width: '100%', height: '6px', background: '#0a0b0f', borderRadius: '4px', padding: '1px', overflow: 'hidden', border: '1px solid #1f2937' }}>
+          {Array.from({ length: numSegs }).map((_, idx) => {
+            const activo = idx < segsActivos;
+            let colorSeg = '#10b981';
+            if (idx > numSegs * 0.7) colorSeg = '#f59e0b';
+            if (idx > numSegs * 0.9) colorSeg = '#ef4444';
+            return (
+              <div
+                key={idx}
+                style={{
+                  flex: 1,
+                  backgroundColor: activo ? colorSeg : '#1e293b',
+                  borderRadius: '1px',
+                  boxShadow: activo ? `0 0 3px ${colorSeg}` : 'none',
+                  transition: 'background-color 0.08s ease'
+                }}
+              />
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Alerta de escala incorrecta (solo si no está en modo libre) */}
       {esIncorrecta && (
         <div style={{
           width: '100%',
@@ -131,7 +317,7 @@ const VisorHUD = ({ valor, unidad, conectado, conectarFn, desconectarFn, vozActi
           boxShadow: '0 0 10px rgba(239, 68, 68, 0.3)'
         }}>
           <AlertTriangle size={16} color="#ef4444" />
-          ⚠️ ESCALA INCORRECTA: CONFIGURA EL DIAL FÍSICO O LA APP A LA MISMA FUNCIÓN
+          ⚠️ ESCALA INCORRECTA: CONFIGURA EL DIAL FÍSICO O SELECCIONA EL MODO CORRECTO ARRIBA
         </div>
       )}
     </div>
@@ -845,6 +1031,38 @@ export default function AppDiagnostico() {
   const [mcMeterDesacoplado, setMcMeterDesacoplado] = useState(false);
   const [mcMeterModoDesacoplado, setMcMeterModoDesacoplado] = useState('pip'); // 'pip' | 'popout' | 'inapp'
 
+  // ESTADOS DE DESACOPLAMIENTO Y TELEMETRÍA AVANZADA MULTÍMETRO & SUITE DUAL
+  const [multimetroDesacoplado, setMultimetroDesacoplado] = useState(false);
+  const [multimetroModoDesacoplado, setMultimetroModoDesacoplado] = useState('pip'); // 'pip' | 'popout' | 'inapp'
+  const [suiteDualDesacoplada, setSuiteDualDesacoplada] = useState(false);
+  const [suiteDualModoDesacoplado, setSuiteDualModoDesacoplado] = useState('pip'); // 'pip' | 'popout' | 'inapp'
+  const [maxLecturaUsb, setMaxLecturaUsb] = useState(null);
+  const [minLecturaUsb, setMinLecturaUsb] = useState(null);
+  const resetMaxMinLectura = () => {
+    setMaxLecturaUsb(null);
+    setMinLecturaUsb(null);
+  };
+
+  // ESTADOS DE OVERLAY / FUENTE NAVEGADOR PARA OBS STUDIO CON TRANSPARENCIA REAL 100%
+  const [obsParam, setObsParam] = useState(null); // 'hud' | 'dual' | 'multimetro' | 'mcmeter' | null
+  const [obsLecturaUsb, setObsLecturaUsb] = useState({ valor: '----', unidad: '---', tick: 0 });
+  const [obsUsbConectado, setObsUsbConectado] = useState(false);
+  const [obsEscala, setObsEscala] = useState('diodo');
+  const [obsAutoHold, setObsAutoHold] = useState(false);
+  const [obsMaxDmm, setObsMaxDmm] = useState(null);
+  const [obsMinDmm, setObsMinDmm] = useState(null);
+  const [obsMcMeterData, setObsMcMeterData] = useState({
+    conectado: false,
+    vbus: 0,
+    ibus: 0,
+    watts: 0,
+    dp: 0,
+    dm: 0,
+    cc1: 0,
+    cc2: 0,
+    sps: '0 sps'
+  });
+
   // Captura aislada e independiente para Marshall MC-Meter Pro (JAMÁS toca docktestDiodo ni multímetro)
   const capturarMcMeterDataEnModelo = () => {
     if (!mcMeter.conectado) {
@@ -1062,6 +1280,114 @@ export default function AppDiagnostico() {
   const [autoHoldActivo, setAutoHoldActivo] = useState(false); const autoHoldActivoRef = useRef(autoHoldActivo); useEffect(() => { autoHoldActivoRef.current = autoHoldActivo; }, [autoHoldActivo]);
   const lecturaRffeRef = useRef(lecturaRffe); useEffect(() => { lecturaRffeRef.current = lecturaRffe; }, [lecturaRffe]);
   const autoHoldValueRef = useRef(null); const autoHoldStartTimeRef = useRef(0); const autoHoldTriggeredRef = useRef(false);
+
+  // Detección de parámetro ?obs=... (ej: /?obs=hud, /?obs=dual, /?obs=multimetro, /?obs=mcmeter)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const obs = params.get('obs');
+      if (obs) {
+        setObsParam(obs.toLowerCase());
+        // Forzar fondo 100% transparente en el documento para renderizado nativo en OBS Browser Source
+        document.documentElement.style.backgroundColor = 'transparent';
+        document.body.style.backgroundColor = 'transparent';
+        document.body.style.margin = '0';
+        document.body.style.padding = '0';
+        document.body.style.overflow = 'hidden';
+      }
+    }
+  }, []);
+
+  // Transmisor BroadcastChannel (Pestaña Principal con WebHID hacia OBS Browser Source)
+  useEffect(() => {
+    if (typeof window === 'undefined' || obsParam) return;
+    let channel = null;
+    try {
+      channel = new BroadcastChannel('marshall_hardware_stream');
+      const payload = {
+        tipo: 'SYNC_HARDWARE',
+        timestamp: Date.now(),
+        multimetro: {
+          valor: lecturaUsb.valor,
+          unidad: lecturaUsb.unidad,
+          conectado: usbConectado,
+          escalaActiva: seccionLibreria === 'ic' ? escalaIc : (seccionLibreria === 'fpc_bateria' ? escalaFpcBateria : escalaFpc),
+          autoHoldActivo,
+          maxVal: maxLecturaUsb,
+          minVal: minLecturaUsb
+        },
+        mcMeter: {
+          conectado: mcMeter.conectado,
+          vbus: mcMeter.vbus,
+          ibus: mcMeter.ibus,
+          watts: mcMeter.watts,
+          dp: mcMeter.dp,
+          dm: mcMeter.dm,
+          cc1: mcMeter.cc1,
+          cc2: mcMeter.cc2,
+          sps: mcMeter.sps
+        }
+      };
+      channel.postMessage(payload);
+    } catch (e) {
+      console.warn('Error en BroadcastChannel emisor:', e);
+    }
+    return () => {
+      if (channel) channel.close();
+    };
+  }, [
+    obsParam,
+    lecturaUsb.valor,
+    lecturaUsb.unidad,
+    lecturaUsb.tick,
+    usbConectado,
+    escalaFpc,
+    escalaIc,
+    escalaFpcBateria,
+    seccionLibreria,
+    autoHoldActivo,
+    maxLecturaUsb,
+    minLecturaUsb,
+    mcMeter.conectado,
+    mcMeter.vbus,
+    mcMeter.ibus,
+    mcMeter.watts,
+    mcMeter.dp,
+    mcMeter.dm,
+    mcMeter.cc1,
+    mcMeter.cc2,
+    mcMeter.sps
+  ]);
+
+  // Receptor BroadcastChannel (Ventana OBS Browser Source sin necesidad de re-abrir WebHID)
+  useEffect(() => {
+    if (typeof window === 'undefined' || !obsParam) return;
+    let channel = null;
+    try {
+      channel = new BroadcastChannel('marshall_hardware_stream');
+      channel.onmessage = (event) => {
+        if (event.data && event.data.tipo === 'SYNC_HARDWARE') {
+          const { multimetro, mcMeter: mc } = event.data;
+          if (multimetro) {
+            setObsLecturaUsb({ valor: multimetro.valor, unidad: multimetro.unidad, tick: Date.now() });
+            setObsUsbConectado(multimetro.conectado);
+            if (multimetro.escalaActiva) setObsEscala(multimetro.escalaActiva);
+            if (multimetro.autoHoldActivo !== undefined) setObsAutoHold(multimetro.autoHoldActivo);
+            if (multimetro.maxVal !== undefined) setObsMaxDmm(multimetro.maxVal);
+            if (multimetro.minVal !== undefined) setObsMinDmm(multimetro.minVal);
+          }
+          if (mc) {
+            setObsMcMeterData(mc);
+          }
+        }
+      };
+    } catch (e) {
+      console.warn('Error en BroadcastChannel receptor:', e);
+    }
+    return () => {
+      if (channel) channel.close();
+    };
+  }, [obsParam]);
 
 
   const cambiarSeccionLibreria = (nuevaSeccion) => {
@@ -1394,6 +1720,16 @@ export default function AppDiagnostico() {
 
         if (parsedVal !== null && parsedUni !== null) {
           setLecturaUsb(prev => ({ valor: parsedVal, unidad: parsedUni, tick: prev.tick + 1 }));
+
+          // Rastreo en tiempo real de picos Máximos y Mínimos (MAX/MIN)
+          if (parsedVal !== 'OL' && !String(parsedVal).includes('?0')) {
+            const vNum = parseFloat(parsedVal);
+            if (!isNaN(vNum)) {
+              setMaxLecturaUsb(prev => (prev === null || vNum > prev ? vNum : prev));
+              setMinLecturaUsb(prev => (prev === null || vNum < prev ? vNum : prev));
+            }
+          }
+
           if (autoHoldActivoRef.current) {
             const valNum = parseFloat(parsedVal);
             const esIncorrecta = (escalaActiva === 'diodo' && (parsedUni !== 'Diod' && parsedUni !== 'V')) ||
@@ -2154,6 +2490,89 @@ export default function AppDiagnostico() {
     );
   };
 
+  // SI SE ESPECIFICA PARÁMETRO OBS (?obs=hud, ?obs=dual, ?obs=multimetro, ?obs=mcmeter):
+  // RENDERIZADO AISLADO PARA FUENTE NAVEGADOR DE OBS STUDIO CON FONDO 100% TRANSPARENTE
+  if (obsParam) {
+    return (
+      <div
+        style={{
+          width: '100vw',
+          height: '100vh',
+          backgroundColor: 'transparent',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '16px',
+          boxSizing: 'border-box',
+          overflow: 'hidden'
+        }}
+      >
+        <style>{`
+          html, body {
+            background-color: transparent !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: hidden !important;
+          }
+        `}</style>
+        {(obsParam === 'hud' || obsParam === 'dual') && (
+          <div style={{ maxWidth: '720px', width: '100%' }}>
+            <MarshallSuiteDualHUD
+              lecturaUsb={obsLecturaUsb}
+              usbConectado={obsUsbConectado}
+              conectarMultimetroFn={conectarMultimetroUSB}
+              desconectarMultimetroFn={desconectarMultimetroUSB}
+              escalaActiva={obsEscala}
+              setEscalaFn={setObsEscala}
+              autoHoldActivo={obsAutoHold}
+              toggleAutoHoldFn={() => setObsAutoHold(!obsAutoHold)}
+              maxVal={obsMaxDmm}
+              minVal={obsMinDmm}
+              resetMaxMinFn={() => { setObsMaxDmm(null); setObsMinDmm(null); }}
+              mcMeter={{
+                ...mcMeter,
+                ...(obsMcMeterData.conectado ? obsMcMeterData : {})
+              }}
+              isPopout={true}
+            />
+          </div>
+        )}
+        {(obsParam === 'multimetro' || obsParam === 'dmm') && (
+          <div style={{ maxWidth: '420px', width: '100%' }}>
+            <MultimetroMiniHUD
+              valor={obsLecturaUsb.valor}
+              unidad={obsLecturaUsb.unidad}
+              conectado={obsUsbConectado}
+              conectarFn={conectarMultimetroUSB}
+              desconectarFn={desconectarMultimetroUSB}
+              escalaActiva={obsEscala}
+              setEscalaFn={setObsEscala}
+              autoHoldActivo={obsAutoHold}
+              toggleAutoHoldFn={() => setObsAutoHold(!obsAutoHold)}
+              maxVal={obsMaxDmm}
+              minVal={obsMinDmm}
+              resetMaxMinFn={() => { setObsMaxDmm(null); setObsMinDmm(null); }}
+              isPopout={true}
+              colorFondo="transparent"
+            />
+          </div>
+        )}
+        {(obsParam === 'mcmeter' || obsParam === 'km003c') && (
+          <div style={{ maxWidth: '380px', width: '100%' }}>
+            <MCMeterMiniHUD
+              mcMeter={{
+                ...mcMeter,
+                ...(obsMcMeterData.conectado ? obsMcMeterData : {})
+              }}
+              isPopout={true}
+              colorFondoObs="transparent"
+            />
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div style={{ ...estilos.contenedor, ...t.fondoPrincipal }}>
       <style>{`
@@ -2767,114 +3186,234 @@ export default function AppDiagnostico() {
                 {/* NIVEL 3: VISTA DE MEDICIONES DEL MODELO ACTIVO */}
                 {nivelDb === 'mediciones' && modeloActivo && (
                   <>
-                    {/* ÁREA DE INSTRUMENTOS EN MARSHALL HARDWARE SUITE: 50% MULTÍMETRO / 50% MC-METER PRO */}
+                    {/* ÁREA DE INSTRUMENTOS EN MARSHALL HARDWARE SUITE: 50% MULTÍMETRO / 50% MC-METER PRO O SUITE DUAL */}
                     <div style={{ padding: '15px 20px', borderBottom: '1px solid #374151', flexShrink: 0 }}>
-                      <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))',
-                        gap: '15px',
-                        alignItems: 'stretch'
-                      }}>
-                        {/* 50% IZQUIERDA: MULTÍMETRO UNI-T UT61E+ (INTACTO) */}
-                        <VisorHUD
-                          valor={lecturaUsb.valor}
-                          unidad={lecturaUsb.unidad}
-                          conectado={usbConectado}
-                          conectarFn={conectarMultimetroUSB}
-                          desconectarFn={desconectarMultimetroUSB}
-                          vozActiva={vozActiva}
-                          toggleVozFn={toggleVoz}
-                          autoHoldActivo={autoHoldActivo}
-                          toggleAutoHoldFn={() => setAutoHoldActivo(!autoHoldActivo)}
-                          capturarFn={modeloActivo ? avanzarPinMagico : null}
-                          escalaActiva={
-                            modeloActivo
-                              ? (seccionLibreria === 'ic'
-                                ? escalaIc
-                                : (seccionLibreria === 'fpc_bateria'
-                                  ? escalaFpcBateria
-                                  : escalaFpc))
-                              : 'amperio'
-                          }
-                          oscilogramaActivo={false}
-                          toggleOscilogramaFn={null}
-                          mostrarOscilogramaBtn={false}
-                        />
-
-                        {/* 50% DERECHA: MARSHALL MC-METER PRO (ACOPLADO O BAHÍA DE RE-ACOPLAMIENTO) */}
-                        {!mcMeterDesacoplado ? (
-                          <MCMeterDockPanel
-                            mcMeter={mcMeter}
-                            onDesacoplar={(modo = 'pip') => {
-                              setMcMeterModoDesacoplado(modo);
-                              setMcMeterDesacoplado(true);
-                            }}
-                            onAbrirOscilograma={() => setMostrarOsciloscopioGrande(true)}
-                            modoAvanzado={modoAvanzadoMc}
-                            setModoAvanzado={setModoAvanzadoMc}
-                          />
-                        ) : (
-                          <div
+                      {suiteDualDesacoplada ? (
+                        <div
+                          style={{
+                            backgroundColor: '#1a1a1a',
+                            border: '2px dashed #a855f7',
+                            borderRadius: '15px',
+                            padding: '22px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            textAlign: 'center',
+                            gap: '10px'
+                          }}
+                        >
+                          <span style={{ color: '#c084fc', fontWeight: 'bold', fontSize: '1rem' }}>
+                            ⚡ MARSHALL HARDWARE SUITE (SUITE DUAL DESACOPLADA)
+                          </span>
+                          <p style={{ color: '#94a3b8', fontSize: '0.8rem', margin: 0, maxWidth: '520px' }}>
+                            Multímetro Digital UNI-T y Marshall MC-Meter Pro operando en una sola ventana compacta (~1/3 de tamaño) para {suiteDualModoDesacoplado === 'pip' ? 'Escritorio Always-on-Top' : 'Streaming en OBS Studio (Transparencia 100%)'}.
+                          </p>
+                          <div style={{ display: 'flex', gap: '15px', alignItems: 'center', margin: '4px 0' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span style={{ color: usbConectado ? '#10b981' : '#ef4444', fontSize: '10px' }}>●</span>
+                              <span style={{ color: '#38bdf8', fontWeight: 'bold', fontSize: '0.95rem' }}>DMM: {lecturaUsb.valor} {lecturaUsb.unidad}</span>
+                            </div>
+                            <span style={{ color: '#475569' }}>|</span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span style={{ color: mcMeter.conectado ? '#10b981' : '#ef4444', fontSize: '10px' }}>●</span>
+                              <span style={{ color: '#ff4444', fontWeight: 'bold', fontSize: '0.95rem' }}>{mcMeter.conectado ? `${mcMeter.vbus.toFixed(2)}V` : '--V'}</span>
+                              <span style={{ color: '#facc15', fontWeight: 'bold', fontSize: '0.95rem' }}>{mcMeter.conectado ? `${mcMeter.ibus.toFixed(3)}A` : '--A'}</span>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => setSuiteDualDesacoplada(false)}
                             style={{
-                              backgroundColor: '#1a1a1a',
-                              border: '2px dashed #00e5ff',
-                              borderRadius: '15px',
-                              padding: '20px',
+                              background: '#7c3aed',
+                              color: 'white',
+                              border: 'none',
+                              padding: '8px 18px',
+                              borderRadius: '20px',
+                              fontWeight: 'bold',
+                              fontSize: '0.78rem',
+                              cursor: 'pointer',
                               display: 'flex',
-                              flexDirection: 'column',
                               alignItems: 'center',
-                              justifyContent: 'center',
-                              textAlign: 'center',
-                              marginBottom: '15px',
-                              gap: '8px'
+                              gap: '6px',
+                              boxShadow: '0 0 15px rgba(124, 58, 237, 0.4)'
                             }}
                           >
-                            <span style={{ color: '#00e5ff', fontWeight: 'bold', fontSize: '0.95rem' }}>
-                              📌 INSTRUMENTO DESACOPLADO {mcMeterModoDesacoplado === 'pip' ? '(ESCRITORIO PIP)' : (mcMeterModoDesacoplado === 'popout' ? '(OBS STUDIO)' : '(FLOTANTE)')}
-                            </span>
-                            <p style={{ color: '#94a3b8', fontSize: '0.78rem', margin: 0, maxWidth: '340px' }}>
-                              {mcMeterModoDesacoplado === 'pip'
-                                ? 'Marshall MC-Meter Pro está operando como widget en el Escritorio (Siempre Visible / Always-on-Top).'
-                                : (mcMeterModoDesacoplado === 'popout'
-                                  ? 'Marshall MC-Meter Pro está operando en ventana externa independiente para OBS Studio.'
-                                  : 'Marshall MC-Meter Pro está operando en tarjeta flotante sobre la interfaz.')}
-                            </p>
-                            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', margin: '4px 0' }}>
-                              <span style={{ color: mcMeter.conectado ? '#10b981' : '#ef4444', fontSize: '11px' }}>●</span>
-                              <span style={{ color: '#ff4444', fontWeight: 'bold', fontSize: '0.95rem' }}>
-                                {mcMeter.conectado ? `${mcMeter.vbus.toFixed(2)}V` : '-- V'}
-                              </span>
-                              <span style={{ color: '#facc15', fontWeight: 'bold', fontSize: '0.95rem' }}>
-                                {mcMeter.conectado ? `${mcMeter.ibus.toFixed(3)}A` : '-- A'}
-                              </span>
-                              <span style={{ color: '#fbbf24', fontSize: '0.65rem', backgroundColor: '#172554', padding: '1px 5px', borderRadius: '4px' }}>
-                                {mcMeter.sps}
-                              </span>
-                            </div>
-                            <button
-                              onClick={() => {
-                                setMcMeterDesacoplado(false);
-                                setMostrarOsciloscopioGrande(false);
+                            <RotateCcw size={14} /> Re-Acoplar Suite Dual a la Plataforma
+                          </button>
+                        </div>
+                      ) : (
+                        <div style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))',
+                          gap: '15px',
+                          alignItems: 'stretch'
+                        }}>
+                          {/* 50% IZQUIERDA: MULTÍMETRO UNI-T UT61E+ (ACOPLADO O BAHÍA DE RE-ACOPLAMIENTO) */}
+                          {!multimetroDesacoplado ? (
+                            <VisorHUD
+                              valor={lecturaUsb.valor}
+                              unidad={lecturaUsb.unidad}
+                              conectado={usbConectado}
+                              conectarFn={conectarMultimetroUSB}
+                              desconectarFn={desconectarMultimetroUSB}
+                              vozActiva={vozActiva}
+                              toggleVozFn={toggleVoz}
+                              autoHoldActivo={autoHoldActivo}
+                              toggleAutoHoldFn={() => setAutoHoldActivo(!autoHoldActivo)}
+                              capturarFn={modeloActivo ? avanzarPinMagico : null}
+                              escalaActiva={
+                                modeloActivo
+                                  ? (seccionLibreria === 'ic'
+                                    ? escalaIc
+                                    : (seccionLibreria === 'fpc_bateria'
+                                      ? escalaFpcBateria
+                                      : escalaFpc))
+                                  : 'amperio'
+                              }
+                              setEscalaFn={(nuevaEscala) => {
+                                if (seccionLibreria === 'ic') setEscalaIc(nuevaEscala);
+                                else if (seccionLibreria === 'fpc_bateria') setEscalaFpcBateria(nuevaEscala);
+                                else setEscalaFpc(nuevaEscala);
                               }}
+                              onDesacoplarFn={(modo = 'pip') => {
+                                setMultimetroModoDesacoplado(modo);
+                                setMultimetroDesacoplado(true);
+                              }}
+                              onDesacoplarDualFn={(modo = 'pip') => {
+                                setSuiteDualModoDesacoplado(modo);
+                                setSuiteDualDesacoplada(true);
+                              }}
+                              maxVal={maxLecturaUsb}
+                              minVal={minLecturaUsb}
+                              resetMaxMinFn={resetMaxMinLectura}
+                              oscilogramaActivo={false}
+                              toggleOscilogramaFn={null}
+                              mostrarOscilogramaBtn={false}
+                            />
+                          ) : (
+                            <div
                               style={{
-                                background: 'rgba(0, 229, 255, 0.15)',
-                                border: '1px solid #00e5ff',
-                                color: '#00e5ff',
-                                padding: '6px 16px',
-                                borderRadius: '20px',
-                                fontWeight: 'bold',
-                                fontSize: '0.75rem',
-                                cursor: 'pointer',
+                                backgroundColor: '#1a1a1a',
+                                border: '2px dashed #00ffff',
+                                borderRadius: '15px',
+                                padding: '20px',
                                 display: 'flex',
+                                flexDirection: 'column',
                                 alignItems: 'center',
-                                gap: '6px'
+                                justifyContent: 'center',
+                                textAlign: 'center',
+                                marginBottom: '15px',
+                                gap: '8px'
                               }}
                             >
-                              🔗 Re-Acoplar Instrumento Aquí
-                            </button>
-                          </div>
-                        )}
-                      </div>
+                              <span style={{ color: '#00ffff', fontWeight: 'bold', fontSize: '0.95rem' }}>
+                                📌 MULTÍMETRO DESACOPLADO {multimetroModoDesacoplado === 'pip' ? '(ESCRITORIO PIP)' : '(OBS STUDIO)'}
+                              </span>
+                              <p style={{ color: '#94a3b8', fontSize: '0.78rem', margin: 0, maxWidth: '340px' }}>
+                                Operando en ventana independiente para esquemáticos o streaming.
+                              </p>
+                              <div style={{ display: 'flex', gap: '10px', alignItems: 'center', margin: '4px 0' }}>
+                                <span style={{ color: usbConectado ? '#10b981' : '#ef4444', fontSize: '11px' }}>●</span>
+                                <span style={{ color: '#38bdf8', fontWeight: 'bold', fontSize: '1.2rem' }}>
+                                  {lecturaUsb.valor} {lecturaUsb.unidad}
+                                </span>
+                              </div>
+                              <button
+                                onClick={() => setMultimetroDesacoplado(false)}
+                                style={{
+                                  background: 'rgba(0, 255, 255, 0.15)',
+                                  border: '1px solid #00ffff',
+                                  color: '#00ffff',
+                                  padding: '6px 16px',
+                                  borderRadius: '20px',
+                                  fontWeight: 'bold',
+                                  fontSize: '0.75rem',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '6px'
+                                }}
+                              >
+                                <RotateCcw size={12} /> Re-Acoplar Multímetro Aquí
+                              </button>
+                            </div>
+                          )}
+
+                          {/* 50% DERECHA: MARSHALL MC-METER PRO (ACOPLADO O BAHÍA DE RE-ACOPLAMIENTO) */}
+                          {!mcMeterDesacoplado ? (
+                            <MCMeterDockPanel
+                              mcMeter={mcMeter}
+                              onDesacoplar={(modo = 'pip') => {
+                                setMcMeterModoDesacoplado(modo);
+                                setMcMeterDesacoplado(true);
+                              }}
+                              onAbrirOscilograma={() => setMostrarOsciloscopioGrande(true)}
+                              modoAvanzado={modoAvanzadoMc}
+                              setModoAvanzado={setModoAvanzadoMc}
+                            />
+                          ) : (
+                            <div
+                              style={{
+                                backgroundColor: '#1a1a1a',
+                                border: '2px dashed #00e5ff',
+                                borderRadius: '15px',
+                                padding: '20px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                textAlign: 'center',
+                                marginBottom: '15px',
+                                gap: '8px'
+                              }}
+                            >
+                              <span style={{ color: '#00e5ff', fontWeight: 'bold', fontSize: '0.95rem' }}>
+                                📌 INSTRUMENTO DESACOPLADO {mcMeterModoDesacoplado === 'pip' ? '(ESCRITORIO PIP)' : (mcMeterModoDesacoplado === 'popout' ? '(OBS STUDIO)' : '(FLOTANTE)')}
+                              </span>
+                              <p style={{ color: '#94a3b8', fontSize: '0.78rem', margin: 0, maxWidth: '340px' }}>
+                                {mcMeterModoDesacoplado === 'pip'
+                                  ? 'Marshall MC-Meter Pro está operando como widget en el Escritorio (Siempre Visible / Always-on-Top).'
+                                  : (mcMeterModoDesacoplado === 'popout'
+                                    ? 'Marshall MC-Meter Pro está operando en ventana externa independiente para OBS Studio.'
+                                    : 'Marshall MC-Meter Pro está operando en tarjeta flotante sobre la interfaz.')}
+                              </p>
+                              <div style={{ display: 'flex', gap: '10px', alignItems: 'center', margin: '4px 0' }}>
+                                <span style={{ color: mcMeter.conectado ? '#10b981' : '#ef4444', fontSize: '11px' }}>●</span>
+                                <span style={{ color: '#ff4444', fontWeight: 'bold', fontSize: '0.95rem' }}>
+                                  {mcMeter.conectado ? `${mcMeter.vbus.toFixed(2)}V` : '-- V'}
+                                </span>
+                                <span style={{ color: '#facc15', fontWeight: 'bold', fontSize: '0.95rem' }}>
+                                  {mcMeter.conectado ? `${mcMeter.ibus.toFixed(3)}A` : '-- A'}
+                                </span>
+                                <span style={{ color: '#fbbf24', fontSize: '0.65rem', backgroundColor: '#172554', padding: '1px 5px', borderRadius: '4px' }}>
+                                  {mcMeter.sps}
+                                </span>
+                              </div>
+                              <button
+                                onClick={() => {
+                                  setMcMeterDesacoplado(false);
+                                  setMostrarOsciloscopioGrande(false);
+                                }}
+                                style={{
+                                  background: 'rgba(0, 229, 255, 0.15)',
+                                  border: '1px solid #00e5ff',
+                                  color: '#00e5ff',
+                                  padding: '6px 16px',
+                                  borderRadius: '20px',
+                                  fontWeight: 'bold',
+                                  fontSize: '0.75rem',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '6px'
+                                }}
+                              >
+                                🔗 Re-Acoplar Instrumento Aquí
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     <div style={{ flex: 1, overflowY: 'auto', padding: '15px' }}>
@@ -3719,6 +4258,18 @@ export default function AppDiagnostico() {
                 toggleAutoHoldFn={() => setAutoHoldActivo(!autoHoldActivo)}
                 capturarFn={avanzarPinMagico}
                 escalaActiva={escalaFpc}
+                setEscalaFn={setEscalaFpc}
+                onDesacoplarFn={(modo = 'pip') => {
+                  setMultimetroModoDesacoplado(modo);
+                  setMultimetroDesacoplado(true);
+                }}
+                onDesacoplarDualFn={(modo = 'pip') => {
+                  setSuiteDualModoDesacoplado(modo);
+                  setSuiteDualDesacoplada(true);
+                }}
+                maxVal={maxLecturaUsb}
+                minVal={minLecturaUsb}
+                resetMaxMinFn={resetMaxMinLectura}
                 mostrarOscilogramaBtn={false}
               />
             </div>
@@ -3819,6 +4370,18 @@ export default function AppDiagnostico() {
                 toggleAutoHoldFn={() => setAutoHoldActivo(!autoHoldActivo)}
                 capturarFn={avanzarPinMagico}
                 escalaActiva={escalaIc}
+                setEscalaFn={setEscalaIc}
+                onDesacoplarFn={(modo = 'pip') => {
+                  setMultimetroModoDesacoplado(modo);
+                  setMultimetroDesacoplado(true);
+                }}
+                onDesacoplarDualFn={(modo = 'pip') => {
+                  setSuiteDualModoDesacoplado(modo);
+                  setSuiteDualDesacoplada(true);
+                }}
+                maxVal={maxLecturaUsb}
+                minVal={minLecturaUsb}
+                resetMaxMinFn={resetMaxMinLectura}
                 mostrarOscilogramaBtn={false}
               />
             </div>
@@ -4286,8 +4849,102 @@ export default function AppDiagnostico() {
         />
       )}
 
-      {/* MINI-HUD FLOTANTE / POPOUT OBS / PIP ESCRITORIO */}
-      {mcMeterDesacoplado && !mostrarOsciloscopioGrande && (
+      {/* --- SUITE DUAL DESACOPLADA (MULTÍMETRO + MC-METER PRO EN ~1/3 COMPACTO) --- */}
+      {suiteDualDesacoplada && (
+        <MCMeterPopoutWindow
+          mode={suiteDualModoDesacoplado === 'pip' ? 'pip' : 'window'}
+          onClose={() => setSuiteDualDesacoplada(false)}
+          title={suiteDualModoDesacoplado === 'pip' ? 'Marshall Suite Dual — Escritorio (PiP)' : 'Marshall Suite Dual — Mini HUD (OBS)'}
+          width={680}
+          height={210}
+          transparent={true}
+        >
+          <MarshallSuiteDualHUD
+            lecturaUsb={lecturaUsb}
+            usbConectado={usbConectado}
+            conectarMultimetroFn={conectarMultimetroUSB}
+            desconectarMultimetroFn={desconectarMultimetroUSB}
+            escalaActiva={seccionLibreria === 'ic' ? escalaIc : (seccionLibreria === 'fpc_bateria' ? escalaFpcBateria : escalaFpc)}
+            setEscalaFn={(nueva) => {
+              if (seccionLibreria === 'ic') setEscalaIc(nueva);
+              else if (seccionLibreria === 'fpc_bateria') setEscalaFpcBateria(nueva);
+              else setEscalaFpc(nueva);
+            }}
+            autoHoldActivo={autoHoldActivo}
+            toggleAutoHoldFn={() => setAutoHoldActivo(!autoHoldActivo)}
+            maxVal={maxLecturaUsb}
+            minVal={minLecturaUsb}
+            resetMaxMinFn={resetMaxMinLectura}
+            mcMeter={mcMeter}
+            onAbrirOscilograma={() => setMostrarOsciloscopioGrande(true)}
+            onReacoplar={() => setSuiteDualDesacoplada(false)}
+            isPopout={true}
+            isPip={suiteDualModoDesacoplado === 'pip'}
+          />
+        </MCMeterPopoutWindow>
+      )}
+
+      {/* --- MULTÍMETRO DIGITAL DESACOPLADO (PIP ESCRITORIO / POPOUT OBS / FLOTANTE) --- */}
+      {multimetroDesacoplado && !suiteDualDesacoplada && (
+        multimetroModoDesacoplado === 'inapp' ? (
+          <div style={{ position: 'fixed', bottom: '80px', right: '20px', zIndex: 3000, width: '340px' }}>
+            <MultimetroMiniHUD
+              valor={lecturaUsb.valor}
+              unidad={lecturaUsb.unidad}
+              conectado={usbConectado}
+              conectarFn={conectarMultimetroUSB}
+              desconectarFn={desconectarMultimetroUSB}
+              escalaActiva={seccionLibreria === 'ic' ? escalaIc : (seccionLibreria === 'fpc_bateria' ? escalaFpcBateria : escalaFpc)}
+              setEscalaFn={(nueva) => {
+                if (seccionLibreria === 'ic') setEscalaIc(nueva);
+                else if (seccionLibreria === 'fpc_bateria') setEscalaFpcBateria(nueva);
+                else setEscalaFpc(nueva);
+              }}
+              autoHoldActivo={autoHoldActivo}
+              toggleAutoHoldFn={() => setAutoHoldActivo(!autoHoldActivo)}
+              maxVal={maxLecturaUsb}
+              minVal={minLecturaUsb}
+              resetMaxMinFn={resetMaxMinLectura}
+              onReacoplar={() => setMultimetroDesacoplado(false)}
+            />
+          </div>
+        ) : (
+          <MCMeterPopoutWindow
+            mode={multimetroModoDesacoplado === 'pip' ? 'pip' : 'window'}
+            onClose={() => setMultimetroDesacoplado(false)}
+            title={multimetroModoDesacoplado === 'pip' ? 'UT61E+ — Escritorio (PiP)' : 'UT61E+ — Multímetro Mini HUD (OBS)'}
+            width={350}
+            height={180}
+            transparent={true}
+          >
+            <MultimetroMiniHUD
+              valor={lecturaUsb.valor}
+              unidad={lecturaUsb.unidad}
+              conectado={usbConectado}
+              conectarFn={conectarMultimetroUSB}
+              desconectarFn={desconectarMultimetroUSB}
+              escalaActiva={seccionLibreria === 'ic' ? escalaIc : (seccionLibreria === 'fpc_bateria' ? escalaFpcBateria : escalaFpc)}
+              setEscalaFn={(nueva) => {
+                if (seccionLibreria === 'ic') setEscalaIc(nueva);
+                else if (seccionLibreria === 'fpc_bateria') setEscalaFpcBateria(nueva);
+                else setEscalaFpc(nueva);
+              }}
+              autoHoldActivo={autoHoldActivo}
+              toggleAutoHoldFn={() => setAutoHoldActivo(!autoHoldActivo)}
+              maxVal={maxLecturaUsb}
+              minVal={minLecturaUsb}
+              resetMaxMinFn={resetMaxMinLectura}
+              onReacoplar={() => setMultimetroDesacoplado(false)}
+              isPopout={true}
+              isPip={multimetroModoDesacoplado === 'pip'}
+              colorFondo="transparent"
+            />
+          </MCMeterPopoutWindow>
+        )
+      )}
+
+      {/* --- MARSHALL MC-METER PRO DESACOPLADO (PIP ESCRITORIO / POPOUT OBS / FLOTANTE) --- */}
+      {mcMeterDesacoplado && !mostrarOsciloscopioGrande && !suiteDualDesacoplada && (
         mcMeterModoDesacoplado === 'inapp' ? (
           <MCMeterMiniHUD
             mcMeter={mcMeter}
@@ -4303,6 +4960,7 @@ export default function AppDiagnostico() {
             mode={mcMeterModoDesacoplado === 'pip' ? 'pip' : 'window'}
             onClose={() => setMcMeterDesacoplado(false)}
             title={mcMeterModoDesacoplado === 'pip' ? 'Marshall MC-Meter Pro — Escritorio (PiP)' : 'Marshall MC-Meter Pro — Mini HUD (OBS)'}
+            transparent={true}
           >
             <MCMeterMiniHUD
               mcMeter={mcMeter}
@@ -4312,6 +4970,7 @@ export default function AppDiagnostico() {
               onReacoplar={() => setMcMeterDesacoplado(false)}
               modoAvanzado={modoAvanzadoMc}
               setModoAvanzado={setModoAvanzadoMc}
+              colorFondoObs="transparent"
             />
           </MCMeterPopoutWindow>
         )
