@@ -1430,17 +1430,6 @@ export default function AppDiagnostico() {
           }
         }
       });
-      try {
-        const cmd64 = new Uint8Array(64);
-        cmd64.set([0x06, 0xAB, 0xCD, 0x03, 0x5E, 0x01, 0xD9]);
-        await device.sendReport(0x00, cmd64);
-      } catch (e1) {
-        try {
-          await device.sendReport(0x00, new Uint8Array([0x06, 0xAB, 0xCD, 0x03, 0x5E, 0x01, 0xD9]));
-        } catch (e2) {
-          console.warn("Aviso en sendReport:", e2);
-        }
-      }
     } catch (error) {
       console.error(error);
       alert("Error USB: " + (error?.message || error));
