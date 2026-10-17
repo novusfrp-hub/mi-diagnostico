@@ -20,6 +20,7 @@ export default function MarshallSuiteDualHUD({
   maxVal = null,
   minVal = null,
   resetMaxMinFn,
+  enviarCmdDmmFn,
 
   // Props MC-Meter Pro
   mcMeter,
@@ -195,6 +196,9 @@ export default function MarshallSuiteDualHUD({
           <MultimetroMiniHUD
             valor={lecturaUsb.valor}
             unidad={lecturaUsb.unidad}
+            prefijo={lecturaUsb.prefijo}
+            modoKey={lecturaUsb.modoKey}
+            enviarCmdDmmFn={enviarCmdDmmFn}
             conectado={usbConectado}
             conectarFn={conectarMultimetroFn}
             desconectarFn={desconectarMultimetroFn}

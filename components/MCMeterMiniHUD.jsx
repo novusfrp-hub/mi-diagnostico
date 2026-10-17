@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Maximize2, X, ChevronDown, ChevronUp, Activity, Pin, PinOff, RotateCcw, Eye, EyeOff, Copy, Check } from 'lucide-react';
@@ -173,10 +174,10 @@ export default function MCMeterMiniHUD({
     colorFondoObs === 'transparent'
       ? 'transparent'
       : colorFondoObs === 'green'
-      ? '#00ff00'
-      : colorFondoObs === 'black'
-      ? '#000000'
-      : '#070b12';
+        ? '#00ff00'
+        : colorFondoObs === 'black'
+          ? '#000000'
+          : '#070b12';
 
   // Sincronizar dinámicamente el fondo de body y html de la ventana externa para eliminar todo espacio en negro
   useEffect(() => {
@@ -236,534 +237,534 @@ export default function MCMeterMiniHUD({
       }}
     >
       <div ref={contentInnerRef} style={{ width: '100%' }}>
-      {/* BARRA SUPERIOR CON CONTROLES */}
-      {isPopout && ocultarBarra ? (
-        /* Barra ultra-compacta (Modo Limpio OBS: sólo telemetría) */
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            backgroundColor: '#0a0f1d',
-            padding: '3px 8px',
-            borderBottom: '1px solid #1e293b'
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ color: conectado ? '#10b981' : '#ef4444', fontSize: '10px' }}>●</span>
-            <span style={{ color: '#00e5ff', fontSize: '0.72rem', fontWeight: 800 }}>MC-METER PRO</span>
-            <span style={{ color: '#fbbf24', fontSize: '0.65rem', fontWeight: 700 }}>{sps}</span>
-          </div>
-          <button
-            onClick={() => setOcultarBarra(false)}
-            title="Mostrar Barra de Herramientas"
+        {/* BARRA SUPERIOR CON CONTROLES */}
+        {isPopout && ocultarBarra ? (
+          /* Barra ultra-compacta (Modo Limpio OBS: sólo telemetría) */
+          <div
             style={{
-              background: '#1e293b',
-              border: '1px solid #334155',
-              borderRadius: '4px',
-              color: '#38bdf8',
-              padding: '2px 6px',
-              fontSize: '10px',
-              fontWeight: 700,
-              cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: '4px'
+              justifyContent: 'space-between',
+              backgroundColor: '#0a0f1d',
+              padding: '3px 8px',
+              borderBottom: '1px solid #1e293b'
             }}
           >
-            <Eye size={11} /> Herramientas
-          </button>
-        </div>
-      ) : (
-        /* Barra de herramientas completa */
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            backgroundColor: '#0f172a',
-            padding: '6px 10px',
-            borderBottom: '1px solid #1e293b',
-            cursor: isPopout || anclado ? 'default' : 'grab'
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ color: conectado ? '#10b981' : '#ef4444', fontSize: '10px' }}>●</span>
+              <span style={{ color: '#00e5ff', fontSize: '0.72rem', fontWeight: 800 }}>MC-METER PRO</span>
+              <span style={{ color: '#fbbf24', fontSize: '0.65rem', fontWeight: 700 }}>{sps}</span>
+            </div>
+            <button
+              onClick={() => setOcultarBarra(false)}
+              title="Mostrar Barra de Herramientas"
               style={{
-                color: conectado ? '#10b981' : '#ef4444',
-                fontSize: '12px',
-                animation: conectado ? 'pulse 2s infinite' : 'none'
-              }}
-            >
-              ●
-            </span>
-            <span style={{ color: '#00e5ff', fontWeight: 800, fontSize: '0.8rem', letterSpacing: '0.5px' }}>
-              MC-METER PRO
-            </span>
-            <span
-              style={{
-                backgroundColor: '#172554',
-                color: '#fbbf24',
-                fontSize: '0.65rem',
+                background: '#1e293b',
+                border: '1px solid #334155',
+                borderRadius: '4px',
+                color: '#38bdf8',
+                padding: '2px 6px',
+                fontSize: '10px',
                 fontWeight: 700,
-                padding: '1px 5px',
-                borderRadius: '4px'
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
               }}
             >
-              {sps}
-            </span>
-            {isPopout && (
+              <Eye size={11} /> Herramientas
+            </button>
+          </div>
+        ) : (
+          /* Barra de herramientas completa */
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              backgroundColor: '#0f172a',
+              padding: '6px 10px',
+              borderBottom: '1px solid #1e293b',
+              cursor: isPopout || anclado ? 'default' : 'grab'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span
                 style={{
-                  backgroundColor: isPip ? '#065f46' : '#3b0764',
-                  color: isPip ? '#6ee7b7' : '#c084fc',
-                  fontSize: '0.6rem',
-                  fontWeight: 800,
-                  padding: '1px 4px',
-                  borderRadius: '3px',
-                  border: isPip ? '1px solid #10b981' : '1px solid #9333ea'
+                  color: conectado ? '#10b981' : '#ef4444',
+                  fontSize: '12px',
+                  animation: conectado ? 'pulse 2s infinite' : 'none'
                 }}
               >
-                {isPip ? '📌 ESCRITORIO' : 'OBS'}
+                ●
               </span>
-            )}
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            {/* Selector de Fondo para Chroma Key / Transparencia en OBS */}
-            {isPopout && (
-              <>
-                <button
-                  onClick={() => {
-                    setColorFondoObs((prev) => (prev === 'transparent' ? 'dark' : (prev === 'dark' ? 'black' : (prev === 'black' ? 'green' : 'transparent'))));
-                  }}
-                  title="Fondo para OBS: 100% Transparente / Oscuro / Negro Puro / Verde Chroma"
+              <span style={{ color: '#00e5ff', fontWeight: 800, fontSize: '0.8rem', letterSpacing: '0.5px' }}>
+                MC-METER PRO
+              </span>
+              <span
+                style={{
+                  backgroundColor: '#172554',
+                  color: '#fbbf24',
+                  fontSize: '0.65rem',
+                  fontWeight: 700,
+                  padding: '1px 5px',
+                  borderRadius: '4px'
+                }}
+              >
+                {sps}
+              </span>
+              {isPopout && (
+                <span
                   style={{
-                    background: colorFondoObs === 'transparent' ? 'transparent' : (colorFondoObs === 'green' ? '#00ff00' : (colorFondoObs === 'black' ? '#000000' : '#1e293b')),
-                    color: colorFondoObs === 'green' ? '#000000' : (colorFondoObs === 'transparent' ? '#34d399' : '#38bdf8'),
-                    border: colorFondoObs === 'transparent' ? '1px dashed #34d399' : '1px solid #38bdf8',
-                    borderRadius: '4px',
-                    padding: '3px 6px',
-                    cursor: 'pointer',
-                    fontSize: '10px',
-                    fontWeight: 800
+                    backgroundColor: isPip ? '#065f46' : '#3b0764',
+                    color: isPip ? '#6ee7b7' : '#c084fc',
+                    fontSize: '0.6rem',
+                    fontWeight: 800,
+                    padding: '1px 4px',
+                    borderRadius: '3px',
+                    border: isPip ? '1px solid #10b981' : '1px solid #9333ea'
                   }}
                 >
-                  🎨 {colorFondoObs === 'transparent' ? 'TRANSP' : (colorFondoObs === 'green' ? 'CHROMA' : (colorFondoObs === 'black' ? 'NEGRO' : 'DARK'))}
-                </button>
+                  {isPip ? '📌 ESCRITORIO' : 'OBS'}
+                </span>
+              )}
+            </div>
 
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              {/* Selector de Fondo para Chroma Key / Transparencia en OBS */}
+              {isPopout && (
+                <>
+                  <button
+                    onClick={() => {
+                      setColorFondoObs((prev) => (prev === 'transparent' ? 'dark' : (prev === 'dark' ? 'black' : (prev === 'black' ? 'green' : 'transparent'))));
+                    }}
+                    title="Fondo para OBS: 100% Transparente / Oscuro / Negro Puro / Verde Chroma"
+                    style={{
+                      background: colorFondoObs === 'transparent' ? 'transparent' : (colorFondoObs === 'green' ? '#00ff00' : (colorFondoObs === 'black' ? '#000000' : '#1e293b')),
+                      color: colorFondoObs === 'green' ? '#000000' : (colorFondoObs === 'transparent' ? '#34d399' : '#38bdf8'),
+                      border: colorFondoObs === 'transparent' ? '1px dashed #34d399' : '1px solid #38bdf8',
+                      borderRadius: '4px',
+                      padding: '3px 6px',
+                      cursor: 'pointer',
+                      fontSize: '10px',
+                      fontWeight: 800
+                    }}
+                  >
+                    🎨 {colorFondoObs === 'transparent' ? 'TRANSP' : (colorFondoObs === 'green' ? 'CHROMA' : (colorFondoObs === 'black' ? 'NEGRO' : 'DARK'))}
+                  </button>
+
+                  <button
+                    onClick={copiarLinkObsMc}
+                    title="Copiar URL para Fuente Navegador en OBS Studio (Transparencia 100% Nativa)"
+                    style={{
+                      background: copiadoObs ? '#065f46' : '#1e293b',
+                      color: copiadoObs ? '#34d399' : '#38bdf8',
+                      border: '1px solid #334155',
+                      borderRadius: '4px',
+                      padding: '3px 6px',
+                      cursor: 'pointer',
+                      fontSize: '10px',
+                      fontWeight: 700,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '3px'
+                    }}
+                  >
+                    {copiadoObs ? <Check size={11} color="#34d399" /> : <Copy size={11} />}
+                    {copiadoObs ? 'COPIADO' : 'OBS URL'}
+                  </button>
+                </>
+              )}
+
+              {/* Botón Re-Acoplar a Hardware Suite 🔗 */}
+              {onReacoplar && (
                 <button
-                  onClick={copiarLinkObsMc}
-                  title="Copiar URL para Fuente Navegador en OBS Studio (Transparencia 100% Nativa)"
+                  onClick={onReacoplar}
+                  title="Re-acoplar en Marshall Hardware Suite"
                   style={{
-                    background: copiadoObs ? '#065f46' : '#1e293b',
-                    color: copiadoObs ? '#34d399' : '#38bdf8',
-                    border: '1px solid #334155',
+                    background: '#1e293b',
+                    border: '1px solid #00e5ff',
                     borderRadius: '4px',
+                    color: '#00e5ff',
                     padding: '3px 6px',
                     cursor: 'pointer',
                     fontSize: '10px',
                     fontWeight: 700,
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '3px'
+                    gap: '2px'
                   }}
                 >
-                  {copiadoObs ? <Check size={11} color="#34d399" /> : <Copy size={11} />}
-                  {copiadoObs ? 'COPIADO' : 'OBS URL'}
+                  🔗 Acoplar
                 </button>
-              </>
-            )}
+              )}
 
-            {/* Botón Re-Acoplar a Hardware Suite 🔗 */}
-            {onReacoplar && (
+              {/* Botón Anclar (solo en modo In-App) */}
+              {!isPopout && (
+                <button
+                  onClick={() => setAnclado(!anclado)}
+                  title={anclado ? 'Desanclar (Arrastrable)' : 'Anclar (Fijo)'}
+                  style={{
+                    background: '#1e293b',
+                    border: 'none',
+                    borderRadius: '4px',
+                    color: anclado ? '#10b981' : '#64748b',
+                    padding: '3px 6px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center'
+                  }}
+                >
+                  {anclado ? <Pin size={12} /> : <PinOff size={12} />}
+                </button>
+              )}
+
+              {/* Botón Modo Avanzado 🔬 */}
               <button
-                onClick={onReacoplar}
-                title="Re-acoplar en Marshall Hardware Suite"
+                onClick={() => setModoAvanzado(!modoAvanzado)}
+                title="Alternar Modo Avanzado (Micro-dígitos de 6 decimales)"
+                style={{
+                  background: modoAvanzado ? '#1e3a8a' : '#1e293b',
+                  border: 'none',
+                  borderRadius: '4px',
+                  color: modoAvanzado ? '#00e5ff' : '#64748b',
+                  padding: '3px 6px',
+                  cursor: 'pointer',
+                  fontSize: '11px',
+                  fontWeight: 700
+                }}
+              >
+                🔬
+              </button>
+
+              {/* Botón Sparkline 📈 */}
+              <button
+                onClick={() => setMostrarMiniGrafico(!mostrarMiniGrafico)}
+                title="Mini-Gráfico Sparkline integrado"
+                style={{
+                  background: mostrarMiniGrafico ? '#1e3a8a' : '#1e293b',
+                  border: 'none',
+                  borderRadius: '4px',
+                  color: mostrarMiniGrafico ? '#00e5ff' : '#94a3b8',
+                  padding: '3px 6px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center'
+                }}
+              >
+                <Activity size={12} />
+              </button>
+
+              {/* Botón 🗗 ABRIR GRANDE (EXCLUSIÓN MUTUA) */}
+              <button
+                onClick={onAbrirGrande}
+                title="Abrir Analizador Oscilograma X-Y a Pantalla Grande"
+                style={{
+                  background: '#0284c7',
+                  border: 'none',
+                  borderRadius: '4px',
+                  color: '#ffffff',
+                  padding: '3px 6px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  fontWeight: 700
+                }}
+              >
+                <Maximize2 size={12} />
+              </button>
+
+              {/* Botón Desplegar Panel ▾ */}
+              <button
+                onClick={() => setExpandido(!expandido)}
+                title="Expandir / Contraer Pines y Potencia"
                 style={{
                   background: '#1e293b',
-                  border: '1px solid #00e5ff',
+                  border: 'none',
                   borderRadius: '4px',
                   color: '#00e5ff',
                   padding: '3px 6px',
                   cursor: 'pointer',
-                  fontSize: '10px',
-                  fontWeight: 700,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '2px'
-                }}
-              >
-                🔗 Acoplar
-              </button>
-            )}
-
-            {/* Botón Anclar (solo en modo In-App) */}
-            {!isPopout && (
-              <button
-                onClick={() => setAnclado(!anclado)}
-                title={anclado ? 'Desanclar (Arrastrable)' : 'Anclar (Fijo)'}
-                style={{
-                  background: '#1e293b',
-                  border: 'none',
-                  borderRadius: '4px',
-                  color: anclado ? '#10b981' : '#64748b',
-                  padding: '3px 6px',
-                  cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center'
                 }}
               >
-                {anclado ? <Pin size={12} /> : <PinOff size={12} />}
+                {expandido ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
               </button>
-            )}
 
-            {/* Botón Modo Avanzado 🔬 */}
-            <button
-              onClick={() => setModoAvanzado(!modoAvanzado)}
-              title="Alternar Modo Avanzado (Micro-dígitos de 6 decimales)"
-              style={{
-                background: modoAvanzado ? '#1e3a8a' : '#1e293b',
-                border: 'none',
-                borderRadius: '4px',
-                color: modoAvanzado ? '#00e5ff' : '#64748b',
-                padding: '3px 6px',
-                cursor: 'pointer',
-                fontSize: '11px',
-                fontWeight: 700
-              }}
-            >
-              🔬
-            </button>
+              {/* Botón Ocultar Barra (solo en Popout para OBS limpio) */}
+              {isPopout && (
+                <button
+                  onClick={() => setOcultarBarra(true)}
+                  title="Ocultar barra de herramientas para captura 100% limpia en OBS"
+                  style={{
+                    background: '#1e293b',
+                    border: 'none',
+                    borderRadius: '4px',
+                    color: '#94a3b8',
+                    padding: '3px 6px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center'
+                  }}
+                >
+                  <EyeOff size={12} />
+                </button>
+              )}
 
-            {/* Botón Sparkline 📈 */}
-            <button
-              onClick={() => setMostrarMiniGrafico(!mostrarMiniGrafico)}
-              title="Mini-Gráfico Sparkline integrado"
-              style={{
-                background: mostrarMiniGrafico ? '#1e3a8a' : '#1e293b',
-                border: 'none',
-                borderRadius: '4px',
-                color: mostrarMiniGrafico ? '#00e5ff' : '#94a3b8',
-                padding: '3px 6px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center'
-              }}
-            >
-              <Activity size={12} />
-            </button>
-
-            {/* Botón 🗗 ABRIR GRANDE (EXCLUSIÓN MUTUA) */}
-            <button
-              onClick={onAbrirGrande}
-              title="Abrir Analizador Oscilograma X-Y a Pantalla Grande"
-              style={{
-                background: '#0284c7',
-                border: 'none',
-                borderRadius: '4px',
-                color: '#ffffff',
-                padding: '3px 6px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                fontWeight: 700
-              }}
-            >
-              <Maximize2 size={12} />
-            </button>
-
-            {/* Botón Desplegar Panel ▾ */}
-            <button
-              onClick={() => setExpandido(!expandido)}
-              title="Expandir / Contraer Pines y Potencia"
-              style={{
-                background: '#1e293b',
-                border: 'none',
-                borderRadius: '4px',
-                color: '#00e5ff',
-                padding: '3px 6px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center'
-              }}
-            >
-              {expandido ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-            </button>
-
-            {/* Botón Ocultar Barra (solo en Popout para OBS limpio) */}
-            {isPopout && (
-              <button
-                onClick={() => setOcultarBarra(true)}
-                title="Ocultar barra de herramientas para captura 100% limpia en OBS"
-                style={{
-                  background: '#1e293b',
-                  border: 'none',
-                  borderRadius: '4px',
-                  color: '#94a3b8',
-                  padding: '3px 6px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center'
-                }}
-              >
-                <EyeOff size={12} />
-              </button>
-            )}
-
-            {/* Botón Cerrar (solo en modo In-App, para evitar doble 'X' en la ventana del SO) */}
-            {!isPopout && (
-              <button
-                onClick={onReacoplar || (conectado ? desconectar : conectar)}
-                title={onReacoplar ? "Cerrar ventana flotante y re-acoplar a la Suite" : (conectado ? 'Desconectar MC-Meter' : 'Conectar MC-Meter')}
-                style={{
-                  background: 'rgba(239, 68, 68, 0.2)',
-                  border: 'none',
-                  borderRadius: '4px',
-                  color: '#ef4444',
-                  padding: '3px 6px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  fontWeight: 800,
-                  fontSize: '11px'
-                }}
-              >
-                <X size={12} />
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* CUERPO PRINCIPAL: VBUS E IBUS */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', padding: '8px 10px' }}>
-        {/* Celda VBUS */}
-        <div
-          style={{
-            backgroundColor: '#0c1424',
-            border: '1px solid #1e293b',
-            borderRadius: '8px',
-            padding: '6px 8px'
-          }}
-        >
-          <div style={{ color: '#fca5a5', fontSize: '0.68rem', fontWeight: 700, marginBottom: '2px' }}>
-            VBUS
-          </div>
-          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'flex-end' }}>
-            <span style={{ color: '#ff4444', fontSize: '1.25rem', fontWeight: 800, lineHeight: 1 }}>
-              {vData.ent}
-            </span>
-            {vData.micro && (
-              <span style={{ color: '#f87171', fontSize: '0.72rem', fontWeight: 700, marginLeft: '2px' }}>
-                {vData.micro}
-              </span>
-            )}
-            <span style={{ color: '#fca5a5', fontSize: '0.8rem', fontWeight: 700, marginLeft: '2px' }}>
-              {vData.unit}
-            </span>
-          </div>
-        </div>
-
-        {/* Celda IBUS */}
-        <div
-          style={{
-            backgroundColor: '#0c1424',
-            border: '1px solid #1e293b',
-            borderRadius: '8px',
-            padding: '6px 8px'
-          }}
-        >
-          <div style={{ color: '#fde047', fontSize: '0.68rem', fontWeight: 700, marginBottom: '2px' }}>
-            IBUS
-          </div>
-          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'flex-end' }}>
-            <span style={{ color: '#facc15', fontSize: '1.25rem', fontWeight: 800, lineHeight: 1 }}>
-              {iData.ent}
-            </span>
-            {iData.micro && (
-              <span style={{ color: '#fde047', fontSize: '0.72rem', fontWeight: 700, marginLeft: '2px' }}>
-                {iData.micro}
-              </span>
-            )}
-            <span style={{ color: '#fde047', fontSize: '0.8rem', fontWeight: 700, marginLeft: '2px' }}>
-              {iData.unit}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* MINI OSCILOGRAMA INTEGRADO (SPARKLINE) */}
-      {mostrarMiniGrafico && (
-        <div style={{ padding: '0 10px 8px 10px' }}>
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              backgroundColor: '#0c1424',
-              padding: '3px 8px',
-              borderRadius: '6px 6px 0 0',
-              border: '1px solid #1e293b',
-              borderBottom: 'none'
-            }}
-          >
-            <span style={{ color: '#facc15', fontSize: '0.7rem', fontWeight: 700 }}>
-              PEAK: {peakIbus.toFixed(3)}A
-            </span>
-            <div style={{ display: 'flex', gap: '4px' }}>
-              <button
-                onClick={resetPeak}
-                style={{
-                  background: '#1e293b',
-                  border: 'none',
-                  color: '#cbd5e1',
-                  borderRadius: '3px',
-                  padding: '2px 5px',
-                  fontSize: '0.65rem',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '3px'
-                }}
-              >
-                <RotateCcw size={10} /> RST
-              </button>
-              <button
-                onClick={onAbrirGrande}
-                style={{
-                  background: '#0284c7',
-                  border: 'none',
-                  color: '#ffffff',
-                  borderRadius: '3px',
-                  padding: '2px 6px',
-                  fontSize: '0.65rem',
-                  fontWeight: 700,
-                  cursor: 'pointer'
-                }}
-              >
-                🗗 ABRIR GRANDE
-              </button>
+              {/* Botón Cerrar (solo en modo In-App, para evitar doble 'X' en la ventana del SO) */}
+              {!isPopout && (
+                <button
+                  onClick={onReacoplar || (conectado ? desconectar : conectar)}
+                  title={onReacoplar ? "Cerrar ventana flotante y re-acoplar a la Suite" : (conectado ? 'Desconectar MC-Meter' : 'Conectar MC-Meter')}
+                  style={{
+                    background: 'rgba(239, 68, 68, 0.2)',
+                    border: 'none',
+                    borderRadius: '4px',
+                    color: '#ef4444',
+                    padding: '3px 6px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    fontWeight: 800,
+                    fontSize: '11px'
+                  }}
+                >
+                  <X size={12} />
+                </button>
+              )}
             </div>
           </div>
-          <canvas
-            ref={canvasRef}
-            width={430}
-            height={85}
-            style={{
-              display: 'block',
-              width: '100%',
-              height: '85px',
-              backgroundColor: '#04070d',
-              border: '1px solid #1e293b',
-              borderRadius: '0 0 6px 6px'
-            }}
-          />
-        </div>
-      )}
+        )}
 
-      {/* PANEL EXPANDIDO: POTENCIA Y PINES DE CARGA */}
-      {expandido && (
-        <div style={{ padding: '0 10px 10px 10px' }}>
-          {/* Potencia (Watts) */}
+        {/* CUERPO PRINCIPAL: VBUS E IBUS */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', padding: '8px 10px' }}>
+          {/* Celda VBUS */}
           <div
             style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
               backgroundColor: '#0c1424',
               border: '1px solid #1e293b',
               borderRadius: '8px',
-              padding: '6px 10px',
-              marginBottom: '6px'
+              padding: '6px 8px'
             }}
           >
-            <span style={{ color: '#38bdf8', fontSize: '0.72rem', fontWeight: 700 }}>
-              POTENCIA
-            </span>
-            <span style={{ color: '#38bdf8', fontSize: '0.95rem', fontWeight: 800 }}>
-              {fmtWatts(watts)}
-            </span>
+            <div style={{ color: '#fca5a5', fontSize: '0.68rem', fontWeight: 700, marginBottom: '2px' }}>
+              VBUS
+            </div>
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'flex-end' }}>
+              <span style={{ color: '#ff4444', fontSize: '1.25rem', fontWeight: 800, lineHeight: 1 }}>
+                {vData.ent}
+              </span>
+              {vData.micro && (
+                <span style={{ color: '#f87171', fontSize: '0.72rem', fontWeight: 700, marginLeft: '2px' }}>
+                  {vData.micro}
+                </span>
+              )}
+              <span style={{ color: '#fca5a5', fontSize: '0.8rem', fontWeight: 700, marginLeft: '2px' }}>
+                {vData.unit}
+              </span>
+            </div>
           </div>
 
-          {/* Grilla de Pines D+, D-, CC1, CC2 */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-            {/* D+ */}
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                backgroundColor: '#0b1220',
-                border: '1px solid #19253d',
-                borderRadius: '6px',
-                padding: '4px 8px'
-              }}
-            >
-              <span style={{ color: '#94a3b8', fontSize: '0.7rem', fontWeight: 700 }}>D+</span>
-              <span style={{ color: '#10b981', fontSize: '0.85rem', fontWeight: 800 }}>{fmtPin(dp)}</span>
+          {/* Celda IBUS */}
+          <div
+            style={{
+              backgroundColor: '#0c1424',
+              border: '1px solid #1e293b',
+              borderRadius: '8px',
+              padding: '6px 8px'
+            }}
+          >
+            <div style={{ color: '#fde047', fontSize: '0.68rem', fontWeight: 700, marginBottom: '2px' }}>
+              IBUS
             </div>
-
-            {/* D- */}
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                backgroundColor: '#0b1220',
-                border: '1px solid #19253d',
-                borderRadius: '6px',
-                padding: '4px 8px'
-              }}
-            >
-              <span style={{ color: '#94a3b8', fontSize: '0.7rem', fontWeight: 700 }}>D-</span>
-              <span style={{ color: '#eab308', fontSize: '0.85rem', fontWeight: 800 }}>{fmtPin(dm)}</span>
-            </div>
-
-            {/* CC1 con enmarcado verde en activo */}
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                backgroundColor: '#0b1220',
-                border: cc1Activo ? '2px solid #10b981' : '1px solid #19253d',
-                borderRadius: '6px',
-                padding: '4px 8px',
-                boxShadow: cc1Activo ? '0 0 10px rgba(16, 185, 129, 0.4)' : 'none'
-              }}
-            >
-              <span style={{ color: cc1Activo ? '#10b981' : '#94a3b8', fontSize: '0.7rem', fontWeight: 700 }}>
-                {cc1Activo ? '[CC1]' : 'CC1'}
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'flex-end' }}>
+              <span style={{ color: '#facc15', fontSize: '1.25rem', fontWeight: 800, lineHeight: 1 }}>
+                {iData.ent}
               </span>
-              <span style={{ color: cc1Activo ? '#10b981' : '#38bdf8', fontSize: '0.85rem', fontWeight: 800 }}>
-                {fmtPin(cc1)}
-              </span>
-            </div>
-
-            {/* CC2 con enmarcado verde en activo */}
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                backgroundColor: '#0b1220',
-                border: cc2Activo ? '2px solid #10b981' : '1px solid #19253d',
-                borderRadius: '6px',
-                padding: '4px 8px',
-                boxShadow: cc2Activo ? '0 0 10px rgba(16, 185, 129, 0.4)' : 'none'
-              }}
-            >
-              <span style={{ color: cc2Activo ? '#10b981' : '#94a3b8', fontSize: '0.7rem', fontWeight: 700 }}>
-                {cc2Activo ? '[CC2]' : 'CC2'}
-              </span>
-              <span style={{ color: cc2Activo ? '#10b981' : '#c084fc', fontSize: '0.85rem', fontWeight: 800 }}>
-                {fmtPin(cc2)}
+              {iData.micro && (
+                <span style={{ color: '#fde047', fontSize: '0.72rem', fontWeight: 700, marginLeft: '2px' }}>
+                  {iData.micro}
+                </span>
+              )}
+              <span style={{ color: '#fde047', fontSize: '0.8rem', fontWeight: 700, marginLeft: '2px' }}>
+                {iData.unit}
               </span>
             </div>
           </div>
         </div>
-      )}
+
+        {/* MINI OSCILOGRAMA INTEGRADO (SPARKLINE) */}
+        {mostrarMiniGrafico && (
+          <div style={{ padding: '0 10px 8px 10px' }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                backgroundColor: '#0c1424',
+                padding: '3px 8px',
+                borderRadius: '6px 6px 0 0',
+                border: '1px solid #1e293b',
+                borderBottom: 'none'
+              }}
+            >
+              <span style={{ color: '#facc15', fontSize: '0.7rem', fontWeight: 700 }}>
+                PEAK: {peakIbus.toFixed(3)}A
+              </span>
+              <div style={{ display: 'flex', gap: '4px' }}>
+                <button
+                  onClick={resetPeak}
+                  style={{
+                    background: '#1e293b',
+                    border: 'none',
+                    color: '#cbd5e1',
+                    borderRadius: '3px',
+                    padding: '2px 5px',
+                    fontSize: '0.65rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '3px'
+                  }}
+                >
+                  <RotateCcw size={10} /> RST
+                </button>
+                <button
+                  onClick={onAbrirGrande}
+                  style={{
+                    background: '#0284c7',
+                    border: 'none',
+                    color: '#ffffff',
+                    borderRadius: '3px',
+                    padding: '2px 6px',
+                    fontSize: '0.65rem',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                >
+                  🗗 ABRIR GRANDE
+                </button>
+              </div>
+            </div>
+            <canvas
+              ref={canvasRef}
+              width={430}
+              height={85}
+              style={{
+                display: 'block',
+                width: '100%',
+                height: '85px',
+                backgroundColor: '#04070d',
+                border: '1px solid #1e293b',
+                borderRadius: '0 0 6px 6px'
+              }}
+            />
+          </div>
+        )}
+
+        {/* PANEL EXPANDIDO: POTENCIA Y PINES DE CARGA */}
+        {expandido && (
+          <div style={{ padding: '0 10px 10px 10px' }}>
+            {/* Potencia (Watts) */}
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                backgroundColor: '#0c1424',
+                border: '1px solid #1e293b',
+                borderRadius: '8px',
+                padding: '6px 10px',
+                marginBottom: '6px'
+              }}
+            >
+              <span style={{ color: '#38bdf8', fontSize: '0.72rem', fontWeight: 700 }}>
+                POTENCIA
+              </span>
+              <span style={{ color: '#38bdf8', fontSize: '0.95rem', fontWeight: 800 }}>
+                {fmtWatts(watts)}
+              </span>
+            </div>
+
+            {/* Grilla de Pines D+, D-, CC1, CC2 */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+              {/* D+ */}
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  backgroundColor: '#0b1220',
+                  border: '1px solid #19253d',
+                  borderRadius: '6px',
+                  padding: '4px 8px'
+                }}
+              >
+                <span style={{ color: '#94a3b8', fontSize: '0.7rem', fontWeight: 700 }}>D+</span>
+                <span style={{ color: '#10b981', fontSize: '0.85rem', fontWeight: 800 }}>{fmtPin(dp)}</span>
+              </div>
+
+              {/* D- */}
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  backgroundColor: '#0b1220',
+                  border: '1px solid #19253d',
+                  borderRadius: '6px',
+                  padding: '4px 8px'
+                }}
+              >
+                <span style={{ color: '#94a3b8', fontSize: '0.7rem', fontWeight: 700 }}>D-</span>
+                <span style={{ color: '#eab308', fontSize: '0.85rem', fontWeight: 800 }}>{fmtPin(dm)}</span>
+              </div>
+
+              {/* CC1 con enmarcado verde en activo */}
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  backgroundColor: '#0b1220',
+                  border: cc1Activo ? '2px solid #10b981' : '1px solid #19253d',
+                  borderRadius: '6px',
+                  padding: '4px 8px',
+                  boxShadow: cc1Activo ? '0 0 10px rgba(16, 185, 129, 0.4)' : 'none'
+                }}
+              >
+                <span style={{ color: cc1Activo ? '#10b981' : '#94a3b8', fontSize: '0.7rem', fontWeight: 700 }}>
+                  {cc1Activo ? '[CC1]' : 'CC1'}
+                </span>
+                <span style={{ color: cc1Activo ? '#10b981' : '#38bdf8', fontSize: '0.85rem', fontWeight: 800 }}>
+                  {fmtPin(cc1)}
+                </span>
+              </div>
+
+              {/* CC2 con enmarcado verde en activo */}
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  backgroundColor: '#0b1220',
+                  border: cc2Activo ? '2px solid #10b981' : '1px solid #19253d',
+                  borderRadius: '6px',
+                  padding: '4px 8px',
+                  boxShadow: cc2Activo ? '0 0 10px rgba(16, 185, 129, 0.4)' : 'none'
+                }}
+              >
+                <span style={{ color: cc2Activo ? '#10b981' : '#94a3b8', fontSize: '0.7rem', fontWeight: 700 }}>
+                  {cc2Activo ? '[CC2]' : 'CC2'}
+                </span>
+                <span style={{ color: cc2Activo ? '#10b981' : '#c084fc', fontSize: '0.85rem', fontWeight: 800 }}>
+                  {fmtPin(cc2)}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

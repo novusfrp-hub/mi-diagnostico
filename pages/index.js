@@ -18,6 +18,7 @@ import ModalGestionUsuarios from '../components/ModalGestionUsuarios.js';
 import ModalEstadoUsuario from '../components/ModalEstadoUsuario.js';
 import { toPng } from 'html-to-image';
 import useAutoSave from '../hooks/useAutoSave';
+import { decodificarPerillaUT61EPlus, procesarTramaUT61EPlus, enviarComandoDMM } from '../lib/ut61eProtocol';
 import { sanitizarYMigrarModeloAStorage, deduplicarImagenesModelo, rehidratarImagenesModelo } from '../lib/storageHelper';
 import { useMCMeter } from '../hooks/useMCMeter';
 import MCMeterMiniHUD from '../components/MCMeterMiniHUD';
@@ -38,6 +39,8 @@ const obtenerUrlVideo = (url) => { if (!url) return ''; let v = ''; if (url.incl
 const VisorHUD = ({
   valor,
   unidad,
+  prefijo = 'DC',
+  modoKey = 'voltio',
   conectado,
   conectarFn,
   desconectarFn,
@@ -53,11 +56,14 @@ const VisorHUD = ({
   maxVal,
   minVal,
   resetMaxMinFn,
+  enviarCmdDmmFn,
   oscilogramaActivo,
   toggleOscilogramaFn,
   mostrarOscilogramaBtn = false
 }) => {
   const [copiado, setCopiado] = useState(false);
+  const [mostrarControles, setMostrarControles] = useState(false);
+  const [ultimoCmd, setUltimoCmd] = useState(null);
 
   const copiarLinkObsDmm = () => {
     if (typeof window !== 'undefined') {
@@ -68,10 +74,13 @@ const VisorHUD = ({
     }
   };
 
-  const esIncorrecta = conectado && escalaActiva !== 'libre' && (
-    (escalaActiva === 'diodo' && (unidad === 'uA' || unidad === 'mA' || unidad === 'A')) ||
-    (escalaActiva === 'ua' && (unidad === 'V' || unidad === 'Diod' || unidad === 'Ω'))
-  );
+  const ejecutarComando = async (cmd) => {
+    if (enviarCmdDmmFn) {
+      setUltimoCmd(cmd);
+      await enviarCmdDmmFn(cmd);
+      setTimeout(() => setUltimoCmd(null), 800);
+    }
+  };
 
   const valNum = parseFloat(valor);
   const esOl = valor === 'OL' || String(valor).includes('?0');
@@ -79,11 +88,11 @@ const VisorHUD = ({
   // Bargraph dinámico de 46 segmentos
   let pctBargraph = 0;
   if (!isNaN(valNum) && !esOl) {
-    if (escalaActiva === 'diodo') pctBargraph = Math.min(100, Math.max(0, (valNum / 2.5) * 100));
-    else if (escalaActiva === 'voltio') pctBargraph = Math.min(100, Math.max(0, (valNum / 20.0) * 100));
-    else if (escalaActiva === 'ua') pctBargraph = Math.min(100, Math.max(0, (valNum / 100.0) * 100));
-    else if (escalaActiva === 'amperio') pctBargraph = Math.min(100, Math.max(0, (valNum / 5.0) * 100));
-    else if (escalaActiva === 'ohmio') pctBargraph = Math.min(100, Math.max(0, (Math.log10(Math.max(1, valNum)) / 6) * 100));
+    if (modoKey === 'diodo' || escalaActiva === 'diodo') pctBargraph = Math.min(100, Math.max(0, (valNum / 2.5) * 100));
+    else if (modoKey === 'voltio' || escalaActiva === 'voltio') pctBargraph = Math.min(100, Math.max(0, (valNum / 20.0) * 100));
+    else if (modoKey === 'ua' || escalaActiva === 'ua') pctBargraph = Math.min(100, Math.max(0, (valNum / 100.0) * 100));
+    else if (modoKey === 'amperio' || escalaActiva === 'amperio') pctBargraph = Math.min(100, Math.max(0, (valNum / 5.0) * 100));
+    else if (modoKey === 'ohmio' || escalaActiva === 'ohmio') pctBargraph = Math.min(100, Math.max(0, (Math.log10(Math.max(1, valNum)) / 6) * 100));
     else pctBargraph = Math.min(100, Math.max(0, valNum * 20));
   } else if (esOl) {
     pctBargraph = 100;
@@ -91,182 +100,430 @@ const VisorHUD = ({
   const numSegs = 46;
   const segsActivos = Math.round((pctBargraph / 100) * numSegs);
 
-  const ESCALAS = [
-    { id: 'diodo', label: 'DIODO', color: '#3b82f6', icon: '⚡' },
-    { id: 'voltio', label: 'VOLTIOS', color: '#ef4444', icon: 'V' },
-    { id: 'ohmio', label: 'OHMIOS', color: '#a855f7', icon: 'Ω' },
-    { id: 'ua', label: 'µA', color: '#10b981', icon: 'µ' },
-    { id: 'amperio', label: 'AMPERIOS', color: '#f59e0b', icon: 'A' },
-    { id: 'libre', label: 'LIBRE / AUTO', color: '#06b6d4', icon: '🌐' }
-  ];
-
   return (
     <div style={{
-      backgroundColor: '#1a1a1a',
-      border: esIncorrecta ? '2px solid #ef4444' : (conectado ? '2px solid rgba(0, 255, 255, 0.4)' : '2px solid #333333'),
-      borderRadius: '15px',
-      padding: '14px 18px',
+      backgroundColor: '#0c1424',
+      border: conectado ? '2px solid rgba(0, 255, 255, 0.4)' : '2px solid #1e3a5f',
+      borderRadius: '16px',
+      padding: '12px 16px',
       display: 'flex',
       flexDirection: 'column',
       justifyContent: 'space-between',
       marginBottom: '15px',
       position: 'relative',
       overflow: 'hidden',
-      boxShadow: esIncorrecta ? '0 0 25px rgba(239, 68, 68, 0.8)' : (conectado ? '0 0 20px rgba(0, 255, 255, 0.15)' : 'none'),
+      boxShadow: conectado ? '0 0 20px rgba(0, 255, 255, 0.15)' : 'none',
       fontFamily: 'Consolas, monospace'
     }}>
-      {/* 1. BARRA SUPERIOR DE HERRAMIENTAS */}
-      <div className="tools-row" style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span style={{ color: conectado ? '#10b981' : '#ef4444', fontSize: '12px' }}>●</span>
-          <span style={{ color: '#00ffff', fontSize: '0.8rem', fontWeight: 'bold' }}>UT61E+ ANALYZER</span>
-          <span style={{ fontSize: '0.62rem', backgroundColor: '#172554', color: '#38bdf8', padding: '1px 6px', borderRadius: '4px', fontWeight: 'bold' }}>9600 8N1</span>
+      {/* 1. BARRA SUPERIOR LIMPIA (TÍTULO + MODO HARDWARE + ACCIONES PRINCIPALES) */}
+      <div className="tools-row" style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', flexWrap: 'wrap', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ color: conectado ? '#10b981' : '#ef4444', fontSize: '13px' }}>●</span>
+          <span style={{ color: '#00ffff', fontSize: '0.88rem', fontWeight: '900', letterSpacing: '0.8px' }}>
+            MARSHALL DMM PRO
+          </span>
+          {/* Badge del modo detectado por hardware */}
+          <span style={{
+            fontSize: '0.68rem',
+            backgroundColor: '#172554',
+            color: '#38bdf8',
+            border: '1px solid #1e3a8a',
+            padding: '2px 8px',
+            borderRadius: '6px',
+            fontWeight: 'bold',
+            letterSpacing: '0.5px'
+          }}>
+            {prefijo ? `${prefijo} ${unidad}` : (conectado ? 'AUTO V' : 'DESCONECTADO')}
+          </span>
+          {autoHoldActivo && (
+            <span style={{ fontSize: '0.62rem', background: '#065f46', color: '#34d399', padding: '1px 6px', borderRadius: '4px', fontWeight: 'bold' }}>
+              HOLD ON
+            </span>
+          )}
         </div>
 
-        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
-          {/* Conectar / Desconectar */}
-          <button onClick={conectado ? desconectarFn : conectarFn} style={{ background: conectado ? 'rgba(239, 68, 68, 0.2)' : '#333', color: conectado ? '#ef4444' : 'white', border: 'none', padding: '6px 12px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <Link size={12} /> {conectado ? 'DESCONECTAR' : 'CONECTAR USB'}
-          </button>
-
-          {/* Voz */}
-          <button onClick={toggleVozFn} style={{ background: vozActiva ? 'rgba(234, 179, 8, 0.2)' : '#333', color: vozActiva ? '#eab308' : 'white', border: 'none', padding: '6px 10px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', boxShadow: vozActiva ? '0 0 10px rgba(234,179,8,0.5)' : 'none' }}>
-            {vozActiva ? <Mic size={12} /> : <MicOff size={12} />} VOZ
-          </button>
-
-          {/* AutoHold */}
-          <button onClick={toggleAutoHoldFn} style={{ background: autoHoldActivo ? '#065f46' : '#333', color: autoHoldActivo ? '#34d399' : 'white', border: 'none', padding: '6px 10px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', boxShadow: autoHoldActivo ? '0 0 10px rgba(16,185,129,0.5)' : 'none' }}>
-            <Zap size={12} /> {autoHoldActivo ? 'HOLD ON' : 'HOLD'}
-          </button>
-
-          {/* Botón Escritorio Persistente (PiP) 📌 */}
-          {onDesacoplarFn && (
-            <button
-              onClick={() => onDesacoplarFn('pip')}
-              title="Ventana del Multímetro en el Escritorio (Always-on-Top / PiP). Flota sobre esquemáticos aunque minimices la plataforma."
-              style={{ background: '#065f46', color: '#34d399', border: '1px solid #10b981', padding: '6px 10px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', boxShadow: '0 0 10px rgba(16, 185, 129, 0.3)' }}
-            >
-              <Pin size={12} /> ESCRITORIO
-            </button>
-          )}
-
-          {/* Botón Ventana Externa OBS 🎥 */}
-          {onDesacoplarFn && (
-            <button
-              onClick={() => onDesacoplarFn('popout')}
-              title="Abrir ventana externa transparente para OBS Studio ('Captura de Ventana')"
-              style={{ background: '#0284c7', color: '#ffffff', border: 'none', padding: '6px 10px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
-            >
-              <Monitor size={12} /> OBS
-            </button>
-          )}
-
-          {/* Botón Desacoplar Suite Dual ⚡ (Multímetro + MC-Meter juntos en 1/3) */}
-          {onDesacoplarDualFn && (
-            <button
-              onClick={() => onDesacoplarDualFn('pip')}
-              title="Desacoplar ambos instrumentos (Multímetro + MC-Meter Pro) unidos en una sola ventana compacta de 1/3 de tamaño para escritorio o streaming"
-              style={{ background: '#7c3aed', color: '#ffffff', border: '1px solid #a855f7', padding: '6px 11px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', boxShadow: '0 0 12px rgba(124, 58, 237, 0.4)' }}
-            >
-              <Zap size={12} color="#fbbf24" /> SUITE DUAL (1/3)
-            </button>
-          )}
-
-          {/* Copiar enlace OBS Browser Source */}
-          <button
-            onClick={copiarLinkObsDmm}
-            title="Copiar URL para Fuente Navegador en OBS Studio (Transparencia Real 100%)"
-            style={{ background: copiado ? '#065f46' : '#1e293b', color: copiado ? '#34d399' : '#94a3b8', border: '1px solid #334155', padding: '6px 10px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
-          >
-            {copiado ? <Check size={12} color="#34d399" /> : <Copy size={12} />}
-            {copiado ? 'COPIADO' : 'OBS URL'}
-          </button>
-
-          {/* Capturar Pin Mágico */}
+        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+          {/* Botón SIGUIENTE (Siempre accesible para el diagnóstico) */}
           {conectado && capturarFn && (
             <button
-              onClick={esIncorrecta ? null : capturarFn}
-              disabled={esIncorrecta}
+              onClick={capturarFn}
+              title="Avanzar al siguiente pin/medición"
               style={{
-                background: esIncorrecta ? '#4b5563' : '#3b82f6',
-                color: esIncorrecta ? '#9ca3af' : 'white',
+                background: '#2563eb',
+                color: 'white',
                 border: 'none',
-                padding: '6px 12px',
-                borderRadius: '20px',
+                padding: '5px 12px',
+                borderRadius: '16px',
                 fontSize: '0.7rem',
                 fontWeight: 'bold',
-                cursor: esIncorrecta ? 'not-allowed' : 'pointer',
+                cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '4px',
-                boxShadow: esIncorrecta ? 'none' : '0 0 12px rgba(59,130,246,0.6)'
+                boxShadow: '0 0 10px rgba(37,99,235,0.5)'
               }}
             >
               <ChevronRight size={13} /> SIGUIENTE
             </button>
           )}
+
+          {/* Botón ⚙ CONTROLES (Menú colapsable / Opción A) */}
+          <button
+            onClick={() => setMostrarControles(!mostrarControles)}
+            title="Desplegar herramientas: OBS, Escritorio, Voz, Grabación, etc."
+            style={{
+              background: mostrarControles ? '#1e293b' : '#0f172a',
+              color: mostrarControles ? '#00ffff' : '#94a3b8',
+              border: `1px solid ${mostrarControles ? '#00ffff' : '#334155'}`,
+              padding: '5px 10px',
+              borderRadius: '16px',
+              fontSize: '0.7rem',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <Settings size={12} /> {mostrarControles ? '▲ CONTROLES' : '▼ CONTROLES'}
+          </button>
         </div>
       </div>
 
-      {/* 2. SELECTOR DE ESCALAS INTERACTIVO TIPO PÍLDORAS */}
-      {setEscalaFn && (
-        <div style={{ width: '100%', display: 'flex', gap: '6px', margin: '4px 0 8px 0', flexWrap: 'wrap' }}>
-          {ESCALAS.map((esc) => {
-            const activa = escalaActiva === esc.id;
-            return (
+      {/* PANEL DESPLEGABLE DE CONTROLES Y HERRAMIENTAS (OPCIÓN A) */}
+      <AnimatePresence>
+        {mostrarControles && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            style={{
+              width: '100%',
+              background: '#070b12',
+              border: '1px solid #1e293b',
+              borderRadius: '10px',
+              padding: '8px 10px',
+              marginBottom: '8px',
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: '6px',
+              alignItems: 'center'
+            }}
+          >
+            {/* Conectar / Desconectar */}
+            <button
+              onClick={conectado ? desconectarFn : conectarFn}
+              style={{
+                background: conectado ? 'rgba(239, 68, 68, 0.2)' : '#1e293b',
+                color: conectado ? '#ef4444' : '#e2e8f0',
+                border: '1px solid ' + (conectado ? '#dc2626' : '#334155'),
+                padding: '5px 10px',
+                borderRadius: '14px',
+                fontSize: '0.68rem',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+            >
+              <Link size={12} /> {conectado ? 'DESCONECTAR' : 'CONECTAR USB'}
+            </button>
+
+            {/* Voz */}
+            <button
+              onClick={toggleVozFn}
+              style={{
+                background: vozActiva ? 'rgba(234, 179, 8, 0.2)' : '#1e293b',
+                color: vozActiva ? '#eab308' : '#94a3b8',
+                border: '1px solid ' + (vozActiva ? '#ca8a04' : '#334155'),
+                padding: '5px 10px',
+                borderRadius: '14px',
+                fontSize: '0.68rem',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                boxShadow: vozActiva ? '0 0 8px rgba(234,179,8,0.4)' : 'none'
+              }}
+            >
+              {vozActiva ? <Mic size={12} /> : <MicOff size={12} />} VOZ
+            </button>
+
+            {/* AutoHold inteligente de software */}
+            <button
+              onClick={toggleAutoHoldFn}
+              style={{
+                background: autoHoldActivo ? '#065f46' : '#1e293b',
+                color: autoHoldActivo ? '#34d399' : '#94a3b8',
+                border: '1px solid ' + (autoHoldActivo ? '#059669' : '#334155'),
+                padding: '5px 10px',
+                borderRadius: '14px',
+                fontSize: '0.68rem',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                boxShadow: autoHoldActivo ? '0 0 8px rgba(16,185,129,0.4)' : 'none'
+              }}
+            >
+              <Zap size={12} /> {autoHoldActivo ? 'AUTO-HOLD ON' : 'AUTO-HOLD'}
+            </button>
+
+            {/* Botón Escritorio Persistente (PiP) */}
+            {onDesacoplarFn && (
               <button
-                key={esc.id}
-                onClick={() => setEscalaFn(esc.id)}
+                onClick={() => onDesacoplarFn('pip')}
+                title="Ventana del Multímetro flotante en Escritorio (Always-on-Top / PiP)"
                 style={{
-                  background: activa ? esc.color : '#111827',
-                  color: activa ? '#ffffff' : '#94a3b8',
-                  border: `1px solid ${activa ? esc.color : '#374151'}`,
-                  padding: '4px 10px',
-                  borderRadius: '12px',
-                  fontSize: '0.72rem',
+                  background: '#065f46',
+                  color: '#34d399',
+                  border: '1px solid #10b981',
+                  padding: '5px 10px',
+                  borderRadius: '14px',
+                  fontSize: '0.68rem',
                   fontWeight: 'bold',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '4px',
-                  boxShadow: activa ? `0 0 10px ${esc.color}66` : 'none',
-                  transition: 'all 0.15s ease'
+                  gap: '4px'
                 }}
               >
-                <span>{esc.icon}</span> {esc.label}
+                <Pin size={12} /> ESCRITORIO
               </button>
-            );
-          })}
-        </div>
-      )}
+            )}
+
+            {/* Botón OBS Ventana Externa */}
+            {onDesacoplarFn && (
+              <button
+                onClick={() => onDesacoplarFn('popout')}
+                title="Abrir ventana externa transparente para OBS Studio ('Captura de Ventana')"
+                style={{
+                  background: '#0284c7',
+                  color: '#ffffff',
+                  border: 'none',
+                  padding: '5px 10px',
+                  borderRadius: '14px',
+                  fontSize: '0.68rem',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+              >
+                <Monitor size={12} /> OBS
+              </button>
+            )}
+
+            {/* Botón Suite Dual */}
+            {onDesacoplarDualFn && (
+              <button
+                onClick={() => onDesacoplarDualFn('pip')}
+                title="Desacoplar Suite Dual (Multímetro + MC-Meter Pro juntos en 1/3 de pantalla)"
+                style={{
+                  background: '#7c3aed',
+                  color: '#ffffff',
+                  border: '1px solid #a855f7',
+                  padding: '5px 10px',
+                  borderRadius: '14px',
+                  fontSize: '0.68rem',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+              >
+                <Zap size={12} color="#fbbf24" /> SUITE DUAL (1/3)
+              </button>
+            )}
+
+            {/* Copiar enlace OBS Browser Source */}
+            <button
+              onClick={copiarLinkObsDmm}
+              title="Copiar URL para Fuente Navegador en OBS Studio (Transparencia Real 100%)"
+              style={{
+                background: copiado ? '#065f46' : '#1e293b',
+                color: copiado ? '#34d399' : '#94a3b8',
+                border: '1px solid #334155',
+                padding: '5px 10px',
+                borderRadius: '14px',
+                fontSize: '0.68rem',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+            >
+              {copiado ? <Check size={12} color="#34d399" /> : <Copy size={12} />}
+              {copiado ? 'COPIADO' : 'OBS URL'}
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 2. BOTONERA DE CONTROL FÍSICO REAL DEL MULTÍMETRO (SELECT, RANGE, AUTO, Hz%, REL, HOLD) */}
+      <div style={{ width: '100%', display: 'flex', gap: '6px', margin: '3px 0 6px 0', flexWrap: 'wrap' }}>
+        <button
+          onClick={() => ejecutarComando('SELECT')}
+          title="Botón SELECT: Rota entre Ω -> Cont 🔊 -> Diodo ▶| -> Cap ⊣⊢ o DC <-> AC"
+          style={{
+            background: ultimoCmd === 'SELECT' ? '#f59e0b' : '#d97706',
+            color: '#000000',
+            border: 'none',
+            padding: '4px 14px',
+            borderRadius: '10px',
+            fontSize: '0.72rem',
+            fontWeight: '900',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            boxShadow: '0 0 8px rgba(217, 119, 6, 0.4)',
+            transition: 'all 0.12s ease'
+          }}
+        >
+          ⚡ SELECT
+        </button>
+
+        <button
+          onClick={() => ejecutarComando('RANGE')}
+          title="Botón RANGE: Cambiar rango decimal manual"
+          style={{
+            background: ultimoCmd === 'RANGE' ? '#475569' : '#1e293b',
+            color: '#cbd5e1',
+            border: '1px solid #334155',
+            padding: '4px 10px',
+            borderRadius: '10px',
+            fontSize: '0.7rem',
+            fontWeight: 'bold',
+            cursor: 'pointer'
+          }}
+        >
+          RANGE
+        </button>
+
+        <button
+          onClick={() => ejecutarComando('AUTO')}
+          title="Botón AUTO: Volver a Auto-Rango"
+          style={{
+            background: ultimoCmd === 'AUTO' ? '#0284c7' : '#0f172a',
+            color: '#38bdf8',
+            border: '1px solid #1e3a8a',
+            padding: '4px 10px',
+            borderRadius: '10px',
+            fontSize: '0.7rem',
+            fontWeight: 'bold',
+            cursor: 'pointer'
+          }}
+        >
+          AUTO
+        </button>
+
+        <button
+          onClick={() => ejecutarComando('HZ')}
+          title="Botón Hz%: Frecuencia y Duty Cycle"
+          style={{
+            background: ultimoCmd === 'HZ' ? '#0891b2' : '#1e293b',
+            color: '#22d3ee',
+            border: '1px solid #334155',
+            padding: '4px 10px',
+            borderRadius: '10px',
+            fontSize: '0.7rem',
+            fontWeight: 'bold',
+            cursor: 'pointer'
+          }}
+        >
+          Hz %
+        </button>
+
+        <button
+          onClick={() => ejecutarComando('REL')}
+          title="Botón REL: Modo Relativo (Delta Δ)"
+          style={{
+            background: ultimoCmd === 'REL' ? '#059669' : '#1e293b',
+            color: '#34d399',
+            border: '1px solid #334155',
+            padding: '4px 10px',
+            borderRadius: '10px',
+            fontSize: '0.7rem',
+            fontWeight: 'bold',
+            cursor: 'pointer'
+          }}
+        >
+          Δ REL
+        </button>
+
+        <button
+          onClick={() => ejecutarComando('HOLD')}
+          title="Botón HOLD: Congelar lectura en hardware y encender luz"
+          style={{
+            background: ultimoCmd === 'HOLD' ? '#2563eb' : '#1e293b',
+            color: '#60a5fa',
+            border: '1px solid #334155',
+            padding: '4px 10px',
+            borderRadius: '10px',
+            fontSize: '0.7rem',
+            fontWeight: 'bold',
+            cursor: 'pointer'
+          }}
+        >
+          HOLD ☀
+        </button>
+      </div>
 
       {/* 3. PANTALLA DIGITAL GIGANTE Y TELEMETRÍA MAX/MIN */}
-      <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', margin: '4px 0' }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px' }}>
-          <span className="hud-valor-text" style={{ color: valor === 'OL' ? '#ff0000' : '#00ffff', fontSize: '3.8rem', fontWeight: '900', fontFamily: 'Consolas, monospace', textShadow: valor === 'OL' ? '0 0 15px rgba(255,0,0,0.5)' : '0 0 15px rgba(0,255,255,0.4)', lineHeight: '1' }}>
-            {valor}
+      <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '4px 0' }}>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <span style={{ fontSize: '0.82rem', color: '#fbbf24', fontWeight: 'bold', letterSpacing: '0.5px' }}>
+            {prefijo || 'DC'}
           </span>
-          <span style={{ color: '#94a3b8', fontSize: '1.4rem', fontWeight: 'bold' }}>
-            {unidad}
-          </span>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px' }}>
+            <span
+              className="hud-valor-text"
+              style={{
+                color: esOl ? '#ff3b3b' : (conectado ? '#00ffff' : '#64748b'),
+                fontSize: '4.6rem',
+                fontWeight: '900',
+                fontFamily: 'Consolas, monospace',
+                textShadow: esOl ? '0 0 20px rgba(255,59,59,0.6)' : (conectado ? '0 0 20px rgba(0,255,255,0.45)' : 'none'),
+                lineHeight: '1',
+                letterSpacing: '-1px'
+              }}
+            >
+              {valor}
+            </span>
+            <span style={{ color: '#38bdf8', fontSize: '1.7rem', fontWeight: 'bold' }}>
+              {unidad}
+            </span>
+          </div>
         </div>
 
-        {/* Bloque MAX / MIN */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-            <span style={{ fontSize: '0.68rem', color: '#ef4444', fontWeight: 'bold' }}>MAX:</span>
-            <span style={{ fontSize: '0.82rem', color: '#fca5a5', fontWeight: 'bold' }}>
+        {/* Bloque MAX / MIN Agrandado */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '3px', background: '#070b12', padding: '6px 12px', borderRadius: '8px', border: '1px solid #1e293b' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontSize: '0.76rem', color: '#ef4444', fontWeight: '900' }}>MAX:</span>
+            <span style={{ fontSize: '1.02rem', color: '#fca5a5', fontWeight: 'bold', fontFamily: 'Consolas, monospace' }}>
               {maxVal !== null ? `${maxVal.toFixed(3)}` : '----'}
             </span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-            <span style={{ fontSize: '0.68rem', color: '#3b82f6', fontWeight: 'bold' }}>MIN:</span>
-            <span style={{ fontSize: '0.82rem', color: '#93c5fd', fontWeight: 'bold' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontSize: '0.76rem', color: '#38bdf8', fontWeight: '900' }}>MIN:</span>
+            <span style={{ fontSize: '1.02rem', color: '#93c5fd', fontWeight: 'bold', fontFamily: 'Consolas, monospace' }}>
               {minVal !== null ? `${minVal.toFixed(3)}` : '----'}
             </span>
             {resetMaxMinFn && (
-              <button onClick={resetMaxMinFn} title="Reiniciar picos MAX/MIN" style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', padding: 0 }}>
-                <RotateCcw size={11} />
+              <button
+                onClick={resetMaxMinFn}
+                title="Reiniciar picos MAX/MIN"
+                style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '0 2px', display: 'flex', alignItems: 'center' }}
+              >
+                <RotateCcw size={12} />
               </button>
             )}
           </div>
@@ -274,7 +531,7 @@ const VisorHUD = ({
       </div>
 
       {/* 4. BARGRAPH ANALÓGICO DINÁMICO DE 46 SEGMENTOS */}
-      <div style={{ width: '100%', marginTop: '6px' }}>
+      <div style={{ width: '100%', marginTop: '4px' }}>
         <div style={{ display: 'flex', gap: '2px', width: '100%', height: '6px', background: '#0a0b0f', borderRadius: '4px', padding: '1px', overflow: 'hidden', border: '1px solid #1f2937' }}>
           {Array.from({ length: numSegs }).map((_, idx) => {
             const activo = idx < segsActivos;
@@ -296,30 +553,6 @@ const VisorHUD = ({
           })}
         </div>
       </div>
-
-      {/* Alerta de escala incorrecta (solo si no está en modo libre) */}
-      {esIncorrecta && (
-        <div style={{
-          width: '100%',
-          background: 'rgba(239, 68, 68, 0.2)',
-          border: '1px solid #ef4444',
-          color: '#ff6b6b',
-          padding: '8px 12px',
-          borderRadius: '8px',
-          fontSize: '0.8rem',
-          fontWeight: 'bold',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '8px',
-          marginTop: '10px',
-          textAlign: 'center',
-          boxShadow: '0 0 10px rgba(239, 68, 68, 0.3)'
-        }}>
-          <AlertTriangle size={16} color="#ef4444" />
-          ⚠️ ESCALA INCORRECTA: CONFIGURA EL DIAL FÍSICO O SELECCIONA EL MODO CORRECTO ARRIBA
-        </div>
-      )}
     </div>
   );
 };
@@ -1249,7 +1482,7 @@ export default function AppDiagnostico() {
 
 
   // ESTADOS MULTÍMETRO
-  const [usbConectado, setUsbConectado] = useState(false); const [lecturaUsb, setLecturaUsb] = useState({ valor: '----', unidad: '---', tick: 0 }); const [dispositivoUsb, setDispositivoUsb] = useState(null); const ordenCamposDock = ['vbus', 'dp', 'dm', 'cc1', 'cc2']; const [campoActivoDock, setCampoActivoDock] = useState('vbus'); const [pinActivoFpc, setPinActivoFpc] = useState(1); const [modoFpc, setModoFpc] = useState('crear'); const [escalaFpc, setEscalaFpc] = useState('diodo');
+  const [usbConectado, setUsbConectado] = useState(false); const [lecturaUsb, setLecturaUsb] = useState({ valor: '----', unidad: '---', prefijo: 'DC', modoKey: 'voltio', tick: 0 }); const [dispositivoUsb, setDispositivoUsb] = useState(null); const ordenCamposDock = ['vbus', 'dp', 'dm', 'cc1', 'cc2']; const [campoActivoDock, setCampoActivoDock] = useState('vbus'); const [pinActivoFpc, setPinActivoFpc] = useState(1); const [modoFpc, setModoFpc] = useState('crear'); const [escalaFpc, setEscalaFpc] = useState('diodo');
 
   // ESTADOS RFFE
   const [lecturaRffe, setLecturaRffe] = useState('0x00'); const [dispositivoSerial, setDispositivoSerial] = useState(null);
@@ -1310,6 +1543,8 @@ export default function AppDiagnostico() {
         multimetro: {
           valor: lecturaUsb.valor,
           unidad: lecturaUsb.unidad,
+          prefijo: lecturaUsb.prefijo,
+          modoKey: lecturaUsb.modoKey,
           conectado: usbConectado,
           escalaActiva: seccionLibreria === 'ic' ? escalaIc : (seccionLibreria === 'fpc_bateria' ? escalaFpcBateria : escalaFpc),
           autoHoldActivo,
@@ -1369,7 +1604,7 @@ export default function AppDiagnostico() {
         if (event.data && event.data.tipo === 'SYNC_HARDWARE') {
           const { multimetro, mcMeter: mc } = event.data;
           if (multimetro) {
-            setObsLecturaUsb({ valor: multimetro.valor, unidad: multimetro.unidad, tick: Date.now() });
+            setObsLecturaUsb({ valor: multimetro.valor, unidad: multimetro.unidad, prefijo: multimetro.prefijo, modoKey: multimetro.modoKey, tick: Date.now() });
             setObsUsbConectado(multimetro.conectado);
             if (multimetro.escalaActiva) setObsEscala(multimetro.escalaActiva);
             if (multimetro.autoHoldActivo !== undefined) setObsAutoHold(multimetro.autoHoldActivo);
@@ -1651,75 +1886,34 @@ export default function AppDiagnostico() {
       setDispositivoUsb(device);
       setUsbConectado(true);
       device.addEventListener("inputreport", event => {
-        const text = new TextDecoder("latin1").decode(event.data);
-        let parsedVal = null;
-        let parsedUni = null;
-        let escalaActiva = escalaFpcRef.current;
-        if (mostrarOscilogramaRef.current) {
-          escalaActiva = 'amperio';
-        } else if (seccionLibreriaRef.current === 'ic') {
-          escalaActiva = escalaIcRef.current;
-        } else if (seccionLibreriaRef.current === 'fpc_bateria') {
-          escalaActiva = escalaFpcBateriaRef.current;
-        }
+        const parsed = procesarTramaUT61EPlus(event.data);
+        if (parsed) {
+          const { prefijo, valor: parsedVal, unidad: parsedUni, modoKey } = parsed;
 
-        if (text.includes("OL") || text.includes("?0")) {
-          parsedVal = "OL";
-          if (escalaActiva === 'ua') {
-            parsedUni = "uA";
-          } else if (escalaActiva === 'amperio') {
-            parsedUni = "A";
-          } else if (escalaActiva === 'voltio') {
-            parsedUni = "V";
-          } else if (escalaActiva === 'ohmio') {
-            parsedUni = "Ω";
-          } else if (escalaActiva === 'diodo') {
-            parsedUni = "Diod";
-          } else {
-            const textLower = text.toLowerCase();
-            if (text.includes("V")) { parsedUni = "V"; }
-            else if (textLower.includes("ohm") || text.includes("Ω")) { parsedUni = "Ω"; }
-            else if (textLower.includes("ua") || text.includes("µ") || text.includes("μ") || textLower.includes("micro")) { parsedUni = "uA"; }
-            else if (textLower.includes("ma")) { parsedUni = "mA"; }
-            else if (text.includes("A") || textLower.includes("amp")) { parsedUni = "A"; }
-            else { parsedUni = "Diod"; }
+          setLecturaUsb(prev => ({
+            valor: parsedVal,
+            unidad: parsedUni,
+            prefijo,
+            modoKey,
+            tick: prev.tick + 1
+          }));
+
+          // Sincronizar automáticamente la escala activa del diagnóstico según la perilla física
+          if (modoKey === 'diodo') {
+            if (seccionLibreriaRef.current === 'ic') setEscalaIc('diodo');
+            else if (seccionLibreriaRef.current === 'fpc_bateria') setEscalaFpcBateria('diodo');
+            else setEscalaFpc('diodo');
+          } else if (modoKey === 'ohmio') {
+            if (seccionLibreriaRef.current === 'ic') setEscalaIc('ohmio');
+            else if (seccionLibreriaRef.current === 'fpc_bateria') setEscalaFpcBateria('ohmio');
+            else setEscalaFpc('ohmio');
+          } else if (modoKey === 'ua') {
+            setEscalaFpc('ua');
+          } else if (modoKey === 'amperio') {
+            setEscalaFpc('amperio');
+          } else if (modoKey === 'voltio') {
+            setEscalaFpc('voltio');
           }
-        } else {
-          const match = text.match(/([-+]?\d+\.\d+)/);
-          if (match) {
-            const rawVal = match[1];
-            if (escalaActiva === 'ua') {
-              parsedUni = "uA";
-              parsedVal = rawVal;
-            } else if (escalaActiva === 'amperio') {
-              parsedUni = "A";
-              parsedVal = rawVal;
-            } else if (escalaActiva === 'voltio') {
-              parsedUni = "V";
-              parsedVal = parseFloat(rawVal).toFixed(3);
-            } else if (escalaActiva === 'ohmio') {
-              parsedUni = "Ω";
-              parsedVal = rawVal;
-            } else if (escalaActiva === 'diodo') {
-              parsedUni = "Diod";
-              parsedVal = parseFloat(rawVal).toFixed(3);
-            } else {
-              const textLower = text.toLowerCase();
-              if (text.includes("V")) { parsedUni = "V"; }
-              else if (textLower.includes("ohm") || text.includes("Ω")) { parsedUni = "Ω"; }
-              else if (textLower.includes("ua") || text.includes("µ") || text.includes("μ") || textLower.includes("micro")) { parsedUni = "uA"; }
-              else if (textLower.includes("ma")) { parsedUni = "mA"; }
-              else if (text.includes("A") || textLower.includes("amp")) { parsedUni = "A"; }
-              else { parsedUni = "Diod"; }
-
-              if (parsedUni === "V" || parsedUni === "Diod") { parsedVal = parseFloat(rawVal).toFixed(3); }
-              else { parsedVal = rawVal; }
-            }
-          }
-        }
-
-        if (parsedVal !== null && parsedUni !== null) {
-          setLecturaUsb(prev => ({ valor: parsedVal, unidad: parsedUni, tick: prev.tick + 1 }));
 
           // Rastreo en tiempo real de picos Máximos y Mínimos (MAX/MIN)
           if (parsedVal !== 'OL' && !String(parsedVal).includes('?0')) {
@@ -1730,38 +1924,39 @@ export default function AppDiagnostico() {
             }
           }
 
+          // AutoHold inteligente de diagnóstico guiado
           if (autoHoldActivoRef.current) {
             const valNum = parseFloat(parsedVal);
-            const esIncorrecta = (escalaActiva === 'diodo' && (parsedUni !== 'Diod' && parsedUni !== 'V')) ||
-              (escalaActiva === 'ua' && parsedUni !== 'uA') ||
-              (escalaActiva === 'amperio' && parsedUni !== 'A') ||
-              (escalaActiva === 'voltio' && parsedUni !== 'V') ||
-              (escalaActiva === 'ohmio' && parsedUni !== 'Ω');
-            if (esIncorrecta) {
+            let tol = 0.003;
+            let esCeroInactivo = false;
+            if (modoKey === 'ua') {
+              tol = 1.5;
+              esCeroInactivo = valNum < 1.0;
+            } else if (modoKey === 'amperio') {
+              tol = 0.05;
+              esCeroInactivo = valNum < 0.01;
+            } else if (modoKey === 'voltio') {
+              tol = 0.05;
+              esCeroInactivo = valNum < 0.1;
+            } else if (modoKey === 'ohmio') {
+              tol = 5.0;
+              esCeroInactivo = valNum < 1.0;
+            }
+
+            if (!isNaN(valNum) && !esCeroInactivo) {
+              if (autoHoldValueRef.current !== null && Math.abs(valNum - autoHoldValueRef.current) <= tol) {
+                if (!autoHoldTriggeredRef.current && Date.now() - autoHoldStartTimeRef.current >= 1500) {
+                  autoHoldTriggeredRef.current = true;
+                  avanzarPinMagico(parsedVal);
+                }
+              } else {
+                autoHoldValueRef.current = valNum;
+                autoHoldStartTimeRef.current = Date.now();
+                autoHoldTriggeredRef.current = false;
+              }
+            } else {
               autoHoldValueRef.current = null;
               autoHoldTriggeredRef.current = false;
-            } else {
-              let tol = 0.003;
-              let esCeroInactivo = false;
-              if (escalaActiva === 'ua') {
-                tol = 1.5;
-                esCeroInactivo = valNum < 1.0;
-              } else if (escalaActiva === 'amperio') {
-                tol = 0.05;
-                esCeroInactivo = valNum < 0.01;
-              } else if (escalaActiva === 'voltio') {
-                tol = 0.05;
-                esCeroInactivo = valNum < 0.1;
-              } else if (escalaActiva === 'ohmio') {
-                tol = 5.0;
-                esCeroInactivo = valNum < 1.0;
-              }
-
-              if (!isNaN(valNum) && !esCeroInactivo) {
-                if (autoHoldValueRef.current !== null && Math.abs(valNum - autoHoldValueRef.current) <= tol) {
-                  if (!autoHoldTriggeredRef.current && Date.now() - autoHoldStartTimeRef.current >= 1500) { autoHoldTriggeredRef.current = true; avanzarPinMagico(parsedVal); }
-                } else { autoHoldValueRef.current = valNum; autoHoldStartTimeRef.current = Date.now(); autoHoldTriggeredRef.current = false; }
-              } else { autoHoldValueRef.current = null; autoHoldTriggeredRef.current = false; }
             }
           }
         }
@@ -3254,6 +3449,9 @@ export default function AppDiagnostico() {
                             <VisorHUD
                               valor={lecturaUsb.valor}
                               unidad={lecturaUsb.unidad}
+                              prefijo={lecturaUsb.prefijo}
+                              modoKey={lecturaUsb.modoKey}
+                              enviarCmdDmmFn={(cmd) => enviarComandoDMM(dispositivoUsb, cmd)}
                               conectado={usbConectado}
                               conectarFn={conectarMultimetroUSB}
                               desconectarFn={desconectarMultimetroUSB}
@@ -4250,6 +4448,9 @@ export default function AppDiagnostico() {
               <VisorHUD
                 valor={lecturaUsb.valor}
                 unidad={lecturaUsb.unidad}
+                prefijo={lecturaUsb.prefijo}
+                modoKey={lecturaUsb.modoKey}
+                enviarCmdDmmFn={(cmd) => enviarComandoDMM(dispositivoUsb, cmd)}
                 conectado={usbConectado}
                 conectarFn={conectarMultimetroUSB}
                 desconectarFn={desconectarMultimetroUSB}
@@ -4362,6 +4563,9 @@ export default function AppDiagnostico() {
               <VisorHUD
                 valor={lecturaUsb.valor}
                 unidad={lecturaUsb.unidad}
+                prefijo={lecturaUsb.prefijo}
+                modoKey={lecturaUsb.modoKey}
+                enviarCmdDmmFn={(cmd) => enviarComandoDMM(dispositivoUsb, cmd)}
                 conectado={usbConectado}
                 conectarFn={conectarMultimetroUSB}
                 desconectarFn={desconectarMultimetroUSB}
@@ -4862,6 +5066,7 @@ export default function AppDiagnostico() {
         >
           <MarshallSuiteDualHUD
             lecturaUsb={lecturaUsb}
+            enviarCmdDmmFn={(cmd) => enviarComandoDMM(dispositivoUsb, cmd)}
             usbConectado={usbConectado}
             conectarMultimetroFn={conectarMultimetroUSB}
             desconectarMultimetroFn={desconectarMultimetroUSB}
@@ -4893,6 +5098,9 @@ export default function AppDiagnostico() {
             <MultimetroMiniHUD
               valor={lecturaUsb.valor}
               unidad={lecturaUsb.unidad}
+              prefijo={lecturaUsb.prefijo}
+              modoKey={lecturaUsb.modoKey}
+              enviarCmdDmmFn={(cmd) => enviarComandoDMM(dispositivoUsb, cmd)}
               conectado={usbConectado}
               conectarFn={conectarMultimetroUSB}
               desconectarFn={desconectarMultimetroUSB}
@@ -4922,6 +5130,9 @@ export default function AppDiagnostico() {
             <MultimetroMiniHUD
               valor={lecturaUsb.valor}
               unidad={lecturaUsb.unidad}
+              prefijo={lecturaUsb.prefijo}
+              modoKey={lecturaUsb.modoKey}
+              enviarCmdDmmFn={(cmd) => enviarComandoDMM(dispositivoUsb, cmd)}
               conectado={usbConectado}
               conectarFn={conectarMultimetroUSB}
               desconectarFn={desconectarMultimetroUSB}
