@@ -1304,7 +1304,13 @@ export default function AppDiagnostico() {
     if (typeof navigator === 'undefined' || !navigator.hid) { alert("Navegador no compatible."); return; }
     try {
       const devices = await navigator.hid.requestDevice({ filters: [{ vendorId: 0x1A86, productId: 0xE429 }] });
-      if (devices.length === 0) return; const device = devices[0]; await device.open(); setDispositivoUsb(device); setUsbConectado(true);
+      if (devices.length === 0) return;
+      const device = devices[0];
+      await device.open();
+      await device.sendFeatureReport(0x00, new Uint8Array([0x80, 0x25, 0x00, 0x00, 0x03]));
+      await new Promise(resolve => setTimeout(resolve, 100));
+      setDispositivoUsb(device);
+      setUsbConectado(true);
       device.addEventListener("inputreport", event => {
         const text = new TextDecoder("latin1").decode(event.data);
         let parsedVal = null;
@@ -1411,6 +1417,7 @@ export default function AppDiagnostico() {
           }
         }
       });
+      await device.sendReport(0x00, new Uint8Array([0x06, 0xAB, 0xCD, 0x03, 0x5E, 0x01, 0xD9]));
     } catch (error) { alert("Error USB."); }
   };
   const desconectarMultimetroUSB = async () => { if (dispositivoUsb) { try { await dispositivoUsb.close(); } catch (e) { } setDispositivoUsb(null); } setUsbConectado(false); setLecturaUsb({ valor: '----', unidad: '---', tick: 0 }); };
