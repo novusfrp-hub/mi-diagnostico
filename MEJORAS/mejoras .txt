@@ -20,3 +20,10 @@ Vas al ícono del arbolito en la izquierda (Source Control).
 Escribes un mensaje (ej. "Agregué falla de batería"), le das al botón azul de Commit y luego a Sync Changes (Sincronizar cambios).
 
 ¡Y listo! Vercel detectará automáticamente que guardaste algo nuevo en tu caja fuerte y actualizará tu página web en internet en menos de 1 minuto sin que tú muevas un solo dedo.
+
+------------------------------------------------------------------------------------------
+
+NUEVA FUNCIÓN OBS STUDIO:
+- Se implementó la integración de HUD transparente para OBS Studio mediante Fuente Navegador (?obs=hud, ?obs=dual, ?obs=multimetro, ?obs=mcmeter).
+- Fondo 100% transparente sin bordes grises ni filtros chroma key.
+- Guía completa detallada en: MEJORAS/guia-obs-fuente-navegador-transparente.md

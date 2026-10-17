@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Zap, RotateCcw, Copy, Check, Activity, Pin } from 'lucide-react';
 import MultimetroMiniHUD from './MultimetroMiniHUD';
 
@@ -30,10 +30,25 @@ export default function MarshallSuiteDualHUD({
   // Control general
   onReacoplar,
   isPopout = false,
-  isPip = false
+  isPip = false,
+  colorFondo: colorFondoProp = 'dark'
 }) {
-  const [colorFondo, setColorFondo] = useState('transparent');
+  const [colorFondo, setColorFondo] = useState(colorFondoProp || 'dark');
   const [copiado, setCopiado] = useState(false);
+  const containerRef = useRef(null);
+
+  // Sincronizar dinámicamente el fondo de la ventana popout externa
+  useEffect(() => {
+    if (!isPopout || !containerRef.current) return;
+    const doc = containerRef.current.ownerDocument;
+    if (doc) {
+      const bgHex = colorFondo === 'transparent'
+        ? (isPopout ? '#070b12' : 'transparent')
+        : (colorFondo === 'black' ? '#000000' : (colorFondo === 'green' ? '#00ff00' : '#070b12'));
+      if (doc.body) doc.body.style.backgroundColor = bgHex;
+      if (doc.documentElement) doc.documentElement.style.backgroundColor = bgHex;
+    }
+  }, [isPopout, colorFondo]);
 
   // Copiar link OBS para fuente navegador 100% transparente
   const copiarLinkObsDual = () => {
@@ -68,6 +83,7 @@ export default function MarshallSuiteDualHUD({
 
   return (
     <div
+      ref={containerRef}
       style={{
         width: '100%',
         minWidth: '560px',
@@ -86,7 +102,7 @@ export default function MarshallSuiteDualHUD({
       }}
     >
       {/* CABECERA SUITE UNIFICADA */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '6px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: colorFondo === 'transparent' ? '1px solid rgba(0, 229, 255, 0.2)' : '1px solid rgba(255,255,255,0.08)', paddingBottom: '6px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span style={{ fontSize: '0.8rem', fontWeight: '900', color: '#00e5ff', letterSpacing: '0.5px' }}>
             ⚡ MARSHALL HARDWARE SUITE (DUAL HUD)
@@ -100,7 +116,7 @@ export default function MarshallSuiteDualHUD({
           {/* Botón copiar URL OBS */}
           <button
             onClick={copiarLinkObsDual}
-            title="Copiar URL para OBS Studio (Fuente Navegador con transparencia real)"
+            title="Copiar URL para OBS Studio (Fuente Navegador con transparencia real 100%)"
             style={{
               background: copiado ? '#065f46' : '#1e293b',
               color: copiado ? '#34d399' : '#38bdf8',
@@ -121,10 +137,27 @@ export default function MarshallSuiteDualHUD({
 
           {/* Selectores de Fondo Croma en Popout */}
           {isPopout && (
-            <div style={{ display: 'flex', gap: '2px', background: '#0f172a', padding: '2px', borderRadius: '4px' }}>
-              <button onClick={() => setColorFondo('transparent')} title="Transparente" style={{ width: '13px', height: '13px', borderRadius: '2px', background: 'transparent', border: '1px dashed #64748b', cursor: 'pointer' }} />
-              <button onClick={() => setColorFondo('black')} title="Negro" style={{ width: '13px', height: '13px', borderRadius: '2px', background: '#000000', border: '1px solid #334155', cursor: 'pointer' }} />
-              <button onClick={() => setColorFondo('green')} title="Verde Croma" style={{ width: '13px', height: '13px', borderRadius: '2px', background: '#00ff00', border: 'none', cursor: 'pointer' }} />
+            <div style={{ display: 'flex', gap: '3px', background: '#0f172a', padding: '2px 4px', borderRadius: '6px', alignItems: 'center' }}>
+              <button
+                onClick={() => setColorFondo('dark')}
+                title="Fondo Oscuro (Recomendado para Escritorio Windows)"
+                style={{ width: '13px', height: '13px', borderRadius: '2px', background: '#070b12', border: colorFondo === 'dark' ? '2px solid #00e5ff' : '1px solid #334155', cursor: 'pointer' }}
+              />
+              <button
+                onClick={() => setColorFondo('black')}
+                title="Fondo Negro (Para filtro Color Key / Screen en OBS)"
+                style={{ width: '13px', height: '13px', borderRadius: '2px', background: '#000000', border: colorFondo === 'black' ? '2px solid #00e5ff' : '1px solid #334155', cursor: 'pointer' }}
+              />
+              <button
+                onClick={() => setColorFondo('green')}
+                title="Fondo Verde (Para filtro Chroma Key en OBS)"
+                style={{ width: '13px', height: '13px', borderRadius: '2px', background: '#00ff00', border: colorFondo === 'green' ? '2px solid #00e5ff' : 'none', cursor: 'pointer' }}
+              />
+              <button
+                onClick={() => setColorFondo('transparent')}
+                title="Transparente (Para OBS Browser Source / Fuente Navegador)"
+                style={{ width: '13px', height: '13px', borderRadius: '2px', background: 'transparent', border: colorFondo === 'transparent' ? '2px solid #00e5ff' : '1px dashed #64748b', cursor: 'pointer' }}
+              />
             </div>
           )}
 
@@ -153,7 +186,12 @@ export default function MarshallSuiteDualHUD({
       {/* CUERPO DUAL DIVIDIDO: MULTÍMETRO (IZQ) / MC-METER PRO (DER) */}
       <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr', gap: '12px', alignItems: 'stretch' }}>
         {/* PANEL IZQUIERDO: MULTÍMETRO */}
-        <div style={{ background: 'rgba(17, 24, 39, 0.4)', borderRadius: '10px', padding: '6px 10px', border: '1px solid rgba(255,255,255,0.05)' }}>
+        <div style={{
+          background: colorFondo === 'transparent' ? 'transparent' : 'rgba(17, 24, 39, 0.5)',
+          borderRadius: '10px',
+          padding: '6px 10px',
+          border: colorFondo === 'transparent' ? '1px solid rgba(0, 255, 255, 0.18)' : '1px solid rgba(255,255,255,0.06)'
+        }}>
           <MultimetroMiniHUD
             valor={lecturaUsb.valor}
             unidad={lecturaUsb.unidad}
@@ -169,12 +207,20 @@ export default function MarshallSuiteDualHUD({
             resetMaxMinFn={resetMaxMinFn}
             isPopout={isPopout}
             isPip={isPip}
-            colorFondo="transparent"
+            colorFondo={colorFondo}
           />
         </div>
 
         {/* PANEL DERECHO: MARSHALL MC-METER PRO */}
-        <div style={{ background: 'rgba(17, 24, 39, 0.4)', borderRadius: '10px', padding: '8px 10px', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+        <div style={{
+          background: colorFondo === 'transparent' ? 'transparent' : 'rgba(17, 24, 39, 0.5)',
+          borderRadius: '10px',
+          padding: '8px 10px',
+          border: colorFondo === 'transparent' ? '1px solid rgba(0, 229, 255, 0.18)' : '1px solid rgba(255,255,255,0.06)',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between'
+        }}>
           {/* Header MC-Meter */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>

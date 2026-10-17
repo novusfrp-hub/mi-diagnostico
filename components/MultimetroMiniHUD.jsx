@@ -229,7 +229,7 @@ export default function MultimetroMiniHUD({
           >
             {valor}
           </span>
-          <span style={{ color: '#94a3b8', fontSize: '1.1rem', fontWeight: 'bold' }}>
+          <span style={{ color: '#00ffff', fontSize: '1.15rem', fontWeight: 'bold', opacity: 0.9 }}>
             {unidad}
           </span>
         </div>

@@ -2534,6 +2534,7 @@ export default function AppDiagnostico() {
                 ...(obsMcMeterData.conectado ? obsMcMeterData : {})
               }}
               isPopout={true}
+              colorFondo="transparent"
             />
           </div>
         )}
@@ -4857,7 +4858,7 @@ export default function AppDiagnostico() {
           title={suiteDualModoDesacoplado === 'pip' ? 'Marshall Suite Dual — Escritorio (PiP)' : 'Marshall Suite Dual — Mini HUD (OBS)'}
           width={680}
           height={210}
-          transparent={true}
+          transparent={false}
         >
           <MarshallSuiteDualHUD
             lecturaUsb={lecturaUsb}
@@ -4880,6 +4881,7 @@ export default function AppDiagnostico() {
             onReacoplar={() => setSuiteDualDesacoplada(false)}
             isPopout={true}
             isPip={suiteDualModoDesacoplado === 'pip'}
+            colorFondo="dark"
           />
         </MCMeterPopoutWindow>
       )}
@@ -4915,7 +4917,7 @@ export default function AppDiagnostico() {
             title={multimetroModoDesacoplado === 'pip' ? 'UT61E+ — Escritorio (PiP)' : 'UT61E+ — Multímetro Mini HUD (OBS)'}
             width={350}
             height={180}
-            transparent={true}
+            transparent={false}
           >
             <MultimetroMiniHUD
               valor={lecturaUsb.valor}
@@ -4937,7 +4939,7 @@ export default function AppDiagnostico() {
               onReacoplar={() => setMultimetroDesacoplado(false)}
               isPopout={true}
               isPip={multimetroModoDesacoplado === 'pip'}
-              colorFondo="transparent"
+              colorFondo="dark"
             />
           </MCMeterPopoutWindow>
         )
@@ -4960,7 +4962,7 @@ export default function AppDiagnostico() {
             mode={mcMeterModoDesacoplado === 'pip' ? 'pip' : 'window'}
             onClose={() => setMcMeterDesacoplado(false)}
             title={mcMeterModoDesacoplado === 'pip' ? 'Marshall MC-Meter Pro — Escritorio (PiP)' : 'Marshall MC-Meter Pro — Mini HUD (OBS)'}
-            transparent={true}
+            transparent={false}
           >
             <MCMeterMiniHUD
               mcMeter={mcMeter}
@@ -4970,7 +4972,7 @@ export default function AppDiagnostico() {
               onReacoplar={() => setMcMeterDesacoplado(false)}
               modoAvanzado={modoAvanzadoMc}
               setModoAvanzado={setModoAvanzadoMc}
-              colorFondoObs="transparent"
+              colorFondoObs="dark"
             />
           </MCMeterPopoutWindow>
         )
