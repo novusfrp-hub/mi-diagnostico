@@ -1306,9 +1306,22 @@ export default function AppDiagnostico() {
       const devices = await navigator.hid.requestDevice({ filters: [{ vendorId: 0x1A86, productId: 0xE429 }] });
       if (devices.length === 0) return;
       const device = devices[0];
-      await device.open();
-      await device.sendFeatureReport(0x00, new Uint8Array([0x80, 0x25, 0x00, 0x00, 0x03]));
-      await new Promise(resolve => setTimeout(resolve, 100));
+      if (!device.opened) {
+        await device.open();
+      }
+      try {
+        await device.sendFeatureReport(0x00, new Uint8Array([0x80, 0x25, 0x00, 0x00, 0x03]));
+        await new Promise(resolve => setTimeout(resolve, 100));
+      } catch (e1) {
+        try {
+          const feat64 = new Uint8Array(64);
+          feat64.set([0x80, 0x25, 0x00, 0x00, 0x03]);
+          await device.sendFeatureReport(0x00, feat64);
+          await new Promise(resolve => setTimeout(resolve, 100));
+        } catch (e2) {
+          console.warn("Aviso en sendFeatureReport:", e2);
+        }
+      }
       setDispositivoUsb(device);
       setUsbConectado(true);
       device.addEventListener("inputreport", event => {
@@ -1417,8 +1430,21 @@ export default function AppDiagnostico() {
           }
         }
       });
-      await device.sendReport(0x00, new Uint8Array([0x06, 0xAB, 0xCD, 0x03, 0x5E, 0x01, 0xD9]));
-    } catch (error) { alert("Error USB."); }
+      try {
+        const cmd64 = new Uint8Array(64);
+        cmd64.set([0x06, 0xAB, 0xCD, 0x03, 0x5E, 0x01, 0xD9]);
+        await device.sendReport(0x00, cmd64);
+      } catch (e1) {
+        try {
+          await device.sendReport(0x00, new Uint8Array([0x06, 0xAB, 0xCD, 0x03, 0x5E, 0x01, 0xD9]));
+        } catch (e2) {
+          console.warn("Aviso en sendReport:", e2);
+        }
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Error USB: " + (error?.message || error));
+    }
   };
   const desconectarMultimetroUSB = async () => { if (dispositivoUsb) { try { await dispositivoUsb.close(); } catch (e) { } setDispositivoUsb(null); } setUsbConectado(false); setLecturaUsb({ valor: '----', unidad: '---', tick: 0 }); };
 
