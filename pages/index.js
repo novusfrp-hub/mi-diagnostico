@@ -1430,12 +1430,49 @@ export default function AppDiagnostico() {
           }
         }
       });
+
+      // Iniciar polling continuo cada 200ms para recibir lecturas en tiempo real
+      if (typeof window !== 'undefined') {
+        if (window.unitPollInterval) clearInterval(window.unitPollInterval);
+        const pollCmd = new Uint8Array([0x06, 0xAB, 0xCD, 0x03, 0x5E, 0x01, 0xD9]);
+        const pollCmd64 = new Uint8Array(64);
+        pollCmd64.set(pollCmd);
+
+        window.unitPollInterval = setInterval(async () => {
+          if (!device || !device.opened) {
+            clearInterval(window.unitPollInterval);
+            return;
+          }
+          try {
+            await device.sendReport(0x00, pollCmd);
+          } catch (e1) {
+            try {
+              await device.sendReport(0x00, pollCmd64);
+            } catch (e2) {
+              // Ignorar si el puerto se cierra
+            }
+          }
+        }, 200);
+      }
     } catch (error) {
       console.error(error);
       alert("Error USB: " + (error?.message || error));
     }
   };
-  const desconectarMultimetroUSB = async () => { if (dispositivoUsb) { try { await dispositivoUsb.close(); } catch (e) { } setDispositivoUsb(null); } setUsbConectado(false); setLecturaUsb({ valor: '----', unidad: '---', tick: 0 }); };
+  const desconectarMultimetroUSB = async () => {
+    if (typeof window !== 'undefined' && window.unitPollInterval) {
+      clearInterval(window.unitPollInterval);
+      window.unitPollInterval = null;
+    }
+    if (dispositivoUsb) {
+      try {
+        await dispositivoUsb.close();
+      } catch (e) { }
+      setDispositivoUsb(null);
+    }
+    setUsbConectado(false);
+    setLecturaUsb({ valor: '----', unidad: '---', tick: 0 });
+  };
 
   // WEBSERIAL RFFE (RP2040)
   const conectarEscanerRFFE = async () => {
