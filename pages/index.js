@@ -2747,13 +2747,14 @@ export default function AppDiagnostico() {
     return (
       <div
         style={{
-          width: '100vw',
-          height: '100vh',
+          width: '100%',
+          height: '100%',
           backgroundColor: 'transparent',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: '16px',
+          padding: '0',
+          margin: '0',
           boxSizing: 'border-box',
           overflow: 'hidden'
         }}
