@@ -61,7 +61,7 @@ export default function MarshallSuiteDualHUD({
       const win = doc?.defaultView;
       if (!isMinimized) {
         if (win && win.resizeTo) {
-          try { win.resizeTo(win.innerWidth || 680, 52); } catch (e) {}
+          try { win.resizeTo(win.innerWidth || 680, 78); } catch (e) {}
         }
         setIsMinimized(true);
       } else {
@@ -155,6 +155,113 @@ export default function MarshallSuiteDualHUD({
   const bgStyle = colorFondo === 'transparent'
     ? 'transparent'
     : (colorFondo === 'black' ? '#000000' : (colorFondo === 'green' ? '#00ff00' : '#070b12'));
+
+  if (isMinimized) {
+    return (
+      <div
+        ref={containerRef}
+        style={{
+          width: '100%',
+          backgroundColor: bgStyle,
+          padding: '6px 12px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          fontFamily: 'Consolas, monospace',
+          color: '#ffffff',
+          userSelect: 'none',
+          boxSizing: 'border-box',
+          overflow: 'hidden'
+        }}
+      >
+        {/* DMM Lectura */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span style={{ color: '#00e5ff', fontWeight: '900', fontSize: '0.8rem' }}>DMM</span>
+          <span style={{ color: usbConectado ? '#10b981' : '#ef4444', fontSize: '10px' }}>●</span>
+          <span style={{ color: '#38bdf8', fontWeight: 'bold', fontSize: '0.9rem' }}>
+            {lecturaUsb.prefijo ? `${lecturaUsb.prefijo} ` : ''}{lecturaUsb.valor} {lecturaUsb.unidad}
+          </span>
+        </div>
+
+        {/* Separador */}
+        <div style={{ width: '1px', height: '18px', background: 'rgba(255,255,255,0.2)' }} />
+
+        {/* MC-Meter Lectura */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ color: '#00e5ff', fontWeight: '900', fontSize: '0.8rem' }}>MC</span>
+          <span style={{ color: mcConectado ? '#10b981' : '#ef4444', fontSize: '10px' }}>●</span>
+          <span style={{ color: '#ff4444', fontWeight: 'bold', fontSize: '0.9rem' }}>
+            {mcConectado ? `${vbus.toFixed(3)}V` : '--V'}
+          </span>
+          <span style={{ color: '#facc15', fontWeight: 'bold', fontSize: '0.9rem' }}>
+            {mcConectado ? `${ibus.toFixed(3)}A` : '--A'}
+          </span>
+          <span style={{ color: '#94a3b8', fontSize: '0.72rem' }}>
+            {mcConectado ? `${watts.toFixed(2)}W` : '0.0W'}
+          </span>
+        </div>
+
+        {/* Acciones */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <button
+            onClick={resetTamanoOriginal}
+            title="Restablecer tamaño original (680x210)"
+            style={{
+              background: '#1e293b',
+              color: '#38bdf8',
+              border: '1px solid #334155',
+              padding: '3px 7px',
+              borderRadius: '5px',
+              fontSize: '0.65rem',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '3px'
+            }}
+          >
+            <RotateCcw size={10} /> 680×210
+          </button>
+          <button
+            onClick={toggleMinimizar}
+            title="Expandir ventana completa"
+            style={{
+              background: '#0284c7',
+              color: '#ffffff',
+              border: 'none',
+              padding: '3px 10px',
+              borderRadius: '5px',
+              fontSize: '0.7rem',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+          >
+            <Maximize2 size={12} /> EXPANDIR
+          </button>
+          {onReacoplar && (
+            <button
+              onClick={onReacoplar}
+              title="Volver a la plataforma"
+              style={{
+                background: '#1e3a8a',
+                color: '#60a5fa',
+                border: 'none',
+                padding: '3px 8px',
+                borderRadius: '5px',
+                fontSize: '0.65rem',
+                cursor: 'pointer'
+              }}
+            >
+              ACOPLAR
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -305,83 +412,8 @@ export default function MarshallSuiteDualHUD({
         </div>
       </div>
 
-      {/* MODO MINIMIZADO: BARRA ULTRA-DELGADA FLOTANTE QUE NO TAPA ESQUEMÁTICOS */}
-      {isMinimized ? (
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          width: '100%',
-          padding: '4px 8px',
-          background: 'rgba(15, 23, 42, 0.95)',
-          borderRadius: '8px',
-          border: '1px solid rgba(0, 229, 255, 0.3)',
-          gap: '10px',
-          fontSize: '0.8rem',
-          fontFamily: 'Consolas, monospace'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ color: '#00e5ff', fontWeight: '900', fontSize: '0.75rem' }}>DMM</span>
-            <span style={{ color: usbConectado ? '#10b981' : '#ef4444', fontSize: '9px' }}>●</span>
-            <span style={{ color: '#38bdf8', fontWeight: 'bold' }}>
-              {lecturaUsb.prefijo ? `${lecturaUsb.prefijo} ` : ''}{lecturaUsb.valor} {lecturaUsb.unidad}
-            </span>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ color: '#00e5ff', fontWeight: '900', fontSize: '0.75rem' }}>MC</span>
-            <span style={{ color: mcConectado ? '#10b981' : '#ef4444', fontSize: '9px' }}>●</span>
-            <span style={{ color: '#ff4444', fontWeight: 'bold' }}>
-              {mcConectado ? `${vbus.toFixed(3)}V` : '--V'}
-            </span>
-            <span style={{ color: '#facc15', fontWeight: 'bold' }}>
-              {mcConectado ? `${ibus.toFixed(3)}A` : '--A'}
-            </span>
-            <span style={{ color: '#94a3b8', fontSize: '0.7rem' }}>
-              {mcConectado ? `${watts.toFixed(2)}W` : '0.0W'}
-            </span>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-            <button
-              onClick={resetTamanoOriginal}
-              title="Restablecer tamaño original (680x210)"
-              style={{
-                background: '#1e293b',
-                color: '#38bdf8',
-                border: '1px solid #334155',
-                padding: '2px 5px',
-                borderRadius: '4px',
-                fontSize: '0.62rem',
-                cursor: 'pointer'
-              }}
-            >
-              <RotateCcw size={9} />
-            </button>
-            <button
-              onClick={toggleMinimizar}
-              title="Expandir ventana completa"
-              style={{
-                background: '#0284c7',
-                color: '#ffffff',
-                border: 'none',
-                padding: '2px 7px',
-                borderRadius: '4px',
-                fontSize: '0.65rem',
-                fontWeight: 'bold',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '2px'
-              }}
-            >
-              <Maximize2 size={10} /> EXPANDIR
-            </button>
-          </div>
-        </div>
-      ) : (
-        /* CUERPO DUAL DIVIDIDO: MULTÍMETRO (IZQ) / MC-METER PRO (DER) */
-        <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr', gap: '12px', alignItems: 'stretch' }}>
+      {/* CUERPO DUAL DIVIDIDO: MULTÍMETRO (IZQ) / MC-METER PRO (DER) */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr', gap: '12px', alignItems: 'stretch' }}>
         {/* PANEL IZQUIERDO: MULTÍMETRO */}
         <div style={{
           background: colorFondo === 'transparent' ? 'transparent' : 'rgba(17, 24, 39, 0.5)',
@@ -467,7 +499,6 @@ export default function MarshallSuiteDualHUD({
           </div>
         </div>
       </div>
-      )}
     </div>
   );
 }
