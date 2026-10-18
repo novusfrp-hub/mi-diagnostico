@@ -51,13 +51,38 @@ export default function MarshallSuiteDualHUD({
     }
   }, [isPopout, colorFondo]);
 
-  // Copiar link OBS para fuente navegador 100% transparente
+  // Copiar link OBS para fuente navegador 100% transparente (con fallback seguro para PiP/Popout)
   const copiarLinkObsDual = () => {
     if (typeof window !== 'undefined') {
-      const url = `${window.location.origin}/?obs=hud`;
-      navigator.clipboard.writeText(url);
-      setCopiado(true);
-      setTimeout(() => setCopiado(false), 2000);
+      const url = window.location.origin ? (window.location.origin + '/?obs=hud') : 'https://diag-self.vercel.app/?obs=hud';
+      const fallback = () => {
+        try {
+          const ta = document.createElement('textarea');
+          ta.value = url;
+          ta.style.position = 'fixed';
+          ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.focus();
+          ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+          setCopiado(true);
+          setTimeout(() => setCopiado(false), 2000);
+        } catch (e) {
+          prompt('Copia esta URL para OBS Studio:', url);
+        }
+      };
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url)
+          .then(() => {
+            setCopiado(true);
+            setTimeout(() => setCopiado(false), 2000);
+          })
+          .catch(fallback);
+      } else {
+        fallback();
+      }
     }
   };
 

@@ -274,3 +274,64 @@ export async function enviarComandoDMM(device, tipoBoton) {
 1. **Eliminación Total de la Desincronización Manual:** El técnico no necesita tocar la pantalla para indicarle al software que cambió a medición de diodos o continuidad; al mover la perilla o presionar `SELECT`, la aplicación se actualiza en tiempo real.
 2. **Compatibilidad Inmediata con Golden Values en FPC:** Al medir líneas de conectores FPC, la base de datos compara automáticamente la caída de tensión en diodo porque `modoKey === 'diodo'` se activa por hardware.
 3. **Máximo Espacio en Pantalla:** Al sustituir la hilera de botones estáticos por la botonera física interactiva (`SELECT`, `RANGE`, etc.) y agrupar los controles auxiliares en el menú colapsable `⚙ CONTROLES`, los dígitos LCD crecen hasta el doble de su tamaño original, ofreciendo una lectura inmejorable para streaming y trabajo de laboratorio.
+
+
+---
+
+## 8. Guía de Integración con OBS Studio (Fuente Navegador / Browser Source)
+
+El sistema cuenta con un canal de sincronización inter-procesos en tiempo real vía `BroadcastChannel` (`marshall_hardware_stream`). Esto permite proyectar las mediciones del multímetro sobre tus tomas de microscopio, esquemáticos o cámara en OBS Studio con **transparencia real al 100% (Canal Alfa nativo de 32 bits)**, sin bordes grises de ventana y sin requerir filtros de color (*Chroma Key*).
+
+### Paso 1: Copiar la URL desde la Interfaz Web
+1. En la barra superior de **MARSHALL DMM PRO**, haz clic en el botón **`⚙ CONTROLES`**.
+2. En el panel desplegable de herramientas, haz clic en el botón **`OBS URL`**.
+3. El botón cambiará momentáneamente a **`✓ COPIADO`**, guardando en tu portapapeles la dirección URL lista para streaming (por ejemplo: `http://localhost:3000/?obs=multimetro` o `https://tudominio.com/?obs=multimetro`).
+
+### Paso 2: Crear la Fuente en OBS Studio
+1. Abre **OBS Studio**.
+2. Ve al panel **Fuentes** (*Sources*) en la escena donde desees mostrar la telemetría (por ejemplo, tu escena con la cámara del microscopio).
+3. Haz clic en el botón **`+`** (Agregar fuente).
+4. Selecciona **`Navegador`** (*Browser* / *Browser Source*).
+5. Escribe un nombre descriptivo, como por ejemplo: `HUD Marshall Multimetro` (o `HUD Suite Dual`), y presiona **Aceptar**.
+
+### Paso 3: Configurar las Propiedades de la Fuente Navegador
+En la ventana emergente de propiedades de la fuente en OBS, ajusta estos parámetros:
+
+* **URL:** Haz clic en el campo y pega con `Ctrl + V` la dirección copiada (ej: `http://localhost:3000/?obs=multimetro`).
+* **Ancho (Width):** `420` *(o `720` si utilizas la Suite Dual combinada con el MC-Meter)*.
+* **Alto (Height):** `200` *(o `240` si utilizas la Suite Dual combinada)*.
+* **FPS:** `60` *(para que la barra analógica de 46 segmentos y las mediciones fluyan con total suavidad)*.
+* **CSS Personalizado:** Puedes dejar el campo tal cual viene por defecto en OBS. La aplicación inyecta automáticamente `background-color: transparent !important;` en el `<html>` y `<body>` al detectar el parámetro `?obs=...`.
+* **Apagar fuente cuando no sea visible:** **Desmarcar** *(muy recomendado para que no se interrumpa el flujo de datos si cambias de escena momentáneamente)*.
+* **Actualizar el navegador cuando la escena se active:** **Marcar**.
+* Haz clic en **Aceptar**.
+
+### Paso 4: Posicionamiento en el Lienzo de OBS
+* El visor aparecerá de inmediato sobre tu imagen de microscopio con transparencia pura.
+* Arrastra el HUD con el ratón hacia la esquina que prefieras (por ejemplo, esquina inferior derecha o superior izquierda).
+* Para escalar su tamaño sin deformarlo, arrastra cualquiera de los puntos de anclaje rojos en OBS (o mantén pulsada la tecla `Shift` si deseas ajustar libremente las proporciones).
+
+---
+
+## 9. Arquitectura de Sincronización Local: Pestaña Web ➔ OBS
+
+Dado que las fuentes de tipo Navegador dentro de OBS operan en un entorno restringido (Chromium Embedded Framework - CEF) que no tiene acceso directo a cuadros de diálogo de hardware USB, la arquitectura opera así:
+
+```
+┌─────────────────────────────────┐           ┌─────────────────────────────────┐
+│     Pestaña Principal Web       │           │    Fuente Navegador en OBS      │
+│      (Chrome / Edge / App)      │           │    (Browser Source Embebido)    │
+├─────────────────────────────────┤           ├─────────────────────────────────┤
+│  1. Conexión WebHID al UT61E+   │           │                                 │
+│  2. Polling cada 200 ms         │           │                                 │
+│  3. Decodificación de Perilla   │           │                                 │
+│  4. BroadcastChannel Emit:      │──────────>│  Recibe payload en tiempo real: │
+│     { valor, unidad, prefijo }  │ (RAM 0ms) │  - Dibuja dígitos gigantes      │
+└─────────────────────────────────┘           │  - Actualiza bargraph 46 segs   │
+                                              │  - Fondo 100% transparente      │
+                                              └─────────────────────────────────┘
+```
+
+1. **Cero Latencia (0 ms):** La comunicación ocurre directamente en la memoria RAM de tu computadora mediante la API estándar `BroadcastChannel('marshall_hardware_stream')`.
+2. **Sin Conexión a Internet Requerida:** No transita por servidores remotos ni consume ancho de banda.
+3. **Persistencia:** Mientras mantengas la pestaña de tu aplicación abierta con el multímetro conectado, OBS recibirá cada milivoltio, diodo, ohmio o amperio en tiempo real.

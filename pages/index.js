@@ -65,6 +65,41 @@ const VisorHUD = ({
   const [mostrarControles, setMostrarControles] = useState(false);
   const [ultimoCmd, setUltimoCmd] = useState(null);
 
+  const [copiadoDual, setCopiadoDual] = useState(false);
+  const copiarLinkObsDual = () => {
+    if (typeof window !== 'undefined') {
+      const url = window.location.origin ? (window.location.origin + '/?obs=hud') : 'https://diag-self.vercel.app/?obs=hud';
+      const fallback = () => {
+        try {
+          const ta = document.createElement('textarea');
+          ta.value = url;
+          ta.style.position = 'fixed';
+          ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.focus();
+          ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+          setCopiadoDual(true);
+          setTimeout(() => setCopiadoDual(false), 2000);
+        } catch (e) {
+          prompt('Copia esta URL para OBS Studio:', url);
+        }
+      };
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url)
+          .then(() => {
+            setCopiadoDual(true);
+            setTimeout(() => setCopiadoDual(false), 2000);
+          })
+          .catch(fallback);
+      } else {
+        fallback();
+      }
+    }
+  };
+
   const copiarLinkObsDmm = () => {
     if (typeof window !== 'undefined') {
       const url = `${window.location.origin}/?obs=multimetro`;
@@ -341,6 +376,27 @@ const VisorHUD = ({
                 <Zap size={12} color="#fbbf24" /> SUITE DUAL (1/3)
               </button>
             )}
+            {/* Boton Copiar URL OBS Suite Dual */}
+            <button
+              onClick={copiarLinkObsDual}
+              title='Copiar URL para OBS Studio (Suite Dual HUD)'
+              style={{
+                background: copiadoDual ? '#065f46' : '#1e1b4b',
+                color: copiadoDual ? '#34d399' : '#c084fc',
+                border: '1px solid ' + (copiadoDual ? '#059669' : '#6b21a8'),
+                padding: '5px 10px',
+                borderRadius: '14px',
+                fontSize: '0.68rem',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+            >
+              {copiadoDual ? <Check size={12} color='#34d399' /> : <Copy size={12} />}
+              {copiadoDual ? 'COPIADO DUAL' : 'OBS URL (SUITE DUAL)'}
+            </button>
 
             {/* Copiar enlace OBS Browser Source */}
             <button
