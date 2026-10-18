@@ -34,9 +34,22 @@ export default function MCMeterPopoutWindow({
     let cleanupFns = [];
 
     const init = async () => {
-      // Dimensiones iniciales configurables
-      const ancho = width || 450;
-      const alto = height || 150;
+      // Dimensiones iniciales configurables (respetando tamaño personalizado guardado)
+      let savedW = null;
+      let savedH = null;
+      try {
+        const saved = localStorage.getItem('marshall_suite_dual_size');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed.width >= 350 && parsed.height >= 120) {
+            savedW = parsed.width;
+            savedH = parsed.height;
+          }
+        }
+      } catch (e) {}
+
+      const ancho = savedW || width || 450;
+      const alto = savedH || height || 150;
 
       // 1. Intentar modo Picture-in-Picture (PiP) nativo de Chromium para que NO se minimice al minimizar la web
       if (mode === 'pip' && 'documentPictureInPicture' in window) {
@@ -80,6 +93,27 @@ export default function MCMeterPopoutWindow({
       }
 
       popupRef.current = popup;
+
+      // Escuchar cambios de tamaño manuales por el usuario para recordarlos automáticamente
+      let resizeTimer = null;
+      const handleWindowResize = () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+          try {
+            if (popup && !popup.closed && popup.innerWidth >= 350 && popup.innerHeight >= 120) {
+              localStorage.setItem('marshall_suite_dual_size', JSON.stringify({
+                width: popup.innerWidth,
+                height: popup.innerHeight
+              }));
+            }
+          } catch (e) {}
+        }, 300);
+      };
+      popup.addEventListener('resize', handleWindowResize);
+      cleanupFns.push(() => {
+        clearTimeout(resizeTimer);
+        try { popup.removeEventListener('resize', handleWindowResize); } catch (e) {}
+      });
 
       // Forzar redimensionamiento inicial inmediato
       try {
