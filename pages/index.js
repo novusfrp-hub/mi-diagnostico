@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { doc, setDoc, addDoc, collection, getDocs, deleteDoc, updateDoc, getDoc, onSnapshot } from 'firebase/firestore';
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
 import { db, auth } from '../firebase';
-import { Sun, Moon, ArrowLeft, RefreshCcw, RefreshCw, Zap, Smartphone, AlertTriangle, ChevronRight, Home, ShieldCheck, Camera, CheckCircle2, XCircle, Settings, Plus, Save, X, Trash2, Edit, ChevronDown, CornerDownRight, LogOut, Lightbulb, Usb, Map, Play, Flame, ClipboardList, History, Printer, FileText, MessageCircle, Link, Monitor, Mic, MicOff, Cpu, Image as ImageIcon, Maximize2, Search, User, Users, Lock, Pin, RotateCcw, Copy, Check } from 'lucide-react';
+import { Sun, Moon, ArrowLeft, RefreshCcw, RefreshCw, Zap, Smartphone, AlertTriangle, ChevronRight, Home, Shield, ShieldCheck, Camera, CheckCircle2, XCircle, Settings, Plus, Save, X, Trash2, Edit, ChevronDown, CornerDownRight, LogOut, Lightbulb, Usb, Map, Play, Flame, ClipboardList, History, Printer, FileText, MessageCircle, Link, Monitor, Mic, MicOff, Cpu, Image as ImageIcon, Maximize2, Search, User, Users, Lock, Pin, RotateCcw, Copy, Check } from 'lucide-react';
 
 import FPCInteligente from '../components/FPCInteligente.js';
 import ICInteligente from '../components/ICInteligente.js';
@@ -1687,9 +1687,11 @@ export default function AppDiagnostico() {
     setPadActivoIc('A1');
     setPinActivoFpcBateria(1);
     setCampoActivoDock('vbus');
-    setModoFpc('crear');
-    setModoIc('crear');
-    setModoFpcBateria('crear');
+    if (!modeloActivo) {
+      setModoFpc('crear');
+      setModoIc('crear');
+      setModoFpcBateria('crear');
+    }
     if (nuevaSeccion === 'docktest' && escalaFpc === 'amperio') {
       setEscalaFpc('diodo');
     }
@@ -2196,9 +2198,34 @@ export default function AppDiagnostico() {
     }
   };
 
+  const limpiarValoresActualesDeModelo = (mod) => {
+    if (!mod) return mod;
+    try {
+      const copia = JSON.parse(JSON.stringify(mod));
+      if (copia.fpcs) {
+        copia.fpcs = copia.fpcs.map(f => ({
+          ...f,
+          pines: (f.pines || []).map(p => ({
+            ...p,
+            valorActual: '---',
+            valorActualDiodo: '---',
+            valorActualUa: '---',
+            valorActualVoltio: '---',
+            valorActualOhmio: '---',
+            valorActualAmperio: '---'
+          }))
+        }));
+      }
+      return copia;
+    } catch (e) {
+      return mod;
+    }
+  };
+
   const guardarModeloActualDB = async (modeloOverride = null, silencio = false) => {
-    const targetModelo = modeloOverride || modeloActivo;
-    if (!targetModelo || !targetModelo.id) return false;
+    const rawModelo = modeloOverride || modeloActivo;
+    if (!rawModelo || !rawModelo.id) return false;
+    const targetModelo = limpiarValoresActualesDeModelo(rawModelo);
 
     try {
       // 1. Migración Lazy transparente: Si el modelo contiene imágenes base64 heredadas, las migra a Storage
@@ -2397,6 +2424,7 @@ export default function AppDiagnostico() {
   };
 
   // AUTO-SAVE HÍBRIDO (localStorage + Firebase) - AHORA DESPUÉS DE guardarModeloActualDB
+  // En modo diagnóstico la placa de referencia está blindada (Golden Lock) y no se marca como borrador sucio
   const {
     cambiosPendientes: cambiosPendientesFpc,
     guardando: guardandoFpc,
@@ -2404,8 +2432,8 @@ export default function AppDiagnostico() {
     sincronizarAhora: sincronizarFpcAhora,
     descartarCambios: descartarCambiosFpc
   } = useAutoSave(
-    fpcActivo ? `fpc_borrador_${modeloActivo?.id}_${fpcActivo.id}` : null,
-    fpcActivo,
+    (fpcActivo && modoFpc === 'crear') ? `fpc_borrador_${modeloActivo?.id}_${fpcActivo.id}` : null,
+    modoFpc === 'crear' ? fpcActivo : null,
     guardarModeloActualDB
   );
 
@@ -4460,11 +4488,36 @@ export default function AppDiagnostico() {
               <div className="fpc-tools" style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                 <div style={{ display: 'flex', gap: '5px', backgroundColor: '#1a1a1a', padding: '4px', borderRadius: '8px', alignItems: 'center' }}>
                   <BotonesImagenFPC />
-                  <button onClick={editarPinesFpcActivo} style={{ padding: '6px 10px', borderRadius: '6px', border: 'none', background: 'transparent', color: '#eab308', fontWeight: 'bold', cursor: 'pointer', marginLeft: '5px' }}>✏️ Pines</button>
-                  {cambiosPendientesFpc && (
+                  <button
+                    onClick={() => {
+                      if (modoFpc === 'diagnostico') {
+                        alert("🔒 La placa de referencia está protegida en modo Diagnóstico. Para modificar la cantidad de pines o la estructura del conector, pasa a modo 'Grabar'.");
+                        return;
+                      }
+                      editarPinesFpcActivo();
+                    }}
+                    style={{ padding: '6px 10px', borderRadius: '6px', border: 'none', background: 'transparent', color: modoFpc === 'diagnostico' ? '#6b7280' : '#eab308', fontWeight: 'bold', cursor: modoFpc === 'diagnostico' ? 'not-allowed' : 'pointer', marginLeft: '5px' }}
+                    title={modoFpc === 'diagnostico' ? 'Bloqueado en modo diagnóstico' : 'Editar número de pines'}
+                  >
+                    ✏️ Pines
+                  </button>
+                  {cambiosPendientesFpc && modoFpc === 'crear' && (
                     <button onClick={() => { descartarCambiosFpc(); setFpcActivo(prev => prev ? { ...prev } : null); }} style={{ padding: '6px 10px', borderRadius: '6px', border: '1px dashed #6b7280', background: 'transparent', color: '#9ca3af', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.65rem' }}>↩ Descartar</button>
                   )}
-                  <button onClick={() => { eliminarFpcActivo(); setModalFpcAbierto(false); }} style={{ padding: '6px 10px', borderRadius: '6px', border: 'none', background: 'transparent', color: '#ef4444', fontWeight: 'bold', cursor: 'pointer' }}>🗑️</button>
+                  <button
+                    onClick={() => {
+                      if (modoFpc === 'diagnostico') {
+                        alert("🔒 No se puede eliminar el FPC de referencia durante un diagnóstico.");
+                        return;
+                      }
+                      eliminarFpcActivo();
+                      setModalFpcAbierto(false);
+                    }}
+                    style={{ padding: '6px 10px', borderRadius: '6px', border: 'none', background: 'transparent', color: modoFpc === 'diagnostico' ? '#6b7280' : '#ef4444', fontWeight: 'bold', cursor: modoFpc === 'diagnostico' ? 'not-allowed' : 'pointer' }}
+                    title={modoFpc === 'diagnostico' ? 'Bloqueado en modo diagnóstico' : 'Eliminar FPC'}
+                  >
+                    🗑️
+                  </button>
                 </div>
                 <div style={{ display: 'flex', gap: '5px', backgroundColor: '#1a1a1a', padding: '4px', borderRadius: '8px', flexWrap: 'wrap' }}>
                   <button onClick={() => setEscalaFpc('diodo')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: escalaFpc === 'diodo' ? '#8b5cf6' : 'transparent', color: escalaFpc === 'diodo' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}>Diodo</button>
@@ -4474,34 +4527,62 @@ export default function AppDiagnostico() {
                   <button onClick={() => setEscalaFpc('ohmio')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: escalaFpc === 'ohmio' ? '#a855f7' : 'transparent', color: escalaFpc === 'ohmio' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}>Ohmios</button>
                 </div>
                 <div style={{ display: 'flex', gap: '5px', backgroundColor: '#1a1a1a', padding: '4px', borderRadius: '8px' }}>
-                  <button onClick={() => setModoFpc('crear')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: modoFpc === 'crear' ? '#8b5cf6' : 'transparent', color: modoFpc === 'crear' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}>Grabar</button>
-                  <button onClick={() => setModoFpc('diagnostico')} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: modoFpc === 'diagnostico' ? '#ef4444' : 'transparent', color: modoFpc === 'diagnostico' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}>Diagnóstico</button>
+                  <button
+                    onClick={() => {
+                      if (modoFpc === 'diagnostico') {
+                        const tieneValores = fpcActivo?.pines?.some(p => p.valorSano && p.valorSano !== '---');
+                        if (tieneValores) {
+                          if (!window.confirm("⚠️ Estás a punto de entrar al modo 'Grabar Referencia'. Las mediciones que tomes actualizarán los valores de la placa buena (Golden Master). ¿Deseas continuar?")) {
+                            return;
+                          }
+                        }
+                      }
+                      setModoFpc('crear');
+                    }}
+                    style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: modoFpc === 'crear' ? '#8b5cf6' : 'transparent', color: modoFpc === 'crear' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}
+                    title="Grabar mediciones de placa buena de referencia"
+                  >
+                    Grabar Placa Buena
+                  </button>
+                  <button
+                    onClick={() => setModoFpc('diagnostico')}
+                    style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: modoFpc === 'diagnostico' ? '#ef4444' : 'transparent', color: modoFpc === 'diagnostico' ? 'white' : 'gray', fontWeight: 'bold', cursor: 'pointer' }}
+                    title="Diagnosticar placa averiada y contrastar contra la buena"
+                  >
+                    Diagnóstico
+                  </button>
                 </div>
-                <button
-                  onClick={sincronizarFpcAhora}
-                  disabled={guardandoFpc}
-                  style={{
-                    background: cambiosPendientesFpc ? '#f59e0b' : '#10b981',
-                    color: 'white',
-                    border: 'none',
-                    padding: '8px 16px',
-                    borderRadius: '8px',
-                    fontWeight: 'bold',
-                    cursor: guardandoFpc ? 'not-allowed' : 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    fontSize: '0.8rem',
-                    boxShadow: cambiosPendientesFpc
-                      ? '0 0 15px rgba(245, 158, 11, 0.4)'
-                      : '0 0 10px rgba(16, 185, 129, 0.3)',
-                    transition: 'all 0.3s'
-                  }}
-                  title={cambiosPendientesFpc ? 'Hay cambios sin guardar en la nube' : 'Todo está sincronizado'}
-                >
-                  <Save size={16} />
-                  {guardandoFpc ? 'GUARDANDO...' : (cambiosPendientesFpc ? 'SINCRONIZAR AHORA' : 'GUARDADO EN NUBE')}
-                </button>
+                {modoFpc === 'crear' ? (
+                  <button
+                    onClick={sincronizarFpcAhora}
+                    disabled={guardandoFpc}
+                    style={{
+                      background: cambiosPendientesFpc ? '#f59e0b' : '#10b981',
+                      color: 'white',
+                      border: 'none',
+                      padding: '8px 16px',
+                      borderRadius: '8px',
+                      fontWeight: 'bold',
+                      cursor: guardandoFpc ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      fontSize: '0.8rem',
+                      boxShadow: cambiosPendientesFpc
+                        ? '0 0 15px rgba(245, 158, 11, 0.4)'
+                        : '0 0 10px rgba(16, 185, 129, 0.3)',
+                      transition: 'all 0.3s'
+                    }}
+                    title={cambiosPendientesFpc ? 'Hay cambios sin guardar en la nube' : 'Todo está sincronizado'}
+                  >
+                    <Save size={16} />
+                    {guardandoFpc ? 'GUARDANDO...' : (cambiosPendientesFpc ? 'GUARDAR REFERENCIA' : 'REFERENCIA EN NUBE')}
+                  </button>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '8px', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', color: '#10b981', fontSize: '0.75rem', fontWeight: 'bold' }}>
+                    <Shield size={14} /> Golden Lock Activo
+                  </div>
+                )}
                 <button onClick={() => setModalFpcAbierto(false)} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', cursor: 'pointer', padding: '8px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}><X size={20} /></button>
               </div>
             </div>
@@ -4556,6 +4637,7 @@ export default function AppDiagnostico() {
                 guardando={guardandoFpc}
                 ultimaSincronizacion={ultimaSincFpc}
                 onRegistrarOL={() => avanzarPinMagico('OL')}
+                nombreFpc={fpcActivo.nombre}
               />
             </div>
           </motion.div>
