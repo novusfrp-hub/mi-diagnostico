@@ -4628,6 +4628,7 @@ export default function AppDiagnostico() {
                 pinActivo={pinActivoFpc}
                 setPinActivo={setPinActivoFpc}
                 modo={modoFpc}
+                setModo={setModoFpc}
                 escala={escalaFpc}
                 lecturaEnVivo={lecturaUsb.valor}
                 tiposCustom={tiposCustom}
