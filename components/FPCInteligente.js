@@ -321,7 +321,7 @@ export default function FPCInteligente({
   const aplicarTipoRapido = (tipoDestino) => {
     const cat = (tipoDestino === 'GND' || tipoDestino === 'NC') ? 'tierra'
       : tipoDestino === 'VCC' ? 'alimentacion'
-        : 'comunicacion';
+      : 'comunicacion';
 
     setPines(prev => prev.map(p => {
       if (String(p.id) === String(pinActivo)) {
