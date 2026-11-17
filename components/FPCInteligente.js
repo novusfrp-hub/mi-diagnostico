@@ -110,6 +110,19 @@ export default function FPCInteligente({
   const [filtroSoloFallas, setFiltroSoloFallas] = useState(false);
   const [ayudaVisible, setAyudaVisible] = useState(false);
   const [modalReporteVisible, setModalReporteVisible] = useState(false);
+  const [ocultarCategoriaExport, setOcultarCategoriaExport] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const s = localStorage.getItem('fpc_ocultar_cat_export');
+      return s !== null ? s === 'true' : true;
+    }
+    return true;
+  });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('fpc_ocultar_cat_export', String(ocultarCategoriaExport));
+    }
+  }, [ocultarCategoriaExport]);
 
   // --- AUDIO SINTETIZADO: PRE-AVISO DE TIERRA (GND) ---
   const reproducirAvisoGND = () => {
@@ -595,62 +608,123 @@ export default function FPCInteligente({
     ];
 
     if (esDiag) {
-      lineasTxt.push(
-        'PIN'.padEnd(6) + '| ' +
-        'LÍNEA / NET'.padEnd(24) + '| ' +
-        'TIPO'.padEnd(10) + '| ' +
-        'REF (BUENA)'.padEnd(14) + '| ' +
-        'EN PRUEBA'.padEnd(14) + '| ' +
-        'DELTA'.padEnd(12) + '| ' +
-        'ESTADO'
-      );
-      lineasTxt.push(''.padEnd(96, '-'));
-
-      pines.forEach(p => {
-        const s = evaluarSaludPin(p);
-        const vSano = obtenerValSano(p);
-        const vAct = obtenerValActual(p);
-        const nom = esNombreGenerico(p.nombre) ? '---' : p.nombre;
-        const delta = (s.delta !== null && s.delta !== undefined) ? `${s.delta > 0 ? '+' : ''}${s.delta} V` : '---';
-        const estadoTexto = s.estado === 'corto' ? 'ANOMALÍA: CORTOCIRCUITO'
-          : s.estado === 'abierto' ? 'ANOMALÍA: LÍNEA ABIERTA'
-          : s.estado === 'fuga' ? 'ANOMALÍA: FUGA / TOLERANCIA'
-          : s.estado === 'gnd' ? 'GND Normal'
-          : s.estado === 'ok' ? 'Normal (OK)'
-          : 'Sin Medir';
-
+      if (ocultarCategoriaExport) {
         lineasTxt.push(
-          `#${p.id}`.padEnd(6) + '| ' +
-          nom.padEnd(24) + '| ' +
-          (p.tipo || 'PIN').padEnd(10) + '| ' +
-          `${vSano} V`.padEnd(14) + '| ' +
-          `${vAct} V`.padEnd(14) + '| ' +
-          delta.padEnd(12) + '| ' +
-          estadoTexto
+          'PIN'.padEnd(6) + '| ' +
+          'LÍNEA / NET'.padEnd(24) + '| ' +
+          'TIPO'.padEnd(10) + '| ' +
+          'REF (BUENA)'.padEnd(14) + '| ' +
+          'EN PRUEBA'.padEnd(14) + '| ' +
+          'DELTA'.padEnd(12) + '| ' +
+          'ESTADO'
         );
-      });
+        lineasTxt.push(''.padEnd(96, '-'));
+
+        pines.forEach(p => {
+          const s = evaluarSaludPin(p);
+          const vSano = obtenerValSano(p);
+          const vAct = obtenerValActual(p);
+          const nom = esNombreGenerico(p.nombre) ? '---' : p.nombre;
+          const delta = (s.delta !== null && s.delta !== undefined) ? `${s.delta > 0 ? '+' : ''}${s.delta} V` : '---';
+          const estadoTexto = s.estado === 'corto' ? 'ANOMALÍA: CORTOCIRCUITO'
+            : s.estado === 'abierto' ? 'ANOMALÍA: LÍNEA ABIERTA'
+            : s.estado === 'fuga' ? 'ANOMALÍA: FUGA / TOLERANCIA'
+            : s.estado === 'gnd' ? 'GND Normal'
+            : s.estado === 'ok' ? 'Normal (OK)'
+            : 'Sin Medir';
+
+          lineasTxt.push(
+            `#${p.id}`.padEnd(6) + '| ' +
+            nom.padEnd(24) + '| ' +
+            (p.tipo || 'PIN').padEnd(10) + '| ' +
+            `${vSano} V`.padEnd(14) + '| ' +
+            `${vAct} V`.padEnd(14) + '| ' +
+            delta.padEnd(12) + '| ' +
+            estadoTexto
+          );
+        });
+      } else {
+        lineasTxt.push(
+          'PIN'.padEnd(6) + '| ' +
+          'LÍNEA / NET'.padEnd(22) + '| ' +
+          'CATEGORÍA'.padEnd(20) + '| ' +
+          'TIPO'.padEnd(8) + '| ' +
+          'REF (BUENA)'.padEnd(13) + '| ' +
+          'EN PRUEBA'.padEnd(13) + '| ' +
+          'DELTA'.padEnd(10) + '| ' +
+          'ESTADO'
+        );
+        lineasTxt.push(''.padEnd(108, '-'));
+
+        pines.forEach(p => {
+          const s = evaluarSaludPin(p);
+          const vSano = obtenerValSano(p);
+          const vAct = obtenerValActual(p);
+          const nom = esNombreGenerico(p.nombre) ? '---' : p.nombre;
+          const cat = CATEGORIAS_FPC[p.categoria || deducirCategoriaNet(p.nombre)]?.label || 'Genérico';
+          const delta = (s.delta !== null && s.delta !== undefined) ? `${s.delta > 0 ? '+' : ''}${s.delta} V` : '---';
+          const estadoTexto = s.estado === 'corto' ? 'ANOMALÍA: CORTOCIRCUITO'
+            : s.estado === 'abierto' ? 'ANOMALÍA: LÍNEA ABIERTA'
+            : s.estado === 'fuga' ? 'ANOMALÍA: FUGA / TOLERANCIA'
+            : s.estado === 'gnd' ? 'GND Normal'
+            : s.estado === 'ok' ? 'Normal (OK)'
+            : 'Sin Medir';
+
+          lineasTxt.push(
+            `#${p.id}`.padEnd(6) + '| ' +
+            nom.padEnd(22) + '| ' +
+            cat.padEnd(20) + '| ' +
+            (p.tipo || 'PIN').padEnd(8) + '| ' +
+            `${vSano} V`.padEnd(13) + '| ' +
+            `${vAct} V`.padEnd(13) + '| ' +
+            delta.padEnd(10) + '| ' +
+            estadoTexto
+          );
+        });
+      }
     } else {
-      lineasTxt.push(
-        'PIN'.padEnd(6) + '| ' +
-        'LÍNEA / NET'.padEnd(28) + '| ' +
-        'CATEGORÍA'.padEnd(24) + '| ' +
-        'TIPO'.padEnd(10) + '| ' +
-        'VALOR REFERENCIA'
-      );
-      lineasTxt.push(''.padEnd(80, '-'));
-
-      pines.forEach(p => {
-        const vSano = obtenerValSano(p);
-        const nom = esNombreGenerico(p.nombre) ? `Pin_${p.id}` : p.nombre;
-        const cat = CATEGORIAS_FPC[p.categoria || deducirCategoriaNet(p.nombre)]?.label || 'Genérico';
+      if (ocultarCategoriaExport) {
         lineasTxt.push(
-          `#${p.id}`.padEnd(6) + '| ' +
-          nom.padEnd(28) + '| ' +
-          cat.padEnd(24) + '| ' +
-          (p.tipo || 'PIN').padEnd(10) + '| ' +
-          `${vSano} V`
+          'PIN'.padEnd(6) + '| ' +
+          'LÍNEA / NET'.padEnd(28) + '| ' +
+          'TIPO'.padEnd(10) + '| ' +
+          'VALOR REFERENCIA'
         );
-      });
+        lineasTxt.push(''.padEnd(65, '-'));
+
+        pines.forEach(p => {
+          const vSano = obtenerValSano(p);
+          const nom = esNombreGenerico(p.nombre) ? `Pin_${p.id}` : p.nombre;
+          lineasTxt.push(
+            `#${p.id}`.padEnd(6) + '| ' +
+            nom.padEnd(28) + '| ' +
+            (p.tipo || 'PIN').padEnd(10) + '| ' +
+            `${vSano} V`
+          );
+        });
+      } else {
+        lineasTxt.push(
+          'PIN'.padEnd(6) + '| ' +
+          'LÍNEA / NET'.padEnd(28) + '| ' +
+          'CATEGORÍA'.padEnd(24) + '| ' +
+          'TIPO'.padEnd(10) + '| ' +
+          'VALOR REFERENCIA'
+        );
+        lineasTxt.push(''.padEnd(80, '-'));
+
+        pines.forEach(p => {
+          const vSano = obtenerValSano(p);
+          const nom = esNombreGenerico(p.nombre) ? `Pin_${p.id}` : p.nombre;
+          const cat = CATEGORIAS_FPC[p.categoria || deducirCategoriaNet(p.nombre)]?.label || 'Genérico';
+          lineasTxt.push(
+            `#${p.id}`.padEnd(6) + '| ' +
+            nom.padEnd(28) + '| ' +
+            cat.padEnd(24) + '| ' +
+            (p.tipo || 'PIN').padEnd(10) + '| ' +
+            `${vSano} V`
+          );
+        });
+      }
     }
 
     lineasTxt.push('========================================================================================');
@@ -682,42 +756,136 @@ export default function FPCInteligente({
       return;
     }
 
-    const filasHtml = pines.map(p => {
-      const s = evaluarSaludPin(p);
-      const vSano = obtenerValSano(p);
-      const vAct = obtenerValActual(p);
-      const nom = esNombreGenerico(p.nombre) ? `Pin_${p.id}` : p.nombre;
-      const cat = CATEGORIAS_FPC[p.categoria || deducirCategoriaNet(p.nombre)] || CATEGORIAS_FPC.generico;
-      const delta = (s.delta !== null && s.delta !== undefined) ? `${s.delta > 0 ? '+' : ''}${s.delta} V` : '---';
+    let tablaHtml = '';
 
-      let badgeEstado = '';
-      if (esDiag) {
-        if (s.estado === 'corto') badgeEstado = '<span style="background:#ef4444;color:white;padding:2px 7px;border-radius:4px;font-weight:bold;font-size:11px;">CORTOCIRCUITO</span>';
-        else if (s.estado === 'abierto') badgeEstado = '<span style="background:#ef4444;color:white;padding:2px 7px;border-radius:4px;font-weight:bold;font-size:11px;">LÍNEA ABIERTA</span>';
-        else if (s.estado === 'fuga') badgeEstado = '<span style="background:#f59e0b;color:black;padding:2px 7px;border-radius:4px;font-weight:bold;font-size:11px;">FUGA / TOLERANCIA</span>';
-        else if (s.estado === 'gnd') badgeEstado = '<span style="background:#10b981;color:white;padding:2px 7px;border-radius:4px;font-weight:bold;font-size:11px;">GND Normal</span>';
-        else if (s.estado === 'ok') badgeEstado = '<span style="background:#10b981;color:white;padding:2px 7px;border-radius:4px;font-weight:bold;font-size:11px;">Normal (OK)</span>';
-        else badgeEstado = '<span style="background:#64748b;color:white;padding:2px 7px;border-radius:4px;font-size:11px;">Sin Medir</span>';
+    if (!esDiag && ocultarCategoriaExport) {
+      // MODO PLACA BUENA - FORMATO 2 COLUMNAS PARALELAS (CABE EN 1 HOJA A4)
+      const mitad = Math.ceil(pines.length / 2);
+      const col1 = pines.slice(0, mitad);
+      const col2 = pines.slice(mitad);
+      const maxFilas = Math.max(col1.length, col2.length);
+
+      let filas2Col = '';
+      for (let i = 0; i < maxFilas; i++) {
+        const p1 = col1[i];
+        const p2 = col2[i];
+
+        const nom1 = p1 ? (esNombreGenerico(p1.nombre) ? `Pin_${p1.id}` : p1.nombre) : '';
+        const cat1 = p1 ? (CATEGORIAS_FPC[p1.categoria || deducirCategoriaNet(p1.nombre)] || CATEGORIAS_FPC.generico) : null;
+        const vSano1 = p1 ? obtenerValSano(p1) : '';
+
+        const nom2 = p2 ? (esNombreGenerico(p2.nombre) ? `Pin_${p2.id}` : p2.nombre) : '';
+        const cat2 = p2 ? (CATEGORIAS_FPC[p2.categoria || deducirCategoriaNet(p2.nombre)] || CATEGORIAS_FPC.generico) : null;
+        const vSano2 = p2 ? obtenerValSano(p2) : '';
+
+        filas2Col += `
+          <tr style="border-bottom: 1px solid #e2e8f0; font-size: 11px;">
+            <!-- Lado Izquierdo (Pines 1..${mitad}) -->
+            <td style="padding: 3px 6px; font-weight: bold; text-align: center; color: #0f172a; width: 38px;">${p1 ? `#${p1.id}` : ''}</td>
+            <td style="padding: 3px 6px;">
+              ${p1 ? `
+                <span style="display:inline-block; padding: 1px 6px; border-radius: 4px; font-weight: bold; font-size: 10px; background: ${cat1.color}; color: ${cat1.text};">
+                  ${nom1}
+                </span>
+              ` : ''}
+            </td>
+            <td style="padding: 3px 6px; font-family: monospace; font-weight: bold; color: #0284c7; text-align: right; width: 75px;">${p1 ? `${vSano1} V` : ''}</td>
+
+            <!-- Separador Central Vertical -->
+            <td style="width: 8px; padding: 0; background: #f1f5f9; border-left: 1px solid #cbd5e1; border-right: 1px solid #cbd5e1;"></td>
+
+            <!-- Lado Derecho (Pines ${mitad + 1}..${pines.length}) -->
+            <td style="padding: 3px 6px; font-weight: bold; text-align: center; color: #0f172a; width: 38px;">${p2 ? `#${p2.id}` : ''}</td>
+            <td style="padding: 3px 6px;">
+              ${p2 ? `
+                <span style="display:inline-block; padding: 1px 6px; border-radius: 4px; font-weight: bold; font-size: 10px; background: ${cat2.color}; color: ${cat2.text};">
+                  ${nom2}
+                </span>
+              ` : ''}
+            </td>
+            <td style="padding: 3px 6px; font-family: monospace; font-weight: bold; color: #0284c7; text-align: right; width: 75px;">${p2 ? `${vSano2} V` : ''}</td>
+          </tr>
+        `;
       }
 
-      return `
-        <tr style="border-bottom: 1px solid #e2e8f0; font-size: 12px;">
-          <td style="padding: 7px 8px; font-weight: bold; text-align: center; color: #0f172a;">#${p.id}</td>
-          <td style="padding: 7px 8px;">
-            <span style="display:inline-block; padding: 2px 7px; border-radius: 4px; font-weight: bold; font-size: 11px; background: ${cat.color}; color: ${cat.text};">
-              ${nom}
-            </span>
-          </td>
-          <td style="padding: 7px 8px; color: #475569; font-size: 11px;">${cat.label}</td>
-          <td style="padding: 7px 8px; font-family: monospace; font-weight: bold; color: #0284c7;">${vSano} V</td>
-          ${esDiag ? `
-            <td style="padding: 7px 8px; font-family: monospace; font-weight: bold; color: ${s.esAnomalia ? '#dc2626' : '#16a34a'};">${vAct} V</td>
-            <td style="padding: 7px 8px; font-family: monospace; color: #64748b;">${delta}</td>
-            <td style="padding: 7px 8px; text-align: center;">${badgeEstado}</td>
-          ` : ''}
-        </tr>
+      tablaHtml = `
+        <table style="width: 100%; border-collapse: collapse;">
+          <thead>
+            <tr>
+              <th style="width: 38px; text-align: center;">PIN</th>
+              <th>LÍNEA / NET</th>
+              <th style="text-align: right; width: 75px;">REF (BUENA)</th>
+              <th style="width: 8px; background: #0f172a; padding: 0;"></th>
+              <th style="width: 38px; text-align: center;">PIN</th>
+              <th>LÍNEA / NET</th>
+              <th style="text-align: right; width: 75px;">REF (BUENA)</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${filas2Col}
+          </tbody>
+        </table>
       `;
-    }).join('');
+    } else {
+      // FORMATO ESTÁNDAR (1 FILA POR PIN - DIAGNÓSTICO O REFERENCIA COMPLETA)
+      const filasHtml = pines.map(p => {
+        const s = evaluarSaludPin(p);
+        const vSano = obtenerValSano(p);
+        const vAct = obtenerValActual(p);
+        const nom = esNombreGenerico(p.nombre) ? `Pin_${p.id}` : p.nombre;
+        const cat = CATEGORIAS_FPC[p.categoria || deducirCategoriaNet(p.nombre)] || CATEGORIAS_FPC.generico;
+        const delta = (s.delta !== null && s.delta !== undefined) ? `${s.delta > 0 ? '+' : ''}${s.delta} V` : '---';
+
+        let badgeEstado = '';
+        if (esDiag) {
+          if (s.estado === 'corto') badgeEstado = '<span style="background:#ef4444;color:white;padding:2px 7px;border-radius:4px;font-weight:bold;font-size:11px;">CORTOCIRCUITO</span>';
+          else if (s.estado === 'abierto') badgeEstado = '<span style="background:#ef4444;color:white;padding:2px 7px;border-radius:4px;font-weight:bold;font-size:11px;">LÍNEA ABIERTA</span>';
+          else if (s.estado === 'fuga') badgeEstado = '<span style="background:#f59e0b;color:black;padding:2px 7px;border-radius:4px;font-weight:bold;font-size:11px;">FUGA / TOLERANCIA</span>';
+          else if (s.estado === 'gnd') badgeEstado = '<span style="background:#10b981;color:white;padding:2px 7px;border-radius:4px;font-weight:bold;font-size:11px;">GND Normal</span>';
+          else if (s.estado === 'ok') badgeEstado = '<span style="background:#10b981;color:white;padding:2px 7px;border-radius:4px;font-weight:bold;font-size:11px;">Normal (OK)</span>';
+          else badgeEstado = '<span style="background:#64748b;color:white;padding:2px 7px;border-radius:4px;font-size:11px;">Sin Medir</span>';
+        }
+
+        return `
+          <tr style="border-bottom: 1px solid #e2e8f0; font-size: 11.5px;">
+            <td style="padding: 5px 8px; font-weight: bold; text-align: center; color: #0f172a; width: 45px;">#${p.id}</td>
+            <td style="padding: 5px 8px;">
+              <span style="display:inline-block; padding: 2px 7px; border-radius: 4px; font-weight: bold; font-size: 10.5px; background: ${cat.color}; color: ${cat.text};">
+                ${nom}
+              </span>
+            </td>
+            ${!ocultarCategoriaExport ? `<td style="padding: 5px 8px; color: #475569; font-size: 11px;">${cat.label}</td>` : ''}
+            <td style="padding: 5px 8px; font-family: monospace; font-weight: bold; color: #0284c7; ${!esDiag ? 'text-align: right;' : ''}">${vSano} V</td>
+            ${esDiag ? `
+              <td style="padding: 5px 8px; font-family: monospace; font-weight: bold; color: ${s.esAnomalia ? '#dc2626' : '#16a34a'};">${vAct} V</td>
+              <td style="padding: 5px 8px; font-family: monospace; color: #64748b;">${delta}</td>
+              <td style="padding: 5px 8px; text-align: center;">${badgeEstado}</td>
+            ` : ''}
+          </tr>
+        `;
+      }).join('');
+
+      tablaHtml = `
+        <table style="width: 100%; border-collapse: collapse;">
+          <thead>
+            <tr>
+              <th style="width: 45px; text-align: center;">PIN</th>
+              <th>LÍNEA / NET</th>
+              ${!ocultarCategoriaExport ? '<th>CATEGORÍA</th>' : ''}
+              <th style="${!esDiag ? 'text-align: right;' : ''}">REF (BUENA)</th>
+              ${esDiag ? `
+                <th>EN PRUEBA</th>
+                <th>DELTA</th>
+                <th style="text-align: center;">ESTADO</th>
+              ` : ''}
+            </tr>
+          </thead>
+          <tbody>
+            ${filasHtml}
+          </tbody>
+        </table>
+      `;
+    }
 
     const html = `
       <!DOCTYPE html>
@@ -726,29 +894,29 @@ export default function FPCInteligente({
         <meta charset="UTF-8">
         <title>${tituloDoc} - ${marca} ${modeloNombre}</title>
         <style>
-          @page { size: A4 portrait; margin: 12mm; }
-          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #0f172a; margin: 0; padding: 20px; background: #ffffff; }
-          .no-print-bar { display: flex; justify-content: space-between; align-items: center; background: #0f172a; color: white; padding: 12px 20px; border-radius: 8px; margin-bottom: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
-          .btn-print { background: #0284c7; color: white; border: none; padding: 9px 18px; border-radius: 6px; font-weight: bold; font-size: 13px; cursor: pointer; }
-          .header { border-bottom: 3px solid #0284c7; padding-bottom: 14px; margin-bottom: 18px; display: flex; justify-content: space-between; align-items: flex-start; }
-          .titulo-principal { font-size: 20px; font-weight: 800; color: #0f172a; margin: 0 0 4px 0; }
-          .subtitulo { font-size: 13px; color: #64748b; font-weight: 600; margin: 0; }
-          .meta-grid { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 16px; margin-bottom: 18px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+          @page { size: A4 portrait; margin: 8mm 10mm; }
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #0f172a; margin: 0; padding: 14px; background: #ffffff; }
+          .no-print-bar { display: flex; justify-content: space-between; align-items: center; background: #0f172a; color: white; padding: 10px 18px; border-radius: 8px; margin-bottom: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+          .btn-print { background: #0284c7; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: bold; font-size: 13px; cursor: pointer; }
+          .header { border-bottom: 2.5px solid #0284c7; padding-bottom: 10px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: flex-start; }
+          .titulo-principal { font-size: 18px; font-weight: 800; color: #0f172a; margin: 0 0 2px 0; }
+          .subtitulo { font-size: 12px; color: #64748b; font-weight: 600; margin: 0; }
+          .meta-grid { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 12px; margin-bottom: 12px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
           .meta-item { display: flex; flex-direction: column; }
-          .meta-k { font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: bold; }
-          .meta-v { font-size: 13px; font-weight: bold; color: #0f172a; }
-          .resumen-cards { display: flex; gap: 10px; margin-bottom: 18px; }
-          .card { flex: 1; padding: 8px 12px; border-radius: 6px; border: 1px solid #e2e8f0; background: #fafafa; }
-          .card-t { font-size: 10px; text-transform: uppercase; font-weight: bold; color: #64748b; margin-bottom: 2px; }
-          .card-n { font-size: 18px; font-weight: 800; }
+          .meta-k { font-size: 9px; text-transform: uppercase; color: #64748b; font-weight: bold; }
+          .meta-v { font-size: 12px; font-weight: bold; color: #0f172a; }
+          .resumen-cards { display: flex; gap: 8px; margin-bottom: 12px; }
+          .card { flex: 1; padding: 6px 10px; border-radius: 6px; border: 1px solid #e2e8f0; background: #fafafa; }
+          .card-t { font-size: 9px; text-transform: uppercase; font-weight: bold; color: #64748b; margin-bottom: 2px; }
+          .card-n { font-size: 16px; font-weight: 800; }
           table { width: 100%; border-collapse: collapse; }
-          th { background: #0f172a; color: white; padding: 8px 10px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; text-align: left; }
-          .footer { margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 12px; font-size: 11px; color: #94a3b8; display: flex; justify-content: space-between; }
+          th { background: #0f172a; color: white; padding: 6px 8px; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.5px; text-align: left; }
+          .footer { margin-top: 14px; border-top: 1px solid #e2e8f0; padding-top: 8px; font-size: 10px; color: #94a3b8; display: flex; justify-content: space-between; }
           @media print {
             body { padding: 0; }
             .no-print-bar { display: none !important; }
             table { page-break-inside: auto; }
-            tr { page-break-inside: avoid; page-break-after: auto; }
+            tr { page-break-inside: avoid; }
             thead { display: table-header-group; }
           }
         </style>
@@ -788,24 +956,7 @@ export default function FPCInteligente({
           </div>
         ` : ''}
 
-        <table>
-          <thead>
-            <tr>
-              <th style="width: 45px; text-align: center;">PIN</th>
-              <th>LÍNEA / NET</th>
-              <th>CATEGORÍA</th>
-              <th>REF (BUENA)</th>
-              ${esDiag ? `
-                <th>EN PRUEBA</th>
-                <th>DELTA</th>
-                <th style="text-align: center;">ESTADO</th>
-              ` : ''}
-            </tr>
-          </thead>
-          <tbody>
-            ${filasHtml}
-          </tbody>
-        </table>
+        ${tablaHtml}
 
         <div class="footer">
           <span>Mi Diagnóstico Pro • Soluciones Avanzadas en Microelectrónica</span>
@@ -1063,6 +1214,31 @@ export default function FPCInteligente({
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
           {modo === 'crear' ? (
             <>
+              <label
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  fontSize: '0.72rem',
+                  color: '#cbd5e1',
+                  cursor: 'pointer',
+                  background: '#1e293b',
+                  padding: '5px 9px',
+                  borderRadius: '8px',
+                  border: '1px solid #334155',
+                  userSelect: 'none'
+                }}
+                title="Al marcar: Oculta categoría y genera el PDF de Placa Buena en 2 columnas paralelas para que quepa en 1 sola hoja A4"
+              >
+                <input
+                  type="checkbox"
+                  checked={ocultarCategoriaExport}
+                  onChange={(e) => setOcultarCategoriaExport(e.target.checked)}
+                  style={{ accentColor: '#0284c7', cursor: 'pointer' }}
+                />
+                <span>2 Col. (Ocultar Categoría)</span>
+              </label>
+
               <button
                 onClick={() => imprimirReportePDF('referencia')}
                 style={{
@@ -1150,6 +1326,31 @@ export default function FPCInteligente({
             </>
           ) : (
             <>
+              <label
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  fontSize: '0.72rem',
+                  color: '#cbd5e1',
+                  cursor: 'pointer',
+                  background: '#1e293b',
+                  padding: '5px 9px',
+                  borderRadius: '8px',
+                  border: '1px solid #334155',
+                  userSelect: 'none'
+                }}
+                title="Al marcar: Oculta la columna de categoría para dar más espacio a las lecturas y estados en PDF y TXT"
+              >
+                <input
+                  type="checkbox"
+                  checked={ocultarCategoriaExport}
+                  onChange={(e) => setOcultarCategoriaExport(e.target.checked)}
+                  style={{ accentColor: '#0284c7', cursor: 'pointer' }}
+                />
+                <span>Ocultar Categoría</span>
+              </label>
+
               <button
                 onClick={() => imprimirReportePDF('diagnostico')}
                 style={{
