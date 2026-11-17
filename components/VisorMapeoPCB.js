@@ -65,7 +65,7 @@ const CATEGORIAS_NETS = {
     id: 'comunicacion',
     label: '📡 Comunicación (Buses / Protocolos)',
     color: '#6366f1',
-    items: ['USB_DP', 'BPI_BUS10', 'TP_SPI2_SCLK', 'AP_TO_I2C_SDA', 'AP_TO_I2C_SCL', 'SPI_AP_MOSI', 'SPI_AP_MISO', 'SPI_AP_CLK', 'SPI_AP_CS', 'UART_TX', 'UART_RX', 'USB_HS_DP', 'USB_HS_DN', 'RFFE_DATA', 'RFFE_CLK', 'SWI_DATA', 'MIPI_DSI']
+    items: ['USB_DP', 'BPI_BUS10', 'TP_SPI2_SCLK', 'TP_SPI2_MOSI', 'TP_SPI2_MISO', 'TP_SPI2_CS', 'AP_TO_I2C_SDA', 'AP_TO_I2C_SCL', 'SPI_AP_MOSI', 'SPI_AP_MISO', 'SPI_AP_CLK', 'SPI_AP_CS', 'UART_TX', 'UART_RX', 'USB_HS_DP', 'USB_HS_DN', 'RFFE_DATA', 'RFFE_CLK', 'SWI_DATA', 'MIPI_DSI']
   },
   sensado: {
     id: 'sensado',

@@ -1760,6 +1760,25 @@ export default function AppDiagnostico() {
 
   const reproducirBip = () => { try { const audioCtx = new (window.AudioContext || window.webkitAudioContext)(); const oscillator = audioCtx.createOscillator(); oscillator.type = 'sine'; oscillator.frequency.setValueAtTime(1200, audioCtx.currentTime); oscillator.connect(audioCtx.destination); oscillator.start(); oscillator.stop(audioCtx.currentTime + 0.1); } catch (e) { } };
 
+  // Tono grave distintivo de pre-aviso para pin de Tierra (GND)
+  const reproducirAvisoGND = () => {
+    try {
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      // Tono grave descendente 320Hz -> 220Hz (inconfundible con el beep agudo)
+      osc.frequency.setValueAtTime(320, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(220, audioCtx.currentTime + 0.16);
+      gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.16);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.16);
+    } catch (e) { }
+  };
+
   // GUARDADO UNIVERSAL
   const avanzarPinMagico = (valorForzado = null) => {
     try {
@@ -1830,12 +1849,8 @@ export default function AppDiagnostico() {
           });
           modeloActualizado.fpcs = nuevosFpcs; setModeloActivo(modeloActualizado);
           setPinActivoFpc(prev => {
-            let nextPin = Number(prev) + 1;
+            const nextPin = Number(prev) + 1;
             const totalPines = fpcAct?.pines?.length || 0;
-            while (nextPin <= totalPines) {
-              const pinInfo = (fpcAct.pines || []).find(p => Number(p.id) === nextPin);
-              if (pinInfo && (pinInfo.tipo === 'GND' || pinInfo.tipo === 'NC')) { nextPin++; } else { break; }
-            }
             return nextPin <= totalPines ? nextPin : Number(prev);
           });
         } else if (seccion === 'ic' && icActivoRef.current) {
@@ -1870,11 +1885,7 @@ export default function AppDiagnostico() {
           setPadActivoIc(prev => {
             const idx = (icAct.pines || []).findIndex(p => String(p.id) === String(prev));
             if (idx === -1) return prev;
-            let nextIdx = idx + 1;
-            while (nextIdx < icAct.pines.length) {
-              const pinInfo = icAct.pines[nextIdx];
-              if (pinInfo && (pinInfo.tipo === 'GND' || pinInfo.tipo === 'NC')) { nextIdx++; } else { break; }
-            }
+            const nextIdx = idx + 1;
             return nextIdx < icAct.pines.length ? icAct.pines[nextIdx].id : prev;
           });
         } else if (seccion === 'fpc_bateria' && modeloActualizado.fpcBateria) {
@@ -1903,12 +1914,8 @@ export default function AppDiagnostico() {
           setModeloActivo(modeloActualizado);
           setCambiosPendientesFpcBateria(true);
           setPinActivoFpcBateria(prev => {
-            let nextPin = Number(prev) + 1;
+            const nextPin = Number(prev) + 1;
             const totalPines = bateriaAct?.pines?.length || 0;
-            while (nextPin <= totalPines) {
-              const pinInfo = (bateriaAct.pines || []).find(p => Number(p.id) === nextPin);
-              if (pinInfo && (pinInfo.tipo === 'GND' || pinInfo.tipo === 'NC')) { nextPin++; } else { break; }
-            }
             return nextPin <= totalPines ? nextPin : Number(prev);
           });
         }
@@ -4639,6 +4646,9 @@ export default function AppDiagnostico() {
                 ultimaSincronizacion={ultimaSincFpc}
                 onRegistrarOL={() => avanzarPinMagico('OL')}
                 nombreFpc={fpcActivo.nombre}
+                fpcId={fpcActivo.id}
+                marca={modeloActivo?.marca || ''}
+                modeloNombre={modeloActivo?.nombre || ''}
               />
             </div>
           </motion.div>

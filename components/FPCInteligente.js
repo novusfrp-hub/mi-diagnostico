@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Save, Cloud, CloudOff, Check, AlertCircle, Shield, Zap, Radio,
   Activity, Cpu, Tag, RotateCcw, Filter, Eye, AlertTriangle,
   CheckCircle2, Lock, Unlock, Edit3, Plus, Trash2, ArrowRightLeft,
-  Download, HelpCircle
+  Download, HelpCircle, Printer, FileText, Share2, Copy, X
 } from 'lucide-react';
 import SelectorTipoLinea, { CATEGORIAS_LINEAS } from './SelectorTipoLinea.js';
 
@@ -102,10 +102,109 @@ export default function FPCInteligente({
   guardando = false,
   ultimaSincronizacion = null,
   onRegistrarOL,
-  nombreFpc = 'FPC'
+  nombreFpc = 'FPC',
+  fpcId = '',
+  marca = '',
+  modeloNombre = ''
 }) {
   const [filtroSoloFallas, setFiltroSoloFallas] = useState(false);
   const [ayudaVisible, setAyudaVisible] = useState(false);
+  const [modalReporteVisible, setModalReporteVisible] = useState(false);
+
+  // --- AUDIO SINTETIZADO: PRE-AVISO DE TIERRA (GND) ---
+  const reproducirAvisoGND = () => {
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContext) return;
+      const ctx = new AudioContext();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      // Tono grave distintivo (320Hz bajando a 220Hz, inconfundible con el beep agudo)
+      osc.frequency.setValueAtTime(320, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(220, ctx.currentTime + 0.16);
+      gain.gain.setValueAtTime(0.25, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.16);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.16);
+    } catch (e) { }
+  };
+
+  // Detectar cambio de pinActivo y avisar si el nuevo pin es GND
+  const prevPinActivoRef = useRef(pinActivo);
+  useEffect(() => {
+    if (String(prevPinActivoRef.current) !== String(pinActivo)) {
+      prevPinActivoRef.current = pinActivo;
+      const pinObj = pines.find(p => String(p.id) === String(pinActivo));
+      if (pinObj && (pinObj.tipo === 'GND' || pinObj.nombre === 'GND' || pinObj.valorSanoDiodo === '0.000' || pinObj.valorSano === '0.000')) {
+        reproducirAvisoGND();
+      }
+    }
+  }, [pinActivo, pines]);
+
+  // --- HELPER DE AUTO-AVANCE AL SIGUIENTE PIN (SECUENCIA FÍSICA ESTRICTA) ---
+  const avanzarPinActivo = () => {
+    if (setPinActivo) {
+      setPinActivo(prev => {
+        const actual = Number(prev);
+        return actual < pines.length ? actual + 1 : actual;
+      });
+    }
+  };
+
+  // --- PERSISTENCIA LOCAL DE LA SESIÓN DE DIAGNÓSTICO (INMUNE A APAGONES / 0 COSTO FIREBASE) ---
+  const storageDiagKey = `sesion_diag_fpc_${fpcId || nombreFpc}`;
+
+  // 1. Restaurar mediciones guardadas al montar en modo diagnóstico
+  useEffect(() => {
+    if (typeof window === 'undefined' || modo !== 'diagnostico') return;
+    try {
+      const guardado = localStorage.getItem(storageDiagKey);
+      if (guardado) {
+        const parsed = JSON.parse(guardado);
+        if (parsed && parsed.valores) {
+          setPines(prev => prev.map(p => {
+            const valsGuardados = parsed.valores[p.id];
+            if (valsGuardados && (!p.valorActual || p.valorActual === '---')) {
+              return { ...p, ...valsGuardados };
+            }
+            return p;
+          }));
+        }
+      }
+    } catch (e) { }
+  }, [storageDiagKey, modo]);
+
+  // 2. Guardar automáticamente cada medición tomada en modo diagnóstico
+  useEffect(() => {
+    if (typeof window === 'undefined' || modo !== 'diagnostico') return;
+    const tieneMediciones = pines.some(p => p.valorActual && p.valorActual !== '---');
+    if (tieneMediciones) {
+      try {
+        const mapa = {};
+        pines.forEach(p => {
+          if (p.valorActual && p.valorActual !== '---') {
+            mapa[p.id] = {
+              valorActual: p.valorActual,
+              valorActualDiodo: p.valorActualDiodo,
+              valorActualVoltio: p.valorActualVoltio,
+              valorActualUa: p.valorActualUa,
+              valorActualOhmio: p.valorActualOhmio,
+              valorActualAmperio: p.valorActualAmperio
+            };
+          }
+        });
+        localStorage.setItem(storageDiagKey, JSON.stringify({
+          valores: mapa,
+          timestamp: Date.now(),
+          nombreFpc,
+          escala
+        }));
+      } catch (e) { }
+    }
+  }, [pines, modo, storageDiagKey, escala, nombreFpc]);
 
   const mitad = Math.ceil(pines.length / 2);
   const filaSup = pines.slice(0, mitad);
@@ -376,6 +475,7 @@ export default function FPCInteligente({
       }
       return p;
     }));
+    avanzarPinActivo();
   };
 
   const manejarCambioNombre = (nuevoNombre) => {
@@ -454,9 +554,14 @@ export default function FPCInteligente({
     alert('✅ ¡Éxito! Todas las mediciones ahora son la Referencia Oficial de la Placa Buena. Puedes pulsar "GUARDAR REFERENCIA" para subirlas a la nube.');
   };
 
-  // REINICIAR DIAGNÓSTICO (Limpia las lecturas de la placa averiada)
+  // REINICIAR DIAGNÓSTICO (Limpia las lecturas de la placa averiada y el caché local)
   const reiniciarDiagnostico = () => {
     if (!window.confirm('¿Reiniciar diagnóstico? Las lecturas tomadas de la placa averiada (En Prueba) se limpiarán a "---". La Placa Buena se mantendrá intacta.')) return;
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem(storageDiagKey);
+      } catch (e) { }
+    }
     setPines(prev => prev.map(p => ({
       ...p,
       valorActual: '---',
@@ -467,6 +572,258 @@ export default function FPCInteligente({
       valorActualAmperio: '---'
     })));
     setPinActivo(1);
+  };
+
+  // --- EXPORTACIÓN A ARCHIVO TXT LIMPIO ---
+  const exportarTXT = (tipo = 'diagnostico') => {
+    const esDiag = tipo === 'diagnostico';
+    const fecha = new Date().toLocaleString();
+    const tituloDoc = esDiag ? 'REPORTE DE DIAGNÓSTICO COMPARATIVO FPC' : 'HOJA DE DATOS FPC - PLACA BUENA (REFERENCIA)';
+
+    const lineasTxt = [
+      '========================================================================================',
+      tituloDoc,
+      '========================================================================================',
+      `Dispositivo:  ${marca || 'Dispositivo'} ${modeloNombre || ''}`.trim(),
+      `Conector:     ${nombreFpc} (${pines.length} Pines)`,
+      `Escala:       ${escala.toUpperCase()} (V)`,
+      `Fecha:        ${fecha}`,
+      esDiag
+        ? `Resultados:   Medidos: ${resumenDiagnostico.medidos}/${resumenDiagnostico.total} | Normales: ${resumenDiagnostico.normales} | Anomalías: ${resumenDiagnostico.fallas}`
+        : `Total Pines:  ${pines.length} Pines registrados`,
+      '========================================================================================'
+    ];
+
+    if (esDiag) {
+      lineasTxt.push(
+        'PIN'.padEnd(6) + '| ' +
+        'LÍNEA / NET'.padEnd(24) + '| ' +
+        'TIPO'.padEnd(10) + '| ' +
+        'REF (BUENA)'.padEnd(14) + '| ' +
+        'EN PRUEBA'.padEnd(14) + '| ' +
+        'DELTA'.padEnd(12) + '| ' +
+        'ESTADO'
+      );
+      lineasTxt.push(''.padEnd(96, '-'));
+
+      pines.forEach(p => {
+        const s = evaluarSaludPin(p);
+        const vSano = obtenerValSano(p);
+        const vAct = obtenerValActual(p);
+        const nom = esNombreGenerico(p.nombre) ? '---' : p.nombre;
+        const delta = (s.delta !== null && s.delta !== undefined) ? `${s.delta > 0 ? '+' : ''}${s.delta} V` : '---';
+        const estadoTexto = s.estado === 'corto' ? 'ANOMALÍA: CORTOCIRCUITO'
+          : s.estado === 'abierto' ? 'ANOMALÍA: LÍNEA ABIERTA'
+          : s.estado === 'fuga' ? 'ANOMALÍA: FUGA / TOLERANCIA'
+          : s.estado === 'gnd' ? 'GND Normal'
+          : s.estado === 'ok' ? 'Normal (OK)'
+          : 'Sin Medir';
+
+        lineasTxt.push(
+          `#${p.id}`.padEnd(6) + '| ' +
+          nom.padEnd(24) + '| ' +
+          (p.tipo || 'PIN').padEnd(10) + '| ' +
+          `${vSano} V`.padEnd(14) + '| ' +
+          `${vAct} V`.padEnd(14) + '| ' +
+          delta.padEnd(12) + '| ' +
+          estadoTexto
+        );
+      });
+    } else {
+      lineasTxt.push(
+        'PIN'.padEnd(6) + '| ' +
+        'LÍNEA / NET'.padEnd(28) + '| ' +
+        'CATEGORÍA'.padEnd(24) + '| ' +
+        'TIPO'.padEnd(10) + '| ' +
+        'VALOR REFERENCIA'
+      );
+      lineasTxt.push(''.padEnd(80, '-'));
+
+      pines.forEach(p => {
+        const vSano = obtenerValSano(p);
+        const nom = esNombreGenerico(p.nombre) ? `Pin_${p.id}` : p.nombre;
+        const cat = CATEGORIAS_FPC[p.categoria || deducirCategoriaNet(p.nombre)]?.label || 'Genérico';
+        lineasTxt.push(
+          `#${p.id}`.padEnd(6) + '| ' +
+          nom.padEnd(28) + '| ' +
+          cat.padEnd(24) + '| ' +
+          (p.tipo || 'PIN').padEnd(10) + '| ' +
+          `${vSano} V`
+        );
+      });
+    }
+
+    lineasTxt.push('========================================================================================');
+    lineasTxt.push('Generado con Mi Diagnóstico Pro - Laboratorio de Reparación y Microelectrónica');
+    lineasTxt.push('========================================================================================');
+
+    const contenido = lineasTxt.join('\n');
+    const blob = new Blob([contenido], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const prefijo = esDiag ? 'Diagnostico' : 'Referencia_PlacaBuena';
+    const tagEquipo = `${marca || 'Equipo'}_${modeloNombre || ''}`.trim().replace(/\s+/g, '_');
+    a.download = `${prefijo}_${tagEquipo}_${nombreFpc}_${new Date().toISOString().slice(0, 10)}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  // --- GENERACIÓN E IMPRESIÓN DIRECTA EN PDF PROFESIONAL ---
+  const imprimirReportePDF = (tipo = 'diagnostico') => {
+    const esDiag = tipo === 'diagnostico';
+    const fecha = new Date().toLocaleString();
+    const tituloDoc = esDiag ? 'INFORME DE DIAGNÓSTICO COMPARATIVO FPC' : 'HOJA DE DATOS FPC - PLACA BUENA (REFERENCIA)';
+    const ventana = window.open('', '_blank', 'width=950,height=1000');
+    if (!ventana) {
+      alert('Por favor permite ventanas emergentes en tu navegador para generar el PDF.');
+      return;
+    }
+
+    const filasHtml = pines.map(p => {
+      const s = evaluarSaludPin(p);
+      const vSano = obtenerValSano(p);
+      const vAct = obtenerValActual(p);
+      const nom = esNombreGenerico(p.nombre) ? `Pin_${p.id}` : p.nombre;
+      const cat = CATEGORIAS_FPC[p.categoria || deducirCategoriaNet(p.nombre)] || CATEGORIAS_FPC.generico;
+      const delta = (s.delta !== null && s.delta !== undefined) ? `${s.delta > 0 ? '+' : ''}${s.delta} V` : '---';
+
+      let badgeEstado = '';
+      if (esDiag) {
+        if (s.estado === 'corto') badgeEstado = '<span style="background:#ef4444;color:white;padding:2px 7px;border-radius:4px;font-weight:bold;font-size:11px;">CORTOCIRCUITO</span>';
+        else if (s.estado === 'abierto') badgeEstado = '<span style="background:#ef4444;color:white;padding:2px 7px;border-radius:4px;font-weight:bold;font-size:11px;">LÍNEA ABIERTA</span>';
+        else if (s.estado === 'fuga') badgeEstado = '<span style="background:#f59e0b;color:black;padding:2px 7px;border-radius:4px;font-weight:bold;font-size:11px;">FUGA / TOLERANCIA</span>';
+        else if (s.estado === 'gnd') badgeEstado = '<span style="background:#10b981;color:white;padding:2px 7px;border-radius:4px;font-weight:bold;font-size:11px;">GND Normal</span>';
+        else if (s.estado === 'ok') badgeEstado = '<span style="background:#10b981;color:white;padding:2px 7px;border-radius:4px;font-weight:bold;font-size:11px;">Normal (OK)</span>';
+        else badgeEstado = '<span style="background:#64748b;color:white;padding:2px 7px;border-radius:4px;font-size:11px;">Sin Medir</span>';
+      }
+
+      return `
+        <tr style="border-bottom: 1px solid #e2e8f0; font-size: 12px;">
+          <td style="padding: 7px 8px; font-weight: bold; text-align: center; color: #0f172a;">#${p.id}</td>
+          <td style="padding: 7px 8px;">
+            <span style="display:inline-block; padding: 2px 7px; border-radius: 4px; font-weight: bold; font-size: 11px; background: ${cat.color}; color: ${cat.text};">
+              ${nom}
+            </span>
+          </td>
+          <td style="padding: 7px 8px; color: #475569; font-size: 11px;">${cat.label}</td>
+          <td style="padding: 7px 8px; font-family: monospace; font-weight: bold; color: #0284c7;">${vSano} V</td>
+          ${esDiag ? `
+            <td style="padding: 7px 8px; font-family: monospace; font-weight: bold; color: ${s.esAnomalia ? '#dc2626' : '#16a34a'};">${vAct} V</td>
+            <td style="padding: 7px 8px; font-family: monospace; color: #64748b;">${delta}</td>
+            <td style="padding: 7px 8px; text-align: center;">${badgeEstado}</td>
+          ` : ''}
+        </tr>
+      `;
+    }).join('');
+
+    const html = `
+      <!DOCTYPE html>
+      <html lang="es">
+      <head>
+        <meta charset="UTF-8">
+        <title>${tituloDoc} - ${marca} ${modeloNombre}</title>
+        <style>
+          @page { size: A4 portrait; margin: 12mm; }
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #0f172a; margin: 0; padding: 20px; background: #ffffff; }
+          .no-print-bar { display: flex; justify-content: space-between; align-items: center; background: #0f172a; color: white; padding: 12px 20px; border-radius: 8px; margin-bottom: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+          .btn-print { background: #0284c7; color: white; border: none; padding: 9px 18px; border-radius: 6px; font-weight: bold; font-size: 13px; cursor: pointer; }
+          .header { border-bottom: 3px solid #0284c7; padding-bottom: 14px; margin-bottom: 18px; display: flex; justify-content: space-between; align-items: flex-start; }
+          .titulo-principal { font-size: 20px; font-weight: 800; color: #0f172a; margin: 0 0 4px 0; }
+          .subtitulo { font-size: 13px; color: #64748b; font-weight: 600; margin: 0; }
+          .meta-grid { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 16px; margin-bottom: 18px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+          .meta-item { display: flex; flex-direction: column; }
+          .meta-k { font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: bold; }
+          .meta-v { font-size: 13px; font-weight: bold; color: #0f172a; }
+          .resumen-cards { display: flex; gap: 10px; margin-bottom: 18px; }
+          .card { flex: 1; padding: 8px 12px; border-radius: 6px; border: 1px solid #e2e8f0; background: #fafafa; }
+          .card-t { font-size: 10px; text-transform: uppercase; font-weight: bold; color: #64748b; margin-bottom: 2px; }
+          .card-n { font-size: 18px; font-weight: 800; }
+          table { width: 100%; border-collapse: collapse; }
+          th { background: #0f172a; color: white; padding: 8px 10px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; text-align: left; }
+          .footer { margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 12px; font-size: 11px; color: #94a3b8; display: flex; justify-content: space-between; }
+          @media print {
+            body { padding: 0; }
+            .no-print-bar { display: none !important; }
+            table { page-break-inside: auto; }
+            tr { page-break-inside: avoid; page-break-after: auto; }
+            thead { display: table-header-group; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="no-print-bar">
+          <div>
+            <strong>Reporte Listo para Exportar / Imprimir</strong>
+            <span style="color:#94a3b8; font-size: 12px; margin-left: 10px;">Selecciona "Guardar como PDF" en el destino de tu impresora</span>
+          </div>
+          <button class="btn-print" onclick="window.print()">🖨️ Guardar como PDF / Imprimir</button>
+        </div>
+
+        <div class="header">
+          <div>
+            <h1 class="titulo-principal">🔬 MI DIAGNÓSTICO PRO</h1>
+            <p class="subtitulo">${tituloDoc}</p>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-size: 11px; color: #64748b; font-weight: bold;">FECHA: ${fecha}</div>
+            <div style="font-size: 12px; font-weight: bold; color: #0284c7; margin-top: 3px;">ESCALA: ${escala.toUpperCase()} (V)</div>
+          </div>
+        </div>
+
+        <div class="meta-grid">
+          <div class="meta-item"><span class="meta-k">Marca / Fabricante</span><span class="meta-v">${marca || 'Dispositivo'}</span></div>
+          <div class="meta-item"><span class="meta-k">Modelo</span><span class="meta-v">${modeloNombre || 'Estándar'}</span></div>
+          <div class="meta-item"><span class="meta-k">Conector</span><span class="meta-v">${nombreFpc}</span></div>
+          <div class="meta-item"><span class="meta-k">Total Pines</span><span class="meta-v">${pines.length} Pines</span></div>
+        </div>
+
+        ${esDiag ? `
+          <div class="resumen-cards">
+            <div class="card" style="border-left: 4px solid #3b82f6;"><div class="card-t">Medidos</div><div class="card-n" style="color: #3b82f6;">${resumenDiagnostico.medidos} / ${resumenDiagnostico.total}</div></div>
+            <div class="card" style="border-left: 4px solid #10b981;"><div class="card-t">Pines Normales (OK)</div><div class="card-n" style="color: #10b981;">${resumenDiagnostico.normales}</div></div>
+            <div class="card" style="border-left: 4px solid #ef4444;"><div class="card-t">Con Anomalías</div><div class="card-n" style="color: #ef4444;">${resumenDiagnostico.fallas}</div></div>
+          </div>
+        ` : ''}
+
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 45px; text-align: center;">PIN</th>
+              <th>LÍNEA / NET</th>
+              <th>CATEGORÍA</th>
+              <th>REF (BUENA)</th>
+              ${esDiag ? `
+                <th>EN PRUEBA</th>
+                <th>DELTA</th>
+                <th style="text-align: center;">ESTADO</th>
+              ` : ''}
+            </tr>
+          </thead>
+          <tbody>
+            ${filasHtml}
+          </tbody>
+        </table>
+
+        <div class="footer">
+          <span>Mi Diagnóstico Pro • Soluciones Avanzadas en Microelectrónica</span>
+          <span>Reporte Oficial de Laboratorio • 0 Costo Cloud</span>
+        </div>
+
+        <script>
+          window.onload = function() {
+            setTimeout(function() { window.print(); }, 400);
+          };
+        </script>
+      </body>
+      </html>
+    `;
+
+    ventana.document.open();
+    ventana.document.write(html);
+    ventana.document.close();
   };
 
   // RESUMEN ESTADÍSTICO PARA LA TABLA INFERIOR
@@ -703,9 +1060,51 @@ export default function FPCInteligente({
         </div>
 
         {/* Acciones de la barra superior */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
           {modo === 'crear' ? (
             <>
+              <button
+                onClick={() => imprimirReportePDF('referencia')}
+                style={{
+                  background: '#0284c7',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '6px 12px',
+                  fontSize: '0.72rem',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px'
+                }}
+                title="Exportar hoja de datos oficial de la Placa Buena en PDF"
+              >
+                <Printer size={13} />
+                PDF Referencia
+              </button>
+
+              <button
+                onClick={() => exportarTXT('referencia')}
+                style={{
+                  background: '#1e293b',
+                  border: '1px solid #475569',
+                  color: '#cbd5e1',
+                  borderRadius: '8px',
+                  padding: '6px 12px',
+                  fontSize: '0.72rem',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px'
+                }}
+                title="Descargar mediciones de la Placa Buena en archivo TXT simple"
+              >
+                <FileText size={13} />
+                TXT Referencia
+              </button>
+
               <button
                 onClick={transferirEnPruebaAReferencia}
                 style={{
@@ -750,26 +1149,71 @@ export default function FPCInteligente({
               )}
             </>
           ) : (
-            <button
-              onClick={reiniciarDiagnostico}
-              style={{
-                background: 'rgba(239, 68, 68, 0.15)',
-                border: '1px solid #ef4444',
-                color: '#ef4444',
-                borderRadius: '8px',
-                padding: '6px 12px',
-                fontSize: '0.72rem',
-                fontWeight: 'bold',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px'
-              }}
-              title="Limpia la columna 'En Prueba' para comenzar a diagnosticar otra placa"
-            >
-              <RotateCcw size={13} />
-              Reiniciar Diagnóstico
-            </button>
+            <>
+              <button
+                onClick={() => imprimirReportePDF('diagnostico')}
+                style={{
+                  background: '#0284c7',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '6px 12px',
+                  fontSize: '0.72rem',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  boxShadow: '0 0 10px rgba(2, 132, 199, 0.3)'
+                }}
+                title="Generar e imprimir informe de diagnóstico en PDF con formato profesional de laboratorio"
+              >
+                <Printer size={13} />
+                Exportar PDF
+              </button>
+
+              <button
+                onClick={() => exportarTXT('diagnostico')}
+                style={{
+                  background: '#1e293b',
+                  border: '1px solid #475569',
+                  color: '#cbd5e1',
+                  borderRadius: '8px',
+                  padding: '6px 12px',
+                  fontSize: '0.72rem',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px'
+                }}
+                title="Descargar reporte comparativo en archivo TXT simple"
+              >
+                <FileText size={13} />
+                Descargar TXT
+              </button>
+
+              <button
+                onClick={reiniciarDiagnostico}
+                style={{
+                  background: 'rgba(239, 68, 68, 0.15)',
+                  border: '1px solid #ef4444',
+                  color: '#ef4444',
+                  borderRadius: '8px',
+                  padding: '6px 12px',
+                  fontSize: '0.72rem',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px'
+                }}
+                title="Limpia la columna 'En Prueba' para comenzar a diagnosticar otra placa"
+              >
+                <RotateCcw size={13} />
+                Reiniciar Diagnóstico
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -902,9 +1346,10 @@ export default function FPCInteligente({
                 <button
                   onClick={() => {
                     setPines(prev => prev.map(p => String(p.id) === String(pinActivo) ? { ...p, valorSano: 'OL', valorSanoDiodo: 'OL' } : p));
+                    avanzarPinActivo();
                   }}
                   style={{ background: '#ffffff', color: '#000000', border: '1px solid #cbd5e1', padding: '4px 9px', borderRadius: '5px', fontSize: '0.72rem', fontWeight: 'bold', cursor: 'pointer' }}
-                  title="Marcar medición de referencia como Abierto (OL)"
+                  title="Marcar medición de referencia como Abierto (OL) y pasar al siguiente pin"
                 >
                   OL
                 </button>
@@ -936,13 +1381,19 @@ export default function FPCInteligente({
                   PIN
                 </button>
 
-                {/* Input de Nombre con autodetección */}
+                {/* Input de Nombre con autodetección y avance con Enter */}
                 <input
                   value={esNombreGenerico(pinActivoObj.nombre) ? '' : pinActivoObj.nombre}
                   onChange={(e) => manejarCambioNombre(e.target.value)}
-                  placeholder="Asignar nombre de línea..."
-                  style={{ background: '#000', color: 'white', border: '1px solid #374151', padding: '4px 8px', borderRadius: '5px', width: '170px', outline: 'none', fontSize: '0.78rem', fontWeight: 'bold' }}
-                  title="Escribe o pega el nombre de la línea"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      avanzarPinActivo();
+                    }
+                  }}
+                  placeholder="Asignar nombre de línea... (Enter = siguiente)"
+                  style={{ background: '#000', color: 'white', border: '1px solid #374151', padding: '4px 8px', borderRadius: '5px', width: '200px', outline: 'none', fontSize: '0.78rem', fontWeight: 'bold' }}
+                  title="Escribe o pega el nombre de la línea. Pulsa Enter para pasar al siguiente pin automáticamente"
                 />
 
                 {/* Input Manual de Valor de Referencia */}
@@ -952,9 +1403,15 @@ export default function FPCInteligente({
                     type="text"
                     value={valSanoActivo === '---' ? '' : valSanoActivo}
                     onChange={(e) => actualizarValorReferenciaManual(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        avanzarPinActivo();
+                      }
+                    }}
                     placeholder="0.000"
                     style={{ background: 'transparent', color: '#38bdf8', border: 'none', width: '55px', outline: 'none', fontSize: '0.78rem', fontWeight: 'bold', textAlign: 'center' }}
-                    title="Escribe manualmente el valor sano de referencia con el teclado"
+                    title="Escribe manualmente el valor sano de referencia con el teclado (Enter = siguiente)"
                   />
                   <span style={{ fontSize: '0.68rem', color: '#6b7280' }}>{unidadEscala}</span>
                 </div>
@@ -987,6 +1444,7 @@ export default function FPCInteligente({
                         } : p
                       )
                     );
+                    avanzarPinActivo();
                   }}
                   tiposCustom={tiposCustom}
                   onAgregarTipo={(nuevo) => setTiposCustom && setTiposCustom([...tiposCustom, nuevo])}
