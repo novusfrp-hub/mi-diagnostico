@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Search, X, Check, Plus, Trash2, Zap, Shield, Radio, Cpu, Star, Activity, Volume2, ArrowDown, Edit2 } from 'lucide-react';
 
-const CATEGORIAS_LINEAS = {
+export const CATEGORIAS_LINEAS = {
   alimentacion: {
     lbl: 'Alimentación (Voltajes / Power)',
     shortLbl: 'Alimentación',
@@ -22,6 +22,8 @@ const CATEGORIAS_LINEAS = {
       'PP3V0_LDO',
       'PP0V8_CORE',
       'VREG_L6A_0P6',
+      'LTE_VFE28',
+      'AU_MICBIAS0',
       'LCM_LEDA',
       'LCM_LED_A',
       'LCM_LEDK',
@@ -47,6 +49,8 @@ const CATEGORIAS_LINEAS = {
     bgPill: '#7c2d12',
     icon: Volume2,
     items: [
+      'AU_VOUT0_N',
+      'VIBR_PMU',
       'SPKR_OUT_N',
       'SPKR_OUT_P',
       'SPK_LP',
@@ -75,6 +79,10 @@ const CATEGORIAS_LINEAS = {
     bgPill: '#3730a3',
     icon: Radio,
     items: [
+      'USB_DP',
+      'USB_DN',
+      'BPI_BUS10',
+      'TP_SPI2_SCLK',
       'I2C_SDA',
       'I2C_SCL',
       'SMB_SDA',
@@ -91,8 +99,6 @@ const CATEGORIAS_LINEAS = {
       'BATT_SWI',
       'UART_TX',
       'UART_RX',
-      'USB_DP',
-      'USB_DN',
       'MIPI_DSI'
     ]
   },
@@ -103,6 +109,9 @@ const CATEGORIAS_LINEAS = {
     bgPill: '#083344',
     icon: Activity,
     items: [
+      'SUB_USB_TEMP',
+      'SAR_CS0_ANT0_MLB',
+      'ANT_ID',
       'PA_THERM_ADC',
       'AP_THERM_ADC',
       'CPU_THERM',
@@ -131,6 +140,12 @@ const CATEGORIAS_LINEAS = {
     bgPill: '#065f46',
     icon: Cpu,
     items: [
+      'CTP_RST_X',
+      'LCD_RST_CONN',
+      'CTP_EINT_X',
+      'DSI_TE',
+      'LCM_CABC',
+      'ANT_MATCH_LM',
       'RESET',
       'ENABLE',
       'INT',
@@ -179,14 +194,12 @@ export default function SelectorTipoLinea({
   const [catalogoLocal, setCatalogoLocal] = useState(() => {
     if (typeof window !== 'undefined') {
       try {
-        const saved = localStorage.getItem('catalogo_redes_personalizadas_v3');
-        if (saved) return JSON.parse(saved);
-        const legacy = localStorage.getItem('catalogo_redes_personalizadas');
-        const legacyParsed = legacy ? JSON.parse(legacy) : {};
+        const saved = localStorage.getItem('catalogo_redes_personalizadas_v4') || localStorage.getItem('catalogo_redes_personalizadas_v3') || localStorage.getItem('catalogo_redes_personalizadas');
+        const parsed = saved ? JSON.parse(saved) : {};
         const inicial = {};
         Object.keys(CATEGORIAS_LINEAS).forEach(k => {
           const base = (CATEGORIAS_LINEAS[k].items || []).filter(x => x !== 'DATA');
-          const extra = legacyParsed[k] || [];
+          const extra = Array.isArray(parsed[k]) ? parsed[k] : [];
           inicial[k] = Array.from(new Set([...base, ...extra]));
         });
         return inicial;
@@ -210,7 +223,7 @@ export default function SelectorTipoLinea({
   useEffect(() => {
     if (typeof window !== 'undefined') {
       try {
-        localStorage.setItem('catalogo_redes_personalizadas_v3', JSON.stringify(catalogoLocal));
+        localStorage.setItem('catalogo_redes_personalizadas_v4', JSON.stringify(catalogoLocal));
       } catch (e) {}
     }
   }, [catalogoLocal]);
@@ -225,28 +238,32 @@ export default function SelectorTipoLinea({
       } else if (
         CATEGORIAS_LINEAS.actuadores?.items.includes(v) ||
         (catalogoLocal.actuadores || []).includes(v) ||
-        /(SPKR|SPEAKER|SPK_|RCV|EAR|LINE_OUT|HP_L|HP_R|HAP_OUT|HAPTIC|VIB_|MOTOR|BUZZER)/i.test(v)
+        /(SPKR|SPEAKER|SPK_|RCV|EAR|LINE_OUT|HP_L|HP_R|HAP_OUT|HAPTIC|VIB|MOTOR|BUZZER|AU_VOUT)/i.test(v)
       ) {
         setCategoriaActiva('actuadores');
       } else if (
         CATEGORIAS_LINEAS.sensado.items.includes(v) ||
         (catalogoLocal.sensado || []).includes(v) ||
-        /(THERM|SENSE|ISENSE|CSENSE|_ADC$|ADC_|JACK_DET|EAR_DET|BOARD_ID)/i.test(v)
+        /(THERM|TEMP|SENSE|ISENSE|CSENSE|_ADC$|ADC_|JACK_DET|EAR_DET|BOARD_ID|SAR_|ANT_ID|NTC)/i.test(v)
       ) {
         setCategoriaActiva('sensado');
       } else if (
         CATEGORIAS_LINEAS.alimentacion.items.includes(v) ||
         (catalogoLocal.alimentacion || []).includes(v) ||
-        /(LEDA|LED_A|LEDK|LED_K|ANODE|ANODO|CATODO|CATHODE|VBOOST|BOOST|VBAT|VPH|VDD|VBUS|VREG|VCC|CHARGER|CHG|BATT|VLED|AVDD|ELVDD|ELVSS|VSP|VSN|VIO|VBIAS|HV_|PP_|_PWR|POWER|VOLT|VOUT|VIN)/i.test(v)
+        /(LEDA|LED_A|LEDK|LED_K|ANODE|ANODO|CATODO|CATHODE|VBOOST|BOOST|VBAT|VPH|VDD|VBUS|VREG|VCC|CHARGER|CHG|BATT|VLED|AVDD|ELVDD|ELVSS|VSP|VSN|VIO|VBIAS|MICBIAS|MIC_BIAS|VFE|HV_|PP_|_PWR|POWER|VOLT|VOUT|VIN)/i.test(v)
       ) {
         setCategoriaActiva('alimentacion');
       } else if (
         CATEGORIAS_LINEAS.control.items.includes(v) ||
         (catalogoLocal.control || []).includes(v) ||
-        /(RESET|RST|ENABLE|_EN$|^EN_|INT|IRQ|CLK|CLOCK|PWM|POWER_KEY|VOL_UP|VOL_DOWN)/i.test(v)
+        /(RESET|RST|ENABLE|_EN$|^EN_|INT|IRQ|CLK|CLOCK|PWM|POWER_KEY|VOL_UP|VOL_DOWN|EINT|CABC|MATCH|DSI_TE|_TE$)/i.test(v)
       ) {
         setCategoriaActiva('control');
-      } else if (CATEGORIAS_LINEAS.comunicacion.items.includes(v) || (catalogoLocal.comunicacion || []).includes(v)) {
+      } else if (
+        CATEGORIAS_LINEAS.comunicacion.items.includes(v) ||
+        (catalogoLocal.comunicacion || []).includes(v) ||
+        /(I2C|SPI|UART|USB|MIPI|DSI|CSI|RFFE|SWI|BPI|SDA|SCL|MOSI|MISO|DP|DN|TX|RX)/i.test(v)
+      ) {
         setCategoriaActiva('comunicacion');
       } else if (tiposCustom.includes(v) || (catalogoLocal.custom || []).includes(v)) {
         setCategoriaActiva('custom');
@@ -286,25 +303,25 @@ export default function SelectorTipoLinea({
         cat = 'tierra';
       } else if (
         obtenerItemsCategoria('actuadores').includes(t) ||
-        /(SPKR|SPEAKER|SPK_|RCV|EAR|LINE_OUT|HP_L|HP_R|HAP_OUT|HAPTIC|VIB_|MOTOR|BUZZER)/i.test(t)
+        /(SPKR|SPEAKER|SPK_|RCV|EAR|LINE_OUT|HP_L|HP_R|HAP_OUT|HAPTIC|VIB|MOTOR|BUZZER|AU_VOUT)/i.test(t)
       ) {
         cat = 'actuadores';
       } else if (
         obtenerItemsCategoria('sensado').includes(t) ||
-        /(THERM|SENSE|ISENSE|CSENSE|_ADC$|ADC_|JACK_DET|EAR_DET|BOARD_ID)/i.test(t)
+        /(THERM|TEMP|SENSE|ISENSE|CSENSE|_ADC$|ADC_|JACK_DET|EAR_DET|BOARD_ID|SAR_|ANT_ID|NTC)/i.test(t)
       ) {
         cat = 'sensado';
       } else if (
         obtenerItemsCategoria('alimentacion').includes(t) ||
-        /(LEDA|LED_A|LEDK|LED_K|ANODE|ANODO|CATODO|CATHODE|VBOOST|BOOST|VBAT|VPH|VDD|VBUS|VREG|VCC|CHARGER|CHG|BATT|VLED|AVDD|ELVDD|ELVSS|VSP|VSN|VIO|VBIAS|HV_|PP_|_PWR|POWER|VOLT|VOUT|VIN)/i.test(t)
+        /(LEDA|LED_A|LEDK|LED_K|ANODE|ANODO|CATODO|CATHODE|VBOOST|BOOST|VBAT|VPH|VDD|VBUS|VREG|VCC|CHARGER|CHG|BATT|VLED|AVDD|ELVDD|ELVSS|VSP|VSN|VIO|VBIAS|MICBIAS|MIC_BIAS|VFE|HV_|PP_|_PWR|POWER|VOLT|VOUT|VIN)/i.test(t)
       ) {
         cat = 'alimentacion';
       } else if (
         obtenerItemsCategoria('control').includes(t) ||
-        /(RESET|RST|ENABLE|_EN$|^EN_|INT|IRQ|CLK|CLOCK|PWM|POWER_KEY|VOL_UP|VOL_DOWN)/i.test(t)
+        /(RESET|RST|ENABLE|_EN$|^EN_|INT|IRQ|CLK|CLOCK|PWM|POWER_KEY|VOL_UP|VOL_DOWN|EINT|CABC|MATCH|DSI_TE|_TE$)/i.test(t)
       ) {
         cat = 'control';
-      } else if (obtenerItemsCategoria('comunicacion').includes(t)) {
+      } else if (obtenerItemsCategoria('comunicacion').includes(t) || /(I2C|SPI|UART|USB|MIPI|DSI|CSI|RFFE|SWI|BPI|SDA|SCL|MOSI|MISO|DP|DN|TX|RX)/i.test(t)) {
         cat = 'comunicacion';
       }
       onChange(t, cat);
@@ -370,21 +387,21 @@ export default function SelectorTipoLinea({
     if (t === 'NC') return '#1e3a8a';
     if (
       obtenerItemsCategoria('actuadores').includes(t) ||
-      /(SPKR|SPEAKER|SPK_|RCV|EAR|LINE_OUT|HP_L|HP_R|HAP_OUT|HAPTIC|VIB_|MOTOR|BUZZER)/i.test(t)
+      /(SPKR|SPEAKER|SPK_|RCV|EAR|LINE_OUT|HP_L|HP_R|HAP_OUT|HAPTIC|VIB|MOTOR|BUZZER|AU_VOUT)/i.test(t)
     ) return '#f97316';
     if (
       obtenerItemsCategoria('sensado').includes(t) ||
-      /(THERM|SENSE|ISENSE|CSENSE|_ADC$|ADC_|JACK_DET|EAR_DET|BOARD_ID)/i.test(t)
+      /(THERM|TEMP|SENSE|ISENSE|CSENSE|_ADC$|ADC_|JACK_DET|EAR_DET|BOARD_ID|SAR_|ANT_ID|NTC)/i.test(t)
     ) return '#06b6d4';
     if (
       obtenerItemsCategoria('alimentacion').includes(t) ||
-      /(LEDA|LED_A|LEDK|LED_K|ANODE|ANODO|CATODO|CATHODE|VBOOST|BOOST|VBAT|VPH|VDD|VBUS|VREG|VCC|CHARGER|CHG|BATT|VLED|AVDD|ELVDD|ELVSS|VSP|VSN|VIO|VBIAS|HV_|PP_|_PWR|POWER|VOLT|VOUT|VIN)/i.test(t)
+      /(LEDA|LED_A|LEDK|LED_K|ANODE|ANODO|CATODO|CATHODE|VBOOST|BOOST|VBAT|VPH|VDD|VBUS|VREG|VCC|CHARGER|CHG|BATT|VLED|AVDD|ELVDD|ELVSS|VSP|VSN|VIO|VBIAS|MICBIAS|MIC_BIAS|VFE|HV_|PP_|_PWR|POWER|VOLT|VOUT|VIN)/i.test(t)
     ) return '#ef4444';
     if (
       obtenerItemsCategoria('control').includes(t) ||
-      /(RESET|RST|ENABLE|_EN$|^EN_|INT|IRQ|CLK|CLOCK|PWM|POWER_KEY|VOL_UP|VOL_DOWN)/i.test(t)
+      /(RESET|RST|ENABLE|_EN$|^EN_|INT|IRQ|CLK|CLOCK|PWM|POWER_KEY|VOL_UP|VOL_DOWN|EINT|CABC|MATCH|DSI_TE|_TE$)/i.test(t)
     ) return '#10b981';
-    if (obtenerItemsCategoria('comunicacion').includes(t) || /(I2C|SPI|UART|USB|MIPI|DSI|CSI|RFFE|SWI|SDA|SCL|MOSI|MISO|DP|DN|TX|RX)/i.test(t)) {
+    if (obtenerItemsCategoria('comunicacion').includes(t) || /(I2C|SPI|UART|USB|MIPI|DSI|CSI|RFFE|SWI|BPI|SDA|SCL|MOSI|MISO|DP|DN|TX|RX)/i.test(t)) {
       return '#6366f1';
     }
     if (obtenerItemsCategoria('custom').includes(t)) {

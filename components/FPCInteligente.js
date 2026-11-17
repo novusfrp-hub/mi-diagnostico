@@ -5,7 +5,7 @@ import {
   CheckCircle2, Lock, Unlock, Edit3, Plus, Trash2, ArrowRightLeft,
   Download, HelpCircle
 } from 'lucide-react';
-import SelectorTipoLinea from './SelectorTipoLinea.js';
+import SelectorTipoLinea, { CATEGORIAS_LINEAS } from './SelectorTipoLinea.js';
 
 // --- CATÁLOGO DE CATEGORÍAS Y COLORES OFICIALES ---
 export const CATEGORIAS_FPC = {
@@ -39,37 +39,46 @@ export const deducirCategoriaNet = (nombre = '') => {
     return 'tierra';
   }
 
-  // 2. SALIDAS DE POTENCIA / ACTUADOR (Audio, Parlantes, Auricular, Haptics, Vibrador)
+  // 2. Coincidencia directa con catálogo oficial de líneas
+  if (typeof CATEGORIAS_LINEAS !== 'undefined' && CATEGORIAS_LINEAS) {
+    for (const [catKey, catVal] of Object.entries(CATEGORIAS_LINEAS)) {
+      if (catVal.items && catVal.items.includes(n)) {
+        return catKey;
+      }
+    }
+  }
+
+  // 3. SALIDAS DE POTENCIA / ACTUADOR (Audio, Parlantes, Auricular, Haptics, Vibrador)
   if (
-    /(SPKR|SPEAKER|SPK_|RCV|EAR|LINE_OUT|HP_L|HP_R|HAP_OUT|HAPTIC|VIB_|MOTOR|BUZZER)/i.test(n)
+    /(SPKR|SPEAKER|SPK_|RCV|EAR|LINE_OUT|HP_L|HP_R|HAP_OUT|HAPTIC|VIB|MOTOR|BUZZER|AU_VOUT)/i.test(n)
   ) {
     return 'actuadores';
   }
 
-  // 3. ALIMENTACIÓN (Voltajes, Power, Batería, LDOs, Rails, Backlight)
+  // 4. ALIMENTACIÓN (Voltajes, Power, Batería, LDOs, Rails, Backlight)
   if (
-    /(LEDA|LED_A|LEDK|LED_K|ANODE|ANODO|CATODO|CATHODE|VBOOST|BOOST|VBAT|VPH|VDD|VBUS|VREG|VCC|CHARGER|CHG|BATT|VLED|AVDD|ELVDD|ELVSS|VSP|VSN|VIO|VBIAS|HV_|PP_|_PWR|POWER|VOLT|VOUT|VIN)/i.test(n)
+    /(LEDA|LED_A|LEDK|LED_K|ANODE|ANODO|CATODO|CATHODE|VBOOST|BOOST|VBAT|VPH|VDD|VBUS|VREG|VCC|CHARGER|CHG|BATT|VLED|AVDD|ELVDD|ELVSS|VSP|VSN|VIO|VBIAS|MICBIAS|MIC_BIAS|VFE|HV_|PP_|_PWR|POWER|VOLT|VOUT|VIN)/i.test(n)
   ) {
     return 'alimentacion';
   }
 
-  // 4. SENSADO / TÉRMICO / ADC / ID
+  // 5. SENSADO / TÉRMICO / ADC / ID
   if (
-    /(THERM|SENSE|ISENSE|CSENSE|_ADC$|ADC_|JACK_DET|EAR_DET|BOARD_ID|NTC|BATT_NTC|^ID$|_ID$|BATT_ID|BATT_DET|CELL_BAL)/i.test(n)
+    /(THERM|TEMP|SENSE|ISENSE|CSENSE|_ADC$|ADC_|JACK_DET|EAR_DET|BOARD_ID|NTC|BATT_NTC|^ID$|_ID$|BATT_ID|BATT_DET|CELL_BAL|SAR_|ANT_ID)/i.test(n)
   ) {
     return 'sensado';
   }
 
-  // 5. CONTROL Y SINCRONIZACIÓN (Relojes, Enables, Reset, Botones)
+  // 6. CONTROL Y SINCRONIZACIÓN (Relojes, Enables, Reset, Botones, Interrupciones)
   if (
-    /(RESET|RST|ENABLE|_EN$|^EN_|INT|IRQ|CLK|CLOCK|PWM|POWER_KEY|VOL_UP|VOL_DOWN|HOLD|SYNC)/i.test(n)
+    /(RESET|RST|ENABLE|_EN$|^EN_|INT|IRQ|CLK|CLOCK|PWM|POWER_KEY|VOL_UP|VOL_DOWN|HOLD|SYNC|EINT|CABC|MATCH|DSI_TE|_TE$)/i.test(n)
   ) {
     return 'control';
   }
 
-  // 6. COMUNICACIÓN (Datos, Protocolos, Buses diferenciales)
+  // 7. COMUNICACIÓN (Datos, Protocolos, Buses diferenciales)
   if (
-    /(I2C|SPI|UART|USB|MIPI|DSI|CSI|RFFE|SWI|SDA|SCL|MOSI|MISO|DP|DN|TX|RX|CAN|BUS)/i.test(n)
+    /(I2C|SPI|UART|USB|MIPI|DSI|CSI|RFFE|SWI|BPI|SDA|SCL|MOSI|MISO|DP|DN|TX|RX|CAN|BUS)/i.test(n)
   ) {
     return 'comunicacion';
   }

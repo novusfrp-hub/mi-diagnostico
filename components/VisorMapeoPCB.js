@@ -47,7 +47,7 @@ const CATEGORIAS_NETS = {
     color: '#ef4444',
     items: [
       'VPH_PWR', 'PP_VDD_MAIN', 'VBAT', 'VBUS_USB', 'PP_BATT_VCC', 'PP1V8_S2', 'PP3V0_LDO', 'PP0V8_CORE',
-      'VREG_L6A_0P6', 'VCC', 'VCC_IO', 'VDD_MEM', 'LCM_LEDA', 'LCM_LED_A', 'LCM_LEDK', 'LCM_LEDK1', 'LCM_LEDK2',
+      'VREG_L6A_0P6', 'VCC', 'VCC_IO', 'VDD_MEM', 'LTE_VFE28', 'AU_MICBIAS0', 'LCM_LEDA', 'LCM_LED_A', 'LCM_LEDK', 'LCM_LEDK1', 'LCM_LEDK2',
       'BL_LED_A', 'BL_ANODE', 'VBOOST', 'VLED', 'AVDD', 'ELVDD', 'ELVSS', 'VSP', 'VSN'
     ]
   },
@@ -56,7 +56,7 @@ const CATEGORIAS_NETS = {
     label: '🔊 Salidas de Potencia / Actuador',
     color: '#f97316',
     items: [
-      'SPKR_OUT_N', 'SPKR_OUT_P', 'SPK_LP', 'SPK_LN', 'RCV', 'EAR', 'RCV_P', 'RCV_N', 'EAR_P', 'EAR_N',
+      'AU_VOUT0_N', 'VIBR_PMU', 'SPKR_OUT_N', 'SPKR_OUT_P', 'SPK_LP', 'SPK_LN', 'RCV', 'EAR', 'RCV_P', 'RCV_N', 'EAR_P', 'EAR_N',
       'LINE_OUT', 'HP_L', 'HP_R', 'PMI_HAP_OUT_P', 'PMI_HAP_OUT_N', 'HAPTIC_OUT_P', 'HAPTIC_OUT_N',
       'VIB_MOTOR_P', 'VIB_MOTOR_N'
     ]
@@ -65,7 +65,17 @@ const CATEGORIAS_NETS = {
     id: 'comunicacion',
     label: '📡 Comunicación (Buses / Protocolos)',
     color: '#6366f1',
-    items: ['AP_TO_I2C_SDA', 'AP_TO_I2C_SCL', 'SPI_AP_MOSI', 'SPI_AP_MISO', 'SPI_AP_CLK', 'SPI_AP_CS', 'UART_TX', 'UART_RX', 'USB_HS_DP', 'USB_HS_DN', 'RFFE_DATA', 'RFFE_CLK', 'SWI_DATA', 'MIPI_DSI']
+    items: ['USB_DP', 'BPI_BUS10', 'TP_SPI2_SCLK', 'AP_TO_I2C_SDA', 'AP_TO_I2C_SCL', 'SPI_AP_MOSI', 'SPI_AP_MISO', 'SPI_AP_CLK', 'SPI_AP_CS', 'UART_TX', 'UART_RX', 'USB_HS_DP', 'USB_HS_DN', 'RFFE_DATA', 'RFFE_CLK', 'SWI_DATA', 'MIPI_DSI']
+  },
+  sensado: {
+    id: 'sensado',
+    label: '🔬 Sensado (Térmico / ADC / Sensores)',
+    color: '#06b6d4',
+    items: [
+      'SUB_USB_TEMP', 'SAR_CS0_ANT0_MLB', 'ANT_ID', 'PA_THERM_ADC', 'AP_THERM_ADC', 'CPU_THERM', 'CHG_THERM',
+      'USB_THERM', 'BATT_ISENSE', 'BAT_CSENSE', 'V_OUT_SENSE', 'JACK_DET', 'EAR_DET_ADC', 'BOARD_ID',
+      'BOARD_ID_ADC', 'BATT_THERM', 'BATT_NTC', 'BATT_ID', 'BATT_DET', 'CELL_BAL', 'NTC', 'ID'
+    ]
   },
   generico: {
     id: 'generico',
@@ -77,7 +87,11 @@ const CATEGORIAS_NETS = {
     id: 'control',
     label: '⚙️ Control y Sincronización',
     color: '#10b981',
-    items: ['PMIC_TO_CPU_RESET', 'CLK_32K_IN', 'SYS_CLK_19M2', 'POWER_KEY_L', 'VOL_UP_KEY', 'VOL_DOWN_KEY', 'ENABLE', 'EN_BL', 'PWM_BL', 'INT_TOUCH', 'RST_TOUCH', 'NTC_BATT', 'ID']
+    items: [
+      'CTP_RST_X', 'LCD_RST_CONN', 'CTP_EINT_X', 'DSI_TE', 'LCM_CABC', 'ANT_MATCH_LM',
+      'PMIC_TO_CPU_RESET', 'CLK_32K_IN', 'SYS_CLK_19M2', 'POWER_KEY_L', 'VOL_UP_KEY', 'VOL_DOWN_KEY',
+      'ENABLE', 'EN_BL', 'PWM_BL', 'INT_TOUCH', 'RST_TOUCH'
+    ]
   },
   tierra: {
     id: 'tierra',
@@ -103,7 +117,7 @@ export const deducirCategoriaDeNet = (netName, pad = null) => {
   // 2. CATÁLOGO PERSONALIZADO EN LOCALSTORAGE (prioridad máxima del usuario)
   if (typeof window !== 'undefined' && n) {
     try {
-      const saved = localStorage.getItem('catalogo_redes_personalizadas');
+      const saved = localStorage.getItem('catalogo_redes_personalizadas_v4') || localStorage.getItem('catalogo_redes_personalizadas_v3') || localStorage.getItem('catalogo_redes_personalizadas');
       if (saved) {
         const catObj = JSON.parse(saved);
         for (const [catKey, netList] of Object.entries(catObj)) {
@@ -126,18 +140,25 @@ export const deducirCategoriaDeNet = (netName, pad = null) => {
   }
 
   // 4. RECONOCIMIENTO INTELIGENTE DE HARDWARE MÓVIL / SMD (cualquier posición en el nombre)
+  // SALIDAS DE POTENCIA / ACTUADOR (Audio, Parlantes, Haptic, Motores)
+  if (
+    /(SPKR|SPEAKER|SPK_|RCV|EAR|LINE_OUT|HP_L|HP_R|HAP_OUT|HAPTIC|VIB|MOTOR|BUZZER|AU_VOUT)/i.test(n)
+  ) {
+    return 'actuadores';
+  }
+
   // ALIMENTACIÓN (Voltajes / Power / Backlight / Batería / LDO / Buck / Boost / Anode / Cathode / Rails)
   if (
-    /(LEDA|LED_A|LEDK|LED_K|ANODE|ANODO|CATODO|CATHODE|VBOOST|BOOST|VBAT|VPH|VDD|VBUS|VREG|VCC|CHARGER|CHG|BATT|VLED|AVDD|ELVDD|ELVSS|VSP|VSN|VIO|VBIAS|HV_|PP_|_PWR|POWER|VOLT|VOUT|VIN)/i.test(n)
+    /(LEDA|LED_A|LEDK|LED_K|ANODE|ANODO|CATODO|CATHODE|VBOOST|BOOST|VBAT|VPH|VDD|VBUS|VREG|VCC|CHARGER|CHG|BATT|VLED|AVDD|ELVDD|ELVSS|VSP|VSN|VIO|VBIAS|MICBIAS|MIC_BIAS|VFE|HV_|PP_|_PWR|POWER|VOLT|VOUT|VIN)/i.test(n)
   ) {
     return 'alimentacion';
   }
 
-  // SALIDAS DE POTENCIA / ACTUADOR (Audio, Parlantes, Haptic, Motores)
+  // SENSADO (Térmico / ADC / Sensores / Batería / Identificación)
   if (
-    /(SPKR|SPEAKER|SPK_|RCV|EAR|LINE_OUT|HP_L|HP_R|HAP_OUT|HAPTIC|VIB_|MOTOR|BUZZER)/i.test(n)
+    /(THERM|TEMP|SENSE|ISENSE|CSENSE|_ADC$|ADC_|JACK_DET|EAR_DET|BOARD_ID|SAR_|ANT_ID|NTC)/i.test(n)
   ) {
-    return 'actuadores';
+    return 'sensado';
   }
 
   // TIERRA / NEUTRO
@@ -147,14 +168,14 @@ export const deducirCategoriaDeNet = (netName, pad = null) => {
 
   // CONTROL / SINCRONIZACIÓN / CLOCKS / ENABLES / GATING
   if (
-    /(RESET|RST|ENABLE|_EN$|^EN_|INT|IRQ|CLK|CLOCK|PWM|NTC|THERM|^ID$|_ID$|SENSE|POWER_KEY|VOL_UP|VOL_DOWN|HOLD|SYNC)/i.test(n)
+    /(RESET|RST|ENABLE|_EN$|^EN_|INT|IRQ|CLK|CLOCK|PWM|POWER_KEY|VOL_UP|VOL_DOWN|HOLD|SYNC|EINT|CABC|MATCH|DSI_TE|_TE$)/i.test(n)
   ) {
     return 'control';
   }
 
   // COMUNICACIÓN (Datos / Buses / Protocolos de señal diferencial)
   if (
-    /(I2C|SPI|UART|USB|MIPI|DSI|CSI|RFFE|SWI|DATA|SDA|SCL|MOSI|MISO|DP|DN|TX|RX|CAN|BUS|RX_P|RX_N|TX_P|TX_N)/i.test(n)
+    /(I2C|SPI|UART|USB|MIPI|DSI|CSI|RFFE|SWI|BPI|DATA|SDA|SCL|MOSI|MISO|DP|DN|TX|RX|CAN|BUS|RX_P|RX_N|TX_P|TX_N)/i.test(n)
   ) {
     return 'comunicacion';
   }
@@ -174,7 +195,7 @@ export const deducirCategoriaDeNet = (netName, pad = null) => {
   // Redes con categoría 'custom'
   if (pad?.categoria === 'custom') return 'custom';
 
-  return 'comunicacion';
+  return 'generico';
 };
 
 export const obtenerCategoriaInfo = (tipoONet, pad = null) => {
@@ -189,6 +210,9 @@ export const obtenerCategoriaInfo = (tipoONet, pad = null) => {
   }
   if (catId === 'actuadores') {
     return { id: 'actuadores', label: '🔊 Salidas de Potencia / Actuador', color: '#f97316', bgPill: '#7c2d12' };
+  }
+  if (catId === 'sensado') {
+    return { id: 'sensado', label: '🔬 Sensado (Térmico / ADC / Sensores)', color: '#06b6d4', bgPill: '#083344' };
   }
   if (catId === 'control') {
     return { id: 'control', label: '⚙️ Control y Sincronización', color: '#10b981', bgPill: '#065f46' };
