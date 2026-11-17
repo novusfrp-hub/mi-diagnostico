@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Search, X, Check, Plus, Trash2, Zap, Shield, Radio, Cpu, Star, Activity, Volume2, ArrowDown } from 'lucide-react';
+import { Search, X, Check, Plus, Trash2, Zap, Shield, Radio, Cpu, Star, Activity, Volume2, ArrowDown, Edit2 } from 'lucide-react';
 
 const CATEGORIAS_LINEAS = {
   alimentacion: {
@@ -69,13 +69,12 @@ const CATEGORIAS_LINEAS = {
     ]
   },
   comunicacion: {
-    lbl: 'Comunicación (Buses / Datos)',
+    lbl: 'Comunicación (Buses / Protocolos)',
     shortLbl: 'Comunicación',
-    color: '#eab308',
-    bgPill: '#854d0e',
+    color: '#6366f1',
+    bgPill: '#3730a3',
     icon: Radio,
     items: [
-      'DATA',
       'I2C_SDA',
       'I2C_SCL',
       'SMB_SDA',
@@ -180,11 +179,24 @@ export default function SelectorTipoLinea({
   const [catalogoLocal, setCatalogoLocal] = useState(() => {
     if (typeof window !== 'undefined') {
       try {
-        const saved = localStorage.getItem('catalogo_redes_personalizadas');
+        const saved = localStorage.getItem('catalogo_redes_personalizadas_v3');
         if (saved) return JSON.parse(saved);
+        const legacy = localStorage.getItem('catalogo_redes_personalizadas');
+        const legacyParsed = legacy ? JSON.parse(legacy) : {};
+        const inicial = {};
+        Object.keys(CATEGORIAS_LINEAS).forEach(k => {
+          const base = (CATEGORIAS_LINEAS[k].items || []).filter(x => x !== 'DATA');
+          const extra = legacyParsed[k] || [];
+          inicial[k] = Array.from(new Set([...base, ...extra]));
+        });
+        return inicial;
       } catch (e) {}
     }
-    return { alimentacion: [], actuadores: [], comunicacion: [], sensado: [], control: [], custom: [] };
+    const def = {};
+    Object.keys(CATEGORIAS_LINEAS).forEach(k => {
+      def[k] = (CATEGORIAS_LINEAS[k].items || []).filter(x => x !== 'DATA');
+    });
+    return def;
   });
 
   const searchInputRef = useRef(null);
@@ -198,7 +210,7 @@ export default function SelectorTipoLinea({
   useEffect(() => {
     if (typeof window !== 'undefined') {
       try {
-        localStorage.setItem('catalogo_redes_personalizadas', JSON.stringify(catalogoLocal));
+        localStorage.setItem('catalogo_redes_personalizadas_v3', JSON.stringify(catalogoLocal));
       } catch (e) {}
     }
   }, [catalogoLocal]);
@@ -261,10 +273,9 @@ export default function SelectorTipoLinea({
   }, [isOpen]);
 
   const obtenerItemsCategoria = (cat) => {
-    const base = CATEGORIAS_LINEAS[cat]?.items || [];
-    const local = catalogoLocal[cat] || [];
+    const list = catalogoLocal[cat] !== undefined ? catalogoLocal[cat] : ((CATEGORIAS_LINEAS[cat]?.items || []).filter(x => x !== 'DATA'));
     const customGlobal = cat === 'custom' ? tiposCustom : [];
-    return Array.from(new Set([...base, ...local, ...customGlobal]));
+    return Array.from(new Set([...list, ...customGlobal]));
   };
 
   const handleSelect = (tipo) => {
@@ -307,7 +318,7 @@ export default function SelectorTipoLinea({
     if (!limpia) return;
 
     setCatalogoLocal(prev => {
-      const arr = prev[categoriaActiva] || [];
+      const arr = prev[categoriaActiva] || (CATEGORIAS_LINEAS[categoriaActiva]?.items || []).filter(x => x !== 'DATA');
       if (!arr.includes(limpia)) {
         return { ...prev, [categoriaActiva]: [...arr, limpia] };
       }
@@ -322,18 +333,38 @@ export default function SelectorTipoLinea({
     handleSelect(limpia);
   };
 
-  const eliminarRedLocal = (cat, red) => {
-    setCatalogoLocal(prev => ({
-      ...prev,
-      [cat]: (prev[cat] || []).filter(item => item !== red)
-    }));
+  const editarRed = (cat, redVieja) => {
+    const nuevoNombre = window.prompt(`Editar nombre de la línea en "${CATEGORIAS_LINEAS[cat]?.shortLbl || cat}":`, redVieja);
+    if (!nuevoNombre) return;
+    const limpia = nuevoNombre.trim().toUpperCase().replace(/\s+/g, '_');
+    if (!limpia || limpia === redVieja) return;
+
+    setCatalogoLocal(prev => {
+      const arr = prev[cat] || (CATEGORIAS_LINEAS[cat]?.items || []).filter(x => x !== 'DATA');
+      const actualizados = arr.map(item => item === redVieja ? limpia : item);
+      return { ...prev, [cat]: actualizados };
+    });
+
+    if (valor === redVieja && onChange) {
+      onChange(limpia, cat);
+    }
+  };
+
+  const eliminarRed = (cat, red) => {
+    if (!window.confirm(`¿Seguro que deseas eliminar la línea "${red}" de la categoría "${CATEGORIAS_LINEAS[cat]?.shortLbl || cat}"?`)) {
+      return;
+    }
+    setCatalogoLocal(prev => {
+      const arr = prev[cat] || (CATEGORIAS_LINEAS[cat]?.items || []).filter(x => x !== 'DATA');
+      return { ...prev, [cat]: arr.filter(item => item !== red) };
+    });
     if (onEliminarTipo) {
       onEliminarTipo(red);
     }
   };
 
   const getPillColor = (tipo) => {
-    if (!tipo) return '#854d0e';
+    if (!tipo) return '#eab308';
     const t = String(tipo).toUpperCase().trim();
     if (t === 'GND') return '#4b5563';
     if (t === 'NC') return '#1e3a8a';
@@ -353,8 +384,13 @@ export default function SelectorTipoLinea({
       obtenerItemsCategoria('control').includes(t) ||
       /(RESET|RST|ENABLE|_EN$|^EN_|INT|IRQ|CLK|CLOCK|PWM|POWER_KEY|VOL_UP|VOL_DOWN)/i.test(t)
     ) return '#10b981';
-    if (obtenerItemsCategoria('comunicacion').includes(t)) return '#eab308';
-    return '#8b5cf6';
+    if (obtenerItemsCategoria('comunicacion').includes(t) || /(I2C|SPI|UART|USB|MIPI|DSI|CSI|RFFE|SWI|SDA|SCL|MOSI|MISO|DP|DN|TX|RX)/i.test(t)) {
+      return '#6366f1';
+    }
+    if (obtenerItemsCategoria('custom').includes(t)) {
+      return '#8b5cf6';
+    }
+    return '#eab308';
   };
 
   // Filtrado por búsqueda en todo el catálogo o por categoría
@@ -746,31 +782,48 @@ export default function SelectorTipoLinea({
                     </span>
                   </div>
 
-                  {esCustom && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (window.confirm(`¿Eliminar la red personalizada "${item}"?`)) {
-                          eliminarRedLocal(cat, item);
-                        }
-                      }}
-                      style={{
-                        background: 'rgba(239, 68, 68, 0.2)',
-                        color: '#f87171',
-                        border: 'none',
-                        borderRadius: '4px',
-                        padding: '2px 4px',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0
-                      }}
-                      title="Eliminar red personalizada"
-                    >
-                      <Trash2 size={11} />
-                    </button>
+                  {cat !== 'tierra' && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '3px', flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
+                      <button
+                        type="button"
+                        onClick={() => editarRed(cat, item)}
+                        style={{
+                          background: 'rgba(56, 189, 248, 0.15)',
+                          color: '#38bdf8',
+                          border: 'none',
+                          borderRadius: '4px',
+                          padding: '3px 4px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          transition: 'all 0.15s'
+                        }}
+                        title={`Editar nombre de "${item}"`}
+                      >
+                        <Edit2 size={11} />
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => eliminarRed(cat, item)}
+                        style={{
+                          background: 'rgba(239, 68, 68, 0.15)',
+                          color: '#f87171',
+                          border: 'none',
+                          borderRadius: '4px',
+                          padding: '3px 4px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          transition: 'all 0.15s'
+                        }}
+                        title={`Eliminar "${item}" de la categoría`}
+                      >
+                        <Trash2 size={11} />
+                      </button>
+                    </div>
                   )}
                 </div>
               );
@@ -872,7 +925,9 @@ export default function SelectorTipoLinea({
               flexShrink: 0
             }}
           />
-          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{valor}</span>
+          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {!valor || valor === 'DATA' || valor === 'PIN' || /^(LINEA_\d+|PIN_\d+)/i.test(valor) ? 'Asignar Nombre / Tipo de Línea...' : valor}
+          </span>
         </div>
         <span style={{ fontSize: '0.65rem', opacity: 0.7 }}>▼</span>
       </button>

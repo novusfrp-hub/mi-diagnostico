@@ -11,18 +11,25 @@ import SelectorTipoLinea from './SelectorTipoLinea.js';
 export const CATEGORIAS_FPC = {
   alimentacion: { id: 'alimentacion', label: 'Alimentación (Voltajes / Power)', color: '#ef4444', text: '#ffffff' },
   actuadores: { id: 'actuadores', label: 'Salidas de Potencia / Actuador', color: '#f97316', text: '#ffffff' },
-  comunicacion: { id: 'comunicacion', label: 'Comunicación (Buses / Datos)', color: '#eab308', text: '#000000' },
+  comunicacion: { id: 'comunicacion', label: 'Comunicación (Buses / Protocolos)', color: '#6366f1', text: '#ffffff' },
   sensado: { id: 'sensado', label: 'Sensado (Térmico / ADC / Sensores)', color: '#06b6d4', text: '#000000' },
   control: { id: 'control', label: 'Control & Sincronización', color: '#10b981', text: '#ffffff' },
   tierra: { id: 'tierra', label: 'Tierra / Neutro (GND / NC)', color: '#4b5563', text: '#ffffff' },
-  generico: { id: 'generico', label: 'Sin Asignar / Genérico', color: '#64748b', text: '#ffffff' },
+  generico: { id: 'generico', label: 'Pin Genérico (Sin Asignar)', color: '#eab308', text: '#000000' },
   custom: { id: 'custom', label: 'Personalizada', color: '#8b5cf6', text: '#ffffff' }
+};
+
+// Helper para verificar si un pin o línea sigue teniendo nombre genérico por defecto
+export const esNombreGenerico = (nombre = '') => {
+  if (!nombre) return true;
+  const n = String(nombre).trim();
+  return /^(LINEA_\d+|PIN_\d+|PIN\s*\d+|PAD_\d+|PIN$)/i.test(n) || n.toUpperCase() === 'DATA';
 };
 
 // Detección automática de categoría según el nombre de la señal
 export const deducirCategoriaNet = (nombre = '') => {
   const n = String(nombre).toUpperCase().trim();
-  if (!n) return 'generico';
+  if (!n || esNombreGenerico(n)) return 'generico';
 
   // 1. TIERRA Y NEUTRO
   if (n === 'GND' || n === 'GROUND' || n.endsWith('_GND') || n.startsWith('GND_') || n === 'AGND' || n === 'PGND') {
@@ -62,14 +69,9 @@ export const deducirCategoriaNet = (nombre = '') => {
 
   // 6. COMUNICACIÓN (Datos, Protocolos, Buses diferenciales)
   if (
-    /(I2C|SPI|UART|USB|MIPI|DSI|CSI|RFFE|SWI|SDA|SCL|MOSI|MISO|DP|DN|TX|RX|CAN|BUS)/i.test(n) || n === 'DATA'
+    /(I2C|SPI|UART|USB|MIPI|DSI|CSI|RFFE|SWI|SDA|SCL|MOSI|MISO|DP|DN|TX|RX|CAN|BUS)/i.test(n)
   ) {
     return 'comunicacion';
-  }
-
-  // 7. PINES GENÉRICOS (Linea_1, Pin_1, PIN)
-  if (/^(LINEA_\d+|PIN_\d+|PIN$|PIN#|PAD_\d+)/i.test(n)) {
-    return 'generico';
   }
 
   return 'generico';
@@ -336,7 +338,6 @@ export default function FPCInteligente({
     const cat = (tipoDestino === 'GND' || tipoDestino === 'NC') ? 'tierra'
       : tipoDestino === 'VCC' || tipoDestino === 'PWR' ? 'alimentacion'
       : tipoDestino === 'ACT' ? 'actuadores'
-      : tipoDestino === 'DATA' ? 'comunicacion'
       : 'generico';
 
     setPines(prev => prev.map(p => {
@@ -345,7 +346,7 @@ export default function FPCInteligente({
           ...p,
           tipo: tipoDestino === 'VCC' ? 'PWR' : tipoDestino,
           categoria: cat,
-          nombre: (tipoDestino === 'GND' || tipoDestino === 'NC') ? tipoDestino : p.nombre
+          nombre: (tipoDestino === 'GND' || tipoDestino === 'NC') ? tipoDestino : (tipoDestino === 'PIN' ? `Pin_${p.id}` : p.nombre)
         };
         if (tipoDestino === 'GND') {
           mod.colorCustom = '#4b5563';
@@ -359,7 +360,7 @@ export default function FPCInteligente({
           mod.colorCustom = '#ef4444';
         } else if (tipoDestino === 'ACT') {
           mod.colorCustom = '#f97316';
-        } else if (tipoDestino === 'DATA') {
+        } else if (tipoDestino === 'PIN') {
           mod.colorCustom = '#eab308';
         }
         return mod;
@@ -371,7 +372,7 @@ export default function FPCInteligente({
   const manejarCambioNombre = (nuevoNombre) => {
     const nombreLimpio = nuevoNombre.replace(/\s+/g, '_');
     const catDeducida = deducirCategoriaNet(nombreLimpio);
-    const colorAuto = CATEGORIAS_FPC[catDeducida]?.color || '#d4af37';
+    const colorAuto = CATEGORIAS_FPC[catDeducida]?.color || '#eab308';
 
     setPines(prev => prev.map(p => {
       if (String(p.id) === String(pinActivo)) {
@@ -380,7 +381,7 @@ export default function FPCInteligente({
           nombre: nombreLimpio,
           categoria: catDeducida,
           colorCustom: colorAuto,
-          tipo: catDeducida === 'tierra' ? (nombreLimpio.toUpperCase().includes('NC') ? 'NC' : 'GND') : p.tipo
+          tipo: catDeducida === 'tierra' ? (nombreLimpio.toUpperCase().includes('NC') ? 'NC' : 'GND') : (esNombreGenerico(nombreLimpio) ? 'PIN' : p.tipo)
         };
       }
       return p;
@@ -822,22 +823,36 @@ export default function FPCInteligente({
           {/* Datos del Pin */}
           <div style={{ flex: '1 1 340px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-              <span style={{ color: '#00ffff', fontWeight: 'bold', fontSize: '1.2rem' }}>
+              <span style={{ color: '#00ffff', fontWeight: 'bold', fontSize: '1.25rem', letterSpacing: '0.5px' }}>
                 PIN {pinActivo}
               </span>
-              <span style={{ color: '#ffffff', fontWeight: 'bold', fontSize: '1rem' }}>
-                {pinActivoObj.nombre || 'Línea_sin_nombre'}
-              </span>
-              <span style={{
-                fontSize: '0.68rem',
-                padding: '2px 8px',
-                borderRadius: '6px',
-                backgroundColor: CATEGORIAS_FPC[pinActivoObj.categoria || deducirCategoriaNet(pinActivoObj.nombre)]?.color || '#4b5563',
-                color: CATEGORIAS_FPC[pinActivoObj.categoria || deducirCategoriaNet(pinActivoObj.nombre)]?.text || '#ffffff',
-                fontWeight: 'bold'
-              }}>
-                {pinActivoObj.tipo === 'DATA' && deducirCategoriaNet(pinActivoObj.nombre) === 'generico' ? 'PIN' : (pinActivoObj.tipo || 'PIN')}
-              </span>
+
+              {/* Si se cambió a un nombre real (como USB_TYPEC_CC1 en imagen 5), se muestra su pastilla con el nombre y color oficial */}
+              {!esNombreGenerico(pinActivoObj.nombre) ? (
+                <span style={{
+                  fontSize: '0.8rem',
+                  padding: '3px 10px',
+                  borderRadius: '6px',
+                  backgroundColor: CATEGORIAS_FPC[pinActivoObj.categoria || deducirCategoriaNet(pinActivoObj.nombre)]?.color || '#ef4444',
+                  color: CATEGORIAS_FPC[pinActivoObj.categoria || deducirCategoriaNet(pinActivoObj.nombre)]?.text || '#ffffff',
+                  fontWeight: 'bold',
+                  letterSpacing: '0.5px'
+                }}>
+                  {pinActivoObj.nombre}
+                </span>
+              ) : (
+                /* Si no ha sido cambiado (sigue genérico), muestra la pastilla [ PIN ] en amarillo boardview unida a PIN X sin el texto 'Linea_47' */
+                <span style={{
+                  fontSize: '0.75rem',
+                  padding: '3px 9px',
+                  borderRadius: '6px',
+                  backgroundColor: CATEGORIAS_FPC.generico.color, // #eab308 (Amarillo Boardview)
+                  color: '#000000',
+                  fontWeight: 'bold'
+                }}>
+                  {pinActivoObj.tipo === 'GND' || pinActivoObj.tipo === 'NC' ? pinActivoObj.tipo : 'PIN'}
+                </span>
+              )}
 
               {modo === 'diagnostico' && saludActivo.badge && (
                 <span style={{
@@ -894,15 +909,6 @@ export default function FPCInteligente({
                   PWR
                 </button>
 
-                {/* 1-Click: DATA */}
-                <button
-                  onClick={() => aplicarTipoRapido('DATA')}
-                  style={{ background: '#eab308', color: 'black', border: 'none', padding: '4px 9px', borderRadius: '5px', fontSize: '0.72rem', fontWeight: 'bold', cursor: 'pointer' }}
-                  title="Marcar como Datos / Buses"
-                >
-                  DATA
-                </button>
-
                 {/* 1-Click: ACT (Potencia / Actuador / Audio) */}
                 <button
                   onClick={() => aplicarTipoRapido('ACT')}
@@ -912,13 +918,22 @@ export default function FPCInteligente({
                   ACT
                 </button>
 
+                {/* 1-Click: PIN (Genérico / Amarillo Boardview) */}
+                <button
+                  onClick={() => aplicarTipoRapido('PIN')}
+                  style={{ background: '#eab308', color: '#000000', border: 'none', padding: '4px 9px', borderRadius: '5px', fontSize: '0.72rem', fontWeight: 'bold', cursor: 'pointer' }}
+                  title="Restablecer a PIN Genérico (Amarillo Boardview)"
+                >
+                  PIN
+                </button>
+
                 {/* Input de Nombre con autodetección */}
                 <input
-                  value={pinActivoObj.nombre || ''}
+                  value={esNombreGenerico(pinActivoObj.nombre) ? '' : pinActivoObj.nombre}
                   onChange={(e) => manejarCambioNombre(e.target.value)}
-                  placeholder="Nombre_línea..."
-                  style={{ background: '#000', color: 'white', border: '1px solid #374151', padding: '4px 8px', borderRadius: '5px', width: '120px', outline: 'none', fontSize: '0.78rem' }}
-                  title="Nombre de la línea. Detecta si es VBAT, I2C, NTC, etc."
+                  placeholder="Asignar nombre de línea..."
+                  style={{ background: '#000', color: 'white', border: '1px solid #374151', padding: '4px 8px', borderRadius: '5px', width: '170px', outline: 'none', fontSize: '0.78rem', fontWeight: 'bold' }}
+                  title="Escribe o pega el nombre de la línea"
                 />
 
                 {/* Input Manual de Valor de Referencia */}
@@ -946,17 +961,20 @@ export default function FPCInteligente({
 
                 {/* Selector de Catálogo Completo */}
                 <SelectorTipoLinea
-                  valor={pinActivoObj.tipo || 'DATA'}
+                  valor={esNombreGenerico(pinActivoObj.nombre) ? 'PIN' : (pinActivoObj.nombre || pinActivoObj.tipo || 'PIN')}
                   nombreComponente={nombreFpc}
                   idPad={pinActivo}
                   onChange={(val, cat) => {
+                    const catLimpia = cat || deducirCategoriaNet(val);
+                    const colorAuto = CATEGORIAS_FPC[catLimpia]?.color || '#eab308';
                     setPines(prev =>
                       prev.map(p =>
                         String(p.id) === String(pinActivo) ? {
                           ...p,
-                          tipo: val,
-                          categoria: cat || deducirCategoriaNet(val),
-                          nombre: val === 'GND' || val === 'NC' ? val : p.nombre
+                          nombre: val === 'GND' || val === 'NC' ? val : val,
+                          tipo: val === 'GND' || val === 'NC' ? val : (catLimpia === 'alimentacion' ? 'PWR' : catLimpia === 'actuadores' ? 'ACT' : 'PIN'),
+                          categoria: catLimpia,
+                          colorCustom: colorAuto
                         } : p
                       )
                     );
@@ -1005,7 +1023,46 @@ export default function FPCInteligente({
       </div>
 
       {/* --- PANEL INFERIOR DE HALLAZGOS Y DISCREPANCIAS (OPCIÓN C) --- */}
-      <div style={{ marginTop: '16px', backgroundColor: '#0a0d14', borderRadius: '12px', border: '1px solid #1f2937', padding: '12px' }}>
+      <div style={{ marginTop: '16px', backgroundColor: '#0a0d14', borderRadius: '12px', border: '1px solid #1f2937', padding: '14px' }}>
+        {/* Cabecera y Título Oficial de la Tabla */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          paddingBottom: '10px',
+          marginBottom: '10px',
+          borderBottom: '1px solid #1e293b',
+          flexWrap: 'wrap',
+          gap: '8px'
+        }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '1rem' }}>📋</span>
+              <span style={{ fontSize: '0.88rem', fontWeight: 'bold', color: '#f8fafc', letterSpacing: '0.3px' }}>
+                {modo === 'diagnostico'
+                  ? 'TABLA DE DIAGNÓSTICO DIFERENCIAL Y CONTRASTE DE PINES'
+                  : 'REGISTRO Y MAPEO DE LÍNEAS DE LA PLACA BUENA (PATRÓN)'}
+              </span>
+              <span style={{
+                fontSize: '0.65rem',
+                padding: '2px 8px',
+                borderRadius: '6px',
+                backgroundColor: modo === 'diagnostico' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(139, 92, 246, 0.2)',
+                color: modo === 'diagnostico' ? '#6ee7b7' : '#c4b5fd',
+                border: modo === 'diagnostico' ? '1px solid #059669' : '1px solid #7c3aed',
+                fontWeight: 'bold'
+              }}>
+                {modo === 'diagnostico' ? 'MODO DIAGNÓSTICO' : 'MODO REFERENCIA'}
+              </span>
+            </div>
+            <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '2px' }}>
+              {modo === 'diagnostico'
+                ? 'Compara en tiempo real los valores de la placa bajo prueba contra la placa de referencia patrón'
+                : 'Catálogo de pines, líneas asignadas y valores estándar de referencia'}
+            </div>
+          </div>
+        </div>
+
         {/* Barra de Estadísticas y Filtros */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
@@ -1067,6 +1124,7 @@ export default function FPCInteligente({
                 .filter(p => !filtroSoloFallas || (p.yaMedido && p.salud.estado !== 'OK'))
                 .map(p => {
                   const isSel = String(p.id) === String(pinActivo);
+                  const esGenerico = esNombreGenerico(p.nombre);
                   return (
                     <tr
                       key={p.id}
@@ -1081,19 +1139,23 @@ export default function FPCInteligente({
                       <td style={{ padding: '6px 8px', fontWeight: 'bold', color: isSel ? '#00ffff' : '#ffffff' }}>
                         #{p.id}
                       </td>
-                      <td style={{ padding: '6px 8px', color: '#e2e8f0' }}>
-                        {p.nombre || 'Línea_' + p.id}
+                      <td style={{ padding: '6px 8px', color: esGenerico ? '#64748b' : '#e2e8f0', fontWeight: esGenerico ? 'normal' : 'bold' }}>
+                        {esGenerico ? '---' : p.nombre}
                       </td>
                       <td style={{ padding: '6px 8px' }}>
                         <span style={{
                           padding: '2px 6px',
                           borderRadius: '4px',
-                          backgroundColor: CATEGORIAS_FPC[p.categoria || deducirCategoriaNet(p.nombre)]?.color || '#374151',
-                          color: CATEGORIAS_FPC[p.categoria || deducirCategoriaNet(p.nombre)]?.text || '#ffffff',
+                          backgroundColor: esGenerico
+                            ? (p.tipo === 'GND' ? '#4b5563' : p.tipo === 'NC' ? '#1e3a8a' : CATEGORIAS_FPC.generico.color)
+                            : (CATEGORIAS_FPC[p.categoria || deducirCategoriaNet(p.nombre)]?.color || CATEGORIAS_FPC.generico.color),
+                          color: esGenerico
+                            ? (p.tipo === 'GND' || p.tipo === 'NC' ? '#ffffff' : CATEGORIAS_FPC.generico.text)
+                            : (CATEGORIAS_FPC[p.categoria || deducirCategoriaNet(p.nombre)]?.text || '#ffffff'),
                           fontSize: '0.65rem',
                           fontWeight: 'bold'
                         }}>
-                          {p.tipo === 'DATA' && deducirCategoriaNet(p.nombre) === 'generico' ? 'PIN' : (p.tipo || 'PIN')}
+                          {esGenerico ? (p.tipo === 'GND' || p.tipo === 'NC' ? p.tipo : 'PIN') : (p.tipo || 'PIN')}
                         </span>
                       </td>
                       {/* REF (BUENA): Muestra el valor de referencia patrón */}

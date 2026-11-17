@@ -63,9 +63,15 @@ const CATEGORIAS_NETS = {
   },
   comunicacion: {
     id: 'comunicacion',
-    label: '📡 Comunicación (Datos / Buses)',
+    label: '📡 Comunicación (Buses / Protocolos)',
+    color: '#6366f1',
+    items: ['AP_TO_I2C_SDA', 'AP_TO_I2C_SCL', 'SPI_AP_MOSI', 'SPI_AP_MISO', 'SPI_AP_CLK', 'SPI_AP_CS', 'UART_TX', 'UART_RX', 'USB_HS_DP', 'USB_HS_DN', 'RFFE_DATA', 'RFFE_CLK', 'SWI_DATA', 'MIPI_DSI']
+  },
+  generico: {
+    id: 'generico',
+    label: '🟡 Pin Genérico (Sin Asignar)',
     color: '#eab308',
-    items: ['DATA', 'AP_TO_I2C_SDA', 'AP_TO_I2C_SCL', 'SPI_AP_MOSI', 'SPI_AP_MISO', 'SPI_AP_CLK', 'SPI_AP_CS', 'UART_TX', 'UART_RX', 'USB_HS_DP', 'USB_HS_DN', 'RFFE_DATA', 'RFFE_CLK', 'SWI_DATA', 'MIPI_DSI']
+    items: []
   },
   control: {
     id: 'control',
@@ -173,11 +179,11 @@ export const deducirCategoriaDeNet = (netName, pad = null) => {
 
 export const obtenerCategoriaInfo = (tipoONet, pad = null) => {
   const val = String(tipoONet || pad?.netName || pad?.tipo || '').trim().toUpperCase();
-  if (!val) return { id: 'comunicacion', label: '📡 Comunicación (Datos / Buses)', color: '#eab308', bgPill: '#854d0e' };
+  if (!val) return { id: 'generico', label: '🟡 Pin Genérico (Sin Asignar)', color: '#eab308', bgPill: '#854d0e' };
   if (val === 'GND' || val.endsWith('_GND')) return { id: 'tierra', label: '🛡️ Tierra (GND)', color: '#4b5563', bgPill: '#374151' };
   if (val === 'NC') return { id: 'tierra', label: '⚪ No Conectado (NC)', color: '#1e3a8a', bgPill: '#1e3a8a' };
 
-  const catId = deducirCategoriaDeNet(val, pad) || 'comunicacion';
+  const catId = deducirCategoriaDeNet(val, pad) || 'generico';
   if (catId === 'alimentacion') {
     return { id: 'alimentacion', label: '⚡ Alimentación (Voltajes / Power)', color: '#ef4444', bgPill: '#7f1d1d' };
   }
@@ -193,7 +199,10 @@ export const obtenerCategoriaInfo = (tipoONet, pad = null) => {
   if (catId === 'custom') {
     return { id: 'custom', label: '⭐ Red Personalizada', color: '#8b5cf6', bgPill: '#5b21b6' };
   }
-  return { id: 'comunicacion', label: '📡 Comunicación (Datos / Buses)', color: '#eab308', bgPill: '#854d0e' };
+  if (catId === 'comunicacion') {
+    return { id: 'comunicacion', label: '📡 Comunicación (Buses / Protocolos)', color: '#6366f1', bgPill: '#3730a3' };
+  }
+  return { id: 'generico', label: '🟡 Pin Genérico (Sin Asignar)', color: '#eab308', bgPill: '#854d0e' };
 };
 
 const IMAGEN_PREDETERMINADA = '/pcb_motherboard_bg.png';
