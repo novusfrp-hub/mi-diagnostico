@@ -10,17 +10,19 @@ import SelectorTipoLinea from './SelectorTipoLinea.js';
 // --- CATÁLOGO DE CATEGORÍAS Y COLORES OFICIALES ---
 export const CATEGORIAS_FPC = {
   alimentacion: { id: 'alimentacion', label: 'Alimentación (Voltajes / Power)', color: '#ef4444', text: '#ffffff' },
+  actuadores: { id: 'actuadores', label: 'Salidas de Potencia / Actuador', color: '#f97316', text: '#ffffff' },
   comunicacion: { id: 'comunicacion', label: 'Comunicación (Buses / Datos)', color: '#eab308', text: '#000000' },
   sensado: { id: 'sensado', label: 'Sensado (Térmico / ADC / Sensores)', color: '#06b6d4', text: '#000000' },
   control: { id: 'control', label: 'Control & Sincronización', color: '#10b981', text: '#ffffff' },
   tierra: { id: 'tierra', label: 'Tierra / Neutro (GND / NC)', color: '#4b5563', text: '#ffffff' },
+  generico: { id: 'generico', label: 'Sin Asignar / Genérico', color: '#64748b', text: '#ffffff' },
   custom: { id: 'custom', label: 'Personalizada', color: '#8b5cf6', text: '#ffffff' }
 };
 
 // Detección automática de categoría según el nombre de la señal
 export const deducirCategoriaNet = (nombre = '') => {
   const n = String(nombre).toUpperCase().trim();
-  if (!n) return 'comunicacion';
+  if (!n) return 'generico';
 
   // 1. TIERRA Y NEUTRO
   if (n === 'GND' || n === 'GROUND' || n.endsWith('_GND') || n.startsWith('GND_') || n === 'AGND' || n === 'PGND') {
@@ -30,35 +32,47 @@ export const deducirCategoriaNet = (nombre = '') => {
     return 'tierra';
   }
 
-  // 2. ALIMENTACIÓN (Voltajes, Power, Batería, LDOs, Rails, Backlight)
+  // 2. SALIDAS DE POTENCIA / ACTUADOR (Audio, Parlantes, Auricular, Haptics, Vibrador)
+  if (
+    /(SPKR|SPEAKER|SPK_|RCV|EAR|LINE_OUT|HP_L|HP_R|HAP_OUT|HAPTIC|VIB_|MOTOR|BUZZER)/i.test(n)
+  ) {
+    return 'actuadores';
+  }
+
+  // 3. ALIMENTACIÓN (Voltajes, Power, Batería, LDOs, Rails, Backlight)
   if (
     /(LEDA|LED_A|LEDK|LED_K|ANODE|ANODO|CATODO|CATHODE|VBOOST|BOOST|VBAT|VPH|VDD|VBUS|VREG|VCC|CHARGER|CHG|BATT|VLED|AVDD|ELVDD|ELVSS|VSP|VSN|VIO|VBIAS|HV_|PP_|_PWR|POWER|VOLT|VOUT|VIN)/i.test(n)
   ) {
     return 'alimentacion';
   }
 
-  // 3. SENSADO / TÉRMICO / ADC / ID
+  // 4. SENSADO / TÉRMICO / ADC / ID
   if (
     /(THERM|SENSE|ISENSE|CSENSE|_ADC$|ADC_|JACK_DET|EAR_DET|BOARD_ID|NTC|BATT_NTC|^ID$|_ID$|BATT_ID|BATT_DET|CELL_BAL)/i.test(n)
   ) {
     return 'sensado';
   }
 
-  // 4. CONTROL Y SINCRONIZACIÓN (Relojes, Enables, Reset, Botones)
+  // 5. CONTROL Y SINCRONIZACIÓN (Relojes, Enables, Reset, Botones)
   if (
     /(RESET|RST|ENABLE|_EN$|^EN_|INT|IRQ|CLK|CLOCK|PWM|POWER_KEY|VOL_UP|VOL_DOWN|HOLD|SYNC)/i.test(n)
   ) {
     return 'control';
   }
 
-  // 5. COMUNICACIÓN (Datos, Protocolos, Buses diferenciales)
+  // 6. COMUNICACIÓN (Datos, Protocolos, Buses diferenciales)
   if (
-    /(I2C|SPI|UART|USB|MIPI|DSI|CSI|RFFE|SWI|DATA|SDA|SCL|MOSI|MISO|DP|DN|TX|RX|CAN|BUS)/i.test(n)
+    /(I2C|SPI|UART|USB|MIPI|DSI|CSI|RFFE|SWI|SDA|SCL|MOSI|MISO|DP|DN|TX|RX|CAN|BUS)/i.test(n) || n === 'DATA'
   ) {
     return 'comunicacion';
   }
 
-  return 'comunicacion';
+  // 7. PINES GENÉRICOS (Linea_1, Pin_1, PIN)
+  if (/^(LINEA_\d+|PIN_\d+|PIN$|PIN#|PAD_\d+)/i.test(n)) {
+    return 'generico';
+  }
+
+  return 'generico';
 };
 
 export default function FPCInteligente({
@@ -320,14 +334,16 @@ export default function FPCInteligente({
   // ACCIONES RÁPIDAS DE 1-CLICK PARA LA PLACA BUENA
   const aplicarTipoRapido = (tipoDestino) => {
     const cat = (tipoDestino === 'GND' || tipoDestino === 'NC') ? 'tierra'
-      : tipoDestino === 'VCC' ? 'alimentacion'
-      : 'comunicacion';
+      : tipoDestino === 'VCC' || tipoDestino === 'PWR' ? 'alimentacion'
+      : tipoDestino === 'ACT' ? 'actuadores'
+      : tipoDestino === 'DATA' ? 'comunicacion'
+      : 'generico';
 
     setPines(prev => prev.map(p => {
       if (String(p.id) === String(pinActivo)) {
         const mod = {
           ...p,
-          tipo: tipoDestino,
+          tipo: tipoDestino === 'VCC' ? 'PWR' : tipoDestino,
           categoria: cat,
           nombre: (tipoDestino === 'GND' || tipoDestino === 'NC') ? tipoDestino : p.nombre
         };
@@ -339,8 +355,10 @@ export default function FPCInteligente({
           mod.colorCustom = '#1e3a8a';
           mod.valorSano = 'OL';
           mod.valorSanoDiodo = 'OL';
-        } else if (tipoDestino === 'VCC') {
+        } else if (tipoDestino === 'VCC' || tipoDestino === 'PWR') {
           mod.colorCustom = '#ef4444';
+        } else if (tipoDestino === 'ACT') {
+          mod.colorCustom = '#f97316';
         } else if (tipoDestino === 'DATA') {
           mod.colorCustom = '#eab308';
         }
@@ -818,7 +836,7 @@ export default function FPCInteligente({
                 color: CATEGORIAS_FPC[pinActivoObj.categoria || deducirCategoriaNet(pinActivoObj.nombre)]?.text || '#ffffff',
                 fontWeight: 'bold'
               }}>
-                {pinActivoObj.tipo || 'DATA'}
+                {pinActivoObj.tipo === 'DATA' && deducirCategoriaNet(pinActivoObj.nombre) === 'generico' ? 'PIN' : (pinActivoObj.tipo || 'PIN')}
               </span>
 
               {modo === 'diagnostico' && saludActivo.badge && (
@@ -883,6 +901,15 @@ export default function FPCInteligente({
                   title="Marcar como Datos / Buses"
                 >
                   DATA
+                </button>
+
+                {/* 1-Click: ACT (Potencia / Actuador / Audio) */}
+                <button
+                  onClick={() => aplicarTipoRapido('ACT')}
+                  style={{ background: '#f97316', color: 'white', border: 'none', padding: '4px 9px', borderRadius: '5px', fontSize: '0.72rem', fontWeight: 'bold', cursor: 'pointer' }}
+                  title="Marcar como Potencia / Actuador (Audio, Haptic, Parlante)"
+                >
+                  ACT
                 </button>
 
                 {/* Input de Nombre con autodetección */}
@@ -1066,7 +1093,7 @@ export default function FPCInteligente({
                           fontSize: '0.65rem',
                           fontWeight: 'bold'
                         }}>
-                          {p.tipo || 'DATA'}
+                          {p.tipo === 'DATA' && deducirCategoriaNet(p.nombre) === 'generico' ? 'PIN' : (p.tipo || 'PIN')}
                         </span>
                       </td>
                       {/* REF (BUENA): Muestra el valor de referencia patrón */}

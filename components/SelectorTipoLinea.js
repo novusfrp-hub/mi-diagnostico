@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Search, X, Check, Plus, Trash2, Zap, Shield, Radio, Cpu, Star, Activity } from 'lucide-react';
+import { Search, X, Check, Plus, Trash2, Zap, Shield, Radio, Cpu, Star, Activity, Volume2, ArrowDown } from 'lucide-react';
 
 const CATEGORIAS_LINEAS = {
   alimentacion: {
@@ -38,6 +38,34 @@ const CATEGORIAS_LINEAS = {
       'VSN',
       'CHG_IN',
       'BATT_THERM_PWR'
+    ]
+  },
+  actuadores: {
+    lbl: 'Salidas de Potencia / Actuador (Audio, Haptic, Motores)',
+    shortLbl: 'Potencia / Actuador',
+    color: '#f97316',
+    bgPill: '#7c2d12',
+    icon: Volume2,
+    items: [
+      'SPKR_OUT_N',
+      'SPKR_OUT_P',
+      'SPK_LP',
+      'SPK_LN',
+      'RCV',
+      'EAR',
+      'RCV_P',
+      'RCV_N',
+      'EAR_P',
+      'EAR_N',
+      'LINE_OUT',
+      'HP_L',
+      'HP_R',
+      'PMI_HAP_OUT_P',
+      'PMI_HAP_OUT_N',
+      'HAPTIC_OUT_P',
+      'HAPTIC_OUT_N',
+      'VIB_MOTOR_P',
+      'VIB_MOTOR_N'
     ]
   },
   comunicacion: {
@@ -156,10 +184,11 @@ export default function SelectorTipoLinea({
         if (saved) return JSON.parse(saved);
       } catch (e) {}
     }
-    return { alimentacion: [], comunicacion: [], sensado: [], control: [], custom: [] };
+    return { alimentacion: [], actuadores: [], comunicacion: [], sensado: [], control: [], custom: [] };
   });
 
   const searchInputRef = useRef(null);
+  const nuevoInputRef = useRef(null);
 
   useEffect(() => {
     setMounted(true);
@@ -181,6 +210,12 @@ export default function SelectorTipoLinea({
       const v = String(valor || '').toUpperCase().trim();
       if (v === 'GND' || v === 'NC') {
         setCategoriaActiva('tierra');
+      } else if (
+        CATEGORIAS_LINEAS.actuadores?.items.includes(v) ||
+        (catalogoLocal.actuadores || []).includes(v) ||
+        /(SPKR|SPEAKER|SPK_|RCV|EAR|LINE_OUT|HP_L|HP_R|HAP_OUT|HAPTIC|VIB_|MOTOR|BUZZER)/i.test(v)
+      ) {
+        setCategoriaActiva('actuadores');
       } else if (
         CATEGORIAS_LINEAS.sensado.items.includes(v) ||
         (catalogoLocal.sensado || []).includes(v) ||
@@ -238,6 +273,11 @@ export default function SelectorTipoLinea({
       const t = String(tipo || '').toUpperCase().trim();
       if (t === 'GND' || t === 'NC') {
         cat = 'tierra';
+      } else if (
+        obtenerItemsCategoria('actuadores').includes(t) ||
+        /(SPKR|SPEAKER|SPK_|RCV|EAR|LINE_OUT|HP_L|HP_R|HAP_OUT|HAPTIC|VIB_|MOTOR|BUZZER)/i.test(t)
+      ) {
+        cat = 'actuadores';
       } else if (
         obtenerItemsCategoria('sensado').includes(t) ||
         /(THERM|SENSE|ISENSE|CSENSE|_ADC$|ADC_|JACK_DET|EAR_DET|BOARD_ID)/i.test(t)
@@ -297,6 +337,10 @@ export default function SelectorTipoLinea({
     const t = String(tipo).toUpperCase().trim();
     if (t === 'GND') return '#4b5563';
     if (t === 'NC') return '#1e3a8a';
+    if (
+      obtenerItemsCategoria('actuadores').includes(t) ||
+      /(SPKR|SPEAKER|SPK_|RCV|EAR|LINE_OUT|HP_L|HP_R|HAP_OUT|HAPTIC|VIB_|MOTOR|BUZZER)/i.test(t)
+    ) return '#f97316';
     if (
       obtenerItemsCategoria('sensado').includes(t) ||
       /(THERM|SENSE|ISENSE|CSENSE|_ADC$|ADC_|JACK_DET|EAR_DET|BOARD_ID)/i.test(t)
@@ -475,7 +519,7 @@ export default function SelectorTipoLinea({
             <input
               ref={searchInputRef}
               type="text"
-              placeholder="Escribe para buscar... (ej: NTC, ID, SDA, VBAT, DET)"
+              placeholder="Escribe para buscar... (ej: SPKR, NTC, ID, SDA, VBAT)"
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
               style={{
@@ -498,6 +542,93 @@ export default function SelectorTipoLinea({
               </button>
             )}
           </div>
+
+          {/* Pregunta / Acción rápida si no existe la línea en la categoría actual */}
+          {busqueda.trim() && !obtenerItemsCategoria(categoriaActiva).some(x => x.toUpperCase() === busqueda.trim().toUpperCase().replace(/\s+/g, '_')) && (
+            <div style={{
+              marginTop: '10px',
+              padding: '8px 12px',
+              backgroundColor: 'rgba(2, 132, 199, 0.12)',
+              border: '1px dashed #38bdf8',
+              borderRadius: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '10px',
+              flexWrap: 'wrap'
+            }}>
+              <div style={{ fontSize: '0.78rem', color: '#cbd5e1' }}>
+                ¿Guardar <strong>"{busqueda.trim().toUpperCase().replace(/\s+/g, '_')}"</strong> en <span style={{ color: CATEGORIAS_LINEAS[categoriaActiva]?.color || '#f97316', fontWeight: 'bold' }}>{CATEGORIAS_LINEAS[categoriaActiva]?.shortLbl || categoriaActiva}</span>?
+              </div>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const limpia = busqueda.trim().toUpperCase().replace(/\s+/g, '_');
+                    setNuevaRedInput(limpia);
+                    setBusqueda('');
+                    setTimeout(() => {
+                      if (nuevoInputRef.current) nuevoInputRef.current.focus();
+                    }, 50);
+                  }}
+                  style={{
+                    background: '#1e293b',
+                    color: '#38bdf8',
+                    border: '1px solid #0284c7',
+                    padding: '4px 8px',
+                    borderRadius: '6px',
+                    fontSize: '0.72rem',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                  title="Borra la búsqueda y copia el nombre al campo inferior '+ Agregar'"
+                >
+                  <ArrowDown size={12} />
+                  Copiar a +Agregar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const limpia = busqueda.trim().toUpperCase().replace(/\s+/g, '_');
+                    if (!limpia) return;
+                    setCatalogoLocal(prev => {
+                      const arr = prev[categoriaActiva] || [];
+                      if (!arr.includes(limpia)) {
+                        return { ...prev, [categoriaActiva]: [...arr, limpia] };
+                      }
+                      return prev;
+                    });
+                    if (onAgregarTipo) {
+                      onAgregarTipo(limpia, categoriaActiva);
+                    }
+                    setBusqueda('');
+                    handleSelect(limpia);
+                  }}
+                  style={{
+                    background: '#0284c7',
+                    color: 'white',
+                    border: 'none',
+                    padding: '4px 10px',
+                    borderRadius: '6px',
+                    fontSize: '0.72rem',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    boxShadow: '0 0 10px rgba(2,132,199,0.3)'
+                  }}
+                  title="Guardar de inmediato en esta categoría y asignar al pin"
+                >
+                  <Plus size={12} />
+                  Guardar y Asignar
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Pestañas de Categoría (visibles cuando no hay texto de búsqueda activo) */}
@@ -659,8 +790,9 @@ export default function SelectorTipoLinea({
         }}>
           <form onSubmit={guardarNuevaRed} style={{ display: 'flex', gap: '8px' }}>
             <input
+              ref={nuevoInputRef}
               type="text"
-              placeholder={`Crear nueva red (ej: BATT_ALERT, DET)...`}
+              placeholder={`Guardar nueva red en ${CATEGORIAS_LINEAS[categoriaActiva]?.shortLbl || 'categoría'} (ej: ${categoriaActiva === 'actuadores' ? 'SPKR_AMP_OUT' : 'BATT_ALERT'})...`}
               value={nuevaRedInput}
               onChange={(e) => setNuevaRedInput(e.target.value)}
               style={{

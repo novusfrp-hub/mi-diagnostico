@@ -51,6 +51,16 @@ const CATEGORIAS_NETS = {
       'BL_LED_A', 'BL_ANODE', 'VBOOST', 'VLED', 'AVDD', 'ELVDD', 'ELVSS', 'VSP', 'VSN'
     ]
   },
+  actuadores: {
+    id: 'actuadores',
+    label: '🔊 Salidas de Potencia / Actuador',
+    color: '#f97316',
+    items: [
+      'SPKR_OUT_N', 'SPKR_OUT_P', 'SPK_LP', 'SPK_LN', 'RCV', 'EAR', 'RCV_P', 'RCV_N', 'EAR_P', 'EAR_N',
+      'LINE_OUT', 'HP_L', 'HP_R', 'PMI_HAP_OUT_P', 'PMI_HAP_OUT_N', 'HAPTIC_OUT_P', 'HAPTIC_OUT_N',
+      'VIB_MOTOR_P', 'VIB_MOTOR_N'
+    ]
+  },
   comunicacion: {
     id: 'comunicacion',
     label: '📡 Comunicación (Datos / Buses)',
@@ -117,6 +127,13 @@ export const deducirCategoriaDeNet = (netName, pad = null) => {
     return 'alimentacion';
   }
 
+  // SALIDAS DE POTENCIA / ACTUADOR (Audio, Parlantes, Haptic, Motores)
+  if (
+    /(SPKR|SPEAKER|SPK_|RCV|EAR|LINE_OUT|HP_L|HP_R|HAP_OUT|HAPTIC|VIB_|MOTOR|BUZZER)/i.test(n)
+  ) {
+    return 'actuadores';
+  }
+
   // TIERRA / NEUTRO
   if (/(^GND|_GND|GROUND|^NC$|NO_CONNECT)/i.test(n)) {
     return 'tierra';
@@ -163,6 +180,9 @@ export const obtenerCategoriaInfo = (tipoONet, pad = null) => {
   const catId = deducirCategoriaDeNet(val, pad) || 'comunicacion';
   if (catId === 'alimentacion') {
     return { id: 'alimentacion', label: '⚡ Alimentación (Voltajes / Power)', color: '#ef4444', bgPill: '#7f1d1d' };
+  }
+  if (catId === 'actuadores') {
+    return { id: 'actuadores', label: '🔊 Salidas de Potencia / Actuador', color: '#f97316', bgPill: '#7c2d12' };
   }
   if (catId === 'control') {
     return { id: 'control', label: '⚙️ Control y Sincronización', color: '#10b981', bgPill: '#065f46' };
