@@ -42,25 +42,29 @@ export default function BandejaPinesFPC({
     const mapaPadsPorPin = new Map(); // pinId -> Array de { compNombre, padId, netName }
     const mapaPadsPorNet = new Map(); // netNameNorm -> Array de { compNombre, padId, netName }
 
-    componentes.forEach(comp => {
-      comp.pads.forEach(pad => {
-        const netNorm = normalizarNetName(pad.netName);
-        if (netNorm && netNorm !== 'GND' && netNorm !== 'NC') {
-          if (!mapaPadsPorNet.has(netNorm)) {
-            mapaPadsPorNet.set(netNorm, []);
-          }
-          mapaPadsPorNet.get(netNorm).push({ compNombre: comp.nombre, padId: pad.id, netName: pad.netName });
-        }
+    if (Array.isArray(componentes)) {
+      componentes.forEach(comp => {
+        if (comp && Array.isArray(comp.pads)) {
+          comp.pads.forEach(pad => {
+            const netNorm = normalizarNetName(pad.netName);
+            if (netNorm && netNorm !== 'GND' && netNorm !== 'NC') {
+              if (!mapaPadsPorNet.has(netNorm)) {
+                mapaPadsPorNet.set(netNorm, []);
+              }
+              mapaPadsPorNet.get(netNorm).push({ compNombre: comp.nombre, padId: pad.id, netName: pad.netName });
+            }
 
-        if (pad.fpcRef && conectorActivo && String(pad.fpcRef.fpcId) === String(conectorActivo.id)) {
-          const pinKey = String(pad.fpcRef.pinId);
-          if (!mapaPadsPorPin.has(pinKey)) {
-            mapaPadsPorPin.set(pinKey, []);
-          }
-          mapaPadsPorPin.get(pinKey).push({ compNombre: comp.nombre, padId: pad.id, netName: pad.netName });
+            if (pad.fpcRef && conectorActivo && String(pad.fpcRef.fpcId) === String(conectorActivo.id)) {
+              const pinKey = String(pad.fpcRef.pinId);
+              if (!mapaPadsPorPin.has(pinKey)) {
+                mapaPadsPorPin.set(pinKey, []);
+              }
+              mapaPadsPorPin.get(pinKey).push({ compNombre: comp.nombre, padId: pad.id, netName: pad.netName });
+            }
+          });
         }
       });
-    });
+    }
 
     return { mapaPadsPorPin, mapaPadsPorNet };
   }, [componentes, conectorActivo]);

@@ -373,6 +373,22 @@ export default function VisorMapeoPCB({
   const [pinFpcActivoParaVincular, setPinFpcActivoParaVincular] = useState(null);
   const [hoveredPinFpc, setHoveredPinFpc] = useState(null);
 
+  // Unificar conectores FPC generales y FPC de batería en una sola lista homogénea
+  const conectoresFpc = useMemo(() => {
+    return normalizarConectoresFpc(fpcs, fpcBateria);
+  }, [fpcs, fpcBateria]);
+
+  // Sincronizar FPC seleccionado por defecto cuando cambian los conectores
+  useEffect(() => {
+    if (conectoresFpc && conectoresFpc.length > 0) {
+      if (!fpcSeleccionadoId || !conectoresFpc.some(c => String(c.id) === String(fpcSeleccionadoId))) {
+        setFpcSeleccionadoId(conectoresFpc[0].id);
+      }
+    } else {
+      setFpcSeleccionadoId(null);
+    }
+  }, [conectoresFpc, fpcSeleccionadoId]);
+
   // Diccionario multizona de sectores del modelo: { [nombreSector]: { imagenCaraA, imagenCaraB, imagenEsquema, componentes } }
   const [sectores, setSectores] = useState(() => {
     if (sectoresIniciales && typeof sectoresIniciales === 'object' && Object.keys(sectoresIniciales).length > 0) {

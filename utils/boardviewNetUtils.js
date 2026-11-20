@@ -215,6 +215,7 @@ export function autoMatchFpcBoardview({
   });
 
   const componentesActualizados = componentes.map(comp => {
+    if (!comp || !Array.isArray(comp.pads)) return comp;
     let huboCambioComp = false;
 
     const nuevosPads = comp.pads.map(pad => {
@@ -319,9 +320,9 @@ export function actualizarPadConPropagacion({
 }) {
   if (!componentes || !compId || !padId || !propiedad) return componentes;
 
-  const compObjetivo = componentes.find(c => c.id === compId);
-  if (!compObjetivo) return componentes;
-  const padObjetivo = compObjetivo.pads.find(p => p.id === padId);
+  const compObjetivo = componentes.find(c => c && c.id === compId);
+  if (!compObjetivo || !Array.isArray(compObjetivo.pads)) return componentes;
+  const padObjetivo = compObjetivo.pads.find(p => p && p.id === padId);
   if (!padObjetivo) return componentes;
 
   const netObjetivo = padObjetivo.netName;
@@ -336,9 +337,10 @@ export function actualizarPadConPropagacion({
   );
 
   return componentes.map(comp => {
+    if (!comp || !Array.isArray(comp.pads)) return comp;
     const esCompActivo = comp.id === compId;
     const tienePadMismaRed = debePropagar && comp.pads.some(
-      p => normalizarNetName(p.netName) === netObjetivoNorm
+      p => p && normalizarNetName(p.netName) === netObjetivoNorm
     );
 
     if (!esCompActivo && !tienePadMismaRed) {
