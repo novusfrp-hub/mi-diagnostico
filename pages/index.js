@@ -4787,6 +4787,8 @@ export default function AppDiagnostico() {
                 imagenPlacaCaraBInicial={modeloActivo.boardviewImagenPlacaCaraB || ''}
                 sectorInicial={modeloActivo.boardviewSector || 'Placa Completa'}
                 imagenEsquemaInicial={modeloActivo.boardviewImagenEsquema || modeloActivo.imgEsquema}
+                fpcs={modeloActivo.fpcs || []}
+                fpcBateria={modeloActivo.fpcBateria || null}
                 onCambios={(payload) => {
                   if (payload && typeof payload === 'object') {
                     setModeloActivo(prev => ({

@@ -6,6 +6,19 @@ import {
   Image as ImageIcon, Upload, RotateCcw, X, Link, Search, RotateCw, Lock, Zap, ArrowLeftRight, Tag, Gauge, FolderOpen, MousePointer
 } from 'lucide-react';
 import SelectorTipoLinea from './SelectorTipoLinea';
+import BandejaPinesFPC from './BandejaPinesFPC';
+import {
+  normalizarNetName,
+  esRedPropagable,
+  normalizarValorMedicion,
+  getPropSano,
+  getPropActual,
+  extraerValorPad,
+  normalizarConectoresFpc,
+  obtenerValoresPinFpc,
+  autoMatchFpcBoardview,
+  actualizarPadConPropagacion
+} from '../utils/boardviewNetUtils';
 import {
   optimizarYComprimirImagen,
   subirImagenStorage,
@@ -325,7 +338,9 @@ export default function VisorMapeoPCB({
   setTiposCustom = null,             // setter de tipos de línea personalizados
   nombreModelo = '',                 // nombre del modelo activo (ej: Samsung Galaxy S22)
   modeloId = null,                   // ID único del modelo (para evitar saltos de selección al escribir)
-  puedeEditar = true                 // control de permisos RBAC (solo super_admin y editor pueden alterar mapa)
+  puedeEditar = true,                // control de permisos RBAC (solo super_admin y editor pueden alterar mapa)
+  fpcs = [],                         // Lista de conectores FPC del modelo activo
+  fpcBateria = null                  // Conector FPC Batería del modelo activo
 }) {
   // --- Organización de Placa: Cara A (Superior) / Cara B (Inferior) & Sectores Mapeados ---
   const [caraPlaca, setCaraPlaca] = useState('A'); // 'A' | 'B'
@@ -337,6 +352,26 @@ export default function VisorMapeoPCB({
   const [sectorModalOrigen, setSectorModalOrigen] = useState(null);
   const [sectorDestinoInput, setSectorDestinoInput] = useState('');
   const [nuevoSectorInput, setNuevoSectorInput] = useState('');
+
+  // --- Estados para Propagación de Redes y Medición Manual ---
+  const [propagarRedSano, setPropagarRedSano] = useState(true);
+  const [propagarRedActual, setPropagarRedActual] = useState(false);
+  const [inputMedicionLocal, setInputMedicionLocal] = useState('');
+  const valorInicialMedicionActualRef = useRef('');
+  const valorInicialSanoRef = useRef('');
+  const snapshotTomadoSanoRef = useRef(false);
+
+  // --- Estados para Medición Guiada Robusta ---
+  const [modoMedicionGuiada, setModoMedicionGuiada] = useState(false);
+  const [soloPadsPendientes, setSoloPadsPendientes] = useState(true);
+  const [avisoHudInline, setAvisoHudInline] = useState(null);
+
+  // --- Estados para Bandeja Visual de Pines FPC ---
+  const [drawerFpcAbierto, setDrawerFpcAbierto] = useState(false);
+  const [fpcSeleccionadoId, setFpcSeleccionadoId] = useState(null);
+  const [destinoTransferenciaFpc, setDestinoTransferenciaFpc] = useState('valorSano'); // 'valorSano' | 'valorActual' | 'ambos'
+  const [pinFpcActivoParaVincular, setPinFpcActivoParaVincular] = useState(null);
+  const [hoveredPinFpc, setHoveredPinFpc] = useState(null);
 
   // Diccionario multizona de sectores del modelo: { [nombreSector]: { imagenCaraA, imagenCaraB, imagenEsquema, componentes } }
   const [sectores, setSectores] = useState(() => {
@@ -601,6 +636,15 @@ export default function VisorMapeoPCB({
     }
   }, [estadoCargaImagen]);
 
+  const avanzarRef = useRef(null);
+  const retrocederRef = useRef(null);
+  const pinFpcActivoParaVincularRef = useRef(pinFpcActivoParaVincular);
+  useEffect(() => { pinFpcActivoParaVincularRef.current = pinFpcActivoParaVincular; }, [pinFpcActivoParaVincular]);
+  const modoMedicionGuiadaRef = useRef(modoMedicionGuiada);
+  useEffect(() => { modoMedicionGuiadaRef.current = modoMedicionGuiada; }, [modoMedicionGuiada]);
+  const drawerFpcAbiertoRef = useRef(drawerFpcAbierto);
+  useEffect(() => { drawerFpcAbiertoRef.current = drawerFpcAbierto; }, [drawerFpcAbierto]);
+
   // Listener para tecla Shift / Ctrl, atajos de teclado y Ctrl + Z / Y
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -624,12 +668,31 @@ export default function VisorMapeoPCB({
       if ((e.key === 'r' || e.key === 'R') && selectedCompId && document.activeElement.tagName !== 'INPUT') {
         rotarComponente(selectedCompId);
       }
-      // ESC: Cancela dibujo y vuelve a Puntero
+      // Navegación de pads con flechas izquierda / derecha
+      if (document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA' && document.activeElement.tagName !== 'SELECT') {
+        if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          if (retrocederRef.current) retrocederRef.current();
+        } else if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          if (avanzarRef.current) avanzarRef.current();
+        }
+      }
+      // ESC: Cancela modo estampado, medición guiada, bandeja FPC o dibujo
       if (e.key === 'Escape') {
-        setDrawingStep(0);
-        setPad1Temp(null);
-        setPad2Temp(null);
-        setTool('select');
+        if (pinFpcActivoParaVincularRef.current) {
+          setPinFpcActivoParaVincular(null);
+        } else if (modoMedicionGuiadaRef.current) {
+          setModoMedicionGuiada(false);
+          setAvisoHudInline(null);
+        } else if (drawerFpcAbiertoRef.current) {
+          setDrawerFpcAbierto(false);
+        } else {
+          setDrawingStep(0);
+          setPad1Temp(null);
+          setPad2Temp(null);
+          setTool('select');
+        }
       }
     };
     const handleKeyUp = (e) => {
@@ -1372,9 +1435,11 @@ export default function VisorMapeoPCB({
     }
 
     if (tool === 'select') {
-      // Clic en área vacía/fondo de la placa: desmarcar componente y pin seleccionado
-      setSelectedCompId(null);
-      setSelectedPadId(null);
+      // Clic en área vacía/fondo de la placa: desmarcar componente y pin seleccionado solo si no estamos en medición guiada ni estampado
+      if (!modoMedicionGuiada && !pinFpcActivoParaVincular) {
+        setSelectedCompId(null);
+        setSelectedPadId(null);
+      }
     }
   };
 
@@ -1808,6 +1873,58 @@ export default function VisorMapeoPCB({
 
   const activeNetName = (padActivo && padActivo.netName && padActivo.netName !== 'NC') ? padActivo.netName : null;
 
+  // Pads que comparten la misma red eléctrica propagable en la placa
+  const padsMismaRed = useMemo(() => {
+    if (!activeNetName || !esRedPropagable(activeNetName)) return [];
+    const netNorm = normalizarNetName(activeNetName);
+    return componentes.flatMap(c => c.pads.filter(p => normalizarNetName(p.netName) === netNorm));
+  }, [componentes, activeNetName]);
+
+  // Lista ordenada de pads medibles en la cara activa (excluye GND y NC)
+  const padsMediblesCaraActual = useMemo(() => {
+    const lista = [];
+    const propActual = getPropActual(activeScale);
+    const compsCara = componentes.filter(c => (c.cara || 'A') === caraPlaca);
+
+    compsCara.forEach(comp => {
+      comp.pads.forEach(pad => {
+        const netNorm = normalizarNetName(pad.netName);
+        const tipoNorm = normalizarNetName(pad.tipo);
+        const esGnd = netNorm === 'GND' || tipoNorm === 'GND';
+        const esNc = netNorm === 'NC' || tipoNorm === 'NC';
+
+        if (!esGnd && !esNc) {
+          const val = pad[propActual];
+          const medido = val !== undefined && val !== null && val !== '' && val !== '---';
+          lista.push({
+            compId: comp.id,
+            padId: pad.id,
+            comp,
+            pad,
+            compNombre: comp.nombre,
+            netName: pad.netName || '---',
+            medido,
+            valorActual: val || '---'
+          });
+        }
+      });
+    });
+    return lista;
+  }, [componentes, caraPlaca, activeScale]);
+
+  // Sincronizar el campo de texto local de medición actual cuando cambia el pad o la escala
+  useEffect(() => {
+    if (!selectedCompId || !selectedPadId) {
+      setInputMedicionLocal('');
+      return;
+    }
+    const comp = componentes.find(c => c.id === selectedCompId);
+    const pad = comp?.pads.find(p => p.id === selectedPadId);
+    const propActual = getPropActual(activeScale);
+    const val = pad ? pad[propActual] : '';
+    setInputMedicionLocal(val !== undefined && val !== '---' ? val : '');
+  }, [selectedCompId, selectedPadId, activeScale, componentes]);
+
   // Evaluar color de pad:
   // - Si no está medido (---): Hereda el color funcional de su red (Rojo para Alimentación, Amarillo para Datos, etc.)
   // - Si tiene medición activa real: Refleja el estado de salud (Verde=Sano, Rojo=Corto <0.050V, Naranja=Alterado)
@@ -1865,62 +1982,96 @@ export default function VisorMapeoPCB({
     return colorBaseRed;
   };
 
-  // Guardar medición en pad activo en la columna de la escala seleccionada
-  const grabarMedicionActual = useCallback((valorEntrada) => {
-    if (!selectedCompId || !selectedPadId) return;
+  // Auto-avance inteligente en orden de creación omitiendo GND/NC con opción de saltar medidos
+  const avanzarSiguientePadMedicion = useCallback(() => {
+    if (padsMediblesCaraActual.length === 0) return;
+    const idxActual = padsMediblesCaraActual.findIndex(
+      item => item.compId === selectedCompId && item.padId === selectedPadId
+    );
 
-    setComponentes(prev => prev.map(comp => {
-      if (comp.id !== selectedCompId) return comp;
-      return {
-        ...comp,
-        pads: comp.pads.map(pad => {
-          if (pad.id !== selectedPadId) return pad;
-          const actualizaciones = {};
-          if (activeScale === 'diodo') actualizaciones.valorActualDiodo = valorEntrada;
-          if (activeScale === 'voltio') actualizaciones.valorActualVoltio = valorEntrada;
-          if (activeScale === 'ua') actualizaciones.valorActualUa = valorEntrada;
-          if (activeScale === 'ohmio') actualizaciones.valorActualOhmio = valorEntrada;
-          return { ...pad, ...actualizaciones };
-        })
-      };
+    let siguiente = null;
+
+    if (soloPadsPendientes) {
+      // Buscar el siguiente pad pendiente (no medido), sin ciclar sobre el pad que se acaba de medir
+      for (let i = 1; i < padsMediblesCaraActual.length; i++) {
+        const nextIdx = (idxActual === -1 ? 0 : idxActual + i) % padsMediblesCaraActual.length;
+        if (!padsMediblesCaraActual[nextIdx].medido) {
+          siguiente = padsMediblesCaraActual[nextIdx];
+          break;
+        }
+      }
+    } else {
+      if (idxActual !== -1 && idxActual < padsMediblesCaraActual.length - 1) {
+        siguiente = padsMediblesCaraActual[idxActual + 1];
+      } else if (idxActual === -1) {
+        siguiente = padsMediblesCaraActual[0];
+      }
+    }
+
+    if (siguiente) {
+      setSelectedCompId(siguiente.compId);
+      setSelectedPadId(siguiente.padId);
+      centrarEnComponente(siguiente.comp);
+      setAvisoHudInline(null);
+    } else {
+      setAvisoHudInline({
+        tipo: 'exito',
+        texto: '✅ ¡Todos los pads pendientes han sido medidos!'
+      });
+    }
+  }, [padsMediblesCaraActual, selectedCompId, selectedPadId, soloPadsPendientes]);
+
+  // Retroceder al pad anterior en la secuencia
+  const retrocederPadMedicion = useCallback(() => {
+    if (padsMediblesCaraActual.length === 0) return;
+    const idxActual = padsMediblesCaraActual.findIndex(
+      item => item.compId === selectedCompId && item.padId === selectedPadId
+    );
+
+    if (idxActual > 0) {
+      const anterior = padsMediblesCaraActual[idxActual - 1];
+      setSelectedCompId(anterior.compId);
+      setSelectedPadId(anterior.padId);
+      centrarEnComponente(anterior.comp);
+      setAvisoHudInline(null);
+    }
+  }, [padsMediblesCaraActual, selectedCompId, selectedPadId]);
+
+  useEffect(() => {
+    avanzarRef.current = avanzarSiguientePadMedicion;
+  }, [avanzarSiguientePadMedicion]);
+
+  useEffect(() => {
+    retrocederRef.current = retrocederPadMedicion;
+  }, [retrocederPadMedicion]);
+
+  // Confirmar y aplicar medición actual ingresada manualmente o por sonda
+  const confirmarMedicionActual = useCallback((valorEntrada, autoAvanzar = false) => {
+    if (!selectedCompId || !selectedPadId) return;
+    const propActual = getPropActual(activeScale);
+    const valNorm = normalizarValorMedicion(valorEntrada);
+
+    setComponentes(prev => actualizarPadConPropagacion({
+      componentes: prev,
+      compId: selectedCompId,
+      padId: selectedPadId,
+      propiedad: propActual,
+      valor: valNorm,
+      propagarRedSano,
+      propagarRedActual
     }));
 
     playBeep();
-    avanzarSiguientePadMedicion();
-  }, [selectedCompId, selectedPadId, activeScale, playBeep]);
-
-  // Auto-avance inteligente en orden de creación omitiendo GND
-  const avanzarSiguientePadMedicion = useCallback(() => {
-    if (!selectedCompId || componentes.length === 0) return;
-    const indexComp = componentes.findIndex(c => c.id === selectedCompId);
-    if (indexComp === -1) return;
-
-    const compActual = componentes[indexComp];
-    const pad1 = compActual.pads.find(p => p.id === '1');
-    const pad2 = compActual.pads.find(p => p.id === '2');
-
-    if (selectedPadId === '1' && pad2 && pad2.tipo !== 'GND') {
-      setSelectedPadId('2');
-      return;
+    if (autoAvanzar && modoMedicionGuiada) {
+      avanzarSiguientePadMedicion();
     }
+  }, [selectedCompId, selectedPadId, activeScale, propagarRedSano, propagarRedActual, modoMedicionGuiada, avanzarSiguientePadMedicion, playBeep]);
 
-    for (let i = 1; i <= componentes.length; i++) {
-      const nextIndex = (indexComp + i) % componentes.length;
-      const nextComp = componentes[nextIndex];
-      const nextP1 = nextComp.pads.find(p => p.id === '1');
-      const nextP2 = nextComp.pads.find(p => p.id === '2');
-
-      if (nextP1 && nextP1.tipo !== 'GND') {
-        setSelectedCompId(nextComp.id);
-        setSelectedPadId('1');
-        return;
-      } else if (nextP2 && nextP2.tipo !== 'GND') {
-        setSelectedCompId(nextComp.id);
-        setSelectedPadId('2');
-        return;
-      }
-    }
-  }, [selectedCompId, selectedPadId, componentes]);
+  // Guardar medición en pad activo proveniente de la sonda/multímetro
+  const grabarMedicionActual = useCallback((valorEntrada) => {
+    guardarSnapshotHistorial();
+    confirmarMedicionActual(valorEntrada, true);
+  }, [confirmarMedicionActual, guardarSnapshotHistorial]);
 
   // AutoHold
   useEffect(() => {
@@ -1969,34 +2120,154 @@ export default function VisorMapeoPCB({
     }
   }, [lecturaEnVivo, autoHoldActivo, activeScale, grabarMedicionActual]);
 
+  // Iniciar o reanudar medición secuencial en orden
   const iniciarMedicionGuiada = () => {
-    if (componentes.length === 0) return;
-    for (let i = 0; i < componentes.length; i++) {
-      const comp = componentes[i];
-      const p1 = comp.pads.find(p => p.id === '1');
-      const p2 = comp.pads.find(p => p.id === '2');
-      if (p1 && p1.tipo !== 'GND') {
-        setSelectedCompId(comp.id);
-        setSelectedPadId('1');
-        setAutoHoldActivo(true);
-        centrarEnComponente(comp);
-        return;
-      } else if (p2 && p2.tipo !== 'GND') {
-        setSelectedCompId(comp.id);
-        setSelectedPadId('2');
-        setAutoHoldActivo(true);
-        centrarEnComponente(comp);
-        return;
-      }
+    if (padsMediblesCaraActual.length === 0) {
+      setAvisoHudInline({ tipo: 'aviso', texto: 'No hay pads medibles en esta cara de la placa.' });
+      return;
     }
+
+    setModoMedicionGuiada(true);
+    setAutoHoldActivo(true);
+    setAvisoHudInline(null);
+    setPinFpcActivoParaVincular(null);
+
+    // 1. Si el pad actualmente seleccionado es medible, enfocarlo y mantener el punto actual
+    const idxActual = padsMediblesCaraActual.findIndex(
+      item => item.compId === selectedCompId && item.padId === selectedPadId
+    );
+    if (idxActual !== -1) {
+      centrarEnComponente(padsMediblesCaraActual[idxActual].comp);
+      return;
+    }
+
+    // 2. Si no, seleccionar el primer pad sin medición (!medido)
+    const primerPendiente = padsMediblesCaraActual.find(item => !item.medido);
+    if (primerPendiente) {
+      setSelectedCompId(primerPendiente.compId);
+      setSelectedPadId(primerPendiente.padId);
+      centrarEnComponente(primerPendiente.comp);
+      return;
+    }
+
+    // 3. Si todos están medidos, avisar inline en el HUD ofreciendo reiniciar desde el pad 1 (sin window.confirm)
+    setAvisoHudInline({
+      tipo: 'completado',
+      texto: '¡Todos los pads ya tienen medición!',
+      accionLabel: 'Reiniciar desde Pad 1',
+      onAccion: () => {
+        setSelectedCompId(padsMediblesCaraActual[0].compId);
+        setSelectedPadId(padsMediblesCaraActual[0].padId);
+        centrarEnComponente(padsMediblesCaraActual[0].comp);
+        setAvisoHudInline(null);
+      }
+    });
   };
 
-  const actualizarPropiedadPad = (padId, prop, valor, extraCategoria = null) => {
+  // Estampar pin de FPC seleccionado en un pad de la placa
+  const estamparPinFpcEnPad = (comp, pad) => {
+    if (!pinFpcActivoParaVincular) return;
+    guardarSnapshotHistorial();
+
+    const pin = pinFpcActivoParaVincular;
+    const propS = getPropSano(activeScale);
+    const propA = getPropActual(activeScale);
+    const dest = pin.destinoTransferencia || destinoTransferenciaFpc;
+
+    const extraProps = {
+      fpcRef: {
+        fpcId: String(pin.conectorId),
+        pinId: pin.id,
+        fpcNombre: pin.conectorNombre,
+        pinNombre: pin.nombre
+      }
+    };
+
+    // Protección estricta de NetName: Si el pad destino ya tiene un netName válido (no vacío ni '---'),
+    // NUNCA se sobrescribe silenciosamente; se conserva el netName del pad y solo se transfiere la medición y fpcRef.
+    const netActual = (pad.netName || '').trim();
+    const padTieneNetValido = netActual !== '' && netActual !== '---';
+    if (!padTieneNetValido && pin.nombre && pin.nombre.trim() !== '') {
+      extraProps.netName = pin.nombre;
+      extraProps.categoria = pin.categoria || deducirCategoriaDeNet(pin.nombre);
+      extraProps.tipo = pin.tipo || 'DATA';
+    }
+
+    if (dest === 'valorSano' || dest === 'ambos') {
+      if (pin.valorSano && pin.valorSano !== '---') {
+        extraProps[propS] = pin.valorSano;
+      }
+    }
+    if (dest === 'valorActual' || dest === 'ambos') {
+      if (pin.valorActual && pin.valorActual !== '---') {
+        extraProps[propA] = pin.valorActual;
+      }
+    }
+
+    setComponentes(prev => actualizarPadConPropagacion({
+      componentes: prev,
+      compId: comp.id,
+      padId: pad.id,
+      propiedad: dest === 'valorActual' ? propA : propS,
+      valor: dest === 'valorActual' ? (pin.valorActual || '---') : (pin.valorSano || '---'),
+      propagarRedSano,
+      propagarRedActual,
+      extraProps
+    }));
+
+    setSelectedCompId(comp.id);
+    setSelectedPadId(pad.id);
+    playBeep();
+  };
+
+  // Aplicar emparejamiento automático FPC <-> Boardview
+  const handleAplicarAutoMatch = ({ soloVacios }) => {
+    guardarSnapshotHistorial();
+    const resultado = autoMatchFpcBoardview({
+      conectoresFpc,
+      componentes,
+      fpcId: fpcSeleccionadoId,
+      escala: activeScale,
+      destino: destinoTransferenciaFpc,
+      soloVacios
+    });
+
+    setComponentes(resultado.componentesActualizados);
+    playBeep();
+    setAvisoHudInline({
+      tipo: 'exito',
+      texto: `⚡ Se vincularon ${resultado.coincidenciasCount} pads con el FPC seleccionado.`
+    });
+  };
+
+  const actualizarPropiedadPad = (padId, prop, valor, extraCategoria = null, compIdObjetivo = null) => {
+    const cId = compIdObjetivo || selectedCompId;
+    if (!cId) return;
+
+    // Si es propiedad de medición (sano o actual), usar actualizador central con propagación
+    const esPropSano = prop.startsWith('valorSano');
+    const esPropActual = prop.startsWith('valorActual');
+
+    if (esPropSano || esPropActual) {
+      const valNorm = normalizarValorMedicion(valor);
+
+      setComponentes(prev => actualizarPadConPropagacion({
+        componentes: prev,
+        compId: cId,
+        padId,
+        propiedad: prop,
+        valor: valNorm,
+        propagarRedSano,
+        propagarRedActual
+      }));
+      return;
+    }
+
     const valLimpio = String(valor || '').trim().toUpperCase();
     const catDeducida = extraCategoria || deducirCategoriaDeNet(valLimpio);
 
     setComponentes(prev => prev.map(comp => {
-      const esCompActivo = comp.id === selectedCompId;
+      const esCompActivo = comp.id === cId;
       const tieneMismaNet = prop === 'netName' && valLimpio && valLimpio !== 'NC' && comp.pads.some(p => p.netName && p.netName.toUpperCase() === valLimpio);
 
       if (!esCompActivo && !tieneMismaNet) return comp;
@@ -2789,13 +3060,36 @@ export default function VisorMapeoPCB({
             onClick={iniciarMedicionGuiada}
             style={{
               ...styles.btn,
-              backgroundColor: '#3b82f6',
-              color: '#ffffff'
+              backgroundColor: modoMedicionGuiada ? '#10b981' : '#3b82f6',
+              color: '#ffffff',
+              boxShadow: modoMedicionGuiada ? '0 0 10px rgba(16,185,129,0.5)' : 'none'
             }}
             title="Recorrer componentes en el orden creado para medir"
           >
-            <Play size={13} /> Medir en Orden
+            <Play size={13} /> {modoMedicionGuiada ? 'Medición Activa' : 'Medir en Orden'}
           </button>
+
+          {/* Botón de Bandeja FPC */}
+          {conectoresFpc.length > 0 && (
+            <button
+              onClick={() => {
+                const nuevoEstado = !drawerFpcAbierto;
+                setDrawerFpcAbierto(nuevoEstado);
+                if (nuevoEstado && modoMedicionGuiada) {
+                  setModoMedicionGuiada(false);
+                }
+              }}
+              style={{
+                ...styles.btn,
+                backgroundColor: drawerFpcAbierto ? '#0284c7' : '#1e293b',
+                color: drawerFpcAbierto ? '#ffffff' : '#38bdf8',
+                border: '1px solid #0284c7'
+              }}
+              title="Abrir bandeja visual de pines FPC para vincular y estampar mediciones"
+            >
+              <Layers size={13} /> Bandeja FPC ({conectoresFpc.length})
+            </button>
+          )}
 
           <div style={styles.divider} />
 
@@ -3174,7 +3468,7 @@ export default function VisorMapeoPCB({
           ref={svgContainerRef}
           style={{
             ...styles.canvasContainer,
-            cursor: tool === 'pan' ? (isPanning ? 'grabbing' : 'grab') : (isDraggingComp ? 'move' : 'default')
+            cursor: tool === 'pan' ? (isPanning ? 'grabbing' : 'grab') : (isDraggingComp ? 'move' : (pinFpcActivoParaVincular ? 'crosshair' : 'default'))
           }}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
@@ -3182,6 +3476,205 @@ export default function VisorMapeoPCB({
           onMouseLeave={() => { setIsPanning(false); setIsDraggingComp(false); setHoveredComp(null); }}
           onContextMenu={(e) => e.preventDefault()}
         >
+          {/* BANNER FLOTANTE: MODO ESTAMPADO FPC */}
+          {pinFpcActivoParaVincular && (
+            <div style={{
+              position: 'absolute',
+              top: '12px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 110,
+              backgroundColor: '#042f2eed',
+              backdropFilter: 'blur(8px)',
+              border: '1.5px solid #2dd4bf',
+              borderRadius: '8px',
+              padding: '8px 16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              boxShadow: '0 6px 20px rgba(0,0,0,0.6)',
+              color: '#fff',
+              fontSize: '0.75rem',
+              animation: 'fadeIn 0.2s'
+            }}>
+              <span>
+                📍 <strong>Modo Estampado:</strong> Haz clic en un pad para asignarle el Pin {pinFpcActivoParaVincular.id} ({pinFpcActivoParaVincular.nombre})
+              </span>
+              <button
+                type="button"
+                onClick={() => setPinFpcActivoParaVincular(null)}
+                style={{
+                  padding: '3px 8px',
+                  backgroundColor: '#1f2937',
+                  color: '#f87171',
+                  border: '1px solid #374151',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '0.7rem',
+                  fontWeight: 'bold'
+                }}
+              >
+                Cancelar (Esc)
+              </button>
+            </div>
+          )}
+
+          {/* MINI HUD FLOTANTE: MEDICIÓN GUIADA EN ORDEN */}
+          {modoMedicionGuiada && (
+            <div style={{
+              position: 'absolute',
+              top: pinFpcActivoParaVincular ? '60px' : '12px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 109,
+              backgroundColor: '#0c0f18ee',
+              backdropFilter: 'blur(8px)',
+              border: '1.5px solid #3b82f6',
+              borderRadius: '8px',
+              padding: '6px 14px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              boxShadow: '0 6px 25px rgba(0,0,0,0.7)',
+              color: '#fff',
+              fontSize: '0.75rem'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <button
+                  type="button"
+                  onClick={retrocederPadMedicion}
+                  style={{
+                    padding: '4px 8px',
+                    backgroundColor: '#1f2937',
+                    color: '#e5e7eb',
+                    border: '1px solid #374151',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '2px',
+                    fontSize: '0.72rem',
+                    fontWeight: 'bold'
+                  }}
+                  title="Retroceder al pad anterior (Flecha Izquierda)"
+                >
+                  <ChevronLeft size={14} /> Anterior
+                </button>
+
+                <button
+                  type="button"
+                  onClick={avanzarSiguientePadMedicion}
+                  style={{
+                    padding: '4px 8px',
+                    backgroundColor: '#1f2937',
+                    color: '#e5e7eb',
+                    border: '1px solid #374151',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '2px',
+                    fontSize: '0.72rem',
+                    fontWeight: 'bold'
+                  }}
+                  title="Avanzar al siguiente pad (Flecha Derecha)"
+                >
+                  Siguiente <ChevronRight size={14} />
+                </button>
+              </div>
+
+              {(() => {
+                const idxActual = padsMediblesCaraActual.findIndex(
+                  item => item.compId === selectedCompId && item.padId === selectedPadId
+                );
+                const total = padsMediblesCaraActual.length;
+                const medidos = padsMediblesCaraActual.filter(item => item.medido).length;
+
+                return (
+                  <div style={{ textAlign: 'center', minWidth: '140px' }}>
+                    <div style={{ fontWeight: 'bold', color: '#38bdf8' }}>
+                      Pad {idxActual !== -1 ? idxActual + 1 : '-'} de {total}
+                      <span style={{ fontSize: '0.66rem', color: '#9ca3af', marginLeft: '6px' }}>
+                        ({medidos}/{total} medidos)
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '0.67rem', color: '#e5e7eb' }}>
+                      {padActivo?.netName || 'Sin Net'} <span style={{ color: '#6b7280' }}>({compActivo?.nombre || '---'})</span>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.68rem', color: soloPadsPendientes ? '#10b981' : '#9ca3af', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={soloPadsPendientes}
+                  onChange={(e) => setSoloPadsPendientes(e.target.checked)}
+                />
+                Saltar medidos
+              </label>
+
+              <button
+                type="button"
+                onClick={() => { setModoMedicionGuiada(false); setAvisoHudInline(null); }}
+                style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', padding: '2px' }}
+                title="Salir del modo medición guiada (Esc)"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          )}
+
+          {/* AVISOS INLINE NO BLOQUEANTES */}
+          {avisoHudInline && (
+            <div style={{
+              position: 'absolute',
+              top: modoMedicionGuiada ? (pinFpcActivoParaVincular ? '105px' : '60px') : '12px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 112,
+              backgroundColor: avisoHudInline.tipo === 'exito' ? '#064e3bcc' : (avisoHudInline.tipo === 'completado' ? '#1e3a8acc' : '#78350fcc'),
+              backdropFilter: 'blur(6px)',
+              border: `1px solid ${avisoHudInline.tipo === 'exito' ? '#10b981' : (avisoHudInline.tipo === 'completado' ? '#3b82f6' : '#f59e0b')}`,
+              borderRadius: '6px',
+              padding: '6px 12px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              color: '#fff',
+              fontSize: '0.72rem',
+              boxShadow: '0 4px 15px rgba(0,0,0,0.5)',
+              animation: 'fadeIn 0.2s'
+            }}>
+              <span>{avisoHudInline.texto}</span>
+              {avisoHudInline.accionLabel && (
+                <button
+                  type="button"
+                  onClick={avisoHudInline.onAccion}
+                  style={{
+                    padding: '2px 8px',
+                    backgroundColor: '#3b82f6',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '4px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    fontSize: '0.68rem'
+                  }}
+                >
+                  {avisoHudInline.accionLabel}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setAvisoHudInline(null)}
+                style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', padding: 0 }}
+              >
+                <X size={13} />
+              </button>
+            </div>
+          )}
+
           {/* HUD de Medición del Multímetro con Verificación de Coincidencia de Dial */}
           <div style={styles.hudContainer}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
@@ -3690,6 +4183,10 @@ export default function VisorMapeoPCB({
                       const padY = comp.y + pad.y_rel;
                       const isPadSelected = selectedCompId === comp.id && selectedPadId === pad.id;
                       const isNetMatch = activeNetName && pad.netName === activeNetName;
+                      const isHoveredFpcMatch = hoveredPinFpc && (
+                        (pad.fpcRef && String(pad.fpcRef.pinId) === String(hoveredPinFpc.id)) ||
+                        (esRedPropagable(pad.netName) && normalizarNetName(pad.netName) === normalizarNetName(hoveredPinFpc.nombre))
+                      );
 
                       return (
                         <g key={pad.id}>
@@ -3775,6 +4272,24 @@ export default function VisorMapeoPCB({
                             />
                           )}
 
+                          {/* RESALTADO TEMPORAL AL PASAR MOUSE SOBRE PIN FPC EN LA BANDEJA */}
+                          {isHoveredFpcMatch && (
+                            <rect
+                              x={padX - 3}
+                              y={padY - 3}
+                              width={pad.w + 6}
+                              height={pad.h + 6}
+                              rx="4"
+                              ry="4"
+                              fill="none"
+                              stroke="#f59e0b"
+                              strokeWidth="2.5"
+                              strokeDasharray="4 2"
+                              vectorEffect="non-scaling-stroke"
+                              style={{ pointerEvents: 'none', filter: 'drop-shadow(0 0 5px #f59e0b)' }}
+                            />
+                          )}
+
                           {/* Cuerpo metálico del pad con su color base/salud y borde blanco activo */}
                           <rect
                             x={padX}
@@ -3784,15 +4299,19 @@ export default function VisorMapeoPCB({
                             rx={(pad.forma === 'circle' || comp.tipo === 'TestPoint') ? Math.min(pad.w, pad.h) / 2 : 2}
                             ry={(pad.forma === 'circle' || comp.tipo === 'TestPoint') ? Math.min(pad.w, pad.h) / 2 : 2}
                             fill={obtenerColorDePad(pad, comp.id)}
-                            stroke={isPadSelected ? '#ffffff' : (isNetMatch ? '#00ffff' : '#000000')}
+                            stroke={isPadSelected ? '#ffffff' : (isNetMatch ? '#00ffff' : (isHoveredFpcMatch ? '#f59e0b' : '#000000'))}
                             strokeWidth={isPadSelected ? '2' : (isNetMatch ? '1.5' : '1')}
                             vectorEffect="non-scaling-stroke"
-                            style={{ cursor: 'pointer', transition: 'fill 0.2s' }}
+                            style={{ cursor: pinFpcActivoParaVincular ? 'crosshair' : 'pointer', transition: 'fill 0.2s' }}
                             onMouseDown={(e) => {
                               e.stopPropagation();
                             }}
                             onClick={(e) => {
                               e.stopPropagation();
+                              if (pinFpcActivoParaVincular) {
+                                estamparPinFpcEnPad(comp, pad);
+                                return;
+                              }
                               if (tool === 'select') {
                                 setSelectedCompId(comp.id);
                                 setSelectedPadId(pad.id);
@@ -4821,7 +5340,10 @@ export default function VisorMapeoPCB({
 
                       <div style={{ display: 'flex', gap: '8px' }}>
                         <button
-                          onClick={() => grabarMedicionActual(lecturaEnVivo)}
+                          onClick={() => {
+                            guardarSnapshotHistorial();
+                            confirmarMedicionActual(lecturaEnVivo, true);
+                          }}
                           disabled={lecturaEnVivo === '----'}
                           style={{ ...styles.btn, flex: 1, backgroundColor: ESCALAS_CONFIG.find(e => e.id === activeScale)?.color || '#3b82f6', color: 'white' }}
                           title={`Registrar valor en escala ${activeScale.toUpperCase()}`}
@@ -4830,8 +5352,12 @@ export default function VisorMapeoPCB({
                         </button>
 
                         <button
-                          onClick={() => grabarMedicionActual('OL')}
+                          onClick={() => {
+                            guardarSnapshotHistorial();
+                            confirmarMedicionActual('OL', true);
+                          }}
                           style={{ ...styles.btn, backgroundColor: '#f97316', color: 'white' }}
+                          title="Registrar circuito abierto (OL)"
                         >
                           OL
                         </button>
@@ -4841,15 +5367,69 @@ export default function VisorMapeoPCB({
                       </div>
                     </div>
 
+                    {/* Toggles de Sincronización / Propagación de Red */}
+                    {activeNetName && esRedPropagable(activeNetName) && (
+                      <div style={{
+                        marginTop: '10px',
+                        padding: '8px 10px',
+                        backgroundColor: '#111827',
+                        borderRadius: '8px',
+                        border: '1px solid #1f2937',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '6px'
+                      }}>
+                        <div style={{ fontSize: '0.7rem', color: '#9ca3af', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span>Red: <strong style={{ color: '#00ffff' }}>{activeNetName}</strong></span>
+                          <span style={{ color: '#38bdf8', fontWeight: 'bold' }}>{padsMismaRed.length} puntos en placa</span>
+                        </div>
+                        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.68rem', color: propagarRedSano ? '#34d399' : '#6b7280', cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={propagarRedSano}
+                              onChange={(e) => setPropagarRedSano(e.target.checked)}
+                            />
+                            Propagar Sano
+                          </label>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.68rem', color: propagarRedActual ? '#f59e0b' : '#6b7280', cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={propagarRedActual}
+                              onChange={(e) => setPropagarRedActual(e.target.checked)}
+                            />
+                            Propagar Med. Actual
+                          </label>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Panel de Valores: Enfocado en la Escala Activa */}
                     {(() => {
                       const cfgEscalaActiva = ESCALAS_CONFIG.find(e => e.id === activeScale) || ESCALAS_CONFIG[0];
-                      const getPropSano = (id) => id === 'diodo' ? 'valorSanoDiodo' : id === 'voltio' ? 'valorSanoVoltio' : id === 'ua' ? 'valorSanoUa' : 'valorSanoOhmio';
-                      const getPropActual = (id) => id === 'diodo' ? 'valorActualDiodo' : id === 'voltio' ? 'valorActualVoltio' : id === 'ua' ? 'valorActualUa' : 'valorActualOhmio';
                       const propSanoActivo = getPropSano(activeScale);
                       const propActualActivo = getPropActual(activeScale);
                       const valActual = padActivo[propActualActivo];
                       const valSano = padActivo[propSanoActivo];
+
+                      // Coincidencia con FPC activo para sugerencia rápida
+                      const conectorParaSugerencia = fpcSeleccionadoId
+                        ? conectoresFpc.find(c => String(c.id) === String(fpcSeleccionadoId))
+                        : conectoresFpc[0];
+                      const padNetNorm = normalizarNetName(padActivo.netName);
+                      const pinFpcCoincidente = (conectorParaSugerencia && padNetNorm && esRedPropagable(padNetNorm))
+                        ? conectorParaSugerencia.pines.find(p =>
+                            normalizarNetName(p.nombre) === padNetNorm ||
+                            String(p.id) === padNetNorm ||
+                            `PIN_${p.id}` === padNetNorm
+                          )
+                        : null;
+                      const valoresFpcSugeridos = pinFpcCoincidente
+                        ? obtenerValoresPinFpc(pinFpcCoincidente, activeScale)
+                        : null;
+                      const valorFpcDisponible = valoresFpcSugeridos
+                        ? (valoresFpcSugeridos.valorSano !== '---' ? valoresFpcSugeridos.valorSano : valoresFpcSugeridos.valorActual)
+                        : null;
 
                       return (
                         <div style={{ marginTop: '10px' }}>
@@ -4885,7 +5465,25 @@ export default function VisorMapeoPCB({
                                   type="text"
                                   placeholder="---"
                                   value={valSano !== undefined && valSano !== '---' ? valSano : ''}
-                                  onChange={(e) => actualizarPropiedadPad(padActivo.id, propSanoActivo, e.target.value)}
+                                  onFocus={(e) => {
+                                    valorInicialSanoRef.current = e.target.value || '';
+                                    snapshotTomadoSanoRef.current = false;
+                                  }}
+                                  onChange={(e) => {
+                                    if (!snapshotTomadoSanoRef.current) {
+                                      guardarSnapshotHistorial();
+                                      snapshotTomadoSanoRef.current = true;
+                                    }
+                                    actualizarPropiedadPad(padActivo.id, propSanoActivo, e.target.value);
+                                  }}
+                                  onBlur={(e) => {
+                                    const norm = normalizarValorMedicion(e.target.value);
+                                    if (norm !== e.target.value) {
+                                      actualizarPropiedadPad(padActivo.id, propSanoActivo, norm);
+                                    }
+                                    snapshotTomadoSanoRef.current = false;
+                                    valorInicialSanoRef.current = norm;
+                                  }}
                                   style={{
                                     width: '100%',
                                     padding: '8px',
@@ -4901,25 +5499,108 @@ export default function VisorMapeoPCB({
                                 />
                               </div>
 
-                              {/* Medición Registrada Actual */}
+                              {/* Medición Registrada Actual (Editable Manualmente) */}
                               <div>
-                                <label style={{ fontSize: '0.68rem', color: '#9ca3af', display: 'block', marginBottom: '4px' }}>
-                                  Medición Actual:
-                                </label>
-                                <div style={{
-                                  padding: '8px',
-                                  backgroundColor: '#111827',
-                                  border: '1px solid #374151',
-                                  borderRadius: '6px',
-                                  textAlign: 'center',
-                                  fontWeight: 'bold',
-                                  fontSize: '0.95rem',
-                                  color: obtenerColorDePad(padActivo, compActivo.id)
-                                }}>
-                                  {valActual && valActual !== '---' ? `${valActual} ${cfgEscalaActiva.unidad}` : '---'}
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                                  <label style={{ fontSize: '0.68rem', color: '#9ca3af' }}>
+                                    Medición Actual:
+                                  </label>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      guardarSnapshotHistorial();
+                                      confirmarMedicionActual('---', false);
+                                      valorInicialMedicionActualRef.current = '---';
+                                    }}
+                                    style={{ background: 'none', border: 'none', color: '#6b7280', fontSize: '0.65rem', cursor: 'pointer', textDecoration: 'underline' }}
+                                    title="Limpiar medición de este pad"
+                                  >
+                                    Limpiar
+                                  </button>
                                 </div>
+                                <input
+                                  type="text"
+                                  placeholder="---"
+                                  value={inputMedicionLocal}
+                                  onFocus={() => {
+                                    valorInicialMedicionActualRef.current = inputMedicionLocal || '';
+                                  }}
+                                  onChange={(e) => setInputMedicionLocal(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      const norm = normalizarValorMedicion(inputMedicionLocal);
+                                      const inicialNorm = normalizarValorMedicion(valorInicialMedicionActualRef.current);
+                                      if (norm !== inicialNorm) {
+                                        guardarSnapshotHistorial();
+                                      }
+                                      confirmarMedicionActual(norm, true);
+                                      valorInicialMedicionActualRef.current = norm;
+                                    }
+                                  }}
+                                  onBlur={() => {
+                                    const norm = normalizarValorMedicion(inputMedicionLocal);
+                                    const inicialNorm = normalizarValorMedicion(valorInicialMedicionActualRef.current);
+                                    if (norm !== inicialNorm) {
+                                      guardarSnapshotHistorial();
+                                      confirmarMedicionActual(norm, false);
+                                      valorInicialMedicionActualRef.current = norm;
+                                    }
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px',
+                                    backgroundColor: '#111827',
+                                    border: `1px solid ${obtenerColorDePad(padActivo, compActivo.id)}`,
+                                    borderRadius: '6px',
+                                    color: obtenerColorDePad(padActivo, compActivo.id),
+                                    fontWeight: 'bold',
+                                    fontSize: '0.95rem',
+                                    textAlign: 'center',
+                                    outline: 'none'
+                                  }}
+                                  title="Escribe la medición y presiona Enter para guardar (avanza automáticamente si estás en medición guiada)"
+                                />
                               </div>
                             </div>
+
+                            {/* Sugerencia Rápida si existe coincidencia en FPC */}
+                            {valorFpcDisponible && valorFpcDisponible !== '---' && (
+                              <div style={{
+                                marginTop: '10px',
+                                padding: '6px 8px',
+                                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                                border: '1px solid rgba(16, 185, 129, 0.3)',
+                                borderRadius: '6px',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center'
+                              }}>
+                                <span style={{ fontSize: '0.68rem', color: '#34d399' }}>
+                                  💡 En FPC ({pinFpcCoincidente.nombre}): <strong>{valorFpcDisponible} {cfgEscalaActiva.unidad}</strong>
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    guardarSnapshotHistorial();
+                                    confirmarMedicionActual(valorFpcDisponible, false);
+                                  }}
+                                  style={{
+                                    padding: '2px 7px',
+                                    backgroundColor: '#10b981',
+                                    color: '#fff',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    fontSize: '0.65rem',
+                                    fontWeight: 'bold',
+                                    cursor: 'pointer'
+                                  }}
+                                  title="Copiar valor de FPC a Medición Actual"
+                                >
+                                  Copiar
+                                </button>
+                              </div>
+                            )}
                           </div>
 
                           {/* Vista Expandible de Todas las Escalas Secundarias */}
@@ -4999,6 +5680,32 @@ export default function VisorMapeoPCB({
             </div>
           </div>
         )}
+
+        {/* BANDEJA RETRÁCTIL DE PINES FPC */}
+        <BandejaPinesFPC
+          abierto={drawerFpcAbierto}
+          onCerrar={() => {
+            setDrawerFpcAbierto(false);
+            setPinFpcActivoParaVincular(null);
+          }}
+          conectoresFpc={conectoresFpc}
+          fpcSeleccionadoId={fpcSeleccionadoId}
+          onCambiarFpcSeleccionado={(id) => setFpcSeleccionadoId(id)}
+          componentes={componentes}
+          escala={activeScale}
+          destinoTransferencia={destinoTransferenciaFpc}
+          onCambiarDestinoTransferencia={(dest) => setDestinoTransferenciaFpc(dest)}
+          pinFpcActivoParaVincular={pinFpcActivoParaVincular}
+          onSeleccionarPinParaVincular={(pin) => {
+            setPinFpcActivoParaVincular(pin);
+            if (pin && modoMedicionGuiada) {
+              setModoMedicionGuiada(false);
+            }
+          }}
+          onAplicarAutoMatch={handleAplicarAutoMatch}
+          onHoverPin={(pin) => setHoveredPinFpc(pin)}
+          onLeavePin={() => setHoveredPinFpc(null)}
+        />
 
       </div>
 
